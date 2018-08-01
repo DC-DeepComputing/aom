@@ -41,6 +41,8 @@ extern "C" {
     ((__GNUC__ == 3 && __GNUC_MINOR__ >= 4) || __GNUC__ >= 4)
 static inline int get_msb(unsigned int n) {
   assert(n != 0);
+  // 31 ^ i = 31 - i for i = 0, ..., 31. But ^ is commutative, so the compiler
+  // can generate an instruction that uses 31 as an immediate second operand.
   return 31 ^ __builtin_clz(n);
 }
 #elif defined(USE_MSC_INTRINSICS)
