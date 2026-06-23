@@ -1447,7 +1447,7 @@ static inline void init_mc_flow_dispenser(AV1_COMP *cpi, int frame_idx,
       cpi->ppi->gf_group.update_type[cpi->gf_frame_index], layer_depth,
       boost_index, frame_type, cpi->oxcf.q_cfg.use_fixed_qp_offsets,
       is_stat_consumption_stage(cpi), cpi->oxcf.tune_cfg.tuning,
-      cpi->oxcf.mode);
+      cpi->oxcf.mode, cpi->oxcf.rc_cfg.cq_level_extended_qindex_offset);
 
   if (rdmult < 1) rdmult = 1;
   av1_set_error_per_bit(&x->errorperbit, rdmult);
@@ -2375,7 +2375,7 @@ void av1_tpl_rdmult_setup_sb(AV1_COMP *cpi, MACROBLOCK *const x,
       cpi->ppi->gf_group.update_type[cpi->gf_frame_index], layer_depth,
       boost_index, frame_type, cpi->oxcf.q_cfg.use_fixed_qp_offsets,
       is_stat_consumption_stage(cpi), cpi->oxcf.tune_cfg.tuning,
-      cpi->oxcf.mode);
+      cpi->oxcf.mode, cpi->oxcf.rc_cfg.cq_level_extended_qindex_offset);
 
   const int new_qindex_rdmult = quant_params->base_qindex +
                                 x->rdmult_delta_qindex +
@@ -2385,7 +2385,7 @@ void av1_tpl_rdmult_setup_sb(AV1_COMP *cpi, MACROBLOCK *const x,
       cpi->ppi->gf_group.update_type[cpi->gf_frame_index], layer_depth,
       boost_index, frame_type, cpi->oxcf.q_cfg.use_fixed_qp_offsets,
       is_stat_consumption_stage(cpi), cpi->oxcf.tune_cfg.tuning,
-      cpi->oxcf.mode);
+      cpi->oxcf.mode, cpi->oxcf.rc_cfg.cq_level_extended_qindex_offset);
 
   const double scaling_factor = (double)new_rdmult / (double)orig_rdmult;
 
