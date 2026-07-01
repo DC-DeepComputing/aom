@@ -296,6 +296,9 @@ enum aome_enc_control_id {
    * Valid range: 0..70. Values 64..70 are only valid in constant quality
    * mode (#AOM_Q).
    *
+   * The most recent successful setting of this control or #AOME_SET_CQ_QINDEX
+   * selects the quality scale used by the encoder.
+   *
    * \attention For this value to be used aom_codec_enc_cfg_t::rc_end_usage
    *            must be set to #AOM_CQ or #AOM_Q.
    */
@@ -1658,6 +1661,22 @@ enum aome_enc_control_id {
    */
   AV1E_SET_MODE_REF_DELTA_ENABLED = 176,
 
+  /*!\brief Codec control function to set constrained / constant quality using
+   * the internal qindex scale directly, unsigned int parameter.
+   *
+   * Valid range: 0..280. Values 0..255 set the exact AV1 qindex used by the
+   * encoder. Values 256..280 are virtual high-qindex extension points and are
+   * only valid in constant quality mode (#AOM_Q); signaled qindices remain
+   * clamped to 255.
+   *
+   * The most recent successful setting of this control or #AOME_SET_CQ_LEVEL
+   * selects the quality scale used by the encoder.
+   *
+   * \attention For this value to be used aom_codec_enc_cfg_t::rc_end_usage
+   *            must be set to #AOM_CQ or #AOM_Q.
+   */
+  AOME_SET_CQ_QINDEX = 177,
+
   // Any new encoder control IDs should be added above.
   // Maximum allowed encoder control ID is 229.
   // No encoder control ID should be added below.
@@ -1984,6 +2003,9 @@ AOM_CTRL_USE_TYPE(AOME_SET_TUNING, int) /* aom_tune_metric */
 
 AOM_CTRL_USE_TYPE(AOME_SET_CQ_LEVEL, unsigned int)
 #define AOM_CTRL_AOME_SET_CQ_LEVEL
+
+AOM_CTRL_USE_TYPE(AOME_SET_CQ_QINDEX, unsigned int)
+#define AOM_CTRL_AOME_SET_CQ_QINDEX
 
 AOM_CTRL_USE_TYPE(AOME_SET_MAX_INTRA_BITRATE_PCT, unsigned int)
 #define AOM_CTRL_AOME_SET_MAX_INTRA_BITRATE_PCT
