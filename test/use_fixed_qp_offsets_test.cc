@@ -29,8 +29,27 @@ const ::libaom_test::TestMode kTestMode[] =
 #endif
 
 const int kUseFixedQPOffsetsMode[] = { 1, 2 };
+const int kDirectCqQIndex[] = { 200, 201, 204, 249, 255, 280 };
 const int kFrameCount = 17;
 const int kCpuUsed = 6;
+
+enum CqSettingSequence {
+  kControlQIndexThenLevel,
+  kControlLevelThenQIndex,
+  kOptionQIndexThenLevel,
+  kOptionLevelThenQIndex,
+  kControlQIndexThenOptionLevel,
+  kOptionQIndexThenControlLevel,
+  kControlLevelThenOptionQIndex,
+  kOptionLevelThenControlQIndex,
+};
+
+const CqSettingSequence kCqSettingSequences[] = {
+  kControlQIndexThenLevel,       kControlLevelThenQIndex,
+  kOptionQIndexThenLevel,        kOptionLevelThenQIndex,
+  kControlQIndexThenOptionLevel, kOptionQIndexThenControlLevel,
+  kControlLevelThenOptionQIndex, kOptionLevelThenControlQIndex,
+};
 
 class UseFixedQPOffsetsTest
     : public ::libaom_test::CodecTestWith3Params<libaom_test::TestMode, int,
@@ -83,6 +102,136 @@ class UseFixedQPOffsetsTest
 
   int frame_qp_;
   int expected_leaf_qindex_;
+};
+
+class UseFixedCQIndexOffsetsTest
+    : public ::libaom_test::CodecTestWith2Params<libaom_test::TestMode, int>,
+      public ::libaom_test::EncoderTest {
+ protected:
+  UseFixedCQIndexOffsetsTest() : EncoderTest(GET_PARAM(0)) {}
+  ~UseFixedCQIndexOffsetsTest() override = default;
+
+  void SetUp() override {
+    InitializeConfig(GET_PARAM(1));
+    cfg_.kf_max_dist = 9999;
+    cfg_.rc_end_usage = AOM_Q;
+    cfg_.use_fixed_qp_offsets = 2;
+    cq_qindex_ = GET_PARAM(2);
+    expected_leaf_qindex_ = AOMMIN(cq_qindex_, MAXQ);
+  }
+
+  void PreEncodeFrameHook(::libaom_test::VideoSource *video,
+                          ::libaom_test::Encoder *encoder) override {
+    if (video->frame() == 0) {
+      encoder->Control(AOME_SET_CPUUSED, kCpuUsed);
+      encoder->Control(AOME_SET_CQ_QINDEX, cq_qindex_);
+    }
+  }
+
+  void PostEncodeFrameHook(::libaom_test::Encoder *encoder) override {
+    int q = 0;
+    encoder->Control(AOME_GET_LAST_QUANTIZER, &q);
+
+    // If a call to encoder->EncodeFrame() results in a last QP of 0,
+    // interpret as the frame being read into the lookahead buffer.
+    if (q == 0) return;
+
+    ASSERT_EQ(q, expected_leaf_qindex_);
+  }
+
+  void DoTest() {
+    ::libaom_test::I420VideoSource video("hantro_collage_w352h288.yuv", 352,
+                                         288, 30, 1, 0, 33);
+    ASSERT_NO_FATAL_FAILURE(RunLoop(&video));
+  }
+
+  int cq_qindex_;
+  int expected_leaf_qindex_;
+};
+
+class CqSettingOrderTest
+    : public ::libaom_test::CodecTestWith2Params<libaom_test::TestMode,
+                                                 CqSettingSequence>,
+      public ::libaom_test::EncoderTest {
+ protected:
+  CqSettingOrderTest() : EncoderTest(GET_PARAM(0)) {}
+  ~CqSettingOrderTest() override = default;
+
+  void SetUp() override {
+    InitializeConfig(GET_PARAM(1));
+    cfg_.rc_end_usage = AOM_Q;
+    cfg_.use_fixed_qp_offsets = 2;
+    cfg_.g_lag_in_frames = 0;
+    sequence_ = GET_PARAM(2);
+    const bool cq_level_last = sequence_ == kControlQIndexThenLevel ||
+                               sequence_ == kOptionQIndexThenLevel ||
+                               sequence_ == kControlQIndexThenOptionLevel ||
+                               sequence_ == kOptionQIndexThenControlLevel;
+    expected_qindex_ = cq_level_last ? av1_quantizer_to_qindex(35) : 200;
+    checked_frames_ = 0;
+  }
+
+  void PreEncodeFrameHook(::libaom_test::VideoSource *video,
+                          ::libaom_test::Encoder *encoder) override {
+    if (video->frame() != 0) return;
+
+    encoder->Control(AOME_SET_CPUUSED, kCpuUsed);
+    switch (sequence_) {
+      case kControlQIndexThenLevel:
+        encoder->Control(AOME_SET_CQ_QINDEX, 200);
+        encoder->Control(AOME_SET_CQ_LEVEL, 35);
+        break;
+      case kControlLevelThenQIndex:
+        encoder->Control(AOME_SET_CQ_LEVEL, 35);
+        encoder->Control(AOME_SET_CQ_QINDEX, 200);
+        break;
+      case kOptionQIndexThenLevel:
+        encoder->SetOption("cq-qindex", "200");
+        encoder->SetOption("cq-level", "35");
+        break;
+      case kOptionLevelThenQIndex:
+        encoder->SetOption("cq-level", "35");
+        encoder->SetOption("cq-qindex", "200");
+        break;
+      case kControlQIndexThenOptionLevel:
+        encoder->Control(AOME_SET_CQ_QINDEX, 200);
+        encoder->SetOption("cq-level", "35");
+        break;
+      case kOptionQIndexThenControlLevel:
+        encoder->SetOption("cq-qindex", "200");
+        encoder->Control(AOME_SET_CQ_LEVEL, 35);
+        break;
+      case kControlLevelThenOptionQIndex:
+        encoder->Control(AOME_SET_CQ_LEVEL, 35);
+        encoder->SetOption("cq-qindex", "200");
+        break;
+      case kOptionLevelThenControlQIndex:
+        encoder->SetOption("cq-level", "35");
+        encoder->Control(AOME_SET_CQ_QINDEX, 200);
+        break;
+    }
+  }
+
+  void PostEncodeFrameHook(::libaom_test::Encoder *encoder) override {
+    int qindex = 0;
+    encoder->Control(AOME_GET_LAST_QUANTIZER, &qindex);
+    if (qindex == 0) return;
+
+    EXPECT_EQ(qindex, expected_qindex_);
+    ++checked_frames_;
+  }
+
+  void DoTest() {
+    ::libaom_test::I420VideoSource video("hantro_collage_w352h288.yuv", 352,
+                                         288, 30, 1, 0, 3);
+    ASSERT_NO_FATAL_FAILURE(RunLoop(&video));
+    EXPECT_GT(checked_frames_, 0);
+  }
+
+ private:
+  CqSettingSequence sequence_;
+  int expected_qindex_;
+  int checked_frames_;
 };
 
 #if !CONFIG_REALTIME_ONLY
@@ -215,6 +364,10 @@ class ExtendedCqLosslessTest
 
 TEST_P(UseFixedQPOffsetsTest, TestQPOffsets) { DoTest(); }
 
+TEST_P(UseFixedCQIndexOffsetsTest, TestDirectQIndexOffsets) { DoTest(); }
+
+TEST_P(CqSettingOrderTest, LastSettingWins) { DoTest(); }
+
 #if !CONFIG_REALTIME_ONLY
 TEST_P(ExtendedCqLevelEndToEndTest,
        HighCqLevelsProduceDecodableMonotonicBitstreams) {
@@ -244,6 +397,9 @@ TEST(ExtendedCqLevelTest, AcceptsHighCqLevelOnlyInConstantQualityMode) {
   EXPECT_EQ(AOM_CODEC_OK, aom_codec_control(&enc_q, AOME_SET_CQ_LEVEL, 70));
   EXPECT_EQ(AOM_CODEC_INVALID_PARAM,
             aom_codec_control(&enc_q, AOME_SET_CQ_LEVEL, 71));
+  EXPECT_EQ(AOM_CODEC_OK, aom_codec_control(&enc_q, AOME_SET_CQ_QINDEX, 280));
+  EXPECT_EQ(AOM_CODEC_INVALID_PARAM,
+            aom_codec_control(&enc_q, AOME_SET_CQ_QINDEX, 281));
   EXPECT_EQ(AOM_CODEC_OK, aom_codec_destroy(&enc_q));
 
   cfg.rc_end_usage = AOM_CQ;
@@ -252,6 +408,9 @@ TEST(ExtendedCqLevelTest, AcceptsHighCqLevelOnlyInConstantQualityMode) {
             aom_codec_enc_init(&enc_cq, aom_codec_av1_cx(), &cfg, 0));
   EXPECT_EQ(AOM_CODEC_INVALID_PARAM,
             aom_codec_control(&enc_cq, AOME_SET_CQ_LEVEL, 70));
+  EXPECT_EQ(AOM_CODEC_OK, aom_codec_control(&enc_cq, AOME_SET_CQ_QINDEX, 255));
+  EXPECT_EQ(AOM_CODEC_INVALID_PARAM,
+            aom_codec_control(&enc_cq, AOME_SET_CQ_QINDEX, 256));
   EXPECT_EQ(AOM_CODEC_OK, aom_codec_destroy(&enc_cq));
 }
 
@@ -259,6 +418,13 @@ AV1_INSTANTIATE_TEST_SUITE(UseFixedQPOffsetsTest,
                            ::testing::ValuesIn(kTestMode),
                            ::testing::ValuesIn(kUseFixedQPOffsetsMode),
                            ::testing::Values(35, 70));
+
+AV1_INSTANTIATE_TEST_SUITE(UseFixedCQIndexOffsetsTest,
+                           ::testing::ValuesIn(kTestMode),
+                           ::testing::ValuesIn(kDirectCqQIndex));
+
+AV1_INSTANTIATE_TEST_SUITE(CqSettingOrderTest, ::testing::ValuesIn(kTestMode),
+                           ::testing::ValuesIn(kCqSettingSequences));
 
 #if !CONFIG_REALTIME_ONLY
 AV1_INSTANTIATE_TEST_SUITE(ExtendedCqLevelEndToEndTest,

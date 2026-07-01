@@ -142,6 +142,7 @@ static const int av1_arg_ctrl_map[] = { AOME_SET_CPUUSED,
                                         AOME_SET_ARNR_STRENGTH,
                                         AOME_SET_TUNING,
                                         AOME_SET_CQ_LEVEL,
+                                        AOME_SET_CQ_QINDEX,
                                         AOME_SET_MAX_INTRA_BITRATE_PCT,
                                         AV1E_SET_MAX_INTER_BITRATE_PCT,
                                         AV1E_SET_GF_CBR_BOOST_PCT,
@@ -354,6 +355,7 @@ static const arg_def_t *const av1_ctrl_args[] = {
   &g_av1_codec_arg_defs.arnr_strength,
   &g_av1_codec_arg_defs.tune_metric,
   &g_av1_codec_arg_defs.cq_level,
+  &g_av1_codec_arg_defs.cq_qindex,
   &g_av1_codec_arg_defs.max_intra_rate_pct,
   &g_av1_codec_arg_defs.max_inter_rate_pct,
   &g_av1_codec_arg_defs.gf_cbr_boost_pct,
@@ -893,10 +895,19 @@ static void set_config_arg_ctrls(struct stream_config *config, int key,
   }
 
   /* Point either to the next free element or the first instance of this
-   * control.
+   * control. Treat cq-level and cq-qindex as one setting so that repeated,
+   * interleaved command-line arguments retain last-setting-wins semantics.
    */
-  for (j = 0; j < config->arg_ctrl_cnt; j++)
-    if (config->arg_ctrls[j][0] == key) break;
+  const int is_cq_setting =
+      key == AOME_SET_CQ_LEVEL || key == AOME_SET_CQ_QINDEX;
+  for (j = 0; j < config->arg_ctrl_cnt; j++) {
+    const int existing_key = config->arg_ctrls[j][0];
+    if (existing_key == key ||
+        (is_cq_setting && (existing_key == AOME_SET_CQ_LEVEL ||
+                           existing_key == AOME_SET_CQ_QINDEX))) {
+      break;
+    }
+  }
 
   /* Update/insert */
   assert(j < ARG_CTRL_CNT_MAX);
