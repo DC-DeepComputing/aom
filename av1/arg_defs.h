@@ -118,6 +118,7 @@ typedef struct av1_codec_arg_definitions {
   arg_def_t tune_metric;
   arg_def_t dist_metric;
   arg_def_t cq_level;
+  arg_def_t cq_qindex;
   arg_def_t max_intra_rate_pct;
 #if CONFIG_AV1_ENCODER
   arg_def_t cpu_used_av1;

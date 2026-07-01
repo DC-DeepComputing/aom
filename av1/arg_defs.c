@@ -310,6 +310,9 @@ const av1_codec_arg_definitions_t g_av1_codec_arg_defs = {
   .cq_level = ARG_DEF(NULL, "cq-level", 1,
                       "Constant/Constrained Quality level (0..70, values "
                       "64..70 require --end-usage=q)"),
+  .cq_qindex = ARG_DEF(NULL, "cq-qindex", 1,
+                       "Constant/Constrained Quality qindex (0..280, values "
+                       "256..280 require --end-usage=q)"),
   .max_intra_rate_pct =
       ARG_DEF(NULL, "max-intra-rate", 1, "Max I-frame bitrate (pct)"),
 #if CONFIG_AV1_ENCODER
