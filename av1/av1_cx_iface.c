@@ -107,6 +107,8 @@ struct av1_extracfg {
   const char *rate_distribution_info;
   aom_dist_metric dist_metric;
   unsigned int cq_level;  // constrained quality level
+  unsigned int cq_qindex;  // constrained quality qindex
+  unsigned int use_cq_qindex;
   unsigned int rc_max_intra_bitrate_pct;
   unsigned int rc_max_inter_bitrate_pct;
   unsigned int gf_cbr_boost_pct;
@@ -280,6 +282,8 @@ static const struct av1_extracfg default_extra_cfg = {
   "./rate_map.txt",                           // rate distribution input
   AOM_DIST_METRIC_PSNR,                       // dist_metric
   10,                                         // cq_level
+  0,                                          // cq_qindex
+  0,                                          // use_cq_qindex
   0,                                          // rc_max_intra_bitrate_pct
   0,                                          // rc_max_inter_bitrate_pct
   0,                                          // gf_cbr_boost_pct
@@ -439,6 +443,8 @@ static const struct av1_extracfg default_extra_cfg = {
   "./rate_map.txt",                           // rate distribution input
   AOM_DIST_METRIC_PSNR,                       // dist_metric
   10,                                         // cq_level
+  0,                                          // cq_qindex
+  0,                                          // use_cq_qindex
   300,                                        // rc_max_intra_bitrate_pct
   0,                                          // rc_max_inter_bitrate_pct
   0,                                          // gf_cbr_boost_pct
@@ -687,6 +693,21 @@ static aom_codec_err_t allocate_and_set_string(const char *src,
     if (!!((p)->memb) != (p)->memb) ERROR(#memb " expected boolean"); \
   } while (0)
 
+#define CQ_QINDEX_MAX 280
+#define CQ_QINDEX_EXTENDED_RANGE (CQ_QINDEX_MAX - MAXQ)
+#define CQ_QINDEX_EXTENDED_MAX_OFFSET ((70 - 63) * 4)
+
+static int get_extended_cq_offset_from_qindex(unsigned int cq_qindex) {
+  if (cq_qindex <= MAXQ) return 0;
+
+  // Values above MAXQ are virtual qindex extension points. They reuse the
+  // high-cq flattening and lambda scaling path, while the bitstream qindex
+  // remains clamped to MAXQ.
+  return (int)(((cq_qindex - MAXQ) * CQ_QINDEX_EXTENDED_MAX_OFFSET +
+                CQ_QINDEX_EXTENDED_RANGE / 2) /
+               CQ_QINDEX_EXTENDED_RANGE);
+}
+
 static aom_codec_err_t validate_config(aom_codec_alg_priv_t *ctx,
                                        const aom_codec_enc_cfg_t *cfg,
                                        const struct av1_extracfg *extra_cfg) {
@@ -808,6 +829,15 @@ static aom_codec_err_t validate_config(aom_codec_alg_priv_t *ctx,
   RANGE_CHECK_HI(extra_cfg, cq_level, 70);
   if (extra_cfg->cq_level > 63 && cfg->rc_end_usage != AOM_Q) {
     ERROR("--cq-level values above 63 can only be used with --end-usage=q");
+  }
+  RANGE_CHECK_HI(extra_cfg, use_cq_qindex, 1);
+  if (extra_cfg->use_cq_qindex) {
+    if (extra_cfg->cq_qindex > CQ_QINDEX_MAX) {
+      ERROR("--cq-qindex out of range [0..280]");
+    }
+    if (extra_cfg->cq_qindex > MAXQ && cfg->rc_end_usage != AOM_Q) {
+      ERROR("--cq-qindex values above 255 can only be used with --end-usage=q");
+    }
   }
   RANGE_CHECK(cfg, g_bit_depth, AOM_BITS_8, AOM_BITS_12);
   RANGE_CHECK(cfg, g_input_bit_depth, 8, 12);
@@ -1267,9 +1297,15 @@ static void set_encoder_config(AV1EncoderConfig *oxcf,
       extra_cfg->lossless ? 0 : av1_quantizer_to_qindex(cfg->rc_min_quantizer);
   rc_cfg->worst_allowed_q =
       extra_cfg->lossless ? 0 : av1_quantizer_to_qindex(cfg->rc_max_quantizer);
-  rc_cfg->cq_level = av1_quantizer_to_qindex(AOMMIN(extra_cfg->cq_level, 63));
-  rc_cfg->cq_level_extended_qindex_offset =
-      (extra_cfg->cq_level > 63) ? (int)(extra_cfg->cq_level - 63) * 4 : 0;
+  if (extra_cfg->use_cq_qindex) {
+    rc_cfg->cq_level = AOMMIN(extra_cfg->cq_qindex, (unsigned int)MAXQ);
+    rc_cfg->cq_level_extended_qindex_offset =
+        get_extended_cq_offset_from_qindex(extra_cfg->cq_qindex);
+  } else {
+    rc_cfg->cq_level = av1_quantizer_to_qindex(AOMMIN(extra_cfg->cq_level, 63));
+    rc_cfg->cq_level_extended_qindex_offset =
+        (extra_cfg->cq_level > 63) ? (int)(extra_cfg->cq_level - 63) * 4 : 0;
+  }
   rc_cfg->under_shoot_pct = cfg->rc_undershoot_pct;
   rc_cfg->over_shoot_pct = cfg->rc_overshoot_pct;
   rc_cfg->maximum_buffer_size_ms = cfg->rc_buf_sz;
@@ -2011,6 +2047,14 @@ static aom_codec_err_t ctrl_set_cq_level(aom_codec_alg_priv_t *ctx,
                                          va_list args) {
   struct av1_extracfg extra_cfg = ctx->extra_cfg;
   extra_cfg.cq_level = CAST(AOME_SET_CQ_LEVEL, args);
+  return update_extra_cfg(ctx, &extra_cfg);
+}
+
+static aom_codec_err_t ctrl_set_cq_qindex(aom_codec_alg_priv_t *ctx,
+                                          va_list args) {
+  struct av1_extracfg extra_cfg = ctx->extra_cfg;
+  extra_cfg.cq_qindex = CAST(AOME_SET_CQ_QINDEX, args);
+  extra_cfg.use_cq_qindex = 1;
   return update_extra_cfg(ctx, &extra_cfg);
 }
 
@@ -4406,7 +4450,7 @@ static aom_codec_err_t ctrl_set_external_rate_control(aom_codec_alg_priv_t *ctx,
     ratectrl_config.undershoot_percent = oxcf->rc_cfg.under_shoot_pct;
     ratectrl_config.min_base_q_index = oxcf->rc_cfg.best_allowed_q;
     ratectrl_config.max_base_q_index = oxcf->rc_cfg.worst_allowed_q;
-    ratectrl_config.base_qp = ctx->extra_cfg.cq_level;
+    ratectrl_config.base_qp = oxcf->rc_cfg.cq_level;
 
     const BLOCK_SIZE sb_size = av1_select_sb_size(
         oxcf, frame_info->frame_width, frame_info->frame_height,
@@ -4553,6 +4597,10 @@ static aom_codec_err_t encoder_set_option(aom_codec_alg_priv_t *ctx,
   } else if (arg_match_helper(&arg, &g_av1_codec_arg_defs.cq_level, argv,
                               err_string)) {
     extra_cfg.cq_level = arg_parse_uint_helper(&arg, err_string);
+  } else if (arg_match_helper(&arg, &g_av1_codec_arg_defs.cq_qindex, argv,
+                              err_string)) {
+    extra_cfg.cq_qindex = arg_parse_uint_helper(&arg, err_string);
+    extra_cfg.use_cq_qindex = 1;
   } else if (arg_match_helper(&arg, &g_av1_codec_arg_defs.max_intra_rate_pct,
                               argv, err_string)) {
     extra_cfg.rc_max_intra_bitrate_pct =
@@ -4999,6 +5047,7 @@ static aom_codec_ctrl_fn_map_t encoder_ctrl_maps[] = {
   { AOME_SET_ARNR_STRENGTH, ctrl_set_arnr_strength },
   { AOME_SET_TUNING, ctrl_set_tuning },
   { AOME_SET_CQ_LEVEL, ctrl_set_cq_level },
+  { AOME_SET_CQ_QINDEX, ctrl_set_cq_qindex },
   { AOME_SET_MAX_INTRA_BITRATE_PCT, ctrl_set_rc_max_intra_bitrate_pct },
   { AOME_SET_NUMBER_SPATIAL_LAYERS, ctrl_set_number_spatial_layers },
   { AV1E_SET_MAX_INTER_BITRATE_PCT, ctrl_set_rc_max_inter_bitrate_pct },
