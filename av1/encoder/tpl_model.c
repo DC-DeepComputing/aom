@@ -1653,12 +1653,16 @@ static void mc_flow_synthesizer(TplParams *tpl_data, int frame_idx, int mi_rows,
   }
 }
 
+#define MIN_TPL_Q_INDEX 120
+#define MAX_TPL_Q_INDEX 220
+
 static inline int init_gop_frames_for_tpl(
     AV1_COMP *cpi, const EncodeFrameParams *const init_frame_params,
     GF_GROUP *gf_group, int *tpl_group_frames, int *pframe_qindex) {
   AV1_COMMON *cm = &cpi->common;
   assert(cpi->gf_frame_index == 0);
   *pframe_qindex = 0;
+  int leaf_frame_qindex = *pframe_qindex;
 
   RefFrameMapPair ref_frame_map_pairs[REF_FRAMES];
   init_ref_map_pair(cpi, ref_frame_map_pairs);
@@ -1716,8 +1720,11 @@ static inline int init_gop_frames_for_tpl(
         frame_update_type == OVERLAY_UPDATE;
     frame_params.frame_type = gf_group->frame_type[gf_index];
 
-    if (frame_update_type == LF_UPDATE)
-      *pframe_qindex = gf_group->q_val[gf_index];
+    if (frame_update_type == LF_UPDATE) {
+      leaf_frame_qindex = gf_group->q_val[gf_index];
+      *pframe_qindex = AOMMIN(gf_group->q_val[gf_index], MAX_TPL_Q_INDEX);
+      *pframe_qindex = AOMMAX(*pframe_qindex, MIN_TPL_Q_INDEX);
+    }
 
     const struct lookahead_entry *buf = av1_lookahead_peek(
         cpi->ppi->lookahead, lookahead_index, cpi->compressor_stage);
@@ -1834,7 +1841,9 @@ static inline int init_gop_frames_for_tpl(
       }
     }
 #endif  // CONFIG_BITRATE_ACCURACY && CONFIG_THREE_PASS
-    gf_group->q_val[gf_index] = *pframe_qindex;
+    // Store the unclipped qindex in gf_group->q_val[] which is used when
+    // ducky_encode is on.
+    gf_group->q_val[gf_index] = leaf_frame_qindex;
     const int true_disp = (int)(tpl_frame->frame_display_index);
     av1_get_ref_frames(ref_frame_map_pairs, true_disp, cpi, gf_index, 0,
                        remapped_ref_idx);
