@@ -67,6 +67,24 @@
       "message": "Salome: I believe this function works for not only `width \u003d\u003d 8` but also `width % 8 \u003d\u003d 0`. Please double check.",
       "revId": "cadfdf0eaf8c0dc194c62da07a8dc0db75c2c72a",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "5ff7bc86_86b8141b",
+        "filename": "aom_dsp/arm/sum_squares_sve.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 324,
+      "author": {
+        "id": 31957
+      },
+      "writtenOn": "2026-07-09T08:10:51Z",
+      "side": 1,
+      "message": "Do you mean width % 16? In which case yes it should work for both width \u003d\u003d 16 and width % 16",
+      "parentUuid": "0ff5c849_45ca9e59",
+      "revId": "cadfdf0eaf8c0dc194c62da07a8dc0db75c2c72a",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
