@@ -85,6 +85,24 @@
       "parentUuid": "0ff5c849_45ca9e59",
       "revId": "cadfdf0eaf8c0dc194c62da07a8dc0db75c2c72a",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "0445bfc2_d95e294d",
+        "filename": "aom_dsp/arm/sum_squares_sve.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 324,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-07-09T12:58:47Z",
+      "side": 1,
+      "message": "Sorry about the copy-and-paste error (I copied this comment from line 290). Yes, I mean width % 16. Thank you for the confirmation.",
+      "parentUuid": "5ff7bc86_86b8141b",
+      "revId": "cadfdf0eaf8c0dc194c62da07a8dc0db75c2c72a",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
