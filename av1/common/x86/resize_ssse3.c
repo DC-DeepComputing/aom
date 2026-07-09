@@ -742,6 +742,8 @@ static void scale_plane_1_to_2_phase_0(const uint8_t *src,
   uint8_t *tmp[9];
   __m128i f[4];
 
+  // The for loop below only works if src_w is a multiple of 8.
+  assert(src_w % 8 == 0);
   max_width = (src_w + 7) & ~7;
   tmp[0] = temp_buffer + 0 * max_width;
   tmp[1] = temp_buffer + 1 * max_width;
@@ -809,17 +811,102 @@ static void scale_plane_1_to_2_phase_0(const uint8_t *src,
   } while (--y);
 }
 
+static void scale_plane_1_to_2_phase_8(const uint8_t *src,
+                                       const ptrdiff_t src_stride, uint8_t *dst,
+                                       const ptrdiff_t dst_stride,
+                                       const int src_w, const int src_h,
+                                       const int16_t *const coef,
+                                       uint8_t *const temp_buffer) {
+  int max_width;
+  int y;
+  uint8_t *tmp[9];
+  __m128i f[4];
+
+  // The for loop below only works if src_w is a multiple of 8.
+  assert(src_w % 8 == 0);
+  max_width = (src_w + 7) & ~7;
+  tmp[0] = temp_buffer + 0 * max_width;
+  tmp[1] = temp_buffer + 1 * max_width;
+  tmp[2] = temp_buffer + 2 * max_width;
+  tmp[3] = temp_buffer + 3 * max_width;
+  tmp[4] = temp_buffer + 4 * max_width;
+  tmp[5] = temp_buffer + 5 * max_width;
+  tmp[6] = temp_buffer + 6 * max_width;
+  tmp[7] = temp_buffer + 7 * max_width;
+
+  shuffle_filter_ssse3(coef, f);
+
+  scale_1_to_2_phase_0_row(src - 3 * src_stride - 3, tmp[0], max_width, f);
+  scale_1_to_2_phase_0_row(src - 2 * src_stride - 3, tmp[1], max_width, f);
+  scale_1_to_2_phase_0_row(src - 1 * src_stride - 3, tmp[2], max_width, f);
+  scale_1_to_2_phase_0_row(src + 0 * src_stride - 3, tmp[3], max_width, f);
+  scale_1_to_2_phase_0_row(src + 1 * src_stride - 3, tmp[4], max_width, f);
+  scale_1_to_2_phase_0_row(src + 2 * src_stride - 3, tmp[5], max_width, f);
+  scale_1_to_2_phase_0_row(src + 3 * src_stride - 3, tmp[6], max_width, f);
+
+  y = src_h;
+  do {
+    int x;
+    scale_1_to_2_phase_0_row(src + 4 * src_stride - 3, tmp[7], max_width, f);
+    for (x = 0; x < max_width; x += 8) {
+      __m128i s[8], C, D, CD;
+
+      // Even rows (2 * y)
+      // Even columns: C = vertical filter of tmp[0..7] at x
+      s[0] = _mm_loadl_epi64((const __m128i *)(tmp[0] + x));
+      s[1] = _mm_loadl_epi64((const __m128i *)(tmp[1] + x));
+      s[2] = _mm_loadl_epi64((const __m128i *)(tmp[2] + x));
+      s[3] = _mm_loadl_epi64((const __m128i *)(tmp[3] + x));
+      s[4] = _mm_loadl_epi64((const __m128i *)(tmp[4] + x));
+      s[5] = _mm_loadl_epi64((const __m128i *)(tmp[5] + x));
+      s[6] = _mm_loadl_epi64((const __m128i *)(tmp[6] + x));
+      s[7] = _mm_loadl_epi64((const __m128i *)(tmp[7] + x));
+      C = scale_1_to_2_phase_0_kernel(s, f);
+
+      // Odd columns: D = vertical filter of src[y-3..y+4] at x + 1
+      load_8bit_8x8(src + x + 1 - 3 * src_stride, src_stride, s);
+      D = scale_1_to_2_phase_0_kernel(s, f);
+
+      CD = _mm_unpacklo_epi8(C, D);
+      _mm_storeu_si128((__m128i *)(dst + 2 * x), CD);
+
+      // Odd rows (2 * y + 1)
+      // Even columns: tmp[4][x..x+7]
+      const __m128i a = _mm_loadl_epi64((const __m128i *)(tmp[4] + x));
+      // Odd columns: src[y+1][x+1..x+8]
+      const __m128i b =
+          _mm_loadl_epi64((const __m128i *)(src + 1 * src_stride + x + 1));
+      const __m128i ab = _mm_unpacklo_epi8(a, b);
+      _mm_storeu_si128((__m128i *)(dst + dst_stride + 2 * x), ab);
+    }
+
+    src += src_stride;
+    dst += 2 * dst_stride;
+    tmp[8] = tmp[0];
+    tmp[0] = tmp[1];
+    tmp[1] = tmp[2];
+    tmp[2] = tmp[3];
+    tmp[3] = tmp[4];
+    tmp[4] = tmp[5];
+    tmp[5] = tmp[6];
+    tmp[6] = tmp[7];
+    tmp[7] = tmp[8];
+  } while (--y);
+}
+
 // There's SIMD optimizations for 1/4, 1/2 and 3/4 downscaling and 2x upscaling
 // in SSSE3.
 static inline bool has_normative_scaler_ssse3(const int src_width,
                                               const int src_height,
                                               const int dst_width,
-                                              const int dst_height) {
+                                              const int dst_height,
+                                              const int phase) {
   const bool has_normative_scaler =
       (2 * dst_width == src_width && 2 * dst_height == src_height) ||
       (4 * dst_width == src_width && 4 * dst_height == src_height) ||
       (4 * dst_width == 3 * src_width && 4 * dst_height == 3 * src_height) ||
-      (dst_width == src_width * 2 && dst_height == src_height * 2);
+      (dst_width == src_width * 2 && dst_height == src_height * 2 &&
+       (phase == 0 || phase == 8) && src_width % 8 == 0);
 
   return has_normative_scaler;
 }
@@ -830,13 +917,13 @@ void av1_resize_and_extend_frame_ssse3(const YV12_BUFFER_CONFIG *src,
                                        const int phase, const int num_planes) {
   bool has_normative_scaler =
       has_normative_scaler_ssse3(src->y_crop_width, src->y_crop_height,
-                                 dst->y_crop_width, dst->y_crop_height);
+                                 dst->y_crop_width, dst->y_crop_height, phase);
 
   if (num_planes > 1) {
-    has_normative_scaler =
-        has_normative_scaler &&
-        has_normative_scaler_ssse3(src->uv_crop_width, src->uv_crop_height,
-                                   dst->uv_crop_width, dst->uv_crop_height);
+    has_normative_scaler = has_normative_scaler &&
+                           has_normative_scaler_ssse3(
+                               src->uv_crop_width, src->uv_crop_height,
+                               dst->uv_crop_width, dst->uv_crop_height, phase);
   }
 
   if (!has_normative_scaler) {
@@ -949,8 +1036,9 @@ void av1_resize_and_extend_frame_ssse3(const YV12_BUFFER_CONFIG *src,
                                  dst_h, interp_kernel, phase, temp_buffer);
       free(temp_buffer);
     } else {
-      assert(dst_w == src_w * 2 && dst_h == src_h * 2);
-      // 1 to 2
+      assert(dst_w == src_w * 2 && dst_h == src_h * 2 &&
+             (phase == 0 || phase == 8) && src_w % 8 == 0);
+      // 1 to 2, phase 0 or 8, src_w a multiple of 8
       uint8_t *const temp_buffer = (uint8_t *)malloc(8 * ((src_y_w + 7) & ~7));
       if (!temp_buffer) {
         malloc_failed = 1;
@@ -959,9 +1047,16 @@ void av1_resize_and_extend_frame_ssse3(const YV12_BUFFER_CONFIG *src,
       const InterpKernel *interp_kernel =
           (const InterpKernel *)av1_interp_filter_params_list[filter]
               .filter_ptr;
-      scale_plane_1_to_2_phase_0(src->buffers[i], src->strides[is_uv],
-                                 dst->buffers[i], dst->strides[is_uv], src_w,
-                                 src_h, interp_kernel[8], temp_buffer);
+      if (phase == 0) {
+        scale_plane_1_to_2_phase_0(src->buffers[i], src->strides[is_uv],
+                                   dst->buffers[i], dst->strides[is_uv], src_w,
+                                   src_h, interp_kernel[8], temp_buffer);
+      } else {
+        assert(phase == 8);
+        scale_plane_1_to_2_phase_8(src->buffers[i], src->strides[is_uv],
+                                   dst->buffers[i], dst->strides[is_uv], src_w,
+                                   src_h, interp_kernel[8], temp_buffer);
+      }
       free(temp_buffer);
     }
   }
