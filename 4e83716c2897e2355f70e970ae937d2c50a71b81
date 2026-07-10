@@ -37,6 +37,23 @@
     {
       "unresolved": false,
       "key": {
+        "uuid": "9639e1ac_b7e2bdb0",
+        "filename": "av1/common/x86/resize_ssse3.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 957,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-07-10T15:53:56Z",
+      "side": 1,
+      "message": "I researched the git history of this code. The 1-to-2 upscaling code here was ported from libvpx in https://aomedia-review.googlesource.com/c/aom/+/114361.\n\nThe libvpx code was originally added in https://chromium-review.googlesource.com/c/webm/libvpx/+/698368. It checks the following condition:\n\n```\n  } else if (dst_w \u003d\u003d src_w * 2 \u0026\u0026 dst_h \u003d\u003d src_h * 2 \u0026\u0026 phase_scaler \u003d\u003d 0) {\n    // 1 to 2\n```\n\nThe `phase_scaler \u003d\u003d 0` check was dropped when this code was ported to libaom. This CL adds that check back (which becomes `phase \u003d\u003d 0` in libaom).\n\nNote: The current libaom code checks this condition in the `has_normative_scaler_ssse3()` function and asserts this condition here.",
+      "revId": "4e83716c2897e2355f70e970ae937d2c50a71b81",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
         "uuid": "b691a23e_50c8d800",
         "filename": "av1/common/x86/resize_ssse3.c",
         "patchSetId": 3
