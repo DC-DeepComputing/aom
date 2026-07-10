@@ -16,6 +16,23 @@
       "message": "In this CL, bias is introduced against the GLOBALMV and GLOBAL_GLOBALMV modes when global motion model is of type ROTZOOM. \n\nThe performance results of encoder and decoder for the streams generated with low complexity decode mode enabled wrt parent version are shown below:\n  \n```\n                       Instruction           Time \n                    Count Reduction(%)    reduction(%)                     BD-Rate Loss(%)\ncpu   Resolution   Encoder    Decoder      Decoder     avg.psnr  ovr.psnr  ssim     vmaf    vmaf_neg   uvq_1p5            \n--------------------------------------------------------------------------------------------------------------------  \n 1    SHORTS608P        0.110      0.932     0.476      0.0104    0.0177   0.0065   0.0116   0.0099   -0.3231 \n 1    SHORTS720P        0.039      1.049     0.576      0.0423    0.0403   0.0279   0.1178   0.0956    0.4804 \n 1   SHORTS1080P        0.103      0.961     0.660      0.0024    0.0176   0.0161   0.0652   0.0332    0.7636 \n 1        HDRES2       -0.037      1.932     1.152      0.0806    0.0835   0.0817   0.1228   0.1083    0.0321 \n 1      UGCHDRES        0.019      0.207     0.075     -0.0011   -0.0041  -0.0088   0.0069   0.0039    0.0654 \n 1       Average        0.052      1.042     0.605      0.0270    0.0317   0.0251   0.0670   0.0515    0.2203 \n \n 2    SHORTS608P        0.011      0.791     0.368      0.0173    0.0146   0.0401  -0.0199  -0.0058    0.3031 \n 2    SHORTS720P       -0.071      0.916     0.532      0.0399    0.0327   0.0451   0.0831   0.0592    0.1417 \n 2   SHORTS1080P       -0.098      0.959     0.631      0.0446    0.0558   0.0704   0.0954   0.0764    0.0486 \n 2        HDRES2        0.015      1.835     1.193      0.0494    0.0426   0.0408   0.1094   0.0970    0.0731 \n 2      UGCHDRES        0.007      0.153     0.199      0.0141    0.0118   0.0240   0.0323   0.0327    0.1823 \n 2       Average       -0.031      0.955     0.590      0.0339    0.0326   0.0457   0.0603   0.0516    0.1501 \n \n 3    SHORTS608P       -0.043      0.563     0.442      0.0161    0.0124   0.0072  -0.0233   0.0238   -0.1599 \n 3    SHORTS720P       -0.091      0.665     0.413      0.0188    0.0262   0.0018   0.0335   0.0532    0.1025 \n 3   SHORTS1080P       -0.046      0.604     0.370      0.0412    0.0249   0.0232   0.0495   0.0395   -0.3295 \n 3        HDRES2       -0.007      0.688     0.478      0.0124    0.0057   0.0133   0.0557   0.0395   -0.2270 \n 3      UGCHDRES        0.021      0.095    -0.036      0.0121    0.0151   0.0315   0.0165   0.0173   -0.0098 \n 3       Average       -0.038      0.549     0.356      0.0210    0.0174   0.0143   0.0260   0.0358   -0.1295 \n```         \n\nThe instruction count reduction specified has been measured using command:\n```\n$ perf stat -e instructions:u ./aomenc …\n```\n```\n$ perf stat -e instructions:u ./dav1d --cpumask avx2 …\n```\n\nThe decode time is measured using command\n```\ntime taskset -c 0  ./dav1d  --cpumask avx2 …\n```\n\nWe performed visual tests for few clips (low-complexity decode mode with cdef enabled) and observed on-par quality with parent version. Please review the CL.",
       "revId": "b0cce0329cd3d420990e000dc9731a5476b85413",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "ffc400bd_72c64efc",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5185
+      },
+      "writtenOn": "2026-07-10T18:19:57Z",
+      "side": 1,
+      "message": "Thanks - looks good.",
+      "revId": "b0cce0329cd3d420990e000dc9731a5476b85413",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
