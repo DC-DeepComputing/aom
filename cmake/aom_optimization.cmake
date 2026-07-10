@@ -73,6 +73,16 @@ function(add_intrinsics_object_library flag opt_name target_to_update sources)
     target_compile_options(${target_name} PUBLIC ${flag})
   endif()
 
+  # Highway files trigger -Wextra-semi warning which can fail the build.
+  # We disable it specifically for highway source files when using GCC.
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    foreach(source ${${sources}})
+      if(source MATCHES "hwy" AND source MATCHES "\\.cc$")
+        set_property(SOURCE ${source} APPEND PROPERTY COMPILE_FLAGS "-Wno-extra-semi")
+      endif()
+    endforeach()
+  endif()
+
   target_sources(aom PRIVATE $<TARGET_OBJECTS:${target_name}>)
   if(BUILD_SHARED_LIBS)
     target_sources(aom_static PRIVATE $<TARGET_OBJECTS:${target_name}>)
