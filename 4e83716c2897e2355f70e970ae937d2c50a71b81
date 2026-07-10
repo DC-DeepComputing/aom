@@ -52,6 +52,23 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": true,
+      "key": {
+        "uuid": "69f80766_120246f3",
+        "filename": "av1/common/x86/resize_ssse3.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 958,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-07-10T16:02:45Z",
+      "side": 1,
+      "message": "Jerome, Marco: When I tested this code with libavif, I only observed `phase \u003d\u003d 8`, which is consistent with the following comment in the libvpx version of this function:\n\n```\nvoid vp9_scale_and_extend_frame_ssse3(const YV12_BUFFER_CONFIG *src,\n                                      YV12_BUFFER_CONFIG *dst,\n                                      uint8_t filter_type, int phase_scaler) {\n  ...\n      \n  // phase_scaler is usually 0 or 8.\n  assert(phase_scaler \u003e\u003d 0 \u0026\u0026 phase_scaler \u003c 16);\n```\n\nIs it easy to add an optimization for `phase \u003d\u003d 8`?\n\nNote: The Arm Neon version of this function doesn\u0027t have an optimization for 1 to 2 at all. So the performance regression for the 1 to 2, phase 8 case is restricted to x86.",
+      "revId": "4e83716c2897e2355f70e970ae937d2c50a71b81",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": false,
       "key": {
         "uuid": "b691a23e_50c8d800",
