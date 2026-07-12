@@ -51,11 +51,10 @@ enum {
 
 enum {
   INTRA_ALL = (1 << DC_PRED) | (1 << V_PRED) | (1 << H_PRED) | (1 << D45_PRED) |
-              (1 << D135_PRED) | (1 << D113_PRED) | (1 << D157_PRED) |
-              (1 << D203_PRED) | (1 << D67_PRED) | (1 << SMOOTH_PRED) |
-              (1 << SMOOTH_V_PRED) | (1 << SMOOTH_H_PRED) | (1 << PAETH_PRED),
-  UV_INTRA_ALL =
-      (1 << UV_DC_PRED) | (1 << UV_V_PRED) | (1 << UV_H_PRED) |
+      (1 << D135_PRED) | (1 << D113_PRED) | (1 << D157_PRED) |
+      (1 << D203_PRED) | (1 << D67_PRED) | (1 << SMOOTH_PRED) |
+      (1 << SMOOTH_V_PRED) | (1 << SMOOTH_H_PRED) | (1 << PAETH_PRED),
+  UV_INTRA_ALL = (1 << UV_DC_PRED) | (1 << UV_V_PRED) | (1 << UV_H_PRED) |
       (1 << UV_D45_PRED) | (1 << UV_D135_PRED) | (1 << UV_D113_PRED) |
       (1 << UV_D157_PRED) | (1 << UV_D203_PRED) | (1 << UV_D67_PRED) |
       (1 << UV_SMOOTH_PRED) | (1 << UV_SMOOTH_V_PRED) |
@@ -63,49 +62,47 @@ enum {
   UV_INTRA_DC = (1 << UV_DC_PRED),
   UV_INTRA_DC_CFL = (1 << UV_DC_PRED) | (1 << UV_CFL_PRED),
   UV_INTRA_DC_TM = (1 << UV_DC_PRED) | (1 << UV_PAETH_PRED),
-  UV_INTRA_DC_PAETH_CFL =
-      (1 << UV_DC_PRED) | (1 << UV_PAETH_PRED) | (1 << UV_CFL_PRED),
+  UV_INTRA_DC_PAETH_CFL = (1 << UV_DC_PRED) | (1 << UV_PAETH_PRED) |
+      (1 << UV_CFL_PRED),
   UV_INTRA_DC_H_V = (1 << UV_DC_PRED) | (1 << UV_V_PRED) | (1 << UV_H_PRED),
   UV_INTRA_DC_H_V_CFL = (1 << UV_DC_PRED) | (1 << UV_V_PRED) |
-                        (1 << UV_H_PRED) | (1 << UV_CFL_PRED),
+      (1 << UV_H_PRED) | (1 << UV_CFL_PRED),
   UV_INTRA_DC_PAETH_H_V = (1 << UV_DC_PRED) | (1 << UV_PAETH_PRED) |
-                          (1 << UV_V_PRED) | (1 << UV_H_PRED),
+      (1 << UV_V_PRED) | (1 << UV_H_PRED),
   UV_INTRA_DC_PAETH_H_V_CFL = (1 << UV_DC_PRED) | (1 << UV_PAETH_PRED) |
-                              (1 << UV_V_PRED) | (1 << UV_H_PRED) |
-                              (1 << UV_CFL_PRED),
+      (1 << UV_V_PRED) | (1 << UV_H_PRED) | (1 << UV_CFL_PRED),
   INTRA_DC = (1 << DC_PRED),
   INTRA_DC_TM = (1 << DC_PRED) | (1 << PAETH_PRED),
   INTRA_DC_H_V = (1 << DC_PRED) | (1 << V_PRED) | (1 << H_PRED),
-  INTRA_DC_H_V_SMOOTH =
-      (1 << DC_PRED) | (1 << V_PRED) | (1 << H_PRED) | (1 << SMOOTH_PRED),
-  INTRA_DC_PAETH_H_V =
-      (1 << DC_PRED) | (1 << PAETH_PRED) | (1 << V_PRED) | (1 << H_PRED)
+  INTRA_DC_H_V_SMOOTH = (1 << DC_PRED) | (1 << V_PRED) | (1 << H_PRED) |
+      (1 << SMOOTH_PRED),
+  INTRA_DC_PAETH_H_V = (1 << DC_PRED) | (1 << PAETH_PRED) | (1 << V_PRED) |
+      (1 << H_PRED)
 };
 
 enum {
   INTER_ALL = (1 << NEARESTMV) | (1 << NEARMV) | (1 << GLOBALMV) |
-              (1 << NEWMV) | (1 << NEAREST_NEARESTMV) | (1 << NEAR_NEARMV) |
-              (1 << NEW_NEWMV) | (1 << NEAREST_NEWMV) | (1 << NEAR_NEWMV) |
-              (1 << NEW_NEARMV) | (1 << NEW_NEARESTMV) | (1 << GLOBAL_GLOBALMV),
+      (1 << NEWMV) | (1 << NEAREST_NEARESTMV) | (1 << NEAR_NEARMV) |
+      (1 << NEW_NEWMV) | (1 << NEAREST_NEWMV) | (1 << NEAR_NEWMV) |
+      (1 << NEW_NEARMV) | (1 << NEW_NEARESTMV) | (1 << GLOBAL_GLOBALMV),
   INTER_NEAREST_NEAR_ZERO = (1 << NEARESTMV) | (1 << NEARMV) | (1 << GLOBALMV) |
-                            (1 << NEAREST_NEARESTMV) | (1 << GLOBAL_GLOBALMV) |
-                            (1 << NEAREST_NEWMV) | (1 << NEW_NEARESTMV) |
-                            (1 << NEW_NEARMV) | (1 << NEAR_NEWMV) |
-                            (1 << NEAR_NEARMV),
-  INTER_SINGLE_ALL =
-      (1 << NEARESTMV) | (1 << NEARMV) | (1 << GLOBALMV) | (1 << NEWMV),
+      (1 << NEAREST_NEARESTMV) | (1 << GLOBAL_GLOBALMV) | (1 << NEAREST_NEWMV) |
+      (1 << NEW_NEARESTMV) | (1 << NEW_NEARMV) | (1 << NEAR_NEWMV) |
+      (1 << NEAR_NEARMV),
+  INTER_SINGLE_ALL = (1 << NEARESTMV) | (1 << NEARMV) | (1 << GLOBALMV) |
+      (1 << NEWMV),
 };
 
 enum {
   DISABLE_ALL_INTER_SPLIT = (1 << THR_COMP_GA) | (1 << THR_COMP_LA) |
-                            (1 << THR_ALTR) | (1 << THR_GOLD) | (1 << THR_LAST),
+      (1 << THR_ALTR) | (1 << THR_GOLD) | (1 << THR_LAST),
 
   DISABLE_ALL_SPLIT = (1 << THR_INTRA) | DISABLE_ALL_INTER_SPLIT,
 
   DISABLE_COMPOUND_SPLIT = (1 << THR_COMP_GA) | (1 << THR_COMP_LA),
 
   LAST_AND_INTRA_SPLIT_ONLY = (1 << THR_COMP_GA) | (1 << THR_COMP_LA) |
-                              (1 << THR_ALTR) | (1 << THR_GOLD)
+      (1 << THR_ALTR) | (1 << THR_GOLD)
 };
 
 enum {
@@ -373,12 +370,11 @@ typedef enum {
                         */
   TOTAL_SIMPLE_AGG_LVLS = QIDX_BASED_AGG_LVL1, /*!< Total number of simple prune
                                                   aggressiveness levels. */
-  TOTAL_QINDEX_BASED_AGG_LVLS =
-      QIDX_BASED_AGG_LVL1 -
+  TOTAL_QINDEX_BASED_AGG_LVLS = QIDX_BASED_AGG_LVL1 -
       SIMPLE_AGG_LVL5, /*!< Total number of qindex based simple prune
                           aggressiveness levels. */
   TOTAL_AGG_LVLS = TOTAL_SIMPLE_AGG_LVLS +
-                   TOTAL_QINDEX_BASED_AGG_LVLS, /*!< Total number of levels. */
+      TOTAL_QINDEX_BASED_AGG_LVLS, /*!< Total number of levels. */
 } SIMPLE_MOTION_SEARCH_PRUNE_LEVEL;
 
 /*!\enum PRUNE_MESH_SEARCH_LEVEL
@@ -1861,6 +1857,12 @@ typedef struct REAL_TIME_SPEED_FEATURES {
   int rt_use_intrabc;
   // Prune IntraBC for nonrd pickmode.
   int rt_prune_intrabc_nonrd;
+  // Fallback search mode for IntraBC on hash misses in nonrd pickmode.
+  // 0: Full pixel search (Diamond/Hex search)
+  // 1: Block Vector Predictor (BVP) only
+  // 2: BVP + 12-point integer offset probe
+  // 3: Skip fallback search entirely (Hash-only)
+  int rt_intrabc_miss_mode;
 
   // Force only single reference (LAST) for prediction.
   int force_only_last_ref;
