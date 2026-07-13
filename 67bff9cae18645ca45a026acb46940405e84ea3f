@@ -33,6 +33,24 @@
       "message": "It might be better to bring this in separately since the test might not have extensive coverage.",
       "revId": "67bff9cae18645ca45a026acb46940405e84ea3f",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "99e11bb1_0bc76f3f",
+        "filename": "av1/common/x86/resize_ssse3.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 814,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-07-13T19:41:08Z",
+      "side": 1,
+      "message": "Done. In patchset 7 I reverted to patchset 3:\nhttps://aomedia-review.googlesource.com/c/aom/+/214921/3..7",
+      "parentUuid": "2ba06a87_9c1e47f1",
+      "revId": "67bff9cae18645ca45a026acb46940405e84ea3f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
