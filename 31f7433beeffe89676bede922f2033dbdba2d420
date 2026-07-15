@@ -1,0 +1,76 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "717c0e60_5e935106",
+        "filename": "av1/common/convolve_2d_sr_hwy.h",
+        "patchSetId": 10
+      },
+      "lineNbr": 331,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-07-15T04:22:30Z",
+      "side": 1,
+      "message": "Did you mean to call `__builtin_memcpy`? This is an intrinsic function of GCC and Clang.",
+      "revId": "31f7433beeffe89676bede922f2033dbdba2d420",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "1d45f7f1_4991d763",
+        "filename": "test/av1_convolve_test.cc",
+        "patchSetId": 10
+      },
+      "lineNbr": 1391,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-07-15T04:22:30Z",
+      "side": 1,
+      "message": "We can use ASan\u0027s \"poison memory region\" macros to detect overreads. The following patch shows that av1_convolve_2d_sr_avx512 seems to overread 6 rows compared with av1_convolve_2d_sr_c. In contrast, av1_convolve_2d_sr_sse2 and av1_convolve_2d_sr_avx2 overread only 7 and 5 bytes, respectively.\n\n```\ndiff --git a/test/av1_convolve_test.cc b/test/av1_convolve_test.cc\nindex ea40a26d38..b8c8572d39 100644\n--- a/test/av1_convolve_test.cc\n+++ b/test/av1_convolve_test.cc\n@@ -17,6 +17,7 @@\n #include \"config/av1_rtcd.h\"\n #include \"config/aom_dsp_rtcd.h\"\n #include \"aom_ports/aom_timer.h\"\n+#include \"aom_ports/sanitizer.h\"\n #include \"gtest/gtest.h\"\n #include \"test/acm_random.h\"\n \n@@ -1290,6 +1291,15 @@ class AV1Convolve2DTest : public AV1ConvolveTest\u003cconvolve_2d_func\u003e {\n     const InterpFilterParams *filter_params_y \u003d\n         av1_get_interp_filter_params_with_block_size(v_f, height);\n     const uint8_t *input \u003d FirstRandomInput8(GetParam());\n+    const int input_size \u003d -(filter_params_y-\u003etaps / 2 - 1) * width\n+           + (height + filter_params_y-\u003etaps - 1 - 1) * width\n+           + width - 1 - (filter_params_x-\u003etaps / 2 - 1) +\n+           filter_params_x-\u003etaps\n+           + 6 * width;  // This line is the amount of overead\n+    // SSE2: + 7\n+    // AVX2: + 5\n+    // AVX512: + 6 * width\n+    ASAN_POISON_MEMORY_REGION(input + input_size, 16);\n     DECLARE_ALIGNED(32, uint8_t, reference[MAX_SB_SQUARE]);\n     ConvolveParams conv_params1 \u003d\n         get_conv_params_no_round(0, 0, nullptr, 0, 0, 8);\n@@ -1302,6 +1312,7 @@ class AV1Convolve2DTest : public AV1ConvolveTest\u003cconvolve_2d_func\u003e {\n     GetParam().TestFunction()(input, width, test, kOutputStride, width, height,\n                               filter_params_x, filter_params_y, sub_x, sub_y,\n                               \u0026conv_params2);\n+    ASAN_UNPOISON_MEMORY_REGION(input + input_size, 16);\n     AssertOutputBufferEq(reference, test, width, height);\n   }\n \n```",
+      "fixSuggestions": [
+        {
+          "fixId": "85b388f1_9b8dfebd",
+          "description": "prompt_to_edit API",
+          "replacements": [
+            {
+              "path": "test/av1_convolve_test.cc",
+              "range": {
+                "startLine": 1,
+                "startChar": 0,
+                "endLine": 1,
+                "endChar": 0
+              },
+              "replacement": "#include \"aom_ports/sanitizer.h\"\n"
+            },
+            {
+              "path": "test/av1_convolve_test.cc",
+              "range": {
+                "startLine": 1,
+                "startChar": 0,
+                "endLine": 1,
+                "endChar": 0
+              },
+              "replacement": "    // The maximum amount of overread is 6 rows. The formula below calculates\n    // the address right after the expected read region. We then poison\n    // 16 bytes starting from that address to catch overreads.\n    // The offsets observed are:\n    // C: 0\n    // SSE2: + 7 bytes\n    // AVX2: + 5 bytes\n    // AVX512: + 6 * width bytes\n    const int input_size \u003d (height + filter_params_y-\u003etaps - 2) * width +\n                           width - 1 + (filter_params_x-\u003etaps / 2 - 1);\n    ASAN_POISON_MEMORY_REGION(input + input_size, 16);\n"
+            },
+            {
+              "path": "test/av1_convolve_test.cc",
+              "range": {
+                "startLine": 1,
+                "startChar": 0,
+                "endLine": 1,
+                "endChar": 0
+              },
+              "replacement": "    ASAN_UNPOISON_MEMORY_REGION(input + input_size, 16);\n"
+            }
+          ]
+        }
+      ],
+      "revId": "31f7433beeffe89676bede922f2033dbdba2d420",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
