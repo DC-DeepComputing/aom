@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "5542f135_1809d549",
+        "filename": "test/av1_convolve_test.cc",
+        "patchSetId": 2
+      },
+      "lineNbr": 1306,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-07-15T23:28:24Z",
+      "side": 1,
+      "message": "`input_size` is calculated based on the maximum index used with `src` inside `av1_convolve_2d_sr_c()`. See especially the two underlined statements.\n\nTODO: We should also calculate the minimum index used with `src`, and poison the memory before that index. I believe the minimum index is `- fo_vert * src_stride - fo_horiz`.\n\n```\nvoid av1_convolve_2d_sr_c(const uint8_t *src, int src_stride, uint8_t *dst,\n                          int dst_stride, int w, int h,\n                          const InterpFilterParams *filter_params_x,\n                          const InterpFilterParams *filter_params_y,\n                          const int subpel_x_qn, const int subpel_y_qn,\n                          ConvolveParams *conv_params) {\n  int16_t im_block[(MAX_SB_SIZE + MAX_FILTER_TAP - 1) * MAX_SB_SIZE];\n  int im_h \u003d h + filter_params_y-\u003etaps - 1;\n  int im_stride \u003d w;\n  assert(w \u003c\u003d MAX_SB_SIZE \u0026\u0026 h \u003c\u003d MAX_SB_SIZE);\n  const int fo_vert \u003d filter_params_y-\u003etaps / 2 - 1;\n  const int fo_horiz \u003d filter_params_x-\u003etaps / 2 - 1;\n  const int bd \u003d 8;\n  const int bits \u003d\n      FILTER_BITS * 2 - conv_params-\u003eround_0 - conv_params-\u003eround_1;\n\n  // horizontal filter\n  const uint8_t *src_horiz \u003d src - fo_vert * src_stride;\n                             ^^^^^^^^^^^^^^^^^^^^^^^^^^\n  const int16_t *x_filter \u003d av1_get_interp_filter_subpel_kernel(\n      filter_params_x, subpel_x_qn \u0026 SUBPEL_MASK);\n  for (int y \u003d 0; y \u003c im_h; ++y) {\n    for (int x \u003d 0; x \u003c w; ++x) {\n      int32_t sum \u003d (1 \u003c\u003c (bd + FILTER_BITS - 1));\n      for (int k \u003d 0; k \u003c filter_params_x-\u003etaps; ++k) {\n        sum +\u003d x_filter[k] * src_horiz[y * src_stride + x - fo_horiz + k];\n                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n      }\n\n      ...\n    }\n  }\n```",
+      "revId": "bdee0c50516108fb6c5a8816c2346e07432ce6e1",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
