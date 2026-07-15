@@ -33,6 +33,40 @@
       "message": "So is this clamp now in a tight loop? What does the performance look like with this change?",
       "revId": "81d2065838a61bb6b58b44a93e240e8f6be2564f",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "a5568d10_e4f904d9",
+        "filename": "av1/common/convolve_2d_sr_hwy.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 285,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-07-15T19:25:35Z",
+      "side": 1,
+      "message": "I suggest renaming this variable, or just reusing `row_idx`.\n\nThe reason `r0` is bad is that the variables name `r0` is also used in the two if blocks.",
+      "revId": "81d2065838a61bb6b58b44a93e240e8f6be2564f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "3968993c_8954b84f",
+        "filename": "av1/common/convolve_2d_sr_hwy.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 309,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-07-15T19:25:35Z",
+      "side": 1,
+      "message": "It seems that using 8 when `h_ge_8` is false is one of the reasons for the overread?",
+      "revId": "81d2065838a61bb6b58b44a93e240e8f6be2564f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
