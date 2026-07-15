@@ -38,6 +38,24 @@
     {
       "unresolved": true,
       "key": {
+        "uuid": "2a772633_69281cb7",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-07-15T21:33:25Z",
+      "side": 1,
+      "message": "Here is the cleaned-up patch. It shows that av1_convolve_2d_sr_avx512() overreads only 8 bytes after this CL.\n\n```\ndiff --git a/test/av1_convolve_test.cc b/test/av1_convolve_test.cc\nindex ea40a26d38..b7a6ff2c73 100644\n--- a/test/av1_convolve_test.cc\n+++ b/test/av1_convolve_test.cc\n@@ -17,6 +17,7 @@\n #include \"config/av1_rtcd.h\"\n #include \"config/aom_dsp_rtcd.h\"\n #include \"aom_ports/aom_timer.h\"\n+#include \"aom_ports/sanitizer.h\"\n #include \"gtest/gtest.h\"\n #include \"test/acm_random.h\"\n \n@@ -1290,18 +1291,31 @@ class AV1Convolve2DTest : public AV1ConvolveTest\u003cconvolve_2d_func\u003e {\n     const InterpFilterParams *filter_params_y \u003d\n         av1_get_interp_filter_params_with_block_size(v_f, height);\n     const uint8_t *input \u003d FirstRandomInput8(GetParam());\n+    const int input_stride \u003d width;\n+    // The following variables come from av1_convolve_2d_sr_c().\n+    const int im_h \u003d height + filter_params_y-\u003etaps - 1;\n+    const int fo_vert \u003d filter_params_y-\u003etaps / 2 - 1;\n+    const int fo_horiz \u003d filter_params_x-\u003etaps / 2 - 1;\n+    // av1_convolve_2d_sr_sse2() overreads 7 bytes. av1_convolve_2d_sr_avx2()\n+    // overreads 5 bytes. av1_convolve_2d_sr_avx512() overreads 8 bytes.\n+    const int overread \u003d 8;\n+    const int input_size \u003d -fo_vert * input_stride + (im_h - 1) * input_stride +\n+                           width - 1 - fo_horiz + filter_params_x-\u003etaps +\n+                           overread;\n+    ASAN_POISON_MEMORY_REGION(input + input_size, 16);\n     DECLARE_ALIGNED(32, uint8_t, reference[MAX_SB_SQUARE]);\n     ConvolveParams conv_params1 \u003d\n         get_conv_params_no_round(0, 0, nullptr, 0, 0, 8);\n-    av1_convolve_2d_sr_c(input, width, reference, kOutputStride, width, height,\n-                         filter_params_x, filter_params_y, sub_x, sub_y,\n+    av1_convolve_2d_sr_c(input, input_stride, reference, kOutputStride, width,\n+                         height, filter_params_x, filter_params_y, sub_x, sub_y,\n                          \u0026conv_params1);\n     DECLARE_ALIGNED(32, uint8_t, test[MAX_SB_SQUARE]);\n     ConvolveParams conv_params2 \u003d\n         get_conv_params_no_round(0, 0, nullptr, 0, 0, 8);\n-    GetParam().TestFunction()(input, width, test, kOutputStride, width, height,\n-                              filter_params_x, filter_params_y, sub_x, sub_y,\n-                              \u0026conv_params2);\n+    GetParam().TestFunction()(input, input_stride, test, kOutputStride, width,\n+                              height, filter_params_x, filter_params_y, sub_x,\n+                              sub_y, \u0026conv_params2);\n+    ASAN_UNPOISON_MEMORY_REGION(input + input_size, 16);\n     AssertOutputBufferEq(reference, test, width, height);\n   }\n \n```\n\nI also uploaded it as a separate CL https://aomedia-review.googlesource.com/c/aom/+/215061, but please feel free to incorporate it into this CL. (Or I can land that CL after this CL is submitted.)",
+      "parentUuid": "e82e74a0_f477dfdb",
+      "revId": "81d2065838a61bb6b58b44a93e240e8f6be2564f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
         "uuid": "b64975d5_8a5d4b09",
         "filename": "av1/common/convolve_2d_sr_hwy.h",
         "patchSetId": 1
