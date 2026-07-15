@@ -160,6 +160,30 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "9d65a07c_9a81556b",
+        "filename": "av1/common/convolve_2d_sr_hwy.h",
+        "patchSetId": 5
+      },
+      "lineNbr": 76,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-07-15T02:35:58Z",
+      "side": 1,
+      "message": "Jerome: libaom now requires C11 and C++17.",
+      "parentUuid": "1e6c45c3_e55280bd",
+      "range": {
+        "startLine": 76,
+        "startChar": 7,
+        "endLine": 76,
+        "endChar": 16
+      },
+      "revId": "391e08b10f3bb72d2d907fb0b0501169fc9bcd7b",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "be32ccce_b27b7349",
