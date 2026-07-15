@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "b0b8a636_3d903011",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-07-15T19:19:44Z",
+      "side": 1,
+      "message": "What about updating the unit test like Wan-Teh suggested, so we can catch the errors more easily and document what the over read expectations are?",
+      "revId": "81d2065838a61bb6b58b44a93e240e8f6be2564f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "b64975d5_8a5d4b09",
+        "filename": "av1/common/convolve_2d_sr_hwy.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 255,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-07-15T19:19:44Z",
+      "side": 1,
+      "message": "So is this clamp now in a tight loop? What does the performance look like with this change?",
+      "revId": "81d2065838a61bb6b58b44a93e240e8f6be2564f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
