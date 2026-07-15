@@ -249,31 +249,41 @@ HWY_ATTR HWY_INLINE void PrepareCoeffs12(D16 d16, const int16_t *filter,
 template <int num_rows, class D, class D128>
 HWY_ATTR HWY_INLINE hn::VFromD<D> LoadAndCombine(D d, D128 d128,
                                                  const uint8_t *src,
-                                                 int src_stride) {
+                                                 int src_stride, int row_idx,
+                                                 int max_rows) {
   HWY_IF_CONSTEXPR(num_rows == 4) {
-    auto r0 = hn::LoadU(d128, src + 0 * src_stride);
-    auto r1 = hn::LoadU(d128, src + 1 * src_stride);
-    auto r2 = hn::LoadU(d128, src + 2 * src_stride);
-    auto r3 = hn::LoadU(d128, src + 3 * src_stride);
+    int r0 = std::min(row_idx + 0, max_rows - 1);
+    int r1 = std::min(row_idx + 1, max_rows - 1);
+    int r2 = std::min(row_idx + 2, max_rows - 1);
+    int r3 = std::min(row_idx + 3, max_rows - 1);
+
+    auto v0 = hn::LoadU(d128, src + r0 * src_stride);
+    auto v1 = hn::LoadU(d128, src + r1 * src_stride);
+    auto v2 = hn::LoadU(d128, src + r2 * src_stride);
+    auto v3 = hn::LoadU(d128, src + r3 * src_stride);
 
     using DHalf = hn::Half<D>;
     const DHalf d_half;
     using DQuarter = hn::Half<DHalf>;
 
-    auto r01 = hn::Combine(d_half, hn::BitCast(DQuarter(), r1),
-                           hn::BitCast(DQuarter(), r0));
-    auto r23 = hn::Combine(d_half, hn::BitCast(DQuarter(), r3),
-                           hn::BitCast(DQuarter(), r2));
+    auto r01 = hn::Combine(d_half, hn::BitCast(DQuarter(), v1),
+                           hn::BitCast(DQuarter(), v0));
+    auto r23 = hn::Combine(d_half, hn::BitCast(DQuarter(), v3),
+                           hn::BitCast(DQuarter(), v2));
     return hn::Combine(d, r23, r01);
   }
   HWY_IF_CONSTEXPR(num_rows == 2) {
-    auto r0 = hn::LoadU(d128, src + 0 * src_stride);
-    auto r1 = hn::LoadU(d128, src + 1 * src_stride);
+    int r0 = std::min(row_idx + 0, max_rows - 1);
+    int r1 = std::min(row_idx + 1, max_rows - 1);
+
+    auto v0 = hn::LoadU(d128, src + r0 * src_stride);
+    auto v1 = hn::LoadU(d128, src + r1 * src_stride);
 
     using DHalf = hn::Half<D>;
-    return hn::Combine(d, hn::BitCast(DHalf(), r1), hn::BitCast(DHalf(), r0));
+    return hn::Combine(d, hn::BitCast(DHalf(), v1), hn::BitCast(DHalf(), v0));
   }
-  return hn::ResizeBitCast(d, hn::LoadU(d128, src));
+  int r0 = std::min(row_idx, max_rows - 1);
+  return hn::ResizeBitCast(d, hn::LoadU(d128, src + r0 * src_stride));
 }
 
 /// Helper function for the vertical convolve pass.
@@ -296,7 +306,7 @@ HWY_ATTR HWY_INLINE void ConvolveVerticalPass(
     const IVec16 *coeffs_v, IVec32 round_const_y, int round_1, int bits,
     IdxTbl idx_tbl, ComputeHRowBlock compute_h_row_block = nullptr) {
   constexpr int num_coeffs = taps_y_val / 2;
-  constexpr int num_z = 8 / 2 + num_coeffs - 1;
+  constexpr int num_z = (h_ge_8 ? 8 : 4) / 2 + num_coeffs - 1;
   constexpr int num_h = num_z / 2 + 1;
 
   hn::Half<decltype(int16xN_tag)> d16_16;
@@ -448,12 +458,12 @@ HWY_ATTR HWY_INLINE void Convolve2DSRHwyImpl(
       for (int i = 0; i < im_h; i += kNumRows) {
         IVec16 res;
         if (is_taps_x_12) {
-          auto data1 = LoadAndCombine<kNumRows>(
-              uint8xN_tag, uint8x16_capped_tag,
-              src_ptr + i * src_stride + j + 0, src_stride);
-          auto data2 = LoadAndCombine<kNumRows>(
-              uint8xN_tag, uint8x16_capped_tag,
-              src_ptr + i * src_stride + j + 6, src_stride);
+          auto data1 =
+              LoadAndCombine<kNumRows>(uint8xN_tag, uint8x16_capped_tag,
+                                       src_ptr + j + 0, src_stride, i, im_h);
+          auto data2 =
+              LoadAndCombine<kNumRows>(uint8xN_tag, uint8x16_capped_tag,
+                                       src_ptr + j + 6, src_stride, i, im_h);
           HWY_IF_CONSTEXPR(taps_x_const == 12) {
             res = ConvolveLowbdX12TapShuffleFree(
                 int16xN_tag, data1, data2, coeffs_h_12[0], coeffs_h_12[1],
@@ -466,9 +476,9 @@ HWY_ATTR HWY_INLINE void Convolve2DSRHwyImpl(
                                       coeffs_h_12[4], coeffs_h_12[5]);
           }
         } else {
-          auto data = LoadAndCombine<kNumRows>(uint8xN_tag, uint8x16_capped_tag,
-                                               src_ptr + i * src_stride + j,
-                                               src_stride);
+          auto data =
+              LoadAndCombine<kNumRows>(uint8xN_tag, uint8x16_capped_tag,
+                                       src_ptr + j, src_stride, i, im_h);
           res = convolve_horizontal(data);
         }
 
@@ -499,9 +509,8 @@ HWY_ATTR HWY_INLINE void Convolve2DSRHwyImpl(
     auto idx_tbl = hn::SetTableIndices(int16xN_tag, idx_arr);
 
     auto compute_h_row_block = [&](int row_idx) {
-      auto data =
-          LoadAndCombine<4>(uint8xN_tag, uint8x16_capped_tag,
-                            src_ptr + row_idx * src_stride + j, src_stride);
+      auto data = LoadAndCombine<4>(uint8xN_tag, uint8x16_capped_tag,
+                                    src_ptr + j, src_stride, row_idx, im_h);
       auto res = convolve_horizontal(data);
       return hn::ShiftRightSame(hn::Add(res, round_const_h), round_0 - 1);
     };
