@@ -16,6 +16,57 @@
       "message": "Performance results w.r.t commit 72030e86dd631921628417d0d34c3820eb948c7a are as follows (negligible impact): \n```\n                  Encoder Instruction                BD-Rate Loss(%)                                 \ncpu   Resolution   Count Reduction(%)  avg.psnr   ovr.psnr   ssim     vmaf   vmaf_neg  \n 1       LOWRES2       -0.039           0.0047     0.0059   0.0127  -0.0264   -0.0181 \n 1       MIDRES2       -0.014          -0.0023     0.0011  -0.0130   0.0199    0.0066 \n 1    SHORTS608P       -0.011          -0.0051    -0.0029  -0.0040   0.0202    0.0101 \n 1    SHORTS720P        0.009          -0.0112    -0.0097  -0.0056  -0.0033   -0.0132 \n 1   SHORTS1080P        0.004          -0.0035    -0.0030   0.0006  -0.0056   -0.0020 \n 1        HDRES2       -0.011           0.0004     0.0007  -0.0116   0.0101    0.0027 \n 1       Average       -0.009          -0.0032    -0.0017  -0.0035   0.0026   -0.0023 \n\n 2       LOWRES2       -0.002           0.0028     0.0059   0.0113  -0.0083    0.0246  \n 2       MIDRES2       -0.025           0.0109     0.0160   0.0233   0.0201    0.0227  \n 2    SHORTS608P       -0.004          -0.0052    -0.0014   0.0031   0.0016   -0.0034  \n 2    SHORTS720P        0.022          -0.0058    -0.0028   0.0032  -0.0095   -0.0034  \n 2   SHORTS1080P        0.004           0.0004    -0.0008  -0.0016  -0.0051   -0.0043  \n 2        HDRES2       -0.088           0.0014     0.0011  -0.0033  -0.0126   -0.0086  \n 2       Average       -0.013           0.0003     0.0026   0.0056  -0.0025    0.0038  \n\t\t\t\t\t\t\t\t\t  \t\t\t\t\t\t\t\t\t\t\t\t \n 3       LOWRES2       -0.027           0.0049     0.0015   0.0161   0.0070    0.0193  \n 3       MIDRES2       -0.025          -0.0037    -0.0016  -0.0050  -0.0304   -0.0104  \n 3    SHORTS608P       -0.005          -0.0059    -0.0036   0.0013  -0.0029    0.0019  \n 3    SHORTS720P       -0.007          -0.0054    -0.0038  -0.0008  -0.0002    0.0016  \n 3   SHORTS1080P        0.004          -0.0072    -0.0062  -0.0067  -0.0048   -0.0019  \n 3        HDRES2        0.000           0.0001     0.0028  -0.0027   0.0017    0.0059  \n 3       Average       -0.009          -0.0032    -0.0021   0.0001  -0.0047    0.0025  \n\t\t\t\t\t\t\t\t\t  \t\t\t\t\t\t\t\t\t\t\t\t \n 4       LOWRES2       -0.039           0.0126     0.0105   0.0197   0.0225    0.0437  \n 4       MIDRES2       -0.032          -0.0249    -0.0163   0.0455   0.0183    0.0115  \n 4    SHORTS608P       -0.001          -0.0022     0.0023   0.0054   0.0099    0.0064  \n 4    SHORTS720P        0.003          -0.0010     0.0030   0.0060   0.0077    0.0036  \n 4   SHORTS1080P        0.015           0.0004    -0.0058  -0.0077  -0.0104   -0.0103  \n 4        HDRES2       -0.006          -0.0028    -0.0101  -0.0131   0.0074    0.0030  \n 4       Average       -0.009          -0.0028    -0.0025   0.0086   0.0086    0.0088  \n\t\t\t\t\t\t\t\t\t  \t\t\t\t\t\t\t\t\t\t\t\t \n 5       LOWRES2       -0.028           0.0047     0.0048  -0.0063  -0.0209   -0.0128  \n 5       MIDRES2       -0.037           0.0048     0.0046   0.0145  -0.0030    0.0052  \n 5    SHORTS608P       -0.012           0.0010     0.0026   0.0087  -0.0055   -0.0002  \n 5    SHORTS720P        0.008           0.0025     0.0051   0.0101   0.0077    0.0056  \n 5   SHORTS1080P       -0.003          -0.0002     0.0001   0.0024   0.0019    0.0001  \n 5        HDRES2       -0.023           0.0026    -0.0143   0.0238  -0.0052   -0.0067  \n 5       Average       -0.015           0.0024     0.0007   0.0087  -0.0037   -0.0012  \n\t\t\t\t\t\t\t\t\t  \t\t\t\t\t\t\t\t\t\t\t\t \n 6       LOWRES2       -0.030           0.0070     0.0083   0.0027  -0.0235   -0.0100  \n 6       MIDRES2       -0.033           0.0161     0.0158   0.0139   0.0008   -0.0106  \n 6    SHORTS608P        0.001           0.0026     0.0050   0.0110  -0.0010    0.0009  \n 6    SHORTS720P       -0.014          -0.0009     0.0022   0.0033   0.0119    0.0075  \n 6   SHORTS1080P        0.002          -0.0048    -0.0034   0.0013   0.0039   -0.0004  \n 6        HDRES2       -0.022           0.0080     0.0081   0.0137   0.0153    0.0126  \n 6       Average       -0.015           0.0042     0.0056   0.0074   0.0016    0.0002 \n \nThe instruction count reduction specified has been measured using command:\n\n$ perf stat -e instructions:u ./aomenc \n```\nPlease review.",
       "revId": "14f523658414d0a92a9da16d2c10e9860b1fe994",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "c95d6b34_23c43675",
+        "filename": "av1/encoder/encode_strategy.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 786,
+      "author": {
+        "id": 5185
+      },
+      "writtenOn": "2026-07-20T16:37:10Z",
+      "side": 1,
+      "message": "Moving these lines up here for av1_rc_pick_q_and_bounds() to get the correct input. Looks good. Thanks.",
+      "range": {
+        "startLine": 785,
+        "startChar": 2,
+        "endLine": 786,
+        "endChar": 49
+      },
+      "fixSuggestions": [
+        {
+          "fixId": "8af110dc_39e0d27d",
+          "description": "prompt_to_edit API",
+          "replacements": [
+            {
+              "path": "av1/encoder/encode_strategy.c",
+              "range": {
+                "startLine": 1,
+                "startChar": 0,
+                "endLine": 1,
+                "endChar": 0
+              },
+              "replacement": "  // Set cm-\u003ecurrent_frame.frame_type and cpi-\u003erc.this_frame_target\n  // so that the call to av1_rc_pick_q_and_bounds() below returns the\n  // correct q_index.\n  cm-\u003ecurrent_frame.frame_type \u003d frame_params-\u003eframe_type;\n  av1_set_frame_size(cpi, cm-\u003ewidth, cm-\u003eheight);\n\n"
+            },
+            {
+              "path": "av1/encoder/encode_strategy.c",
+              "range": {
+                "startLine": 781,
+                "startChar": 0,
+                "endLine": 787,
+                "endChar": 0
+              },
+              "replacement": ""
+            }
+          ]
+        }
+      ],
+      "revId": "14f523658414d0a92a9da16d2c10e9860b1fe994",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
