@@ -18,6 +18,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "1cda2b51_9a0e39c5",
+        "filename": "av1/common/convolve_2d_sr_hwy.h",
+        "patchSetId": 3
+      },
+      "lineNbr": 295,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-07-20T17:30:04Z",
+      "side": 1,
+      "message": "At all call sites of `LoadAndCombineClamped`, `row_idx` (which is `i`) is guaranteed to be `\u003c max_rows` (`0 \u003c\u003d row_idx \u003c max_rows`). So I just changed this to be `row_idx`.",
+      "parentUuid": "d33f4f89_ee6c83ee",
+      "revId": "92c432079b48ca00ae1d577cbeab141a0c5e837a",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "197226ef_92606d89",
@@ -31,6 +49,24 @@
       "writtenOn": "2026-07-20T16:26:20Z",
       "side": 1,
       "message": "3 is related to `kNumRows` (4), right? Should we change `im_h - 3` to `im_h - kNumRows + 1`?\n\nAlternatively, we can change `im_h - 3` to `(im_h \u0026 ~(kNumRows - 1))`, which is `im_h` rounded down to a multiple of `kNumRows`. This seems easier to understand.",
+      "revId": "92c432079b48ca00ae1d577cbeab141a0c5e837a",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "709c600c_d3f20953",
+        "filename": "av1/common/convolve_2d_sr_hwy.h",
+        "patchSetId": 3
+      },
+      "lineNbr": 488,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-07-20T17:30:04Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "197226ef_92606d89",
       "revId": "92c432079b48ca00ae1d577cbeab141a0c5e837a",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
