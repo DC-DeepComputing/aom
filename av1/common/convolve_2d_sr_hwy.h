@@ -335,9 +335,6 @@ HWY_ATTR HWY_INLINE void ConvolveVerticalPass(
     IdxTbl idx_tbl, ComputeHRowBlock compute_h_row_block = nullptr) {
   constexpr int num_coeffs = taps_y_val / 2;
   constexpr int num_z = (h_ge_8 ? 8 : 4) / 2 + num_coeffs - 1;
-  constexpr int num_h = num_z / 2 + 1;
-
-  hn::Half<decltype(int16xN_tag)> d16_16;
   const auto zero_32 = hn::Zero(int32xN_tag);
 
   auto round_and_store = [&](IVec32 sum, int y) {
@@ -376,22 +373,12 @@ HWY_ATTR HWY_INLINE void ConvolveVerticalPass(
   };
 
   for (int y = 0; y < h; y += 8) {
-    IVec16 H[num_h];
-    for (int k = 0; k < num_h; ++k) {
-      HWY_IF_CONSTEXPR(skip_strip_im) { H[k] = compute_h_row_block(y + k * 4); }
-      else {
-        H[k] = hn::LoadU(int16xN_tag, strip_im_buf + (y + k * 4) * 8);
-      }
-    }
-
     IVec16 Z[num_z];
     for (int z_idx = 0; z_idx < num_z; ++z_idx) {
       IVec16 L;
-      if (z_idx % 2 == 0) {
-        L = H[z_idx / 2];
-      } else {
-        L = hn::Combine(int16xN_tag, hn::LowerHalf(d16_16, H[z_idx / 2 + 1]),
-                        hn::UpperHalf(d16_16, H[z_idx / 2]));
+      HWY_IF_CONSTEXPR(skip_strip_im) { L = compute_h_row_block(y + z_idx); }
+      else {
+        L = hn::LoadU(int16xN_tag, strip_im_buf + (y + z_idx) * 8);
       }
       Z[z_idx] = hn::TableLookupLanes(L, idx_tbl);
     }
