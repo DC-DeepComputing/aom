@@ -327,14 +327,16 @@ HWY_ATTR HWY_INLINE hn::VFromD<D> LoadAndCombineClamped(D d, D128 d128,
 // - `ComputeHRowBlock`: Callable type for computing horizontal convolve on the
 //   fly (used when `skip_strip_im` is true).
 template <int taps_y_val, bool h_ge_8, bool skip_strip_im, int round_0_const,
-          int round_1_const, class IdxTbl,
+          int round_1_const, int limit_val, class IdxTbl,
           class ComputeHRowBlock = IVec16 (*)(int)>
 HWY_ATTR HWY_INLINE void ConvolveVerticalPass(
     const int16_t *strip_im_buf, uint8_t *dst, int dst_stride, int w, int h,
     const IVec16 *coeffs_v, IVec32 round_const_y, int round_1, int bits,
     IdxTbl idx_tbl, ComputeHRowBlock compute_h_row_block = nullptr) {
   constexpr int num_coeffs = taps_y_val / 2;
-  constexpr int num_z = (h_ge_8 ? 8 : 4) / 2 + num_coeffs - 1;
+  constexpr int limit_for_num_z =
+      (limit_val > 0) ? limit_val : (h_ge_8 ? 4 : 2);
+  constexpr int num_z = limit_for_num_z + num_coeffs - 1;
   constexpr int num_h = num_z / 2 + 1;
 
   hn::Half<decltype(int16xN_tag)> d16_16;
@@ -396,7 +398,7 @@ HWY_ATTR HWY_INLINE void ConvolveVerticalPass(
       Z[z_idx] = hn::TableLookupLanes(L, idx_tbl);
     }
 
-    constexpr int limit = h_ge_8 ? 4 : 2;
+    constexpr int limit = (limit_val > 0) ? limit_val : (h_ge_8 ? 4 : 2);
     for (int i = 0; i < limit; ++i) {
       auto sum = ConvolveVertical<taps_y_val>(int32xN_tag, &Z[i], coeffs_v,
                                               round_const_y);
@@ -479,6 +481,20 @@ HWY_ATTR HWY_INLINE void Convolve2DSRHwyImpl(
   };
 
   for (int j = 0; j < w; j += 8) {
+    HWY_ALIGN_MAX static constexpr int16_t idx_arr[32] = {
+      0, 8,  1, 9,  2,  10, 3,  11, 4,  12, 5,  13, 6,  14, 7,  15,
+      8, 16, 9, 17, 10, 18, 11, 19, 12, 20, 13, 21, 14, 22, 15, 23
+    };
+    auto idx_tbl = hn::SetTableIndices(int16xN_tag, idx_arr);
+
+    auto compute_h_row_block = [&](int row_idx) {
+      auto data =
+          LoadAndCombineClamped<4>(uint8xN_tag, uint8x16_capped_tag,
+                                   src_ptr + j, src_stride, row_idx, im_h);
+      auto res = convolve_horizontal(data);
+      return hn::ShiftRightSame(hn::Add(res, round_const_h), round_0 - 1);
+    };
+
     const bool skip_strip_im_buf =
         (is_taps_y_12 || is_taps_x_12) ? false : (h == 4 || h == 8);
 
@@ -562,149 +578,75 @@ HWY_ATTR HWY_INLINE void Convolve2DSRHwyImpl(
         ((1 << round_1) >> 1) + ((bits > 0) ? (1 << (bits - 1 + round_1)) : 0);
     const auto round_const_y = hn::Set(int32xN_tag, round_const_y_val);
 
-    HWY_ALIGN_MAX static constexpr int16_t idx_arr[32] = {
-      0, 8,  1, 9,  2,  10, 3,  11, 4,  12, 5,  13, 6,  14, 7,  15,
-      8, 16, 9, 17, 10, 18, 11, 19, 12, 20, 13, 21, 14, 22, 15, 23
-    };
-    auto idx_tbl = hn::SetTableIndices(int16xN_tag, idx_arr);
+    auto dispatch_vertical = [&](int cur_taps_y) {
+      const bool h_ge_8_v = (h >= 8);
+      const int limit_v = h_ge_8_v ? 4 : (h == 2 ? 1 : (h == 6 ? 3 : 2));
+      const bool skip_v =
+          (!is_taps_x_12 && cur_taps_y != 12 && (h == 4 || h == 8));
 
-    auto compute_h_row_block = [&](int row_idx) {
-      auto data =
-          LoadAndCombineClamped<4>(uint8xN_tag, uint8x16_capped_tag,
-                                   src_ptr + j, src_stride, row_idx, im_h);
-      auto res = convolve_horizontal(data);
-      return hn::ShiftRightSame(hn::Add(res, round_const_h), round_0 - 1);
-    };
-
-    if (h == 4 && !is_taps_x_12) {
-      HWY_IF_CONSTEXPR(taps_y_const > 0) {
-        constexpr bool skip_strip_im = taps_y_const == 12 ? false : true;
-        ConvolveVerticalPass<taps_y_const, false, skip_strip_im, round_0_const,
-                             round_1_const>(
+      auto invoke = [&](auto ty_const, auto h8_const, auto skip_const,
+                        auto lim_const) {
+        ConvolveVerticalPass<decltype(ty_const)::value,
+                             decltype(h8_const)::value,
+                             decltype(skip_const)::value, round_0_const,
+                             round_1_const, decltype(lim_const)::value>(
             strip_im_buf, dst + j, dst_stride, w, h, coeffs_v, round_const_y,
             round_1, bits, idx_tbl, compute_h_row_block);
-      }
-      else {
-        if (taps_y == 2) {
-          ConvolveVerticalPass<2, false, true, round_0_const, round_1_const>(
-              strip_im_buf, dst + j, dst_stride, w, h, coeffs_v, round_const_y,
-              round_1, bits, idx_tbl, compute_h_row_block);
-        } else if (taps_y == 4) {
-          ConvolveVerticalPass<4, false, true, round_0_const, round_1_const>(
-              strip_im_buf, dst + j, dst_stride, w, h, coeffs_v, round_const_y,
-              round_1, bits, idx_tbl, compute_h_row_block);
-        } else if (taps_y == 6) {
-          ConvolveVerticalPass<6, false, true, round_0_const, round_1_const>(
-              strip_im_buf, dst + j, dst_stride, w, h, coeffs_v, round_const_y,
-              round_1, bits, idx_tbl, compute_h_row_block);
-        } else if (taps_y == 8) {
-          ConvolveVerticalPass<8, false, true, round_0_const, round_1_const>(
-              strip_im_buf, dst + j, dst_stride, w, h, coeffs_v, round_const_y,
-              round_1, bits, idx_tbl, compute_h_row_block);
-        }
-      }
-    } else if (h == 8 && !is_taps_x_12) {
-      HWY_IF_CONSTEXPR(taps_y_const > 0) {
-        constexpr bool skip_strip_im = taps_y_const == 12 ? false : true;
-        ConvolveVerticalPass<taps_y_const, true, skip_strip_im, round_0_const,
-                             round_1_const>(
-            strip_im_buf, dst + j, dst_stride, w, h, coeffs_v, round_const_y,
-            round_1, bits, idx_tbl, compute_h_row_block);
-      }
-      else {
-        if (taps_y == 2) {
-          ConvolveVerticalPass<2, true, true, round_0_const, round_1_const>(
-              strip_im_buf, dst + j, dst_stride, w, h, coeffs_v, round_const_y,
-              round_1, bits, idx_tbl, compute_h_row_block);
-        } else if (taps_y == 4) {
-          ConvolveVerticalPass<4, true, true, round_0_const, round_1_const>(
-              strip_im_buf, dst + j, dst_stride, w, h, coeffs_v, round_const_y,
-              round_1, bits, idx_tbl, compute_h_row_block);
-        } else if (taps_y == 6) {
-          ConvolveVerticalPass<6, true, true, round_0_const, round_1_const>(
-              strip_im_buf, dst + j, dst_stride, w, h, coeffs_v, round_const_y,
-              round_1, bits, idx_tbl, compute_h_row_block);
-        } else if (taps_y == 8) {
-          ConvolveVerticalPass<8, true, true, round_0_const, round_1_const>(
-              strip_im_buf, dst + j, dst_stride, w, h, coeffs_v, round_const_y,
-              round_1, bits, idx_tbl, compute_h_row_block);
-        }
-      }
-    } else {
-      if (h >= 8) {
-        if (is_taps_y_12) {
-          ConvolveVerticalPass<12, true, false, round_0_const, round_1_const>(
-              strip_im_buf, dst + j, dst_stride, w, h, coeffs_v, round_const_y,
-              round_1, bits, idx_tbl);
-        } else {
-          HWY_IF_CONSTEXPR(taps_y_const > 0) {
-            ConvolveVerticalPass<taps_y_const, true, false, round_0_const,
-                                 round_1_const>(
-                strip_im_buf, dst + j, dst_stride, w, h, coeffs_v,
-                round_const_y, round_1, bits, idx_tbl);
+      };
+
+      auto dispatch_h_skip_lim = [&](auto ty_const) {
+        if (h_ge_8_v) {
+          if (skip_v) {
+            invoke(ty_const, std::bool_constant<true>{},
+                   std::bool_constant<true>{},
+                   std::integral_constant<int, 4>{});
+          } else {
+            invoke(ty_const, std::bool_constant<true>{},
+                   std::bool_constant<false>{},
+                   std::integral_constant<int, 4>{});
           }
-          else {
-            if (taps_y == 2) {
-              ConvolveVerticalPass<2, true, false, round_0_const,
-                                   round_1_const>(
-                  strip_im_buf, dst + j, dst_stride, w, h, coeffs_v,
-                  round_const_y, round_1, bits, idx_tbl);
-            } else if (taps_y == 4) {
-              ConvolveVerticalPass<4, true, false, round_0_const,
-                                   round_1_const>(
-                  strip_im_buf, dst + j, dst_stride, w, h, coeffs_v,
-                  round_const_y, round_1, bits, idx_tbl);
-            } else if (taps_y == 6) {
-              ConvolveVerticalPass<6, true, false, round_0_const,
-                                   round_1_const>(
-                  strip_im_buf, dst + j, dst_stride, w, h, coeffs_v,
-                  round_const_y, round_1, bits, idx_tbl);
-            } else if (taps_y == 8) {
-              ConvolveVerticalPass<8, true, false, round_0_const,
-                                   round_1_const>(
-                  strip_im_buf, dst + j, dst_stride, w, h, coeffs_v,
-                  round_const_y, round_1, bits, idx_tbl);
+        } else {
+          if (skip_v) {
+            invoke(ty_const, std::bool_constant<false>{},
+                   std::bool_constant<true>{},
+                   std::integral_constant<int, 2>{});
+          } else {
+            if (limit_v == 1) {
+              invoke(ty_const, std::bool_constant<false>{},
+                     std::bool_constant<false>{},
+                     std::integral_constant<int, 1>{});
+            } else if (limit_v == 3) {
+              invoke(ty_const, std::bool_constant<false>{},
+                     std::bool_constant<false>{},
+                     std::integral_constant<int, 3>{});
+            } else {
+              invoke(ty_const, std::bool_constant<false>{},
+                     std::bool_constant<false>{},
+                     std::integral_constant<int, 2>{});
             }
           }
         }
-      } else {
-        if (is_taps_y_12) {
-          ConvolveVerticalPass<12, false, false, round_0_const, round_1_const>(
-              strip_im_buf, dst + j, dst_stride, w, h, coeffs_v, round_const_y,
-              round_1, bits, idx_tbl);
-        } else {
-          HWY_IF_CONSTEXPR(taps_y_const > 0) {
-            ConvolveVerticalPass<taps_y_const, false, false, round_0_const,
-                                 round_1_const>(
-                strip_im_buf, dst + j, dst_stride, w, h, coeffs_v,
-                round_const_y, round_1, bits, idx_tbl);
-          }
-          else {
-            if (taps_y == 2) {
-              ConvolveVerticalPass<2, false, false, round_0_const,
-                                   round_1_const>(
-                  strip_im_buf, dst + j, dst_stride, w, h, coeffs_v,
-                  round_const_y, round_1, bits, idx_tbl);
-            } else if (taps_y == 4) {
-              ConvolveVerticalPass<4, false, false, round_0_const,
-                                   round_1_const>(
-                  strip_im_buf, dst + j, dst_stride, w, h, coeffs_v,
-                  round_const_y, round_1, bits, idx_tbl);
-            } else if (taps_y == 6) {
-              ConvolveVerticalPass<6, false, false, round_0_const,
-                                   round_1_const>(
-                  strip_im_buf, dst + j, dst_stride, w, h, coeffs_v,
-                  round_const_y, round_1, bits, idx_tbl);
-            } else if (taps_y == 8) {
-              ConvolveVerticalPass<8, false, false, round_0_const,
-                                   round_1_const>(
-                  strip_im_buf, dst + j, dst_stride, w, h, coeffs_v,
-                  round_const_y, round_1, bits, idx_tbl);
-            }
-          }
+      };
+
+      HWY_IF_CONSTEXPR(taps_y_const > 0) {
+        dispatch_h_skip_lim(std::integral_constant<int, taps_y_const>{});
+      }
+      else {
+        if (cur_taps_y == 2) {
+          dispatch_h_skip_lim(std::integral_constant<int, 2>{});
+        } else if (cur_taps_y == 4) {
+          dispatch_h_skip_lim(std::integral_constant<int, 4>{});
+        } else if (cur_taps_y == 6) {
+          dispatch_h_skip_lim(std::integral_constant<int, 6>{});
+        } else if (cur_taps_y == 8) {
+          dispatch_h_skip_lim(std::integral_constant<int, 8>{});
+        } else if (cur_taps_y == 12) {
+          dispatch_h_skip_lim(std::integral_constant<int, 12>{});
         }
       }
-    }
+    };
+
+    dispatch_vertical(taps_y);
   }
 }
 
