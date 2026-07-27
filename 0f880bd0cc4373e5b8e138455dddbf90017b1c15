@@ -18,6 +18,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "6f81c4f4_e4fa9dbb",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 5
+      },
+      "lineNbr": 9,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-07-27T22:41:15Z",
+      "side": 1,
+      "message": "`AV1/AVxEncoderThreadTest.EncoderResultTest` reported mismatch (pixel values like 129 vs 128)",
+      "parentUuid": "87f3a731_c83c9d9c",
+      "revId": "0f880bd0cc4373e5b8e138455dddbf90017b1c15",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "19d353c5_e6391684",
@@ -31,6 +49,24 @@
       "writtenOn": "2026-07-27T22:31:11Z",
       "side": 1,
       "message": "IMPORTANT: Please add a test that reproduces the bug this CL fixes, or mention which existing tests detected this bug.",
+      "revId": "0f880bd0cc4373e5b8e138455dddbf90017b1c15",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "fa77015c_f49a3531",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 5
+      },
+      "lineNbr": 10,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-07-27T22:41:15Z",
+      "side": 1,
+      "message": "Added the failed test in the commit message.",
+      "parentUuid": "19d353c5_e6391684",
       "revId": "0f880bd0cc4373e5b8e138455dddbf90017b1c15",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
@@ -100,6 +136,24 @@
     {
       "unresolved": false,
       "key": {
+        "uuid": "9466eb89_cf6f95f6",
+        "filename": "av1/common/convolve_2d_sr_hwy.h",
+        "patchSetId": 5
+      },
+      "lineNbr": 587,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-07-27T22:41:15Z",
+      "side": 1,
+      "message": "Yes. I renamed to `taps_y_const`.",
+      "parentUuid": "726344ca_9784686c",
+      "revId": "0f880bd0cc4373e5b8e138455dddbf90017b1c15",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
         "uuid": "cf3d95c3_edcf63b2",
         "filename": "av1/common/convolve_2d_sr_hwy.h",
         "patchSetId": 5
@@ -129,6 +183,24 @@
       "side": 1,
       "message": "\u003e The use of `std::bool_constant` and `std::integral_constant` makes the code very verbose and difficult to understand. Is it possible to avoid them?\n\n+1",
       "parentUuid": "cf3d95c3_edcf63b2",
+      "revId": "0f880bd0cc4373e5b8e138455dddbf90017b1c15",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "aea4d5fc_35ef9bac",
+        "filename": "av1/common/convolve_2d_sr_hwy.h",
+        "patchSetId": 5
+      },
+      "lineNbr": 644,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-07-27T22:41:15Z",
+      "side": 1,
+      "message": "Ah, yeah, however `ConvolveVerticalPass` requires the template parameters to be compile time constants, so they have to be wrapped and passed and then unwrapped in the lambda.\n\nTo avoid them I can restore to calling `ConvolveVerticalPass` directly but that has a bit more code duplications.\n\nWhich do you think is the better approach?",
+      "parentUuid": "6231097e_b140a017",
       "revId": "0f880bd0cc4373e5b8e138455dddbf90017b1c15",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
