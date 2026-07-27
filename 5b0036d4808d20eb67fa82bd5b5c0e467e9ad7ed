@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "6fb09b9f_762adde5",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 8893
+      },
+      "writtenOn": "2026-07-27T09:41:04Z",
+      "side": 1,
+      "message": "Performance results w.r.t commit 18c52422b835ba6cdde1b2342d760c6037a7fd86 are as follows:\n```\n                  Encoder Instruction                BD-Rate Loss(%)                                 \ncpu   Resolution   Count Reduction(%)  avg.psnr ovr.psnr   ssim   vmaf   vmaf_neg  \n 0       LOWRES2       -0.7             0.0481   0.0526  -0.1252  0.2586   0.1513\n 0       MIDRES2        0.1             0.1331   0.1034  -0.1565  0.1299   0.1289\n 0    SHORTS608P       -0.8             0.0436   0.0552  -0.1110  0.0737   0.1301\n 0    SHORTS720P       -1.5             0.0604   0.0628  -0.1294 -0.0058   0.0186\n 0   SHORTS1080P       -1.1             0.0928   0.1042  -0.0489  0.0951   0.0753\n 0        HDRES2        0.3             0.0740   0.0693  -0.1392  0.1171   0.0978\n 0       Average       -0.7             0.0744   0.0745  -0.1164  0.1062   0.0980\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t      \n 1\t LOWRES2        0.1             0.0470   0.0460  -0.1498  0.0417   0.0374\n 1       MIDRES2       -0.9             0.1010   0.0890  -0.1976  0.1735   0.1093\n 1    SHORTS608P       -0.4             0.0722   0.0775  -0.0191  0.1518   0.0867\n 1    SHORTS720P       -1.6            -0.0097   0.0112  -0.1491 -0.0207  -0.0330\n 1   SHORTS1080P       -0.9             0.0589   0.0703  -0.1232  0.0336   0.0287\n 1        HDRES2       -1.7             0.0184   0.0274  -0.1540 -0.0055  -0.0213\n 1       Average       -0.9             0.0473   0.0535  -0.1290  0.0617   0.0340\n```",
+      "revId": "5b0036d4808d20eb67fa82bd5b5c0e467e9ad7ed",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
