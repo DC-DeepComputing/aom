@@ -254,6 +254,57 @@ TEST(EncodeAPI, InvalidSvcParams) {
   EXPECT_EQ(aom_codec_destroy(&enc), AOM_CODEC_OK);
 }
 
+// Bug: 538651949
+TEST(EncodeAPI, SvcFixBypass) {
+  aom_codec_ctx_t enc;
+  aom_codec_enc_cfg_t cfg;
+  aom_codec_iface_t *iface = aom_codec_av1_cx();
+  aom_svc_layer_id_t layer_id = { 3, 0 };
+  aom_svc_params_t svc_params = {};
+
+  EXPECT_EQ(AOM_CODEC_OK, aom_codec_enc_config_default(iface, &cfg, kUsage));
+  cfg.g_w = 320;
+  cfg.g_h = 240;
+  cfg.g_threads = 1;
+  cfg.g_lag_in_frames = 0;
+
+  ASSERT_EQ(AOM_CODEC_OK, aom_codec_enc_init(&enc, iface, &cfg, 0));
+
+  // 1. Set number of spatial layers to 4.
+  EXPECT_EQ(AOM_CODEC_OK,
+            aom_codec_control(&enc, AOME_SET_NUMBER_SPATIAL_LAYERS, 4));
+
+  // 2. Set active layer ID to 3. Should fail because
+  // cpi->svc.number_spatial_layers is still 1 (default).
+  EXPECT_EQ(AOM_CODEC_INVALID_PARAM,
+            aom_codec_control(&enc, AV1E_SET_SVC_LAYER_ID, &layer_id));
+
+  // 3. Set SVC params to 2x2. Should succeed.
+  svc_params.number_spatial_layers = 2;
+  svc_params.number_temporal_layers = 2;
+  for (int i = 0; i < AOM_MAX_LAYERS; i++) {
+    svc_params.max_quantizers[i] = 52;
+    svc_params.min_quantizers[i] = 10;
+    svc_params.layer_target_bitrate[i] = 100;
+  }
+  svc_params.scaling_factor_num[0] = 1;
+  svc_params.scaling_factor_den[0] = 2;
+  svc_params.scaling_factor_num[1] = 1;
+  svc_params.scaling_factor_den[1] = 1;
+  svc_params.framerate_factor[0] = 2;
+  svc_params.framerate_factor[1] = 1;
+
+  EXPECT_EQ(AOM_CODEC_OK,
+            aom_codec_control(&enc, AV1E_SET_SVC_PARAMS, &svc_params));
+
+  // 4. Try setting number of spatial layers to 3 using manual control while
+  // library SVC is active. Should fail.
+  EXPECT_EQ(AOM_CODEC_INVALID_PARAM,
+            aom_codec_control(&enc, AOME_SET_NUMBER_SPATIAL_LAYERS, 3));
+
+  EXPECT_EQ(AOM_CODEC_OK, aom_codec_destroy(&enc));
+}
+
 TEST(EncodeAPI, InvalidControlId) {
   aom_codec_iface_t *iface = aom_codec_av1_cx();
   aom_codec_ctx_t enc;
