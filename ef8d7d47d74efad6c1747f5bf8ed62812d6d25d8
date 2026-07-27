@@ -68,6 +68,24 @@
       "parentUuid": "30149037_9f8a12ee",
       "revId": "ef8d7d47d74efad6c1747f5bf8ed62812d6d25d8",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "42a9f8a2_ecf37dcf",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 8893
+      },
+      "writtenOn": "2026-07-27T18:55:52Z",
+      "side": 1,
+      "message": "Performance results w.r.t commit 515f603aa01a9e96485126a78319ff2adfb7dbb6 for Q mode for speed\u003d3 are as follows (--cq-level \u003d 23, 31, 39, 47, 55, 63):\n```\n                  Encoder Instruction              BD-Rate Loss(%)\ncpu   Resolution  Count Reduction(%)  avg.psnr   ovr.psnr    ssim     vmaf   vmaf_neg \n 3       LOWRES2        1.474         -0.0944    -0.1019  -0.4341  -0.4869   -0.3938  \n 3       MIDRES2        1.744         -0.2397    -0.2081  -0.5366  -0.6457   -0.5512  \n 3    SHORTS608P        1.707         -0.0681    -0.0693  -0.2686  -0.2552   -0.1941  \n 3    SHORTS720P        0.831         -0.0847    -0.0928  -0.3217  -0.3215   -0.2466  \n 3   SHORTS1080P        1.603         -0.0482    -0.0707  -0.2902  -0.2577   -0.2056  \n 3        HDRES2        1.523         -0.1979    -0.2159  -0.5065  -0.3460   -0.3047  \n 3       Average        1.471         -0.1172    -0.1220  -0.3839  -0.3758   -0.3069  \n```",
+      "parentUuid": "3c4a8926_56c49e90",
+      "revId": "ef8d7d47d74efad6c1747f5bf8ed62812d6d25d8",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
