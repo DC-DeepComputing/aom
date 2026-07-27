@@ -45,6 +45,40 @@
       },
       "revId": "0f880bd0cc4373e5b8e138455dddbf90017b1c15",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "726344ca_9784686c",
+        "filename": "av1/common/convolve_2d_sr_hwy.h",
+        "patchSetId": 5
+      },
+      "lineNbr": 587,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-07-27T22:26:41Z",
+      "side": 1,
+      "message": "The name `ty_const` is not clear. I guess `ty` stands for `taps_y`?",
+      "revId": "0f880bd0cc4373e5b8e138455dddbf90017b1c15",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "cf3d95c3_edcf63b2",
+        "filename": "av1/common/convolve_2d_sr_hwy.h",
+        "patchSetId": 5
+      },
+      "lineNbr": 644,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-07-27T22:26:41Z",
+      "side": 1,
+      "message": "The use of `std::bool_constant` and `std::integral_constant` makes the code very verbose and difficult to understand. Is it possible to avoid them?",
+      "revId": "0f880bd0cc4373e5b8e138455dddbf90017b1c15",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
