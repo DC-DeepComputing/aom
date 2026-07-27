@@ -33,6 +33,23 @@
       "message": "The coding gain is consistent through all test sets, showing that the TPL qp is somewhat improved with this change.",
       "revId": "ef8d7d47d74efad6c1747f5bf8ed62812d6d25d8",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "30149037_9f8a12ee",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 7525
+      },
+      "writtenOn": "2026-07-27T17:17:35Z",
+      "side": 1,
+      "message": "Is this for Q mode or vbr mode? For Q mode it feels like we should not cap the base QP.",
+      "revId": "ef8d7d47d74efad6c1747f5bf8ed62812d6d25d8",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
