@@ -104,6 +104,24 @@
       "parentUuid": "42a9f8a2_ecf37dcf",
       "revId": "ef8d7d47d74efad6c1747f5bf8ed62812d6d25d8",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "1e2d3980_dc1496cb",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5185
+      },
+      "writtenOn": "2026-07-27T19:10:54Z",
+      "side": 1,
+      "message": "@Deepa: Here is 1 suggestion based on the offline discussion with Bohan. The cause and effect of this change in Q mode needs to be further studied. For now, could you please exclude Q mode from this CL?",
+      "parentUuid": "3c4a8926_56c49e90",
+      "revId": "ef8d7d47d74efad6c1747f5bf8ed62812d6d25d8",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
