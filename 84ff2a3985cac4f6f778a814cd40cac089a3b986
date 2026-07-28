@@ -1,0 +1,146 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "25d1a71e_29e08920",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 7
+      },
+      "lineNbr": 10,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-07-28T21:19:36Z",
+      "side": 1,
+      "message": "Please describe what the bug was and how it was fixed.\n\nBased on my analysis, the bug fix is related to the new `limit_val` template parameter, and the related `limit_v` and `skip_v` local variables. But I can\u0027t figure out what the bug was.",
+      "revId": "84ff2a3985cac4f6f778a814cd40cac089a3b986",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "d202d857_774cb57d",
+        "filename": "av1/common/convolve_2d_sr_hwy.h",
+        "patchSetId": 7
+      },
+      "lineNbr": 325,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-07-28T21:19:36Z",
+      "side": 1,
+      "message": "Nit: Document the new template parameter `limit_val` after this line.",
+      "revId": "84ff2a3985cac4f6f778a814cd40cac089a3b986",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "372d4332_ad7a9b70",
+        "filename": "av1/common/convolve_2d_sr_hwy.h",
+        "patchSetId": 7
+      },
+      "lineNbr": 401,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-07-28T21:19:36Z",
+      "side": 1,
+      "message": "This expression is exactly the same as `limit_for_num_z`, so we can delete `limit` and just use `limit_for_num_z`.",
+      "revId": "84ff2a3985cac4f6f778a814cd40cac089a3b986",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "82cf3e9e_2b38e9da",
+        "filename": "av1/common/convolve_2d_sr_hwy.h",
+        "patchSetId": 7
+      },
+      "lineNbr": 496,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-07-28T21:19:36Z",
+      "side": 1,
+      "message": "This block of code was moved. However, it seems better to leave this block of code at the original location because that is closer to the user of `idx_tbl` and `compute_h_row_block`.\n\nIs it necessary to move this block of code?",
+      "range": {
+        "startLine": 484,
+        "startChar": 0,
+        "endLine": 496,
+        "endChar": 6
+      },
+      "revId": "84ff2a3985cac4f6f778a814cd40cac089a3b986",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "e5ef7e82_e79d72e9",
+        "filename": "av1/common/convolve_2d_sr_hwy.h",
+        "patchSetId": 7
+      },
+      "lineNbr": 583,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-07-28T21:19:36Z",
+      "side": 1,
+      "message": "Please explain why `limit_v` means.\n\nAlso, can this be simplified to the following?\n\n```\n      const int limit_v \u003d h_ge_8_v ? 4 : h / 2;\n```",
+      "revId": "84ff2a3985cac4f6f778a814cd40cac089a3b986",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "de279a2d_e04fa90b",
+        "filename": "av1/common/convolve_2d_sr_hwy.h",
+        "patchSetId": 7
+      },
+      "lineNbr": 585,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-07-28T21:19:36Z",
+      "side": 1,
+      "message": "IMPORTANT: Document `skip_v` and explain why it is defined this way.",
+      "revId": "84ff2a3985cac4f6f778a814cd40cac089a3b986",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "40a26506_dabfe160",
+        "filename": "av1/common/convolve_2d_sr_hwy.h",
+        "patchSetId": 7
+      },
+      "lineNbr": 587,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-07-28T21:19:36Z",
+      "side": 1,
+      "message": "`h8_const` should be renamed `h_ge_8_const`.",
+      "revId": "84ff2a3985cac4f6f778a814cd40cac089a3b986",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "c1fd5f22_96042c3d",
+        "filename": "av1/common/convolve_2d_sr_hwy.h",
+        "patchSetId": 7
+      },
+      "lineNbr": 649,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-07-28T21:19:36Z",
+      "side": 1,
+      "message": "Nit/optional: The `dispatch_vertical` lambda function doesn\u0027t seem necessary. We can just inline the function.",
+      "revId": "84ff2a3985cac4f6f778a814cd40cac089a3b986",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
