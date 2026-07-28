@@ -1,0 +1,421 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "9663a052_3d1d82e7",
+        "filename": "av1/common/convolve_2d_sr_hwy.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 327,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-07-28T22:10:47Z",
+      "side": 1,
+      "message": "h\u003d6 and h\u003d4 could be swapped in this sentence to make the order 1, 2, 3, 4.",
+      "range": {
+        "startLine": 326,
+        "startChar": 57,
+        "endLine": 327,
+        "endChar": 15
+      },
+      "revId": "cb0e8bb17a30d1c02551c05bffa4b3470fe04489",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "0e067df2_947f0ad0",
+        "filename": "av1/common/convolve_2d_sr_hwy.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 586,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-07-28T22:10:47Z",
+      "side": 1,
+      "message": "Optionally you can add `/*limit_val\u003d*/2` to document the bare constant, here and the other locations.",
+      "range": {
+        "startLine": 586,
+        "startChar": 43,
+        "endLine": 586,
+        "endChar": 44
+      },
+      "fixSuggestions": [
+        {
+          "fixId": "c19bf727_8a43defc",
+          "description": "prompt_to_edit API",
+          "replacements": [
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 586,
+                "startChar": 0,
+                "endLine": 587,
+                "endChar": 0
+              },
+              "replacement": "                             round_1_const, /*limit_val\u003d*/2\u003e(\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 592,
+                "startChar": 0,
+                "endLine": 593,
+                "endChar": 0
+              },
+              "replacement": "          ConvolveVerticalPass\u003c2, false, true, round_0_const, round_1_const,\n                               /*limit_val\u003d*/2\u003e(\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 596,
+                "startChar": 0,
+                "endLine": 597,
+                "endChar": 0
+              },
+              "replacement": "          ConvolveVerticalPass\u003c4, false, true, round_0_const, round_1_const,\n                               /*limit_val\u003d*/2\u003e(\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 600,
+                "startChar": 0,
+                "endLine": 601,
+                "endChar": 0
+              },
+              "replacement": "          ConvolveVerticalPass\u003c6, false, true, round_0_const, round_1_const,\n                               /*limit_val\u003d*/2\u003e(\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 604,
+                "startChar": 0,
+                "endLine": 605,
+                "endChar": 0
+              },
+              "replacement": "          ConvolveVerticalPass\u003c8, false, true, round_0_const, round_1_const,\n                               /*limit_val\u003d*/2\u003e(\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 613,
+                "startChar": 0,
+                "endLine": 614,
+                "endChar": 0
+              },
+              "replacement": "                             round_1_const, /*limit_val\u003d*/4\u003e(\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 619,
+                "startChar": 0,
+                "endLine": 620,
+                "endChar": 0
+              },
+              "replacement": "          ConvolveVerticalPass\u003c2, true, true, round_0_const, round_1_const,\n                               /*limit_val\u003d*/4\u003e(\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 623,
+                "startChar": 0,
+                "endLine": 624,
+                "endChar": 0
+              },
+              "replacement": "          ConvolveVerticalPass\u003c4, true, true, round_0_const, round_1_const,\n                               /*limit_val\u003d*/4\u003e(\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 627,
+                "startChar": 0,
+                "endLine": 628,
+                "endChar": 0
+              },
+              "replacement": "          ConvolveVerticalPass\u003c6, true, true, round_0_const, round_1_const,\n                               /*limit_val\u003d*/4\u003e(\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 631,
+                "startChar": 0,
+                "endLine": 632,
+                "endChar": 0
+              },
+              "replacement": "          ConvolveVerticalPass\u003c8, true, true, round_0_const, round_1_const,\n                               /*limit_val\u003d*/4\u003e(\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 640,
+                "startChar": 0,
+                "endLine": 643,
+                "endChar": 0
+              },
+              "replacement": "                               /*limit_val\u003d*/4\u003e(\n              strip_im_buf, dst + j, dst_stride, w, h, coeffs_v, round_const_y,\n              round_1, bits, idx_tbl);\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 646,
+                "startChar": 0,
+                "endLine": 647,
+                "endChar": 0
+              },
+              "replacement": "                                 round_1_const, /*limit_val\u003d*/4\u003e(\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 653,
+                "startChar": 0,
+                "endLine": 656,
+                "endChar": 0
+              },
+              "replacement": "                                   /*limit_val\u003d*/4\u003e(\n                  strip_im_buf, dst + j, dst_stride, w, h, coeffs_v,\n                  round_const_y, round_1, bits, idx_tbl);\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 658,
+                "startChar": 0,
+                "endLine": 661,
+                "endChar": 0
+              },
+              "replacement": "                                   /*limit_val\u003d*/4\u003e(\n                  strip_im_buf, dst + j, dst_stride, w, h, coeffs_v,\n                  round_const_y, round_1, bits, idx_tbl);\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 663,
+                "startChar": 0,
+                "endLine": 666,
+                "endChar": 0
+              },
+              "replacement": "                                   /*limit_val\u003d*/4\u003e(\n                  strip_im_buf, dst + j, dst_stride, w, h, coeffs_v,\n                  round_const_y, round_1, bits, idx_tbl);\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 668,
+                "startChar": 0,
+                "endLine": 671,
+                "endChar": 0
+              },
+              "replacement": "                                   /*limit_val\u003d*/4\u003e(\n                  strip_im_buf, dst + j, dst_stride, w, h, coeffs_v,\n                  round_const_y, round_1, bits, idx_tbl);\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 678,
+                "startChar": 0,
+                "endLine": 681,
+                "endChar": 0
+              },
+              "replacement": "                                 /*limit_val\u003d*/1\u003e(\n                strip_im_buf, dst + j, dst_stride, w, h, coeffs_v, round_const_y,\n                round_1, bits, idx_tbl);\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 684,
+                "startChar": 0,
+                "endLine": 685,
+                "endChar": 0
+              },
+              "replacement": "                                   round_1_const, /*limit_val\u003d*/1\u003e(\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 691,
+                "startChar": 0,
+                "endLine": 692,
+                "endChar": 0
+              },
+              "replacement": "                                     round_1_const, /*limit_val\u003d*/1\u003e(\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 696,
+                "startChar": 0,
+                "endLine": 697,
+                "endChar": 0
+              },
+              "replacement": "                                     round_1_const, /*limit_val\u003d*/1\u003e(\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 701,
+                "startChar": 0,
+                "endLine": 702,
+                "endChar": 0
+              },
+              "replacement": "                                     round_1_const, /*limit_val\u003d*/1\u003e(\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 706,
+                "startChar": 0,
+                "endLine": 707,
+                "endChar": 0
+              },
+              "replacement": "                                     round_1_const, /*limit_val\u003d*/1\u003e(\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 715,
+                "startChar": 0,
+                "endLine": 718,
+                "endChar": 0
+              },
+              "replacement": "                                 /*limit_val\u003d*/3\u003e(\n                strip_im_buf, dst + j, dst_stride, w, h, coeffs_v, round_const_y,\n                round_1, bits, idx_tbl);\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 721,
+                "startChar": 0,
+                "endLine": 722,
+                "endChar": 0
+              },
+              "replacement": "                                   round_1_const, /*limit_val\u003d*/3\u003e(\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 728,
+                "startChar": 0,
+                "endLine": 729,
+                "endChar": 0
+              },
+              "replacement": "                                     round_1_const, /*limit_val\u003d*/3\u003e(\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 733,
+                "startChar": 0,
+                "endLine": 734,
+                "endChar": 0
+              },
+              "replacement": "                                     round_1_const, /*limit_val\u003d*/3\u003e(\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 738,
+                "startChar": 0,
+                "endLine": 739,
+                "endChar": 0
+              },
+              "replacement": "                                     round_1_const, /*limit_val\u003d*/3\u003e(\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 743,
+                "startChar": 0,
+                "endLine": 744,
+                "endChar": 0
+              },
+              "replacement": "                                     round_1_const, /*limit_val\u003d*/3\u003e(\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 752,
+                "startChar": 0,
+                "endLine": 755,
+                "endChar": 0
+              },
+              "replacement": "                                 /*limit_val\u003d*/2\u003e(\n                strip_im_buf, dst + j, dst_stride, w, h, coeffs_v, round_const_y,\n                round_1, bits, idx_tbl);\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 758,
+                "startChar": 0,
+                "endLine": 759,
+                "endChar": 0
+              },
+              "replacement": "                                   round_1_const, /*limit_val\u003d*/2\u003e(\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 765,
+                "startChar": 0,
+                "endLine": 766,
+                "endChar": 0
+              },
+              "replacement": "                                     round_1_const, /*limit_val\u003d*/2\u003e(\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 770,
+                "startChar": 0,
+                "endLine": 771,
+                "endChar": 0
+              },
+              "replacement": "                                     round_1_const, /*limit_val\u003d*/2\u003e(\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 775,
+                "startChar": 0,
+                "endLine": 776,
+                "endChar": 0
+              },
+              "replacement": "                                     round_1_const, /*limit_val\u003d*/2\u003e(\n"
+            },
+            {
+              "path": "av1/common/convolve_2d_sr_hwy.h",
+              "range": {
+                "startLine": 780,
+                "startChar": 0,
+                "endLine": 781,
+                "endChar": 0
+              },
+              "replacement": "                                     round_1_const, /*limit_val\u003d*/2\u003e(\n"
+            }
+          ]
+        }
+      ],
+      "revId": "cb0e8bb17a30d1c02551c05bffa4b3470fe04489",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "585073fa_88fa6392",
+        "filename": "av1/common/convolve_2d_sr_hwy.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 719,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-07-28T22:10:47Z",
+      "side": 1,
+      "message": "The library requires C++17 now, so in a follow up you could make this `if constexpr` directly to avoid the awkward formatting of the else.",
+      "range": {
+        "startLine": 719,
+        "startChar": 12,
+        "endLine": 719,
+        "endChar": 46
+      },
+      "revId": "cb0e8bb17a30d1c02551c05bffa4b3470fe04489",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
