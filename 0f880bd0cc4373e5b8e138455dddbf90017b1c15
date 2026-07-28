@@ -239,6 +239,24 @@
       "parentUuid": "aea4d5fc_35ef9bac",
       "revId": "0f880bd0cc4373e5b8e138455dddbf90017b1c15",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "f6285032_a6663fef",
+        "filename": "av1/common/convolve_2d_sr_hwy.h",
+        "patchSetId": 5
+      },
+      "lineNbr": 644,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-07-28T14:45:23Z",
+      "side": 1,
+      "message": "It basically boils down to the template parameters of `ConvolveVerticalPass` are non-type, so when calling it, those have to be compile time constants. But lambda arguments are all run-time variables, so they need to be wrapped...\n\nFor example, `dispatch_h_skip_lim` calls `invoke` with one argument `taps_y_const` so it is wrapped here, and then `invoke` adds a few more when calling `ConvolveVerticalPass`, and those are wrapped there.\n\nGiven the multi-layer expansion, maybe it is a good idea to get rid of these lambdas?...",
+      "parentUuid": "c90f4887_864f2d58",
+      "revId": "0f880bd0cc4373e5b8e138455dddbf90017b1c15",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
