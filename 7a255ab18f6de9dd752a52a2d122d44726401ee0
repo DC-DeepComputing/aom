@@ -1,0 +1,113 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "57dd4764_1276f96f",
+        "filename": "av1/av1_cx_iface.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 4085,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-07-29T19:33:04Z",
+      "side": 1,
+      "message": "This last check could use an explanation in the comments.",
+      "range": {
+        "startLine": 4085,
+        "startChar": 53,
+        "endLine": 4085,
+        "endChar": 73
+      },
+      "revId": "7a255ab18f6de9dd752a52a2d122d44726401ee0",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "dd148f88_77f02bc5",
+        "filename": "av1/av1_cx_iface.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 4171,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-07-29T19:33:04Z",
+      "side": 1,
+      "message": "Are `cpi-\u003ecommon.spatial_layer_id` and `cpi-\u003esvc.spatial_layer_id` guaranteed to be the same at this point? Rather than two clamps, would `cpi-\u003ecommon.spatial_layer_id \u003d cpi-\u003esvc.spatial_layer_id \u003d clamp(cpi-\u003esvc.spatial_layer_id, 0, cpi-\u003esvc.number_spatial_layers - 1);` work?",
+      "range": {
+        "startLine": 4171,
+        "startChar": 39,
+        "endLine": 4171,
+        "endChar": 67
+      },
+      "fixSuggestions": [
+        {
+          "fixId": "65b98a34_ba18dfe7",
+          "description": "prompt_to_edit API",
+          "replacements": [
+            {
+              "path": "av1/av1_cx_iface.c",
+              "range": {
+                "startLine": 4171,
+                "startChar": 0,
+                "endLine": 4175,
+                "endChar": 0
+              },
+              "replacement": "  cpi-\u003ecommon.spatial_layer_id \u003d cpi-\u003esvc.spatial_layer_id;\n  cpi-\u003ecommon.temporal_layer_id \u003d cpi-\u003esvc.temporal_layer_id;\n"
+            }
+          ]
+        }
+      ],
+      "revId": "7a255ab18f6de9dd752a52a2d122d44726401ee0",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "abde0d91_6c070dc8",
+        "filename": "test/encode_api_test.cc",
+        "patchSetId": 6
+      },
+      "lineNbr": 265,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-07-29T19:33:04Z",
+      "side": 1,
+      "message": "Swap the parameter order here and lines 271, and 308 to match the other lines.",
+      "fixSuggestions": [
+        {
+          "fixId": "63c10702_764baa93",
+          "description": "prompt_to_edit API",
+          "replacements": [
+            {
+              "path": "test/encode_api_test.cc",
+              "range": {
+                "startLine": 265,
+                "startChar": 0,
+                "endLine": 266,
+                "endChar": 0
+              },
+              "replacement": "  EXPECT_EQ(aom_codec_enc_config_default(iface, \u0026cfg, kUsage), AOM_CODEC_OK);\n"
+            },
+            {
+              "path": "test/encode_api_test.cc",
+              "range": {
+                "startLine": 271,
+                "startChar": 0,
+                "endLine": 272,
+                "endChar": 0
+              },
+              "replacement": "  ASSERT_EQ(aom_codec_enc_init(\u0026enc, iface, \u0026cfg, 0), AOM_CODEC_OK);\n"
+            }
+          ]
+        }
+      ],
+      "revId": "7a255ab18f6de9dd752a52a2d122d44726401ee0",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
