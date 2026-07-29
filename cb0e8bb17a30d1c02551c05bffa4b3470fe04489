@@ -58,6 +58,66 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "818caebb_75e757e5",
+        "filename": "av1/common/convolve_2d_sr_hwy.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 327,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-07-29T15:32:15Z",
+      "side": 1,
+      "message": "Good catch!",
+      "parentUuid": "01b66eaa_ff163d76",
+      "revId": "cb0e8bb17a30d1c02551c05bffa4b3470fe04489",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "ae51fdee_a9bc9426",
+        "filename": "av1/common/convolve_2d_sr_hwy.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 327,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-07-29T15:32:15Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "7dd5a706_a1da2f9e",
+      "revId": "cb0e8bb17a30d1c02551c05bffa4b3470fe04489",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "90394e65_57678687",
+        "filename": "av1/common/convolve_2d_sr_hwy.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 327,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-07-29T15:32:15Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "9663a052_3d1d82e7",
+      "range": {
+        "startLine": 326,
+        "startChar": 57,
+        "endLine": 327,
+        "endChar": 15
+      },
+      "revId": "cb0e8bb17a30d1c02551c05bffa4b3470fe04489",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "1dfd0676_3d8e884c",
@@ -71,6 +131,24 @@
       "writtenOn": "2026-07-28T22:20:10Z",
       "side": 1,
       "message": "See also my comment at line 372. I believe `limit_val \u003e 0` is always true. So we can just use `limit_val` and remove `limit_for_num_z`.",
+      "revId": "cb0e8bb17a30d1c02551c05bffa4b3470fe04489",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "d03562b1_e50935a2",
+        "filename": "av1/common/convolve_2d_sr_hwy.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 340,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-07-29T15:32:15Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "1dfd0676_3d8e884c",
       "revId": "cb0e8bb17a30d1c02551c05bffa4b3470fe04489",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
@@ -442,6 +520,30 @@
           ]
         }
       ],
+      "revId": "cb0e8bb17a30d1c02551c05bffa4b3470fe04489",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "eb2e216e_a9072647",
+        "filename": "av1/common/convolve_2d_sr_hwy.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 586,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-07-29T15:32:15Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "0e067df2_947f0ad0",
+      "range": {
+        "startLine": 586,
+        "startChar": 43,
+        "endLine": 586,
+        "endChar": 44
+      },
       "revId": "cb0e8bb17a30d1c02551c05bffa4b3470fe04489",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
