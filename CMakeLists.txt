@@ -309,7 +309,8 @@ if(CONFIG_HIGHWAY)
   set(AOM_LIB_TARGETS ${AOM_LIB_TARGETS} aom_hwy)
 endif()
 
-if(ENABLE_EXAMPLES)
+if(ENABLE_APPS)
+  # Only used by aomenc.
   add_library(aom_encoder_stats OBJECT ${AOM_ENCODER_STATS_SOURCES})
   set(AOM_LIB_TARGETS ${AOM_LIB_TARGETS} aom_encoder_stats)
 endif()
@@ -440,7 +441,7 @@ file(WRITE "${AOM_GEN_SRC_DIR}/usage_exit.c"
 #
 # Application and application support targets.
 #
-if(ENABLE_EXAMPLES OR ENABLE_TESTS OR ENABLE_TOOLS)
+if(ENABLE_APPS OR ENABLE_EXAMPLES OR ENABLE_TESTS OR ENABLE_TOOLS)
   add_library(aom_common_app_util OBJECT ${AOM_COMMON_APP_UTIL_SOURCES})
   add_library(aom_usage_exit OBJECT "${AOM_GEN_SRC_DIR}/usage_exit.c")
   set_property(TARGET ${example} PROPERTY FOLDER examples)
@@ -456,10 +457,14 @@ if(ENABLE_EXAMPLES OR ENABLE_TESTS OR ENABLE_TOOLS)
   endif()
 endif()
 
-if(CONFIG_AV1_DECODER AND ENABLE_EXAMPLES)
+if(CONFIG_AV1_DECODER AND ENABLE_APPS)
   add_executable(aomdec "${AOM_ROOT}/apps/aomdec.c"
                         $<TARGET_OBJECTS:aom_common_app_util>
                         $<TARGET_OBJECTS:aom_decoder_app_util>)
+  list(APPEND AOM_APP_TARGETS aomdec)
+endif()
+
+if(CONFIG_AV1_DECODER AND ENABLE_EXAMPLES)
   add_executable(decode_to_md5 "${AOM_ROOT}/examples/decode_to_md5.c"
                                $<TARGET_OBJECTS:aom_common_app_util>
                                $<TARGET_OBJECTS:aom_decoder_app_util>)
@@ -512,7 +517,7 @@ if(CONFIG_AV1_DECODER AND ENABLE_EXAMPLES)
   endif()
 
   # Maintain a list of decoder example targets.
-  list(APPEND AOM_DECODER_EXAMPLE_TARGETS aomdec decode_to_md5 decode_with_drops
+  list(APPEND AOM_DECODER_EXAMPLE_TARGETS decode_to_md5 decode_with_drops
               scalable_decoder simple_decoder)
 
   # Add decoder examples to the app targets list.
@@ -539,11 +544,15 @@ if(CONFIG_LIBYUV OR CONFIG_TUNE_BUTTERAUGLI)
 endif()
 
 if(CONFIG_AV1_ENCODER)
-  if(ENABLE_EXAMPLES)
+  if(ENABLE_APPS)
     add_executable(aomenc "${AOM_ROOT}/apps/aomenc.c"
                           $<TARGET_OBJECTS:aom_common_app_util>
                           $<TARGET_OBJECTS:aom_encoder_app_util>
                           $<TARGET_OBJECTS:aom_encoder_stats>)
+    list(APPEND AOM_APP_TARGETS aomenc)
+  endif()
+
+  if(ENABLE_EXAMPLES)
     add_executable(lossless_encoder "${AOM_ROOT}/examples/lossless_encoder.c"
                                     $<TARGET_OBJECTS:aom_common_app_util>
                                     $<TARGET_OBJECTS:aom_encoder_app_util>)
@@ -574,7 +583,7 @@ if(CONFIG_AV1_ENCODER)
     target_link_libraries(svc_encoder_rtc ${AOM_LIB_LINK_TYPE} aom_av1_rc)
 
     # Maintain a list of encoder example targets.
-    list(APPEND AOM_ENCODER_EXAMPLE_TARGETS aomenc lossless_encoder set_maps
+    list(APPEND AOM_ENCODER_EXAMPLE_TARGETS lossless_encoder set_maps
                 simple_encoder scalable_encoder svc_encoder_rtc twopass_encoder)
     if(NOT BUILD_SHARED_LIBS AND NOT CONFIG_REALTIME_ONLY)
       list(APPEND AOM_ENCODER_EXAMPLE_TARGETS noise_model photon_noise_table)
@@ -815,7 +824,7 @@ foreach(aom_app ${AOM_APP_TARGETS})
   target_link_libraries(${aom_app} ${AOM_LIB_LINK_TYPE} aom)
 endforeach()
 
-if(ENABLE_EXAMPLES OR ENABLE_TESTS OR ENABLE_TOOLS)
+if(ENABLE_APPS OR ENABLE_EXAMPLES OR ENABLE_TESTS OR ENABLE_TOOLS)
   if(CONFIG_LIBYUV)
     # Add to existing targets.
     foreach(aom_app ${AOM_APP_TARGETS})
@@ -893,11 +902,9 @@ if(ENABLE_EXAMPLES AND "${CMAKE_GENERATOR}" MATCHES "Makefiles$")
   file(MAKE_DIRECTORY "${AOM_CONFIG_DIR}/examples")
 
   foreach(target ${AOM_EXAMPLE_TARGETS})
-    if(NOT "${target}" MATCHES "aomdec\|aomenc")
-      set_target_properties(${target}
-                            PROPERTIES RUNTIME_OUTPUT_DIRECTORY
-                                       "${AOM_CONFIG_DIR}/examples")
-    endif()
+    set_target_properties(${target}
+                          PROPERTIES RUNTIME_OUTPUT_DIRECTORY
+                                     "${AOM_CONFIG_DIR}/examples")
   endforeach()
 
   if(ENABLE_TOOLS AND AOM_TOOL_TARGETS)
@@ -982,10 +989,10 @@ if(ENABLE_DOCS)
 endif()
 
 # Aomedia dist rule.
-if(CONFIG_AV1_DECODER AND ENABLE_EXAMPLES)
+if(CONFIG_AV1_DECODER AND ENABLE_APPS)
   list(APPEND AOM_DIST_APPS $<TARGET_FILE:aomdec>)
 endif()
-if(CONFIG_AV1_ENCODER AND ENABLE_EXAMPLES)
+if(CONFIG_AV1_ENCODER AND ENABLE_APPS)
   list(APPEND AOM_DIST_APPS $<TARGET_FILE:aomenc>)
 endif()
 
