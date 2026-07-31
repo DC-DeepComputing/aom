@@ -16,6 +16,24 @@
       "message": "[CMake documentation](https://cmake.org/cmake/help/latest/command/set_property.html) says \"Scope may name zero or more existing targets\". I guess that\u0027s why there is no cmake error. Do you know if this `set_property()` call has any side effects?",
       "revId": "4f0e3d0a7791e7d5a1fe4aa31497dbe40a7b1b4a",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "d9eef083_a6e07f59",
+        "filename": "CMakeLists.txt",
+        "patchSetId": 1
+      },
+      "lineNbr": 446,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-07-31T19:44:07Z",
+      "side": 0,
+      "message": "\u003e [CMake documentation](https://cmake.org/cmake/help/latest/command/set_property.html) says \"Scope may name zero or more existing targets\". I guess that\u0027s why there is no cmake error. Do you know if this `set_property()` call has any side effects?\n\nThese are used to add folders to the IDE. Instead of removing them, I suggest adding the target names (`aom_common_app_util` and `aom_usage_exit`) here.",
+      "parentUuid": "3e07cef6_3103055a",
+      "revId": "4f0e3d0a7791e7d5a1fe4aa31497dbe40a7b1b4a",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
