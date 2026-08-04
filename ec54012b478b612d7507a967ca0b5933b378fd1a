@@ -16,6 +16,24 @@
       "message": "This comes from googletest:\n\nhttps://github.com/google/googletest/blob/fcd5e2608974d282dc8492facad3026273c1aded/googletest/CMakeLists.txt#L57",
       "revId": "ec54012b478b612d7507a967ca0b5933b378fd1a",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "7f2df7e5_c6c685d2",
+        "filename": "cmake/aom_config_defaults.cmake",
+        "patchSetId": 1
+      },
+      "lineNbr": 18,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-08-04T21:58:44Z",
+      "side": 1,
+      "message": "The example in [CMake documentation](https://cmake.org/cmake/help/latest/variable/BUILD_SHARED_LIBS.html) uses the help text \"Build using shared libraries\"\n\n```\noption(BUILD_SHARED_LIBS \"Build using shared libraries\" ON)\n```\n\nBut I like your help text better.",
+      "parentUuid": "22196822_d6713ac8",
+      "revId": "ec54012b478b612d7507a967ca0b5933b378fd1a",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
