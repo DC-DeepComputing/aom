@@ -34,6 +34,24 @@
       "parentUuid": "9593ce8b_94906715",
       "revId": "ede1999876567d39174f5cadc77acbde9d1f4fd3",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "401bb0c1_96eee3bb",
+        "filename": "aom/src/aom_image.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 299,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-08-04T18:34:02Z",
+      "side": 1,
+      "message": "Done. I made three edits.\n- Changed \"calculation\" to \"calculations\" (plural).\n- Changed \"the adjustment parameter\" to \"the first operand of the multiplication\".\n- Shortened \"stride parameter\" to \"stride\".",
+      "parentUuid": "627eb5f0_39bcd7ad",
+      "revId": "ede1999876567d39174f5cadc77acbde9d1f4fd3",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
