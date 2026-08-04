@@ -16,6 +16,24 @@
       "message": "I wonder if this is a bug in ASan because `skip_contexts` is a local variable. In any case it is good to move these constants to the global scope so that they are shared.",
       "revId": "37220bd507109e12bf33c91294f3051b9f2aade3",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "e0ec5a70_af8dd7ed",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-08-04T23:05:06Z",
+      "side": 1,
+      "message": "\u003e I wonder if this is a bug in ASan because `skip_contexts` is a local variable. In any case it is good to move these constants to the global scope so that they are shared.\n\nMaybe, though they share the same names. They would go to .rodata. I would expect that they would have been merged. It\u0027s likely I saw this in a debug build.",
+      "parentUuid": "3ac1984d_3445b7ff",
+      "revId": "37220bd507109e12bf33c91294f3051b9f2aade3",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ],
   "submitRequirementResults": [
