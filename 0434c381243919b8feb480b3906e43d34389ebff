@@ -34,6 +34,24 @@
       "parentUuid": "c4f62f92_11459b3c",
       "revId": "0434c381243919b8feb480b3906e43d34389ebff",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "936540d3_0f4afa9f",
+        "filename": "aom/src/aom_encoder.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 183,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-08-04T18:02:27Z",
+      "side": 1,
+      "message": "Done. Thanks for the suggested rewrite. I mention `img` first in the error message to avoid \"non-high bit-depth\".",
+      "parentUuid": "bbfce10b_0882e2ba",
+      "revId": "0434c381243919b8feb480b3906e43d34389ebff",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
