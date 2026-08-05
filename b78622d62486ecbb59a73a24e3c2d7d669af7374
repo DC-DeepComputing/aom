@@ -16,6 +16,23 @@
       "message": "Thanks for signing the CLA. Your first change needs a committer to upload the patch to allow the presubmit to run. I\u0027ll rebase this.",
       "revId": "b78622d62486ecbb59a73a24e3c2d7d669af7374",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "efcfe829_89a7b3d0",
+        "filename": "cmake/aom_configure.cmake",
+        "patchSetId": 3
+      },
+      "lineNbr": 436,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-08-05T18:00:56Z",
+      "side": 1,
+      "message": "The `_POSIX_C_SOURCE` macro is not Linux-specific. I suggest defining it here, next to the two related macro definitions:\n\n```\n  add_compiler_flag_if_supported(\"-D_POSIX_C_SOURCE\u003d200112L\")\n```\n\nIf it is necessary to define `_POSIX_C_SOURCE` at the location you proposed, we should move these two related macto definitions there, and change the condition to `if (NOT WIN32)`.\n\n---\n\nNote: My colleague Vincent Rebaud and I dealt with this issue in libavif before. Here is our solution in [libavif/src/io.c](https://github.com/AOMediaCodec/libavif/blob/main/src/io.c):\n\n```\n#if !defined(_WIN32)\n// Ensure off_t is 64 bits.\n#undef _FILE_OFFSET_BITS\n#define _FILE_OFFSET_BITS 64\n// Ensure we have some POSIX compatibility with fseeko/ftello.\n#undef _POSIX_C_SOURCE\n#define _POSIX_C_SOURCE 200112L\n#endif\n```\n\nSo the only essential difference is the condition (MSVC vs. WIN32).",
+      "revId": "b78622d62486ecbb59a73a24e3c2d7d669af7374",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
