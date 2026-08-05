@@ -249,6 +249,13 @@ if(AOM_TARGET_SYSTEM STREQUAL "Windows")
   add_compiler_flag_if_supported("-D_CRT_SECURE_NO_WARNINGS")
 endif()
 
+# Some libcs (e.g. musl) gate fseeko()/ftello() and off_t behind explicit
+# feature test macros instead of exposing them by default like glibc does.
+# See https://bugs.gentoo.org/869419.
+if(AOM_TARGET_SYSTEM STREQUAL "Linux")
+  add_compiler_flag_if_supported("-D_POSIX_C_SOURCE=200112L")
+endif()
+
 #
 # Fix CONFIG_* dependencies. This must be done before including cpu.cmake to
 # ensure RTCD_CONFIG_* are properly set.
