@@ -16,6 +16,24 @@
       "message": "We call `print_reconstruction_frame()` with `do_print\u003d0`. I wonder if we can delete the `print_reconstruction_frame()` function.",
       "revId": "5430e9d99504a98636c174f40fddf91c30b85d0c",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "63ae80ed_2dbd96c9",
+        "filename": "av1/encoder/firstpass.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1551,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-08-06T21:08:40Z",
+      "side": 1,
+      "message": "\u003e We call `print_reconstruction_frame()` with `do_print\u003d0`. I wonder if we can delete the `print_reconstruction_frame()` function.\n\nIt\u0027s probably left this way for debugging. Before this function it looked like:\n\n```\n// Use this to see what the first pass reconstruction looks like.\nif (0) {\n  char filename[512];\n  FILE *recon_file;\n  snprintf(filename, sizeof(filename), \"enc%04d.yuv\",\n           (int)current_frame-\u003eframe_number);\n\n  if (current_frame-\u003eframe_number \u003d\u003d 0)\n    recon_file \u003d fopen(filename, \"wb\");\n  else\n    recon_file \u003d fopen(filename, \"ab\");\n\n  (void)fwrite(last_frame-\u003ebuffer_alloc, last_frame-\u003eframe_size, 1,\n               recon_file);\n  fclose(recon_file);\n}\n```",
+      "parentUuid": "9e96e824_b79f4496",
+      "revId": "5430e9d99504a98636c174f40fddf91c30b85d0c",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
