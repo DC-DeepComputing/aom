@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "a3d1efe6_4cf15dbf",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-08-11T21:17:42Z",
+      "side": 1,
+      "message": "LGTM. Thank you, Jerome!",
+      "revId": "3ca3b06b42763537723a5832dfb0e5401dd4f3be",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
