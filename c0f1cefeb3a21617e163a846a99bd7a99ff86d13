@@ -20,6 +20,24 @@
     {
       "unresolved": true,
       "key": {
+        "uuid": "396580da_e760072e",
+        "filename": "av1/encoder/encoder.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 983,
+      "author": {
+        "id": 33002
+      },
+      "writtenOn": "2026-08-11T11:52:36Z",
+      "side": 1,
+      "message": "Ack. Since `upsample_pred` serves both the intermediate and dst buffer for convolve 2D (horizontal then vertical) in aom_upsampled_pred() and maximum filter-tap size is 8, buffer size of `((MAX_SB_SIZE + 8) * MAX_SB_SIZE)` should be sufficient. We will submit a patch to fix this.",
+      "parentUuid": "ae10e905_251de339",
+      "revId": "c0f1cefeb3a21617e163a846a99bd7a99ff86d13",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
         "uuid": "e73ede3f_bc3abe1c",
         "filename": "av1/encoder/x86/reconinter_enc_sse2.c",
         "patchSetId": 2
@@ -37,6 +55,24 @@
     {
       "unresolved": true,
       "key": {
+        "uuid": "6b37b02c_442c3141",
+        "filename": "av1/encoder/x86/reconinter_enc_sse2.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 141,
+      "author": {
+        "id": 33002
+      },
+      "writtenOn": "2026-08-11T11:52:36Z",
+      "side": 1,
+      "message": "We will correct the `intermediate_height` limits matching with allocated size as below:\n` assert(intermediate_height \u003c (MAX_SB_SIZE + 8));`\n\nOnce https://aomedia-review.googlesource.com/c/aom/+/215601 is merged, we shall submit a patch to correct the above assert in C, SSE2 and NEON.",
+      "parentUuid": "e73ede3f_bc3abe1c",
+      "revId": "c0f1cefeb3a21617e163a846a99bd7a99ff86d13",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
         "uuid": "5459b338_a24a407d",
         "filename": "av1/encoder/x86/reconinter_enc_sse2.c",
         "patchSetId": 2
@@ -48,6 +84,24 @@
       "writtenOn": "2026-08-11T02:05:25Z",
       "side": 1,
       "message": "I wonder if the upper bound for `intermediate_height` in this assertion is a copy-and-paste error, because the size of the original stack allocated buffer has a different factor:\n\n```\n    DECLARE_ALIGNED(16, uint16_t,\n                    temp[((MAX_SB_SIZE + 16) + 16) * MAX_SB_SIZE]);\n```",
+      "revId": "c0f1cefeb3a21617e163a846a99bd7a99ff86d13",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "02f2ef7c_fe7b217e",
+        "filename": "av1/encoder/x86/reconinter_enc_sse2.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 244,
+      "author": {
+        "id": 33002
+      },
+      "writtenOn": "2026-08-11T11:52:36Z",
+      "side": 1,
+      "message": "Acknowledged",
+      "parentUuid": "5459b338_a24a407d",
       "revId": "c0f1cefeb3a21617e163a846a99bd7a99ff86d13",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
