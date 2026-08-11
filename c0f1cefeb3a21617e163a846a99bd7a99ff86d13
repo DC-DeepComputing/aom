@@ -36,6 +36,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "377c5bcf_755c0d9e",
+        "filename": "av1/encoder/encoder.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 983,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-08-11T18:20:46Z",
+      "side": 1,
+      "message": "Thank you!",
+      "parentUuid": "396580da_e760072e",
+      "revId": "c0f1cefeb3a21617e163a846a99bd7a99ff86d13",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "e73ede3f_bc3abe1c",
@@ -71,6 +89,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "d41d4207_de7b7742",
+        "filename": "av1/encoder/x86/reconinter_enc_sse2.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 141,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-08-11T18:20:46Z",
+      "side": 1,
+      "message": "Thank you!",
+      "parentUuid": "6b37b02c_442c3141",
+      "revId": "c0f1cefeb3a21617e163a846a99bd7a99ff86d13",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "5459b338_a24a407d",
@@ -102,6 +138,23 @@
       "side": 1,
       "message": "Acknowledged",
       "parentUuid": "5459b338_a24a407d",
+      "revId": "c0f1cefeb3a21617e163a846a99bd7a99ff86d13",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "d358ba99_67b569a6",
+        "filename": "av1/encoder/x86/reconinter_enc_sse2.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 250,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-08-11T18:20:46Z",
+      "side": 1,
+      "message": "Satheesh: I have an important question about this `aom_highbd_convolve8_vert()` call. With the change to the `temp` buffer, the `src` and `dst` parameters of this `aom_highbd_convolve8_vert()` call are the same buffer (`comp_pred8`), although they start from different offsets in the buffer. Why is this safe?\n\nIt is not clear why `aom_highbd_convolve8_vert()` can operate on the `comp_pred8` buffer in place.",
       "revId": "c0f1cefeb3a21617e163a846a99bd7a99ff86d13",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
