@@ -16,6 +16,40 @@
       "message": "It would be good to add a comment to explain the `((MAX_SB_SIZE + 16) + 16)` factor. I don\u0027t know why we need to pad it by 16 twice. Does it mean we are padding 16 to the left and 16 to the right of each row?",
       "revId": "c0f1cefeb3a21617e163a846a99bd7a99ff86d13",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "e73ede3f_bc3abe1c",
+        "filename": "av1/encoder/x86/reconinter_enc_sse2.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 141,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-08-11T02:05:25Z",
+      "side": 1,
+      "message": "Note the upper bound for `intermediate_height` in this assertion. The upper bound is apparently based on the size of the original stack allocated buffer:\n\n```\n    DECLARE_ALIGNED(16, uint8_t,\n                    temp[((MAX_SB_SIZE * 2 + 16) + 16) * MAX_SB_SIZE]);\n```\n\nShould we adjust this assertion or the size of the heap allocated buffer so that they match?\n\n```\n  if (x-\u003eupsample_pred \u003d\u003d NULL) {\n    CHECK_MEM_ERROR(\n        cm, x-\u003eupsample_pred,\n        aom_memalign(16, (1 + is_highbitdepth) * ((MAX_SB_SIZE + 16) + 16) *\n                             MAX_SB_SIZE * sizeof(*x-\u003eupsample_pred)));\n    x-\u003ee_mbd.tmp_upsample_pred \u003d x-\u003eupsample_pred;\n  }\n```",
+      "revId": "c0f1cefeb3a21617e163a846a99bd7a99ff86d13",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "5459b338_a24a407d",
+        "filename": "av1/encoder/x86/reconinter_enc_sse2.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 244,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-08-11T02:05:25Z",
+      "side": 1,
+      "message": "I wonder if the upper bound for `intermediate_height` in this assertion is a copy-and-paste error, because the size of the original stack allocated buffer has a different factor:\n\n```\n    DECLARE_ALIGNED(16, uint16_t,\n                    temp[((MAX_SB_SIZE + 16) + 16) * MAX_SB_SIZE]);\n```",
+      "revId": "c0f1cefeb3a21617e163a846a99bd7a99ff86d13",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
