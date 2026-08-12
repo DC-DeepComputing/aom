@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "69b092d8_5c4bd1d1",
+        "filename": "av1/encoder/reconinter_enc.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 564,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-08-12T23:00:13Z",
+      "side": 0,
+      "message": "James: you asked:\n\n\u003e `CONVERT_TO_SHORTPTR` doubles the value, then the stride is added to a `uint16_t`, doubling the effect. Converting it back would halve it, no?\n\nNote line 563:\n\n```\n      ref +\u003d ref_stride;\n```\n\nIt shows `ref_stride` should be applied after `ref8` is converted to a short pointer.",
+      "revId": "95cf99e94ddd2a7642da0ff52514675121088bea",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
