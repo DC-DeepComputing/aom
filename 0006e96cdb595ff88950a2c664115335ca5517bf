@@ -16,6 +16,24 @@
       "message": "James: The pointer arithmetic here seems wrong. `ref_stride` should only be used after `ref8` is converted back to `SHORTPTR`.",
       "revId": "0006e96cdb595ff88950a2c664115335ca5517bf",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "ab711a71_411ed83f",
+        "filename": "av1/encoder/reconinter_enc.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 577,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-08-12T22:33:33Z",
+      "side": 1,
+      "message": "\u003e James: The pointer arithmetic here seems wrong. `ref_stride` should only be used after `ref8` is converted back to `SHORTPTR`.\n\n`CONVERT_TO_SHORTPTR` doubles the value, then the stride is added to a `uint16_t`, doubling the effect. Converting it back would halve it, no?\n\nDoes this path get hit by any tests?",
+      "parentUuid": "582b92e3_e3ac7b90",
+      "revId": "0006e96cdb595ff88950a2c664115335ca5517bf",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
