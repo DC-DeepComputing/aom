@@ -157,6 +157,24 @@
       "message": "Satheesh: I have an important question about this `aom_highbd_convolve8_vert()` call. With the change to the `temp` buffer, the `src` and `dst` parameters of this `aom_highbd_convolve8_vert()` call are the same buffer (`comp_pred8`), although they start from different offsets in the buffer. Why is this safe?\n\nIt is not clear why `aom_highbd_convolve8_vert()` can operate on the `comp_pred8` buffer in place.",
       "revId": "c0f1cefeb3a21617e163a846a99bd7a99ff86d13",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "b6742078_d5662e13",
+        "filename": "av1/encoder/x86/reconinter_enc_sse2.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 250,
+      "author": {
+        "id": 33002
+      },
+      "writtenOn": "2026-08-12T12:09:12Z",
+      "side": 1,
+      "message": "For any given row `\\(y\\)` , the 8-tap vertical filter reads a window of input rows from `\\(y-3\\) to \\(y+4\\)` at stride `MAX_SB_SIZE` and  the result is written  to row `\\(y-3\\)` at stride `width` of the `comp_pred8` buffer. Since `width \u003c\u003d MAX_SB_SIZE`, output is written only after its corresponding input has already been read, eliminating any risk of overwriting data required for future iterations.",
+      "parentUuid": "d358ba99_67b569a6",
+      "revId": "c0f1cefeb3a21617e163a846a99bd7a99ff86d13",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
