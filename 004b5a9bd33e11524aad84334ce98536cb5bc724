@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "cfc755ee_acc819f0",
+        "filename": "av1/encoder/reconinter_enc.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 504,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-08-12T22:57:08Z",
+      "side": 1,
+      "message": "Please compare with the corresponding 8-bit code here. Note the first arguments to the horizontal and vertical convolutions:\n\n```\nref - ref_stride * ((filter-\u003etaps \u003e\u003e 1) - 1)\n```\n\n```\ntemp + MAX_SB_SIZE * ((filter-\u003etaps \u003e\u003e 1) - 1)\n```",
+      "revId": "004b5a9bd33e11524aad84334ce98536cb5bc724",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "856e60b5_a268ca4c",
+        "filename": "av1/encoder/reconinter_enc.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 592,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-08-12T22:57:08Z",
+      "side": 1,
+      "message": "Please see my comment at line 504 above. By symmetry, we would expect the first arguments to the horizontal and vertical convolutions to be the following:\n\n```\nCONVERT_TO_BYTEPTR(ref - ref_stride * ((filter-\u003etaps \u003e\u003e 1) - 1))\n```\n\n```\nCONVERT_TO_BYTEPTR(temp + MAX_SB_SIZE * ((filter-\u003etaps \u003e\u003e 1) - 1))\n```",
+      "revId": "004b5a9bd33e11524aad84334ce98536cb5bc724",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
