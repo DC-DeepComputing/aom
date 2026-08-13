@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "b5a9c12d_c8ab907e",
+        "filename": "aom_ports/bitops.h",
+        "patchSetId": 2
+      },
+      "lineNbr": 45,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-08-13T22:52:23Z",
+      "side": 1,
+      "message": "James: I just discovered this comment that I wrote a long time ago. Do you think it is useful? Is it the reason we wrote `31 ^ i` instead of the more obvious `31 - i`?",
+      "revId": "f3f70c92a9e723ab11ac7bd00553e196280f616b",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
