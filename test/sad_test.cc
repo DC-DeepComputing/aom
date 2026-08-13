@@ -2012,11 +2012,15 @@ const SadMxNParam neon_dotprod_tests[] = {
   make_tuple(16, 32, &aom_sad16x32_neon_dotprod, -1),
   make_tuple(16, 16, &aom_sad16x16_neon_dotprod, -1),
   make_tuple(16, 8, &aom_sad16x8_neon_dotprod, -1),
+  make_tuple(8, 16, &aom_sad8x16_neon_dotprod, -1),
+  make_tuple(8, 8, &aom_sad8x8_neon_dotprod, -1),
+  make_tuple(8, 4, &aom_sad8x4_neon_dotprod, -1),
 #if !CONFIG_REALTIME_ONLY
   make_tuple(64, 16, &aom_sad64x16_neon_dotprod, -1),
   make_tuple(32, 8, &aom_sad32x8_neon_dotprod, -1),
   make_tuple(16, 64, &aom_sad16x64_neon_dotprod, -1),
   make_tuple(16, 4, &aom_sad16x4_neon_dotprod, -1),
+  make_tuple(8, 32, &aom_sad8x32_neon_dotprod, -1),
 #endif  // !CONFIG_REALTIME_ONLY
 };
 INSTANTIATE_TEST_SUITE_P(NEON_DOTPROD, SADTest,

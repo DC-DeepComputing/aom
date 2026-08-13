@@ -103,6 +103,36 @@ static inline unsigned int sad16xh_neon_dotprod(const uint8_t *src_ptr,
   return horizontal_add_u32x4(vaddq_u32(sum[0], sum[1]));
 }
 
+static inline unsigned int sad8xh_neon_dotprod(const uint8_t *src_ptr,
+                                               int src_stride,
+                                               const uint8_t *ref_ptr,
+                                               int ref_stride, int h) {
+  // Pack two 8-byte rows into one 16-byte vector per dot-product step so
+  // the narrow 8-wide block still fills a full Neon register.
+  uint32x4_t sum[2] = { vdupq_n_u32(0), vdupq_n_u32(0) };
+
+  int i = h / 4;
+  do {
+    uint8x16_t s0 = load_u8_8x2(src_ptr, src_stride);
+    uint8x16_t r0 = load_u8_8x2(ref_ptr, ref_stride);
+    uint8x16_t diff0 = vabdq_u8(s0, r0);
+    sum[0] = vdotq_u32(sum[0], diff0, vdupq_n_u8(1));
+
+    src_ptr += 2 * src_stride;
+    ref_ptr += 2 * ref_stride;
+
+    uint8x16_t s1 = load_u8_8x2(src_ptr, src_stride);
+    uint8x16_t r1 = load_u8_8x2(ref_ptr, ref_stride);
+    uint8x16_t diff1 = vabdq_u8(s1, r1);
+    sum[1] = vdotq_u32(sum[1], diff1, vdupq_n_u8(1));
+
+    src_ptr += 2 * src_stride;
+    ref_ptr += 2 * ref_stride;
+  } while (--i != 0);
+
+  return horizontal_add_u32x4(vaddq_u32(sum[0], sum[1]));
+}
+
 #define SAD_WXH_NEON_DOTPROD(w, h)                                         \
   unsigned int aom_sad##w##x##h##_neon_dotprod(                            \
       const uint8_t *src, int src_stride, const uint8_t *ref,              \
@@ -125,7 +155,12 @@ SAD_WXH_NEON_DOTPROD(64, 128)
 SAD_WXH_NEON_DOTPROD(128, 64)
 SAD_WXH_NEON_DOTPROD(128, 128)
 
+SAD_WXH_NEON_DOTPROD(8, 4)
+SAD_WXH_NEON_DOTPROD(8, 8)
+SAD_WXH_NEON_DOTPROD(8, 16)
+
 #if !CONFIG_REALTIME_ONLY
+SAD_WXH_NEON_DOTPROD(8, 32)
 SAD_WXH_NEON_DOTPROD(16, 4)
 SAD_WXH_NEON_DOTPROD(16, 64)
 SAD_WXH_NEON_DOTPROD(32, 8)

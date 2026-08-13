@@ -873,15 +873,15 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
   specialize qw/aom_sad16x32           sse2 neon neon_dotprod/;
   specialize qw/aom_sad16x16           sse2 neon neon_dotprod/;
   specialize qw/aom_sad16x8            sse2 neon neon_dotprod/;
-  specialize qw/aom_sad8x16            sse2 neon/;
-  specialize qw/aom_sad8x8             sse2 neon/;
-  specialize qw/aom_sad8x4             sse2 neon/;
+  specialize qw/aom_sad8x16            sse2 neon neon_dotprod/;
+  specialize qw/aom_sad8x8             sse2 neon neon_dotprod/;
+  specialize qw/aom_sad8x4             sse2 neon neon_dotprod/;
   specialize qw/aom_sad4x8             sse2 neon/;
   specialize qw/aom_sad4x4             sse2 neon/;
 
   specialize qw/aom_sad4x16            sse2 neon/;
   specialize qw/aom_sad16x4            sse2 neon neon_dotprod/;
-  specialize qw/aom_sad8x32            sse2 neon/;
+  specialize qw/aom_sad8x32            sse2 neon neon_dotprod/;
   specialize qw/aom_sad32x8            sse2 neon neon_dotprod/;
   specialize qw/aom_sad16x64           sse2 neon neon_dotprod/;
   specialize qw/aom_sad64x16           sse2 neon neon_dotprod/;
