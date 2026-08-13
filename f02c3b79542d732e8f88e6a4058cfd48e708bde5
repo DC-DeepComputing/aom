@@ -16,6 +16,24 @@
       "message": "Satheesh: Since you are familiar with the `aom_highbd_upsampled_pred_*()` functions, I would appreciate it if you could review this CL.\n\nI believe this is a bug. What I can\u0027t explain is why nothing seems broken.",
       "revId": "f02c3b79542d732e8f88e6a4058cfd48e708bde5",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "1ea15690_02b0a8c3",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 2
+      },
+      "lineNbr": 17,
+      "author": {
+        "id": 33002
+      },
+      "writtenOn": "2026-08-13T13:04:42Z",
+      "side": 1,
+      "message": "The patch looks good to me. Here\u0027s why the reference has no actual issue:\n\nIn the reference, `ref8 - offset` (fake byte pointer and adjusted by offset bytes) is passed directly to `aom_highbd_convolve8_horiz()`.\n\nIn this CL, `ref8` is first converted to a short pointer: `ref \u003d ref8 \u003c\u003c 1`. Since `ref` is a short pointer, `ref - offset` adjusts the address by 2 bytes per offset:\n```\n\u003d (ref8 \u003c\u003c 1) - (offset \u003c\u003c 1)\n```\nThis is then converted back to a byte pointer via `CONVERT_TO_BYTEPTR`:\n```\n\u003d ((ref8 \u003c\u003c 1) - (offset \u003c\u003c 1)) \u003e\u003e 1\n\u003d ref8 - offset  (same as the reference)\n```\nSo the final address passed into `aom_highbd_convolve8_horiz()` is identical in both the reference and this CL.",
+      "parentUuid": "bd66133c_4aad0a92",
+      "revId": "f02c3b79542d732e8f88e6a4058cfd48e708bde5",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
