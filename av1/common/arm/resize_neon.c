@@ -13,6 +13,8 @@
 #include <arm_neon.h>
 #include <assert.h>
 
+#include "aom_dsp/aom_dsp_common.h"
+#include "aom_dsp/aom_filter.h"
 #include "aom_dsp/arm/mem_neon.h"
 #include "aom_dsp/arm/transpose_neon.h"
 #include "av1/common/arm/resize_neon.h"
@@ -813,4 +815,165 @@ void av1_resize_and_extend_frame_neon(const YV12_BUFFER_CONFIG *src,
   } else {
     aom_extend_frame_borders(dst, num_planes);
   }
+}
+
+// Applies the 8-tap symmetric-even factor-of-2 downsample filter
+// (av1_down2_symeven_half_filter) to 8 output columns at once: each input
+// vector s0..s7 is one tap row, and lane k of that vector holds the sample
+// for output column k (s3, s4 are the centre tap pair; s0/s7 the outermost).
+// filt holds the 4 distinct filter taps {f0, f1, f2, f3} in lanes 0..3.
+// vaddl_u8 widens and sums each tap pair in a single instruction, so the
+// caller passes raw 8-bit rows straight through. f1*p1 and f2*p2 (each at
+// most 12*510 in magnitude) and the f3 = -1 tap (a plain subtract, not a
+// multiply) combine losslessly in a single 16-bit accumulator t. f0*p0
+// alone (up to 56*510 = 28560) still fits in 16 bits, but f0*p0 + t (up
+// to 34680) does not, so p0's term is widened with vmull_lane_s16 and t
+// is folded into the 32-bit accumulator with vaddw_s16.
+static inline uint8x8_t resize_down2_symeven_8(uint8x8_t s0, uint8x8_t s1,
+                                               uint8x8_t s2, uint8x8_t s3,
+                                               uint8x8_t s4, uint8x8_t s5,
+                                               uint8x8_t s6, uint8x8_t s7,
+                                               const int16x4_t filt) {
+  const int16x8_t p0 = vreinterpretq_s16_u16(vaddl_u8(s3, s4));
+  const int16x8_t p1 = vreinterpretq_s16_u16(vaddl_u8(s2, s5));
+  const int16x8_t p2 = vreinterpretq_s16_u16(vaddl_u8(s1, s6));
+  const int16x8_t p3 = vreinterpretq_s16_u16(vaddl_u8(s0, s7));
+
+  int16x8_t t = vmulq_lane_s16(p1, filt, 1);
+  t = vmlaq_lane_s16(t, p2, filt, 2);
+  t = vsubq_s16(t, p3);
+
+  int32x4_t acc_lo = vmull_lane_s16(vget_low_s16(p0), filt, 0);
+  int32x4_t acc_hi = vmull_lane_s16(vget_high_s16(p0), filt, 0);
+  acc_lo = vaddw_s16(acc_lo, vget_low_s16(t));
+  acc_hi = vaddw_s16(acc_hi, vget_high_s16(t));
+
+  const int16x4_t out_lo = vqrshrn_n_s32(acc_lo, FILTER_BITS);
+  const int16x4_t out_hi = vqrshrn_n_s32(acc_hi, FILTER_BITS);
+  return vqmovun_s16(vcombine_s16(out_lo, out_hi));
+}
+
+// Vertical direction of the factor-of-2 downscale used to build the global
+// motion pyramid (av1_resize_plane_to_half). intbuf is row-major with row
+// stride width2, so 8 columns at a time are processed by sliding an 8-row
+// window straight down the buffer -- no explicit transpose is needed since a
+// "row" of the window is already contiguous across columns. See
+// av1_resize_vert_dir_sse2 for the reference this mirrors. Unlike that
+// version, its tap multiply-accumulate stays in 16-bit lanes for the
+// three outer taps and only widens to 32-bit for the centre tap's
+// contribution (see resize_down2_symeven_8), rather than widening every
+// tap up front.
+bool av1_resize_vert_dir_neon(uint8_t *intbuf, uint8_t *output, int out_stride,
+                              int height, int height2, int width2,
+                              int start_col) {
+  // The GM pyramid caller guarantees an even height; the odd-height check
+  // here is defensive. Even heights below 8 (2, 4, 6) need per-row padding
+  // logic that isn't worth vectorizing; fall back to the C path for both.
+  if (height & 1 || height < 8) {
+    return av1_resize_vert_dir_c(intbuf, output, out_stride, height, height2,
+                                 width2, start_col);
+  }
+  assert(height2 == height / 2);
+
+  const int16x4_t filt = vld1_s16(av1_down2_symeven_half_filter);
+  const int core_outputs = (height - 4) >> 1;
+
+  int i = start_col;
+
+  // Main loop over 8-wide column groups. Each iteration slides an 8-row
+  // window down the group, producing up to 4 output rows per window
+  // position, so the load/shift latency of stepping the window by 8 rows
+  // is amortised across all 4 stores.
+  for (; i + 8 <= width2; i += 8) {
+    const uint8_t *data = &intbuf[i];
+
+    // Rows above the top edge are clamped to row 0.
+    uint8x8_t s0, s1, s2, s3, s4, s5;
+    load_u8_8x3(data, width2, &s3, &s4, &s5);
+    s0 = s1 = s2 = s3;
+
+    const uint8_t *src = data + 3 * width2;
+    uint8_t *dst = &output[i];
+
+    int j = 0;
+    for (; j + 3 < core_outputs; j += 4) {
+      uint8x8_t s6, s7, s8, s9, sA, sB, sC, sD;
+      load_u8_8x8(src, width2, &s6, &s7, &s8, &s9, &sA, &sB, &sC, &sD);
+
+      const uint8x8_t d0 =
+          resize_down2_symeven_8(s0, s1, s2, s3, s4, s5, s6, s7, filt);
+      const uint8x8_t d1 =
+          resize_down2_symeven_8(s2, s3, s4, s5, s6, s7, s8, s9, filt);
+      const uint8x8_t d2 =
+          resize_down2_symeven_8(s4, s5, s6, s7, s8, s9, sA, sB, filt);
+      const uint8x8_t d3 =
+          resize_down2_symeven_8(s6, s7, s8, s9, sA, sB, sC, sD, filt);
+      store_u8_8x4(dst, out_stride, d0, d1, d2, d3);
+      src += 8 * width2;
+      dst += 4 * out_stride;
+
+      s0 = s8;
+      s1 = s9;
+      s2 = sA;
+      s3 = sB;
+      s4 = sC;
+      s5 = sD;
+    }
+
+    if (j + 1 < core_outputs) {
+      uint8x8_t s6, s7, s8, s9;
+      load_u8_8x4(src, width2, &s6, &s7, &s8, &s9);
+
+      const uint8x8_t d0 =
+          resize_down2_symeven_8(s0, s1, s2, s3, s4, s5, s6, s7, filt);
+      const uint8x8_t d1 =
+          resize_down2_symeven_8(s2, s3, s4, s5, s6, s7, s8, s9, filt);
+      store_u8_8x2(dst, out_stride, d0, d1);
+      src += 4 * width2;
+      dst += 2 * out_stride;
+
+      s0 = s4;
+      s1 = s5;
+      s2 = s6;
+      s3 = s7;
+      s4 = s8;
+      s5 = s9;
+      j += 2;
+    }
+
+    if (j < core_outputs) {
+      const uint8x16_t s67 = load_u8_8x2(src, width2);
+      const uint8x8_t s6 = vget_low_u8(s67);
+      const uint8x8_t s7 = vget_high_u8(s67);
+
+      const uint8x8_t d0 =
+          resize_down2_symeven_8(s0, s1, s2, s3, s4, s5, s6, s7, filt);
+      vst1_u8(dst, d0);
+      src += 2 * width2;
+      dst += out_stride;
+
+      s0 = s2;
+      s1 = s3;
+      s2 = s4;
+      s3 = s5;
+      s4 = s6;
+      s5 = s7;
+    }
+
+    // Bottom edge: the last loaded row is clamped and reused for the
+    // remaining two output rows, mirroring the top-edge clamp above.
+    const uint8x8_t s6 = vld1_u8(src);
+    const uint8x8_t d0 =
+        resize_down2_symeven_8(s0, s1, s2, s3, s4, s5, s6, s6, filt);
+    const uint8x8_t d1 =
+        resize_down2_symeven_8(s2, s3, s4, s5, s6, s6, s6, s6, filt);
+    store_u8_8x2(dst, out_stride, d0, d1);
+  }
+
+  if (i < width2) {
+    return av1_resize_vert_dir_c(intbuf, output, out_stride, height, height2,
+                                 width2, i);
+  }
+
+  return true;
 }
