@@ -141,7 +141,7 @@ TEST_P(AV1ResizeYTest, RunTest) { RunTest(); }
 
 TEST_P(AV1ResizeYTest, DISABLED_SpeedTest) { SpeedTest(); }
 
-#if HAVE_AVX2 || HAVE_SSE2
+#if HAVE_AVX2 || HAVE_SSE2 || HAVE_NEON
 // Resolutions (width x height) to be tested for resizing.
 const FrameDimension kFrameDim[] = {
   make_tuple(3840, 2160), make_tuple(2560, 1440), make_tuple(1920, 1080),
@@ -163,6 +163,13 @@ INSTANTIATE_TEST_SUITE_P(
 INSTANTIATE_TEST_SUITE_P(
     SSE2, AV1ResizeYTest,
     ::testing::Combine(::testing::Values(av1_resize_vert_dir_sse2),
+                       ::testing::ValuesIn(kFrameDim)));
+#endif
+
+#if HAVE_NEON
+INSTANTIATE_TEST_SUITE_P(
+    NEON, AV1ResizeYTest,
+    ::testing::Combine(::testing::Values(av1_resize_vert_dir_neon),
                        ::testing::ValuesIn(kFrameDim)));
 #endif
 
