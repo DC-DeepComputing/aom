@@ -276,4 +276,11 @@ INSTANTIATE_TEST_SUITE_P(
                        ::testing::ValuesIn(kFrameDim)));
 #endif
 
+#if HAVE_NEON_DOTPROD
+INSTANTIATE_TEST_SUITE_P(
+    NEON_DOTPROD, AV1ResizeXTest,
+    ::testing::Combine(::testing::Values(av1_resize_horz_dir_neon_dotprod),
+                       ::testing::ValuesIn(kFrameDim)));
+#endif
+
 }  // namespace
