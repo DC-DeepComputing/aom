@@ -12,6 +12,8 @@
 #include <arm_neon.h>
 #include <assert.h>
 
+#include "aom_dsp/aom_dsp_common.h"
+#include "aom_dsp/aom_filter.h"
 #include "aom_dsp/arm/mem_neon.h"
 #include "aom_dsp/arm/transpose_neon.h"
 #include "av1/common/arm/resize_neon.h"
@@ -310,5 +312,128 @@ void av1_resize_and_extend_frame_neon_dotprod(const YV12_BUFFER_CONFIG *src,
     av1_resize_and_extend_frame_c(src, dst, filter, phase, num_planes);
   } else {
     aom_extend_frame_borders(dst, num_planes);
+  }
+}
+
+// Computes 8 outputs of the factor-of-2 symmetric-even downscale filter
+// (av1_down2_symeven_half_filter) via table-lookup gather + dot product,
+// avoiding both the per-tap reloads and the row<->column transpose that
+// made every earlier Neon attempt at this filter lose to C. s0 supplies
+// the first 4 outputs' taps, table-selected from columns [i-3, i+10]
+// (relative to output index i); s1 the next 4, from columns [i+5, i+18].
+// (The 16-byte loads that produce s0/s1 reach a couple of bytes further
+// than that -- see the loop-bound comment below.) Each output's 8-tap
+// window splits into two table-selected groups of 4 bytes, one dot
+// product each.
+static inline uint8x8_t resize_down2_symeven_dotprod_8(
+    const uint8x16_t s0, const uint8x16_t s1, const uint8x16x2_t permute_tbl,
+    const int8x8_t filter) {
+  // Recentre samples to the signed range the dot product needs.
+  const int8x16_t s0_128 = vreinterpretq_s8_u8(vsubq_u8(s0, vdupq_n_u8(128)));
+  const int8x16_t s1_128 = vreinterpretq_s8_u8(vsubq_u8(s1, vdupq_n_u8(128)));
+
+  const int8x16_t perm0 = vqtbl1q_s8(s0_128, permute_tbl.val[0]);
+  const int8x16_t perm1 = vqtbl1q_s8(s0_128, permute_tbl.val[1]);
+  const int8x16_t perm2 = vqtbl1q_s8(s1_128, permute_tbl.val[0]);
+  const int8x16_t perm3 = vqtbl1q_s8(s1_128, permute_tbl.val[1]);
+
+  // The filter's 8 (unfolded, symmetric) taps sum to 128, so recentring
+  // every tap by -128 shifts the true sum down by exactly 128 * 128; add
+  // it back here rather than in a separate correction step.
+  const int32x4_t acc = vdupq_n_s32(128 * 128);
+
+  int32x4_t sum0123 = vdotq_lane_s32(acc, perm0, filter, 0);
+  sum0123 = vdotq_lane_s32(sum0123, perm1, filter, 1);
+  int32x4_t sum4567 = vdotq_lane_s32(acc, perm2, filter, 0);
+  sum4567 = vdotq_lane_s32(sum4567, perm3, filter, 1);
+
+  // sum0123/sum4567 now hold the exact same value the C reference's `sum`
+  // would before its rounding right shift; vqrshrn applies that shift
+  // (round-to-nearest, matching FILTER_BITS - 1's rounding constant) and
+  // vqmovun clips to [0, 255] the same way clip_pixel() does.
+  const int16x4_t out0123 = vqrshrn_n_s32(sum0123, FILTER_BITS);
+  const int16x4_t out4567 = vqrshrn_n_s32(sum4567, FILTER_BITS);
+  return vqmovun_s16(vcombine_s16(out0123, out4567));
+}
+
+// Clamped scalar fallback for a single output sample, used only for the
+// handful of columns at each end of a row the vectorized loop can't reach
+// without an out-of-bounds read. Mirrors down2_symeven()'s edge clamping.
+static inline uint8_t resize_down2_symeven_scalar(const uint8_t *src,
+                                                  int filtered_length,
+                                                  const int16_t *filter,
+                                                  int i) {
+  int sum = 1 << (FILTER_BITS - 1);
+  for (int j = 0; j < 4; ++j) {
+    const int lo = AOMMAX(i - j, 0);
+    const int hi = AOMMIN(i + 1 + j, filtered_length - 1);
+    sum += (src[lo] + src[hi]) * filter[j];
+  }
+  return clip_pixel(sum >> FILTER_BITS);
+}
+
+// Horizontal direction of the factor-of-2 downscale used to build the
+// global motion pyramid (av1_resize_plane_to_half). Unlike earlier attempts
+// at this function, this processes one row at a time straight through (no
+// multi-row batching or transpose) -- batching rows via transpose measured
+// consistently worse at large widths than not batching at all, likely from
+// juggling many simultaneous per-row memory streams rather than any
+// transpose instruction cost itself.
+void av1_resize_horz_dir_neon_dotprod(const uint8_t *const input, int in_stride,
+                                      uint8_t *intbuf, int height,
+                                      int filtered_length, int width2) {
+  // Needs enough width for the priming window and at least one interior
+  // double-load block that never needs edge clamping.
+  if (filtered_length < 32) {
+    av1_resize_horz_dir_c(input, in_stride, intbuf, height, filtered_length,
+                          width2);
+    return;
+  }
+
+  static const int8_t kFilterTaps[8] = { -1, -3, 12, 56, 56, 12, -3, -1 };
+  const int8x8_t filter = vld1_s8(kFilterTaps);
+  // kScale2DotProdPermuteTbl's four 4-byte groups per 16-byte half, each
+  // starting 2 bytes after the previous one, are exactly the decimate-by-2
+  // gather this filter needs too; reuse it rather than duplicating the
+  // same 32 bytes under a new name.
+  const uint8x16x2_t permute_tbl = vld1q_u8_x2(kScale2DotProdPermuteTbl);
+  const int16_t *filter16 = av1_down2_symeven_half_filter;
+
+  // First output index handled by the vector loop. Must be even (outputs
+  // only exist at even input columns) and >= 3 so the priming window's
+  // leftmost tap (i - 3) never goes negative -- 4 is the smallest value
+  // satisfying both; 3 would leave dst[1] double-written by the scalar
+  // prefix and the first vector output.
+  const int vec_start = 4;
+
+  for (int row = 0; row < height; ++row) {
+    const uint8_t *src = input + row * in_stride;
+    uint8_t *dst = intbuf + row * width2;
+
+    for (int i = 0; i < vec_start; i += 2) {
+      dst[i >> 1] =
+          resize_down2_symeven_scalar(src, filtered_length, filter16, i);
+    }
+
+    int i = vec_start;
+    // Each iteration loads two overlapping 16-byte windows (columns
+    // [i - 3, i + 12] and [i + 5, i + 20]) to produce 8 outputs at i,
+    // i + 2, ..., i + 14. The second window's rightmost byte, i + 20, is
+    // the widest reach of any read this iteration makes, so i + 21 <=
+    // filtered_length keeps every access in bounds; i + 22 adds a byte of
+    // margin.
+    while (i + 22 <= filtered_length) {
+      const uint8x16_t s0 = vld1q_u8(src + i - 3);
+      const uint8x16_t s1 = vld1q_u8(src + i + 5);
+      const uint8x8_t out =
+          resize_down2_symeven_dotprod_8(s0, s1, permute_tbl, filter);
+      vst1_u8(dst + (i >> 1), out);
+      i += 16;
+    }
+
+    for (int k = i; k < filtered_length; k += 2) {
+      dst[k >> 1] =
+          resize_down2_symeven_scalar(src, filtered_length, filter16, k);
+    }
   }
 }
