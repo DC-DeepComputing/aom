@@ -1,0 +1,193 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "f8c17252_c393b653",
+        "filename": "examples/av1_enc_fuzzer.cc",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-08-19T18:46:22Z",
+      "side": 1,
+      "message": "Make sure to run `clang-format -i --style\u003dfile examples/av1_enc_fuzzer.cc` after making changes to this file. The presubmit check uses `clang-format-19` so there still may be differences if you use another version.",
+      "revId": "b01f601235de58dbcc31deee90c71f145ffa326a",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "aedb13a4_c3478256",
+        "filename": "examples/av1_enc_fuzzer.cc",
+        "patchSetId": 2
+      },
+      "lineNbr": 39,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-08-19T18:46:22Z",
+      "side": 1,
+      "message": "I don\u0027t think any of these are necessary. See the following comments.",
+      "revId": "b01f601235de58dbcc31deee90c71f145ffa326a",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "b77ad401_2f8d3df6",
+        "filename": "examples/av1_enc_fuzzer.cc",
+        "patchSetId": 2
+      },
+      "lineNbr": 50,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-08-19T18:46:22Z",
+      "side": 1,
+      "message": "Prefer `static_cast\u003c\u003e` in C++ code. This comment applies to other C-style casts in this file.",
+      "range": {
+        "startLine": 50,
+        "startChar": 25,
+        "endLine": 50,
+        "endChar": 35
+      },
+      "fixSuggestions": [
+        {
+          "fixId": "90cf3225_b86745d6",
+          "description": "prompt_to_edit API",
+          "replacements": [
+            {
+              "path": "examples/av1_enc_fuzzer.cc",
+              "range": {
+                "startLine": 50,
+                "startChar": 0,
+                "endLine": 52,
+                "endChar": 0
+              },
+              "replacement": "  const uint16_t value \u003d static_cast\u003cuint16_t\u003e(reader-\u003edata[0]) |\n                         static_cast\u003cuint16_t\u003e(reader-\u003edata[1] \u003c\u003c 8);\n"
+            }
+          ]
+        }
+      ],
+      "revId": "b01f601235de58dbcc31deee90c71f145ffa326a",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "3d1ab203_41349bbd",
+        "filename": "examples/av1_enc_fuzzer.cc",
+        "patchSetId": 2
+      },
+      "lineNbr": 57,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-08-19T18:46:22Z",
+      "side": 1,
+      "message": "`static` isn\u0027t necessary in an anonymous namespace.",
+      "range": {
+        "startLine": 57,
+        "startChar": 0,
+        "endLine": 57,
+        "endChar": 6
+      },
+      "revId": "b01f601235de58dbcc31deee90c71f145ffa326a",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "e90b7550_60cd9b09",
+        "filename": "examples/av1_enc_fuzzer.cc",
+        "patchSetId": 2
+      },
+      "lineNbr": 100,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-08-19T18:46:22Z",
+      "side": 1,
+      "message": "This can\u0027t happen.",
+      "revId": "b01f601235de58dbcc31deee90c71f145ffa326a",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "5680c188_620c8d9c",
+        "filename": "examples/av1_enc_fuzzer.cc",
+        "patchSetId": 2
+      },
+      "lineNbr": 106,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-08-19T18:46:22Z",
+      "side": 1,
+      "message": "This isn\u0027t saving that much overhead. Just move the test for this configuration to where `g_have_template[]` is used.",
+      "revId": "b01f601235de58dbcc31deee90c71f145ffa326a",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "7dc646b5_2dfd88a4",
+        "filename": "examples/av1_enc_fuzzer.cc",
+        "patchSetId": 2
+      },
+      "lineNbr": 113,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-08-19T18:46:22Z",
+      "side": 1,
+      "message": "This can be removed after the globals are removed.",
+      "revId": "b01f601235de58dbcc31deee90c71f145ffa326a",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "2442f065_28ece1d6",
+        "filename": "examples/av1_enc_fuzzer.cc",
+        "patchSetId": 2
+      },
+      "lineNbr": 138,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-08-19T18:46:22Z",
+      "side": 1,
+      "message": "Better to call this `y_plane_size` (and `uv_plane_size`), here and in `BuildImage`.",
+      "range": {
+        "startLine": 138,
+        "startChar": 15,
+        "endLine": 138,
+        "endChar": 22
+      },
+      "revId": "b01f601235de58dbcc31deee90c71f145ffa326a",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "afd3ad52_16662c98",
+        "filename": "examples/av1_enc_fuzzer.cc",
+        "patchSetId": 2
+      },
+      "lineNbr": 294,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-08-19T18:46:22Z",
+      "side": 1,
+      "message": "The remainder of this block can be replaced with `DrainPackets(codec);`. The loop shouldn\u0027t be necessary.",
+      "revId": "b01f601235de58dbcc31deee90c71f145ffa326a",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
