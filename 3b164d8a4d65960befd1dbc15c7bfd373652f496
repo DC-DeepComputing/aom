@@ -1,0 +1,142 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "6f31dcbd_06f5eb9c",
+        "filename": "av1/common/arm/resize_neon.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 844,
+      "author": {
+        "id": 31392
+      },
+      "writtenOn": "2026-08-20T10:16:50Z",
+      "side": 1,
+      "message": "Can some of this accumulation be done in 16-bit?\nGiven that the input is uint8_t, each symmetric pair sum is at most 510, and the filter is fixed to `{ 56, 12, -3, -1 }`. So the -3, -1, and +12 taps should fit safely in int16_t; only the +56 tap needs to widen to int32_t.\n\nAlso, since one filter value is known to be -1, that tap could just be a vector subtract instead of a multiply.",
+      "range": {
+        "startLine": 837,
+        "startChar": 0,
+        "endLine": 844,
+        "endChar": 58
+      },
+      "revId": "3b164d8a4d65960befd1dbc15c7bfd373652f496",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "11a151d9_830c9de8",
+        "filename": "av1/common/arm/resize_neon.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 848,
+      "author": {
+        "id": 31392
+      },
+      "writtenOn": "2026-08-20T10:16:50Z",
+      "side": 1,
+      "message": "I believe you can use `vqshrn_n_s32` here",
+      "range": {
+        "startLine": 846,
+        "startChar": 0,
+        "endLine": 848,
+        "endChar": 75
+      },
+      "revId": "3b164d8a4d65960befd1dbc15c7bfd373652f496",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "3240fdf3_f200ff25",
+        "filename": "av1/common/arm/resize_neon.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 874,
+      "author": {
+        "id": 31392
+      },
+      "writtenOn": "2026-08-20T10:16:50Z",
+      "side": 1,
+      "message": "Could we load the filter with `vld1_s16` here and use the lane variants for the multiplies?",
+      "range": {
+        "startLine": 873,
+        "startChar": 0,
+        "endLine": 874,
+        "endChar": 78
+      },
+      "revId": "3b164d8a4d65960befd1dbc15c7bfd373652f496",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "bc16c0c1_4ee6625a",
+        "filename": "av1/common/arm/resize_neon.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 879,
+      "author": {
+        "id": 31392
+      },
+      "writtenOn": "2026-08-20T10:16:50Z",
+      "side": 1,
+      "message": "Can we unroll also this loop?",
+      "range": {
+        "startLine": 879,
+        "startChar": 0,
+        "endLine": 879,
+        "endChar": 60
+      },
+      "revId": "3b164d8a4d65960befd1dbc15c7bfd373652f496",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "273b5de9_0865ce49",
+        "filename": "av1/common/arm/resize_neon.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 894,
+      "author": {
+        "id": 31392
+      },
+      "writtenOn": "2026-08-20T10:16:50Z",
+      "side": 1,
+      "message": "Could we use running src/dst pointers here instead of keeping both data/outrow state? The input side already behaves like a row cursor, and dst could follow the same pattern:\n\n    const uint8_t *src \u003d \u0026intbuf[j];\n    uint8_t *dst \u003d \u0026output[j];\n\n    ...\n    vst1_u8(dst, res);\n    dst +\u003d out_stride;\n\nThis would avoid recomputing dst_col + outrow * out_stride and make the sliding-window pointer movement a bit easier to follow.",
+      "range": {
+        "startLine": 892,
+        "startChar": 0,
+        "endLine": 894,
+        "endChar": 0
+      },
+      "revId": "3b164d8a4d65960befd1dbc15c7bfd373652f496",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "0bb925eb_795ea871",
+        "filename": "av1/common/arm/resize_neon.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 914,
+      "author": {
+        "id": 31392
+      },
+      "writtenOn": "2026-08-20T10:16:50Z",
+      "side": 1,
+      "message": "Could we try unrolling this by two output rows?\n\nThe compiler currently emits register moves for the sliding window update. Computing two outputs per iteration should reduce that window-shuffle overhead per output.",
+      "range": {
+        "startLine": 898,
+        "startChar": 0,
+        "endLine": 914,
+        "endChar": 5
+      },
+      "revId": "3b164d8a4d65960befd1dbc15c7bfd373652f496",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
