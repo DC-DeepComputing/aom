@@ -1,0 +1,106 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "3f2fb4cd_7fd1ec08",
+        "filename": "av1/common/arm/resize_neon.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 4977036
+      },
+      "writtenOn": "2026-08-20T14:11:18Z",
+      "side": 1,
+      "message": "Switched to vqrshrn_n_s32, which also absorbs the rounding constant directly -- no separate round-add before the shift anymore.",
+      "revId": "aedd5846eff3ce817d80464706151582a576d459",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "583f6581_166a84c6",
+        "filename": "av1/common/arm/resize_neon.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 4977036
+      },
+      "writtenOn": "2026-08-20T14:11:18Z",
+      "side": 1,
+      "message": "Tried this both alone and combined with the row unroll below, measured on real Neoverse N1. Alone (16-wide columns, no row unroll) it was slower than the existing 8-wide loop at every size tested. Combined with the row unroll -- two independent 8-column groups carried through the same unrolled core so their load/shift latency can overlap -- it\u0027s faster than either unroll alone from 64x32 up, up to +22% at 256x256 (the largest restoration unit size). Kept the combined version, with an 8-wide leftover pass for a [8,16) remainder and the existing C fallback below that.",
+      "revId": "aedd5846eff3ce817d80464706151582a576d459",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "cbeb31b5_0d6055c4",
+        "filename": "av1/common/arm/resize_neon.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 4977036
+      },
+      "writtenOn": "2026-08-20T14:11:18Z",
+      "side": 1,
+      "message": "Done, as suggested.",
+      "revId": "aedd5846eff3ce817d80464706151582a576d459",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "6d785d40_73f08887",
+        "filename": "av1/common/arm/resize_neon.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 4977036
+      },
+      "writtenOn": "2026-08-20T14:11:18Z",
+      "side": 1,
+      "message": "Done -- two outputs per iteration, loading 4 new rows and running the window-shift once instead of twice. The loop\u0027s iteration count is odd when height % 4 \u003d\u003d 2, so there\u0027s a single-output remainder iteration to keep the window in sync with the bottom-edge epilogue in that case; verified bit-exact across every height % 4 residue with a standalone adversarial harness in addition to the gtest sweep.",
+      "revId": "aedd5846eff3ce817d80464706151582a576d459",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "5f4b2938_748ac6dc",
+        "filename": "av1/common/arm/resize_neon.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 4977036
+      },
+      "writtenOn": "2026-08-20T14:11:18Z",
+      "side": 1,
+      "message": "Done — the three outer taps now combine in a single 16-bit accumulator (max magnitude 6120, well inside int16_t), with the -1 tap as a plain vsubq_s16 instead of a multiply. The centre tap\u0027s own product also fits in 16-bit (56*510\u003d28560), but combined with the outer partial the total can reach 34680, so that combine still needs the 32-bit widen (vmlal_lane_s16 + vaddw_s16) -- verified the exact overflow bounds by hand and re-checked with an adversarial bit-exact sweep (all-0/all-255/checkerboard/ramp patterns across every code path) on real Neoverse N1 hardware.",
+      "revId": "aedd5846eff3ce817d80464706151582a576d459",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "10e7ee9c_5f381daf",
+        "filename": "av1/common/arm/resize_neon.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 4977036
+      },
+      "writtenOn": "2026-08-20T14:11:18Z",
+      "side": 1,
+      "message": "Done -- the filter is loaded once with vld1_s16 and the multiplies use the lane-select variants (vmulq_lane_s16 / vmlaq_lane_s16 / vmlal_lane_s16).",
+      "revId": "aedd5846eff3ce817d80464706151582a576d459",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
