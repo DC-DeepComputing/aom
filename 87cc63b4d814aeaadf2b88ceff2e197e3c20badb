@@ -34,6 +34,150 @@
       "parentUuid": "aedb13a4_c3478256",
       "revId": "87cc63b4d814aeaadf2b88ceff2e197e3c20badb",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "fb6c1309_22f0b661",
+        "filename": "examples/av1_enc_fuzzer.cc",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5084449
+      },
+      "writtenOn": "2026-08-20T12:22:11Z",
+      "side": 1,
+      "message": "Done, addressed in patchset 3.",
+      "parentUuid": "e90b7550_60cd9b09",
+      "revId": "87cc63b4d814aeaadf2b88ceff2e197e3c20badb",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "6e980a95_bf562ec6",
+        "filename": "examples/av1_enc_fuzzer.cc",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5084449
+      },
+      "writtenOn": "2026-08-20T12:22:11Z",
+      "side": 1,
+      "message": "Done, addressed in patchset 3.",
+      "parentUuid": "2442f065_28ece1d6",
+      "revId": "87cc63b4d814aeaadf2b88ceff2e197e3c20badb",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "fc8ce0f5_437e4078",
+        "filename": "examples/av1_enc_fuzzer.cc",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5084449
+      },
+      "writtenOn": "2026-08-20T12:22:11Z",
+      "side": 1,
+      "message": "Done, addressed in patchset 3.",
+      "parentUuid": "3d1ab203_41349bbd",
+      "revId": "87cc63b4d814aeaadf2b88ceff2e197e3c20badb",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "f4b8f883_85a5377e",
+        "filename": "examples/av1_enc_fuzzer.cc",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5084449
+      },
+      "writtenOn": "2026-08-20T12:22:11Z",
+      "side": 1,
+      "message": "Done, addressed in patchset 3.",
+      "parentUuid": "f8c17252_c393b653",
+      "revId": "87cc63b4d814aeaadf2b88ceff2e197e3c20badb",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "6c8a8492_c64f2e44",
+        "filename": "examples/av1_enc_fuzzer.cc",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5084449
+      },
+      "writtenOn": "2026-08-20T12:22:11Z",
+      "side": 1,
+      "message": "Done, addressed in patchset 3.",
+      "parentUuid": "5680c188_620c8d9c",
+      "revId": "87cc63b4d814aeaadf2b88ceff2e197e3c20badb",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "c1209b17_457b4f73",
+        "filename": "examples/av1_enc_fuzzer.cc",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5084449
+      },
+      "writtenOn": "2026-08-20T12:22:11Z",
+      "side": 1,
+      "message": "Done, addressed in patchset 3.",
+      "parentUuid": "7dc646b5_2dfd88a4",
+      "revId": "87cc63b4d814aeaadf2b88ceff2e197e3c20badb",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "e5d628a4_00a67d4a",
+        "filename": "examples/av1_enc_fuzzer.cc",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5084449
+      },
+      "writtenOn": "2026-08-20T12:22:11Z",
+      "side": 1,
+      "message": "Done, addressed in patchset 3.",
+      "parentUuid": "afd3ad52_16662c98",
+      "revId": "87cc63b4d814aeaadf2b88ceff2e197e3c20badb",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "43c96670_655a8072",
+        "filename": "examples/av1_enc_fuzzer.cc",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5084449
+      },
+      "writtenOn": "2026-08-20T12:22:11Z",
+      "side": 1,
+      "message": "Done, addressed in patchset 3.",
+      "parentUuid": "b77ad401_2f8d3df6",
+      "revId": "87cc63b4d814aeaadf2b88ceff2e197e3c20badb",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
