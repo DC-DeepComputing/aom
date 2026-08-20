@@ -1,0 +1,50 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "e1b39b31_1468d0f7",
+        "filename": "av1/common/arm/resize_neon_dotprod.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 345,
+      "author": {
+        "id": 31392
+      },
+      "writtenOn": "2026-08-20T10:53:00Z",
+      "side": 1,
+      "message": "You could even use USDOT.",
+      "range": {
+        "startLine": 345,
+        "startChar": 22,
+        "endLine": 345,
+        "endChar": 36
+      },
+      "revId": "8531bff861b25bd913d88975a089a433f6b3a100",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "8731047d_8d1bf8d1",
+        "filename": "av1/common/arm/resize_neon_dotprod.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 411,
+      "author": {
+        "id": 31392
+      },
+      "writtenOn": "2026-08-20T10:53:00Z",
+      "side": 1,
+      "message": "Similarly in previous patch : Could we use running src/dst pointers here instead of keeping both data/outrow state?",
+      "range": {
+        "startLine": 410,
+        "startChar": 0,
+        "endLine": 411,
+        "endChar": 41
+      },
+      "revId": "8531bff861b25bd913d88975a089a433f6b3a100",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
