@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "1e8e5941_c5a068da",
+        "filename": "aom/aomcx.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 2370,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-08-21T00:44:47Z",
+      "side": 1,
+      "message": "This shows `AOME_SET_VALIDATE_HBD_INPUT` has int parameter.",
+      "revId": "2da1a47e6ebe56b297137afc01050b40cf0f4cad",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "51e7f348_eb51d89c",
+        "filename": "aom/aomcx.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 2446,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-08-21T00:44:47Z",
+      "side": 1,
+      "message": "This shows `AV1E_SET_MODE_REF_DELTA_ENABLED` has int parameter.",
+      "revId": "2da1a47e6ebe56b297137afc01050b40cf0f4cad",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
