@@ -57,6 +57,30 @@
       ],
       "revId": "e63102df6e4ff39bd1b74d1980b3aab645f96532",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "8ac81d9f_66baa7d9",
+        "filename": "examples/av1_enc_fuzzer.cc",
+        "patchSetId": 4
+      },
+      "lineNbr": 279,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-08-26T20:37:23Z",
+      "side": 1,
+      "message": "\u003e It might be more interesting to vary what frame this happens on since. Doing a second one that restores the original resolution could be useful too.\n\nI missed the AI suggested fix was attached. That\u0027s not what I was implying with my comment. I was just saying that varying the frame number would make sense.",
+      "parentUuid": "04215e4b_72e63146",
+      "range": {
+        "startLine": 279,
+        "startChar": 8,
+        "endLine": 279,
+        "endChar": 20
+      },
+      "revId": "e63102df6e4ff39bd1b74d1980b3aab645f96532",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
