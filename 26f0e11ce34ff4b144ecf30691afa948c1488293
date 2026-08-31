@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "1fa26090_5d6d4734",
+        "filename": "av1/encoder/bitstream.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 2987,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-08-31T21:02:16Z",
+      "side": 1,
+      "message": "Note that `frame_size_override_flag` is equal to 0 (the initial value) when `seq_params-\u003ereduced_still_picture_hdr` is true.\n\nSo the original assertion is replaced by the error checking added in `write_frame_size()` above.",
+      "revId": "26f0e11ce34ff4b144ecf30691afa948c1488293",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
