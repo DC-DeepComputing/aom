@@ -1683,11 +1683,9 @@ static aom_codec_err_t encoder_set_config(aom_codec_alg_priv_t *ctx,
     // track the actual coded frame size.
     if (ctx->ppi->cpi->svc.number_spatial_layers == 1 &&
         ctx->ppi->cpi->last_coded_width && ctx->ppi->cpi->last_coded_height &&
-        (!valid_ref_frame_size(ctx->ppi->cpi->last_coded_width,
-                               ctx->ppi->cpi->last_coded_height, cfg->g_w,
-                               cfg->g_h) ||
-         ((int)cfg->g_w > ctx->ppi->cpi->last_coded_width) ||
-         ((int)cfg->g_h > ctx->ppi->cpi->last_coded_height))) {
+        !valid_ref_frame_size(ctx->ppi->cpi->last_coded_width,
+                              ctx->ppi->cpi->last_coded_height, cfg->g_w,
+                              cfg->g_h)) {
       force_key = 1;
     }
   }
