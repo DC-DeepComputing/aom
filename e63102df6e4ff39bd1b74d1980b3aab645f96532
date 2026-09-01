@@ -1,6 +1,42 @@
 {
   "comments": [
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "eec0d904_4351f9a1",
+        "filename": "examples/av1_enc_fuzzer.cc",
+        "patchSetId": 4
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5084449
+      },
+      "writtenOn": "2026-09-01T11:04:14Z",
+      "side": 1,
+      "message": "Done, addressed in patchset 5: the explicit AOM_EFLAG_FORCE_KF on frame 0 (kKeyFrameFirst) is removed - the first frame is always a keyframe. kKeyFrameSecond (forcing a keyframe on frame 1) is kept.",
+      "parentUuid": "00bc60f0_f3c50348",
+      "revId": "e63102df6e4ff39bd1b74d1980b3aab645f96532",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "47ab8227_67970790",
+        "filename": "examples/av1_enc_fuzzer.cc",
+        "patchSetId": 4
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5084449
+      },
+      "writtenOn": "2026-09-01T11:04:14Z",
+      "side": 1,
+      "message": "Done, addressed in patchset 5: the switch frame now varies with the fuzzer input (switch_frame \u003d 1 + ctl0 % (num_frames / 4)), and a second switch (restore_frame) restores the original resolution, g_threads and rc_end_usage.",
+      "parentUuid": "04215e4b_72e63146",
+      "revId": "e63102df6e4ff39bd1b74d1980b3aab645f96532",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "00bc60f0_f3c50348",
