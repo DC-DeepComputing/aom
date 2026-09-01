@@ -54,6 +54,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "a1a55142_46e94f11",
+        "filename": "examples/av1_enc_fuzzer.cc",
+        "patchSetId": 4
+      },
+      "lineNbr": 274,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-09-01T18:37:32Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "00bc60f0_f3c50348",
+      "revId": "e63102df6e4ff39bd1b74d1980b3aab645f96532",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "04215e4b_72e63146",
