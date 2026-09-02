@@ -268,7 +268,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   ApplyControls(&codec, usage, mode_flags, cpu_used_raw, ctl0, ctl1);
 
   const unsigned int num_frames = kNumFramesForCpuUsed[cpu_used];
-  bool config_failed = false;
+  bool failed = false;
   for (unsigned int frame = 0; frame < num_frames; ++frame) {
     aom_enc_frame_flags_t flags = 0;
     if (frame == 1 && (mode_flags & kKeyFrameSecond)) {
@@ -291,7 +291,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         cfg.g_threads = threads1;
         cfg.rc_end_usage = PickRcMode(ctl1);
         if (aom_codec_enc_config_set(&codec, &cfg) != AOM_CODEC_OK) {
-          config_failed = true;
+          failed = true;
           break;
         }
         width = width1;
@@ -302,7 +302,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         cfg.g_threads = threads0;
         cfg.rc_end_usage = PickRcMode(ctl0);
         if (aom_codec_enc_config_set(&codec, &cfg) != AOM_CODEC_OK) {
-          config_failed = true;
+          failed = true;
           break;
         }
         width = width0;
@@ -311,12 +311,12 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     }
 
     if (!EncodeFrame(&codec, &reader, width, height, frame, flags)) {
-      config_failed = true;
+      failed = true;
       break;
     }
   }
 
-  if (!config_failed) {
+  if (!failed) {
     const aom_codec_err_t flush_ret =
         aom_codec_encode(&codec, nullptr, 0, 0, 0);
     if (flush_ret == AOM_CODEC_OK) {
