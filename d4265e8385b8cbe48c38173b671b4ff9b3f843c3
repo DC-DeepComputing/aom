@@ -74,6 +74,24 @@
     {
       "unresolved": false,
       "key": {
+        "uuid": "df2a024e_baf1f78a",
+        "filename": "examples/av1_enc_fuzzer.cc",
+        "patchSetId": 7
+      },
+      "lineNbr": 21,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-02T17:40:22Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "eeecb0fa_216d06a7",
+      "revId": "d4265e8385b8cbe48c38173b671b4ff9b3f843c3",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
         "uuid": "5e33f30f_ac774c97",
         "filename": "examples/av1_enc_fuzzer.cc",
         "patchSetId": 7
@@ -106,6 +124,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "b6008b61_e3892e33",
+        "filename": "examples/av1_enc_fuzzer.cc",
+        "patchSetId": 7
+      },
+      "lineNbr": 217,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-02T17:40:22Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "1afc7c7b_f6cb1f9d",
+      "revId": "d4265e8385b8cbe48c38173b671b4ff9b3f843c3",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "0d50ec76_a55c7173",
@@ -119,6 +155,24 @@
       "writtenOn": "2026-09-01T22:38:45Z",
       "side": 1,
       "message": "`DrainPackets()` should only be called after `aom_codec_encode()` returns `AOM_CODEC_OK`.",
+      "revId": "d4265e8385b8cbe48c38173b671b4ff9b3f843c3",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "c7c1cb7e_6878d6ae",
+        "filename": "examples/av1_enc_fuzzer.cc",
+        "patchSetId": 7
+      },
+      "lineNbr": 308,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-02T17:40:22Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "0d50ec76_a55c7173",
       "revId": "d4265e8385b8cbe48c38173b671b4ff9b3f843c3",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
