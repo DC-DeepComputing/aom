@@ -16,6 +16,24 @@
       "message": "James: An alternative is to keep the `config_failed` variable name and do not set it to true here. This will us to flush the encoder after an `EncodeFrame` failure. Is that a valid sequence of API calls?\n\nIn my opinion, we don\u0027t need to go out of our ways to handle an invalid sequence of API calls safely. So if we should destroy the encoder without flushing it after encode failure, I would prefer the fuzzer does that.",
       "revId": "352185535ddf61092044ed7d5767fb8cdb8d1046",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "43251f97_c0138322",
+        "filename": "examples/av1_enc_fuzzer.cc",
+        "patchSetId": 1
+      },
+      "lineNbr": 314,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-09-02T21:08:51Z",
+      "side": 1,
+      "message": "\u003e James: An alternative is to keep the `config_failed` variable name and do not set it to true here. This will us to flush the encoder after an `EncodeFrame` failure. Is that a valid sequence of API calls?\n\u003e \n\nThe encoder should be able to handle that, but in practice most applications would probably exit early.\n\n\u003e In my opinion, we don\u0027t need to go out of our ways to handle an invalid sequence of API calls safely. So if we should destroy the encoder without flushing it after encode failure, I would prefer the fuzzer does that.",
+      "parentUuid": "46141fd7_11d9cfb9",
+      "revId": "352185535ddf61092044ed7d5767fb8cdb8d1046",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
