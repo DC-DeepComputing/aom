@@ -33,6 +33,24 @@
       "message": "Thanks! Good coding gain. Maybe worth re-testing with the newest VMAF, but not blocking. Please feel free to merge.",
       "revId": "fef6524e57ddeee31fc535e25c0f6305fb3dfd86",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "4b7777c4_98948400",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 8893
+      },
+      "writtenOn": "2026-09-02T08:58:13Z",
+      "side": 1,
+      "message": "The results with the latest VMAF version for this patch are similar to \nthose obtained with the earlier version, as shown below. \n```\n                              BD-Rate Loss(%)\n\t\t     VMAF (v3.0.0)      VMAF v1 (v3.2.0)\ncpu   Resolution     vmaf    vmag-neg    vmaf    vmag-neg\n 3       LOWRES2    -0.7209  -0.7154   -0.7214\t-0.7155\n 3       MIDRES2    -1.1734  -1.1088   -1.1737\t-1.1092\n 3    SHORTS608P    -0.7576  -0.9012   -0.7579\t-0.9012\n 3    SHORTS720P    -0.7618  -0.8134   -0.7616\t-0.8134\n 3   SHORTS1080P    -0.7999  -0.8048   -0.7999\t-0.8049\n 3        HDRES2    -0.9219  -0.8534   -0.9219\t-0.8537\n 3       Average    -0.8484  -0.8638   -0.8485\t-0.8639\n```",
+      "parentUuid": "c5028caa_dc8b043b",
+      "revId": "fef6524e57ddeee31fc535e25c0f6305fb3dfd86",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ],
   "submitRequirementResults": [
