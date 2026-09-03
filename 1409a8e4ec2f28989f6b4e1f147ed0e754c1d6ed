@@ -1,0 +1,50 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "6c147ab2_ed3effae",
+        "filename": "av1/common/arm/resize_neon.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 880,
+      "author": {
+        "id": 31042
+      },
+      "writtenOn": "2026-09-03T14:37:14Z",
+      "side": 1,
+      "message": "Nit: People usually start with \u0027i\u0027, and then use \u0027j\u0027 if they need another counter. Can we swap them please?",
+      "range": {
+        "startLine": 880,
+        "startChar": 2,
+        "endLine": 880,
+        "endChar": 20
+      },
+      "revId": "1409a8e4ec2f28989f6b4e1f147ed0e754c1d6ed",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "c100760c_1abf509b",
+        "filename": "av1/common/arm/resize_neon.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 894,
+      "author": {
+        "id": 31042
+      },
+      "writtenOn": "2026-09-03T14:37:14Z",
+      "side": 1,
+      "message": "I think this widening (here and inside the inner loop) is unnecessary. You could pass uint8x8_t types to resize_down2_symeven_8 and use widening adds (vaddl_u8) on lines 835-838.",
+      "range": {
+        "startLine": 894,
+        "startChar": 41,
+        "endLine": 894,
+        "endChar": 49
+      },
+      "revId": "1409a8e4ec2f28989f6b4e1f147ed0e754c1d6ed",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
