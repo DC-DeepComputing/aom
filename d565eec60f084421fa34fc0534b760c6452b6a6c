@@ -16,6 +16,24 @@
       "message": "This CL is based on the following code in test/encode_api_test.cc:\n\n```\nvoid AV1Encoder::Flush() {\n  bool got_data; \n  do {\n    ASSERT_EQ(aom_codec_encode(\u0026enc_, nullptr, 0, 0, 0), AOM_CODEC_OK); \n    got_data \u003d false;\n    const aom_codec_cx_pkt_t *pkt;\n    aom_codec_iter_t iter \u003d nullptr;\n    while ((pkt \u003d aom_codec_get_cx_data(\u0026enc_, \u0026iter)) !\u003d nullptr) {\n      ASSERT_EQ(pkt-\u003ekind, AOM_CODEC_CX_FRAME_PKT);\n      got_data \u003d true;\n    }\n  } while (got_data);\n}\n```",
       "revId": "d565eec60f084421fa34fc0534b760c6452b6a6c",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "1f7b7369_e49b4921",
+        "filename": "examples/av1_enc_fuzzer.cc",
+        "patchSetId": 1
+      },
+      "lineNbr": 324,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-09-03T01:57:04Z",
+      "side": 1,
+      "message": "\u003e This CL is based on the following code in test/encode_api_test.cc:\n\u003e \n\u003e ```\n\u003e void AV1Encoder::Flush() {\n\u003e   bool got_data; \n\u003e   do {\n\u003e     ASSERT_EQ(aom_codec_encode(\u0026enc_, nullptr, 0, 0, 0), AOM_CODEC_OK); \n\u003e     got_data \u003d false;\n\u003e     const aom_codec_cx_pkt_t *pkt;\n\u003e     aom_codec_iter_t iter \u003d nullptr;\n\u003e     while ((pkt \u003d aom_codec_get_cx_data(\u0026enc_, \u0026iter)) !\u003d nullptr) {\n\u003e       ASSERT_EQ(pkt-\u003ekind, AOM_CODEC_CX_FRAME_PKT);\n\u003e       got_data \u003d true;\n\u003e     }\n\u003e   } while (got_data);\n\u003e }\n\u003e ```\n\nI expect flush only needs to be called once, but this is fine.",
+      "parentUuid": "82ba5ff2_9e4bbfd4",
+      "revId": "d565eec60f084421fa34fc0534b760c6452b6a6c",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
