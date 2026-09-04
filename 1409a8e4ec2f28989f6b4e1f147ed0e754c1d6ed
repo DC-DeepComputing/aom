@@ -1,6 +1,42 @@
 {
   "comments": [
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "b33e5585_0e0c77b1",
+        "filename": "av1/common/arm/resize_neon.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 4977036
+      },
+      "writtenOn": "2026-09-04T08:30:48Z",
+      "side": 1,
+      "message": "Done. resize_down2_symeven_8 now takes uint8x8_t directly and uses vaddl_u8 for the tap-pair sums. Re-ran the existing tests with bit-exact results.",
+      "parentUuid": "c100760c_1abf509b",
+      "revId": "1409a8e4ec2f28989f6b4e1f147ed0e754c1d6ed",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "d4de694c_67155dfa",
+        "filename": "av1/common/arm/resize_neon.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 4977036
+      },
+      "writtenOn": "2026-09-04T08:30:48Z",
+      "side": 1,
+      "message": "Done, as suggested.",
+      "parentUuid": "6c147ab2_ed3effae",
+      "revId": "1409a8e4ec2f28989f6b4e1f147ed0e754c1d6ed",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "6c147ab2_ed3effae",
