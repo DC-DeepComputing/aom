@@ -1,0 +1,73 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "ff4d9030_fca7d109",
+        "filename": "av1/common/arm/resize_neon.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 846,
+      "author": {
+        "id": 31042
+      },
+      "writtenOn": "2026-09-04T10:44:13Z",
+      "side": 1,
+      "message": "Instead of accumulating into a 0 register you can use vmull_lane_s16.",
+      "range": {
+        "startLine": 846,
+        "startChar": 36,
+        "endLine": 846,
+        "endChar": 50
+      },
+      "revId": "fb296a42f503a1bd6ed215d5d27e6cf045420b75",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "80a663d7_be332aee",
+        "filename": "av1/common/arm/resize_neon.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 885,
+      "author": {
+        "id": 31042
+      },
+      "writtenOn": "2026-09-04T10:44:13Z",
+      "side": 1,
+      "message": "Instead of this strategy, would it be better to compute 4 output rows per loop iteration instead of 2 for a single \u00278-column group\u0027? At a minimum we would end up with less register shuffling between loop iterations.",
+      "range": {
+        "startLine": 882,
+        "startChar": 2,
+        "endLine": 885,
+        "endChar": 63
+      },
+      "revId": "fb296a42f503a1bd6ed215d5d27e6cf045420b75",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "ade5eff9_23855bfa",
+        "filename": "av1/common/arm/resize_neon.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 887,
+      "author": {
+        "id": 31042
+      },
+      "writtenOn": "2026-09-04T10:44:13Z",
+      "side": 1,
+      "message": "Performance claims about specific CPUs shouldn\u0027t really exist in source code as they go stale very quickly. (E.g. The performance claim didn\u0027t change between the current and previous patch sets even though the code changed quite a bit.)",
+      "range": {
+        "startLine": 887,
+        "startChar": 5,
+        "endLine": 887,
+        "endChar": 41
+      },
+      "revId": "fb296a42f503a1bd6ed215d5d27e6cf045420b75",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
