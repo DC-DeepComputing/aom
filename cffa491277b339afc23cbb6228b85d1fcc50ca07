@@ -35,6 +35,30 @@
       "parentUuid": "e1b39b31_1468d0f7",
       "revId": "cffa491277b339afc23cbb6228b85d1fcc50ca07",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "9b8045d8_8576632e",
+        "filename": "av1/common/arm/resize_neon_dotprod.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 345,
+      "author": {
+        "id": 31392
+      },
+      "writtenOn": "2026-09-04T06:51:42Z",
+      "side": 1,
+      "message": "It’s not a must for this series, but a follow-up would be much appreciated.\n\nWould QEMU be sufficient on your side to implement and verify the I8MM path for correctness? I can take care of benchmarking it on I8MM-capable hardware and share the results. I’d expect the USDOT version to reduce the instruction count and to be a performance uplift, but we can confirm whether that translates into a measurable speedup on hardware.",
+      "parentUuid": "6971de6d_a720d229",
+      "range": {
+        "startLine": 345,
+        "startChar": 22,
+        "endLine": 345,
+        "endChar": 36
+      },
+      "revId": "cffa491277b339afc23cbb6228b85d1fcc50ca07",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
