@@ -1,0 +1,96 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "9bb6db3a_439d556a",
+        "filename": "av1/common/arm/resize_neon.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 891,
+      "author": {
+        "id": 31042
+      },
+      "writtenOn": "2026-09-07T12:57:41Z",
+      "side": 1,
+      "message": "What does \u0027l\u0027 signify here? Usually we use \u0027s\u0027 for source data.\n\nThese could be loaded using load_u8_8x3() from mem_neon.h[1]\n\n[1] https://aomedia.googlesource.com/aom/+/refs/heads/main/aom_dsp/arm/mem_neon.h#270",
+      "range": {
+        "startLine": 891,
+        "startChar": 14,
+        "endLine": 891,
+        "endChar": 15
+      },
+      "revId": "fc6ed985add56ee208f17810ac70643ed0cd8dc4",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "74c168f0_c4adf128",
+        "filename": "av1/common/arm/resize_neon.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 908,
+      "author": {
+        "id": 31042
+      },
+      "writtenOn": "2026-09-07T12:57:41Z",
+      "side": 1,
+      "message": "We have helpers in mem_neon.h[1] to simplify this. This should look something like:\n\nuint8x8_t s6, s7, s8, s9, sA, sB, sC, sD;\nload_u8_8x8(src, width2, \u0026s6, \u0026s7, \u0026s8, \u0026s9, \u0026sA, \u0026sB, \u0026sC, \u0026sD);\n\n[1] https://aomedia.googlesource.com/aom/+/refs/heads/main/aom_dsp/arm/mem_neon.h#199",
+      "range": {
+        "startLine": 901,
+        "startChar": 6,
+        "endLine": 908,
+        "endChar": 48
+      },
+      "revId": "fc6ed985add56ee208f17810ac70643ed0cd8dc4",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "69e11758_fd9c06f1",
+        "filename": "av1/common/arm/resize_neon.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 921,
+      "author": {
+        "id": 31042
+      },
+      "writtenOn": "2026-09-07T12:57:41Z",
+      "side": 1,
+      "message": "To make this look like the other convolutions in this library, this should look something like:\n\nuint8x8_t d0 \u003d resize_down2_symeven_8(...);\nuint8x8_t d1 \u003d resize_down2_symeven_8(...);\nuint8x8_t d2 \u003d resize_down2_symeven_8(...);\nuint8x8_t d3 \u003d resize_down2_symeven_8(...);\n\nstore_u8_8x4(dst, out_stride, d0, d1, d2, d3);\n\n\nThen increment dst underneath where you increment src.",
+      "range": {
+        "startLine": 910,
+        "startChar": 6,
+        "endLine": 921,
+        "endChar": 24
+      },
+      "revId": "fc6ed985add56ee208f17810ac70643ed0cd8dc4",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "d1b58d91_d768b452",
+        "filename": "av1/common/arm/resize_neon.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 943,
+      "author": {
+        "id": 31042
+      },
+      "writtenOn": "2026-09-07T12:57:41Z",
+      "side": 1,
+      "message": "Similar comments apply here. And to the blocks underneath.",
+      "range": {
+        "startLine": 933,
+        "startChar": 6,
+        "endLine": 943,
+        "endChar": 24
+      },
+      "revId": "fc6ed985add56ee208f17810ac70643ed0cd8dc4",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
