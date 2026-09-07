@@ -39,6 +39,24 @@
     {
       "unresolved": true,
       "key": {
+        "uuid": "c369a56c_42da40ef",
+        "filename": "av1/common/arm/resize_neon_dotprod.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 4977036
+      },
+      "writtenOn": "2026-09-07T23:49:37Z",
+      "side": 1,
+      "message": "Thanks for the offer - that sounds good. Once this series lands, I\u0027ll implement and verify the I8MM path under QEMU and follow up with a resize_neon_i8mm.c variant. It would be great if you could benchmark it on I8MM-capable hardware.",
+      "parentUuid": "9b8045d8_8576632e",
+      "revId": "cffa491277b339afc23cbb6228b85d1fcc50ca07",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
         "uuid": "9b8045d8_8576632e",
         "filename": "av1/common/arm/resize_neon_dotprod.c",
         "patchSetId": 5
