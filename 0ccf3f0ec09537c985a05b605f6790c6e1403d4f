@@ -34,6 +34,24 @@
       "parentUuid": "6a1c9fce_faacc48f",
       "revId": "0ccf3f0ec09537c985a05b605f6790c6e1403d4f",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "b6c3c12e_acbd18fe",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-09-08T15:50:39Z",
+      "side": 1,
+      "message": "A unit test is added.",
+      "parentUuid": "e272f3b1_4492514c",
+      "revId": "0ccf3f0ec09537c985a05b605f6790c6e1403d4f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
