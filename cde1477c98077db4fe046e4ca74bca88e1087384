@@ -33,6 +33,23 @@
       "message": "Thank you for signing the CLA. Your first patch will need to be uploaded by a committer to have the presubmit checks run after it\u0027s reviewed. After the change lands your future changes will trigger the change automatically. (There\u0027s a bug in the plugin currently, though, so it will need to be run manually until it is fixed.)",
       "revId": "cde1477c98077db4fe046e4ca74bca88e1087384",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "c529a33e_d7cdcfff",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5152103
+      },
+      "writtenOn": "2026-09-09T23:22:47Z",
+      "side": 1,
+      "message": "Ported and referenced in the commit message. One deviation: libaom has no alpha plane, so the helper covers Y, U and V only. The empty-viewport fix follows as a separate change; aom_img_flip has the same unsigned d_h - 1.",
+      "revId": "cde1477c98077db4fe046e4ca74bca88e1087384",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
