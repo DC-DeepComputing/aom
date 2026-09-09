@@ -3584,6 +3584,10 @@ typedef struct AV1_COMP {
    * Buffer to store MB variance after Wiener filter.
    */
   WeberStats *mb_weber_stats;
+  int mb_weber_stats_alloc_mi_rows;
+  int mb_weber_stats_alloc_mi_cols;
+  int mb_delta_q_alloc_mb_rows;
+  int mb_delta_q_alloc_mb_cols;
 
   /*!
    * Buffer to store rate cost estimates for each macro block (8x8) in the
