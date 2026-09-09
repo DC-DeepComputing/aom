@@ -3586,6 +3586,26 @@ typedef struct AV1_COMP {
   WeberStats *mb_weber_stats;
 
   /*!
+   * Mi rows allocated for mb_weber_stats
+   */
+  int mb_weber_stats_alloc_mi_rows;
+
+  /*!
+   * Mi cols allocated for mb_weber_stats
+   */
+  int mb_weber_stats_alloc_mi_cols;
+
+  /*!
+   * Mb rows allocated for mb_weber_stats
+   */
+  int mb_delta_q_alloc_mb_rows;
+
+  /*!
+   * Mb cols allocated for mb_weber_stats
+   */
+  int mb_delta_q_alloc_mb_cols;
+
+  /*!
    * Buffer to store rate cost estimates for each macro block (8x8) in the
    * preprocessing stage used in allintra mode.
    */
