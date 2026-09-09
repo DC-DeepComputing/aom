@@ -1378,7 +1378,7 @@ class AV1Convolve2DTest : public AV1ConvolveTest<convolve_2d_func> {
   void TestConvolveVmaf() {
     // 8-tap Gaussian blur filter used by tune=vmaf_with_preprocessing
     // in av1/encoder/tune_vmaf.c.
-    static const int16_t kGaussFilter[8] = { 2, 8, 24, 60, 24, 8, 2, 0 };
+    static const int16_t kGaussFilter[8] = { 0, 8, 30, 52, 30, 8, 0, 0 };
     const InterpFilterParams filter_params = { kGaussFilter, 8,
                                                EIGHTTAP_REGULAR };
     const int width = GetParam().Block().Width();
@@ -1696,7 +1696,7 @@ class AV1Convolve2DHighbdTest
 
  private:
   void TestConvolveVmaf() {
-    static const int16_t kGaussFilter[8] = { 2, 8, 24, 60, 24, 8, 2, 0 };
+    static const int16_t kGaussFilter[8] = { 0, 8, 30, 52, 30, 8, 0, 0 };
     const InterpFilterParams filter_params = { kGaussFilter, 8,
                                                EIGHTTAP_REGULAR };
     const int width = GetParam().Block().Width();
