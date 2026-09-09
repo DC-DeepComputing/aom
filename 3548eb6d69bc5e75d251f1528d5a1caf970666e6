@@ -16,6 +16,23 @@
       "message": "https://build.aomedia.org/jenkins/job/libaom__commit_trigger/81730/ The manual run is passed.",
       "revId": "3548eb6d69bc5e75d251f1528d5a1caf970666e6",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "c9d370ea_df5a650c",
+        "filename": "test/encode_api_test.cc",
+        "patchSetId": 3
+      },
+      "lineNbr": 2687,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-09T21:31:28Z",
+      "side": 1,
+      "message": "Since this test uses `AOM_USAGE_GOOD_QUALITY`, we need to put this test inside `#if !CONFIG_REALTIME_ONLY`. Otherwise it will fail in the realtime-only build.",
+      "revId": "3548eb6d69bc5e75d251f1528d5a1caf970666e6",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
