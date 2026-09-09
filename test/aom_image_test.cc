@@ -50,6 +50,65 @@ TEST(AomImageTest, AomImgSetRectOverflow) {
             0);
 }
 
+TEST(AomImageTest, AomImgSetRectPreservesFlip) {
+  static constexpr aom_img_fmt_t kFormats[] = {
+    AOM_IMG_FMT_YV12,   AOM_IMG_FMT_I420,   AOM_IMG_FMT_I422,
+    AOM_IMG_FMT_I444,   AOM_IMG_FMT_NV12,   AOM_IMG_FMT_I42016,
+    AOM_IMG_FMT_YV1216, AOM_IMG_FMT_I42216, AOM_IMG_FMT_I44416,
+  };
+  static constexpr unsigned int kBorders[] = { 0, 4 };
+
+  for (const aom_img_fmt_t format : kFormats) {
+    for (const unsigned int border : kBorders) {
+      aom_image_t *img =
+          aom_img_alloc_with_border(nullptr, format, 16, 5, 1, 1, border);
+      aom_image_t *expected =
+          aom_img_alloc_with_border(nullptr, format, 16, 5, 1, 1, border);
+      ASSERT_NE(img, nullptr);
+      ASSERT_NE(expected, nullptr);
+
+      ASSERT_EQ(aom_img_set_rect(expected, 2, 1, 8, 3, border), 0);
+      aom_img_flip(expected);
+
+      aom_img_flip(img);
+      ASSERT_EQ(aom_img_set_rect(img, 2, 1, 8, 3, border), 0);
+
+      for (int plane = AOM_PLANE_Y; plane <= AOM_PLANE_V; ++plane) {
+        if (expected->planes[plane] == nullptr) {
+          EXPECT_EQ(img->planes[plane], nullptr);
+        } else {
+          ASSERT_NE(img->planes[plane], nullptr);
+          EXPECT_EQ(img->planes[plane] - img->img_data,
+                    expected->planes[plane] - expected->img_data);
+        }
+        EXPECT_EQ(img->stride[plane], expected->stride[plane]);
+      }
+
+      ASSERT_EQ(aom_img_set_rect(img, 0, 0, 16, 0, border), 0);
+      EXPECT_LT(img->stride[AOM_PLANE_Y], 0);
+      ASSERT_EQ(aom_img_set_rect(img, 0, 0, 16, 5, border), 0);
+
+      aom_img_flip(expected);
+      ASSERT_EQ(aom_img_set_rect(expected, 0, 0, 16, 5, border), 0);
+      aom_img_flip(expected);
+
+      for (int plane = AOM_PLANE_Y; plane <= AOM_PLANE_V; ++plane) {
+        if (expected->planes[plane] == nullptr) {
+          EXPECT_EQ(img->planes[plane], nullptr);
+        } else {
+          ASSERT_NE(img->planes[plane], nullptr);
+          EXPECT_EQ(img->planes[plane] - img->img_data,
+                    expected->planes[plane] - expected->img_data);
+        }
+        EXPECT_EQ(img->stride[plane], expected->stride[plane]);
+      }
+
+      aom_img_free(expected);
+      aom_img_free(img);
+    }
+  }
+}
+
 TEST(AomImageTest, AomImgAllocInvalidImageFormats) {
   static constexpr std::array<int, 7> kImageFormats = {
     AOM_IMG_FMT_NONE,       AOM_IMG_FMT_NONE - 1,   AOM_IMG_FMT_NV12 + 1,
@@ -178,6 +237,66 @@ TEST(AomImageTest, AomImgFlipOneRow) {
   EXPECT_EQ(img->stride[AOM_PLANE_V], v_stride);
 
   aom_img_free(img);
+}
+
+TEST(AomImageTest, AomImgEmptyRect) {
+  static constexpr aom_img_fmt_t kFormats[] = {
+    AOM_IMG_FMT_YV12,   AOM_IMG_FMT_I420,   AOM_IMG_FMT_I422,
+    AOM_IMG_FMT_I444,   AOM_IMG_FMT_NV12,   AOM_IMG_FMT_I42016,
+    AOM_IMG_FMT_YV1216, AOM_IMG_FMT_I42216, AOM_IMG_FMT_I44416,
+  };
+  static constexpr unsigned int kBorders[] = { 0, 1, 4, 16 };
+  struct EmptyRect {
+    unsigned int x;
+    unsigned int y;
+    unsigned int w;
+    unsigned int h;
+  };
+  static constexpr EmptyRect kRects[] = {
+    { 16, 5, 0, 0 },
+    { 16, 0, 0, 5 },
+    { 0, 5, 16, 0 },
+  };
+
+  for (const aom_img_fmt_t format : kFormats) {
+    for (const unsigned int border : kBorders) {
+      for (const EmptyRect &rect : kRects) {
+        aom_image_t *img =
+            aom_img_alloc_with_border(nullptr, format, 16, 5, 1, 1, border);
+        ASSERT_NE(img, nullptr);
+
+        unsigned char *planes[3];
+        int strides[3];
+        for (int plane = AOM_PLANE_Y; plane <= AOM_PLANE_V; ++plane) {
+          planes[plane] = img->planes[plane];
+          strides[plane] = img->stride[plane];
+        }
+
+        ASSERT_EQ(aom_img_set_rect(img, rect.x, rect.y, rect.w, rect.h, border),
+                  0);
+        EXPECT_EQ(img->d_w, rect.w);
+        EXPECT_EQ(img->d_h, rect.h);
+        for (int plane = AOM_PLANE_Y; plane <= AOM_PLANE_V; ++plane) {
+          EXPECT_EQ(img->planes[plane], planes[plane]);
+          EXPECT_EQ(img->stride[plane], strides[plane]);
+        }
+
+        aom_img_flip(img);
+        for (int plane = AOM_PLANE_Y; plane <= AOM_PLANE_V; ++plane) {
+          EXPECT_EQ(img->planes[plane], planes[plane]);
+          EXPECT_EQ(img->stride[plane], -strides[plane]);
+        }
+
+        aom_img_flip(img);
+        for (int plane = AOM_PLANE_Y; plane <= AOM_PLANE_V; ++plane) {
+          EXPECT_EQ(img->planes[plane], planes[plane]);
+          EXPECT_EQ(img->stride[plane], strides[plane]);
+        }
+
+        aom_img_free(img);
+      }
+    }
+  }
 }
 
 TEST(AomImageTest, AomImgFlipOddHeight) {

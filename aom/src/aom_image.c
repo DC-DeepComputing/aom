@@ -242,12 +242,30 @@ aom_image_t *aom_img_alloc_with_border(aom_image_t *img, aom_img_fmt_t fmt,
                           NULL, NULL, NULL);
 }
 
+static void negate_strides(aom_image_t *img) {
+  img->stride[AOM_PLANE_Y] = -img->stride[AOM_PLANE_Y];
+  if (img->fmt & AOM_IMG_FMT_PLANAR) {
+    img->stride[AOM_PLANE_U] = -img->stride[AOM_PLANE_U];
+    img->stride[AOM_PLANE_V] = -img->stride[AOM_PLANE_V];
+  }
+}
+
 int aom_img_set_rect(aom_image_t *img, unsigned int x, unsigned int y,
                      unsigned int w, unsigned int h, unsigned int border) {
   if (x <= UINT_MAX - w && x + w <= img->w && y <= UINT_MAX - h &&
       y + h <= img->h) {
     img->d_w = w;
     img->d_h = h;
+
+    /* Empty rectangles contain no addressable samples. Keep the existing
+     * plane pointers so boundary coordinates cannot create pointers outside
+     * the allocation.
+     */
+    if (w == 0 || h == 0) return 0;
+
+    const int flipped = img->stride[AOM_PLANE_Y] < 0;
+    /* Plane offsets are calculated from the unflipped allocation base. */
+    if (flipped) negate_strides(img);
 
     x += border;
     y += border;
@@ -288,12 +306,18 @@ int aom_img_set_rect(aom_image_t *img, unsigned int x, unsigned int y,
             data + uv_x * bytes_per_sample + uv_y * img->stride[AOM_PLANE_U];
       }
     }
+    if (flipped) aom_img_flip(img);
     return 0;
   }
   return -1;
 }
 
 void aom_img_flip(aom_image_t *img) {
+  if (img->d_w == 0 || img->d_h == 0) {
+    negate_strides(img);
+    return;
+  }
+
   const unsigned int chroma_height =
       (img->d_h + img->y_chroma_shift) >> img->y_chroma_shift;
 
@@ -301,19 +325,17 @@ void aom_img_flip(aom_image_t *img) {
     img->planes[AOM_PLANE_Y] +=
         (ptrdiff_t)(img->d_h - 1) * img->stride[AOM_PLANE_Y];
   }
-  img->stride[AOM_PLANE_Y] = -img->stride[AOM_PLANE_Y];
 
   if (img->planes[AOM_PLANE_U]) {
     img->planes[AOM_PLANE_U] +=
         (ptrdiff_t)(chroma_height - 1) * img->stride[AOM_PLANE_U];
   }
-  img->stride[AOM_PLANE_U] = -img->stride[AOM_PLANE_U];
 
   if (img->planes[AOM_PLANE_V]) {
     img->planes[AOM_PLANE_V] +=
         (ptrdiff_t)(chroma_height - 1) * img->stride[AOM_PLANE_V];
   }
-  img->stride[AOM_PLANE_V] = -img->stride[AOM_PLANE_V];
+  negate_strides(img);
 }
 
 void aom_img_free(aom_image_t *img) {
