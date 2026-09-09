@@ -55,6 +55,24 @@
     {
       "unresolved": true,
       "key": {
+        "uuid": "af862c63_4837203f",
+        "filename": "aom_dsp/flow_estimation/disflow.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 451,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-09-09T22:55:45Z",
+      "side": 1,
+      "message": "Yes, these invariants guaranteed by the pyramid and flow field allocation sizes, and I removed the redundant error checks.",
+      "parentUuid": "83a333fd_7f2fd909",
+      "revId": "4c3b2b1fb793ac3065d54d798a0e1bfdd20726c3",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
         "uuid": "b54fe39f_2014d28e",
         "filename": "av1/encoder/allintra_vis.c",
         "patchSetId": 1
@@ -66,6 +84,24 @@
       "writtenOn": "2026-09-09T21:57:01Z",
       "side": 1,
       "message": "This is allocated with `calloc`. Is it necessary to clear the previous stats in each run?",
+      "revId": "4c3b2b1fb793ac3065d54d798a0e1bfdd20726c3",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "4db773da_14737876",
+        "filename": "av1/encoder/allintra_vis.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 99,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-09-09T22:55:45Z",
+      "side": 1,
+      "message": "Yes, `calloc` already zeroes newly allocated memory. Removed the redundant memset() calls from both av1_init_mb_wiener_var_buffer() and av1_init_mb_ur_var_buffer().",
+      "parentUuid": "b54fe39f_2014d28e",
       "revId": "4c3b2b1fb793ac3065d54d798a0e1bfdd20726c3",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
