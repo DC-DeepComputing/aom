@@ -433,6 +433,9 @@ aom_image_t *aom_img_alloc_with_border(aom_image_t *img, aom_img_fmt_t fmt,
  * match the specified coordinates and size. Specifically, sets img->d_w,
  * img->d_h, and elements of the img->planes[] array.
  *
+ * \note If either dimension is zero, the rectangle has no addressable
+ * samples and the existing plane pointers are left unchanged.
+ *
  * \param[in]    img       Image descriptor
  * \param[in]    x         leftmost column
  * \param[in]    y         topmost row
