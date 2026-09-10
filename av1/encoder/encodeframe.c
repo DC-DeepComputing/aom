@@ -2452,7 +2452,10 @@ static inline void encode_frame_internal(AV1_COMP *cpi) {
     enc_row_mt->sync_write_ptr = av1_row_mt_sync_write;
     av1_encode_tiles_row_mt(cpi);
   } else {
-    if (AOMMIN(mt_info->num_workers, cm->tiles.cols * cm->tiles.rows) > 1) {
+    const int num_workers = AOMMIN(mt_info->num_mod_workers[MOD_ENC],
+                                   cm->tiles.cols * cm->tiles.rows);
+    if (num_workers > 1) {
+      mt_info->num_workers = num_workers;
       av1_encode_tiles_mt(cpi);
     } else {
       // Preallocate the pc_tree for realtime coding to reduce the cost of
