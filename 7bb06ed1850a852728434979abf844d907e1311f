@@ -68,6 +68,24 @@
       "message": "I wonder if this was the cause of some TSan errors we\u0027ve seen periodically.",
       "revId": "7bb06ed1850a852728434979abf844d907e1311f",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "9fa73fab_cccdbc6c",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 6585
+      },
+      "writtenOn": "2026-09-10T22:20:56Z",
+      "side": 1,
+      "message": "Well, could be. The bug seems a real one, since non regular input frame size could trigger it.",
+      "parentUuid": "8da12859_2a783b62",
+      "revId": "7bb06ed1850a852728434979abf844d907e1311f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
