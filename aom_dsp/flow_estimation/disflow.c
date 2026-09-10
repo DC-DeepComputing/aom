@@ -780,17 +780,31 @@ bool av1_compute_global_motion_disflow(
     *mem_alloc_failed = true;
     return false;
   }
+
+  if (src_layers != ref_layers) {
+    return false;
+  }
+
   if (!av1_compute_corner_list(src, bit_depth, downsample_level, src_corners)) {
     *mem_alloc_failed = true;
     return false;
   }
 
-  assert(src_layers == ref_layers);
-
   const int src_width = src_pyramid->layers[0].width;
   const int src_height = src_pyramid->layers[0].height;
   assert(ref_pyramid->layers[0].width == src_width);
   assert(ref_pyramid->layers[0].height == src_height);
+
+  if (ref_pyramid->layers[0].stride != src_pyramid->layers[0].stride) {
+    return false;
+  }
+  if (src_width < (1 << DOWNSAMPLE_SHIFT) ||
+      src_height < (1 << DOWNSAMPLE_SHIFT)) {
+    return false;
+  }
+  if (src_corners->num_corners == 0) {
+    return false;
+  }
 
   FlowField *flow = alloc_flow_field(src_width, src_height);
   if (!flow) {
