@@ -51,6 +51,24 @@
       "parentUuid": "5c6be761_100bad46",
       "revId": "9c63b1aeaea49bd5f36efc13bf46b9f125f12bdd",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "bd60e2b2_ac202f06",
+        "filename": "av1/av1_cx_iface.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 1676,
+      "author": {
+        "id": 5190
+      },
+      "writtenOn": "2026-09-10T23:07:45Z",
+      "side": 1,
+      "message": "Ok. Realtime also supports lookahead, so may be better to include the lag\u003d0 and 1 pass condition as well, to be safe.Also update the commit message with this condition.",
+      "parentUuid": "891c8257_b2d6e472",
+      "revId": "9c63b1aeaea49bd5f36efc13bf46b9f125f12bdd",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
