@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "c8226852_f470ab82",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 6
+      },
+      "lineNbr": 9,
+      "author": {
+        "id": 5152103
+      },
+      "writtenOn": "2026-09-10T23:23:25Z",
+      "side": 1,
+      "message": "Removed. The message now describes only what the commit does.",
+      "revId": "4a3acc57e0a56707fe11dbb1e1c1c1432bf19113",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
