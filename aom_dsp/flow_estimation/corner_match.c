@@ -290,6 +290,10 @@ bool av1_compute_global_motion_feature_match(
   assert(ref_pyramid->layers[0].height == src_height);
   const int ref_stride = ref_pyramid->layers[0].stride;
 
+  if (ref_stride != src_stride) {
+    return false;
+  }
+
   // find correspondences between the two images
   correspondences = (Correspondence *)aom_malloc(src_corners->num_corners *
                                                  sizeof(*correspondences));

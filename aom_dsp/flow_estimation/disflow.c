@@ -792,6 +792,17 @@ bool av1_compute_global_motion_disflow(
   assert(ref_pyramid->layers[0].width == src_width);
   assert(ref_pyramid->layers[0].height == src_height);
 
+  if (ref_pyramid->layers[0].stride != src_pyramid->layers[0].stride) {
+    return false;
+  }
+  if (src_width < (1 << DOWNSAMPLE_SHIFT) ||
+      src_height < (1 << DOWNSAMPLE_SHIFT)) {
+    return false;
+  }
+  if (src_corners->num_corners == 0) {
+    return false;
+  }
+
   FlowField *flow = alloc_flow_field(src_width, src_height);
   if (!flow) {
     *mem_alloc_failed = true;
