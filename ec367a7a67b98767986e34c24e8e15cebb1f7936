@@ -16,6 +16,161 @@
       "message": "Presubmit: https://build.aomedia.org/jenkins/job/libaom__commit_trigger/81738/",
       "revId": "ec367a7a67b98767986e34c24e8e15cebb1f7936",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "adfea1d1_17e06c33",
+        "filename": "test/encode_api_test.cc",
+        "patchSetId": 3
+      },
+      "lineNbr": 2774,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-09-10T20:05:24Z",
+      "side": 1,
+      "message": "This test looks pretty close to the other one. Can it be factored out to a function that takes the tile rows and columns as parameters?",
+      "fixSuggestions": [
+        {
+          "fixId": "367063c2_782640de",
+          "description": "prompt_to_edit API",
+          "replacements": [
+            {
+              "path": "test/encode_api_test.cc",
+              "range": {
+                "startLine": 2687,
+                "startChar": 0,
+                "endLine": 2693,
+                "endChar": 0
+              },
+              "replacement": "// Helper for OSS-Fuzz Issues 558463888 and 559075253:\n// When dynamically reducing threads with multiple tiles and row_mt\u003d0, the\n// primary worker pool size (mt_info-\u003enum_workers) retains its peak capacity.\n// If encode_frame_internal() uses mt_info-\u003enum_workers instead of\n"
+            },
+            {
+              "path": "test/encode_api_test.cc",
+              "range": {
+                "startLine": 2696,
+                "startChar": 0,
+                "endLine": 2697,
+                "endChar": 0
+              },
+              "replacement": "void ReproDynamicThreadsNoRowMT(int initial_threads, int peak_threads,\n                                int log2_tile_rows, int log2_tile_cols) {\n"
+            },
+            {
+              "path": "test/encode_api_test.cc",
+              "range": {
+                "startLine": 2709,
+                "startChar": 0,
+                "endLine": 2710,
+                "endChar": 0
+              },
+              "replacement": "  cfg.g_threads \u003d initial_threads;\n"
+            },
+            {
+              "path": "test/encode_api_test.cc",
+              "range": {
+                "startLine": 2715,
+                "startChar": 0,
+                "endLine": 2716,
+                "endChar": 0
+              },
+              "replacement": "  // Disable row-mt and enable multi-tiling.\n"
+            },
+            {
+              "path": "test/encode_api_test.cc",
+              "range": {
+                "startLine": 2718,
+                "startChar": 0,
+                "endLine": 2720,
+                "endChar": 0
+              },
+              "replacement": "  ASSERT_EQ(aom_codec_control(\u0026enc, AV1E_SET_TILE_ROWS, log2_tile_rows),\n            AOM_CODEC_OK);\n  ASSERT_EQ(aom_codec_control(\u0026enc, AV1E_SET_TILE_COLUMNS, log2_tile_cols),\n            AOM_CODEC_OK);\n"
+            },
+            {
+              "path": "test/encode_api_test.cc",
+              "range": {
+                "startLine": 2732,
+                "startChar": 0,
+                "endLine": 2733,
+                "endChar": 0
+              },
+              "replacement": "  // Frame 0: Encode at 256x256 with initial threads.\n"
+            },
+            {
+              "path": "test/encode_api_test.cc",
+              "range": {
+                "startLine": 2735,
+                "startChar": 0,
+                "endLine": 2737,
+                "endChar": 0
+              },
+              "replacement": "  // Frame 1: Switch to 512x512 with peak threads. This expands the primary\n  // worker pool capacity.\n"
+            },
+            {
+              "path": "test/encode_api_test.cc",
+              "range": {
+                "startLine": 2739,
+                "startChar": 0,
+                "endLine": 2740,
+                "endChar": 0
+              },
+              "replacement": "  cfg.g_threads \u003d peak_threads;\n"
+            },
+            {
+              "path": "test/encode_api_test.cc",
+              "range": {
+                "startLine": 2743,
+                "startChar": 0,
+                "endLine": 2747,
+                "endChar": 0
+              },
+              "replacement": "  // Frame 2: Switch back to 256x256 and initial threads.\n"
+            },
+            {
+              "path": "test/encode_api_test.cc",
+              "range": {
+                "startLine": 2749,
+                "startChar": 0,
+                "endLine": 2750,
+                "endChar": 0
+              },
+              "replacement": "  cfg.g_threads \u003d initial_threads;\n"
+            },
+            {
+              "path": "test/encode_api_test.cc",
+              "range": {
+                "startLine": 1,
+                "startChar": 0,
+                "endLine": 1,
+                "endChar": 0
+              },
+              "replacement": "// Test to reproduce OSS-Fuzz Issue 558463888:\n// Dynamically reducing threads from 2 to 1 with 2 tiles (1 col x 2 rows).\nTEST(EncodeAPI, Issue558463888) {\n  ReproDynamicThreadsNoRowMT(/*initial_threads\u003d*/1, /*peak_threads\u003d*/2,\n                              /*log2_tile_rows\u003d*/1, /*log2_tile_cols\u003d*/0);\n}\n\n"
+            },
+            {
+              "path": "test/encode_api_test.cc",
+              "range": {
+                "startLine": 2765,
+                "startChar": 0,
+                "endLine": 2774,
+                "endChar": 0
+              },
+              "replacement": "// Dynamically reducing threads from 4 to 2 with 4 tiles (2 cols x 2 rows).\n"
+            },
+            {
+              "path": "test/encode_api_test.cc",
+              "range": {
+                "startLine": 2775,
+                "startChar": 0,
+                "endLine": 2840,
+                "endChar": 0
+              },
+              "replacement": "  ReproDynamicThreadsNoRowMT(/*initial_threads\u003d*/2, /*peak_threads\u003d*/4,\n                              /*log2_tile_rows\u003d*/1, /*log2_tile_cols\u003d*/1);\n"
+            }
+          ]
+        }
+      ],
+      "revId": "ec367a7a67b98767986e34c24e8e15cebb1f7936",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
