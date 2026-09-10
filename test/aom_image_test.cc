@@ -180,6 +180,47 @@ TEST(AomImageTest, AomImgFlipOneRow) {
   aom_img_free(img);
 }
 
+TEST(AomImageTest, AomImgSetRectRejectsFlippedImage) {
+  static constexpr aom_img_fmt_t kFormats[] = {
+    AOM_IMG_FMT_YV12,   AOM_IMG_FMT_I420,   AOM_IMG_FMT_NV12,
+    AOM_IMG_FMT_I42016, AOM_IMG_FMT_YV1216,
+  };
+
+  for (const aom_img_fmt_t format : kFormats) {
+    SCOPED_TRACE(format);
+    aom_image_t *img = aom_img_alloc(nullptr, format, 16, 16, 1);
+    ASSERT_NE(img, nullptr);
+
+    // A rectangle on an unflipped image is still accepted.
+    ASSERT_EQ(aom_img_set_rect(img, 0, 0, 8, 8, 0), 0);
+    ASSERT_EQ(aom_img_set_rect(img, 0, 0, 16, 16, 0), 0);
+
+    aom_img_flip(img);
+    unsigned char *const y_plane = img->planes[AOM_PLANE_Y];
+    unsigned char *const u_plane = img->planes[AOM_PLANE_U];
+    unsigned char *const v_plane = img->planes[AOM_PLANE_V];
+    const int y_stride = img->stride[AOM_PLANE_Y];
+    const unsigned int d_w = img->d_w;
+    const unsigned int d_h = img->d_h;
+
+    EXPECT_EQ(aom_img_set_rect(img, 0, 0, 8, 8, 0), -1);
+    EXPECT_EQ(aom_img_set_rect(img, 0, 0, 0, 0, 0), -1);
+
+    EXPECT_EQ(img->planes[AOM_PLANE_Y], y_plane);
+    EXPECT_EQ(img->planes[AOM_PLANE_U], u_plane);
+    EXPECT_EQ(img->planes[AOM_PLANE_V], v_plane);
+    EXPECT_EQ(img->stride[AOM_PLANE_Y], y_stride);
+    EXPECT_EQ(img->d_w, d_w);
+    EXPECT_EQ(img->d_h, d_h);
+
+    // Flipping back restores an image the call accepts again.
+    aom_img_flip(img);
+    EXPECT_EQ(aom_img_set_rect(img, 0, 0, 8, 8, 0), 0);
+
+    aom_img_free(img);
+  }
+}
+
 TEST(AomImageTest, AomImgFlipOddHeight) {
   static constexpr aom_img_fmt_t kFormats[] = {
     AOM_IMG_FMT_YV12,   AOM_IMG_FMT_I420,   AOM_IMG_FMT_NV12,

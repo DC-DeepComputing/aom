@@ -440,7 +440,14 @@ aom_image_t *aom_img_alloc_with_border(aom_image_t *img, aom_img_fmt_t fmt,
  * \param[in]    h         height
  * \param[in]    border    A border that is padded on four sides of the image.
  *
- * \return 0 if the requested rectangle is valid, nonzero (-1) otherwise.
+ * The plane pointers are recomputed from img_data, which is the base of the
+ * allocation, so the image must not be flipped: after aom_img_flip() the
+ * strides are negative and img_data is no longer the base those pointers are
+ * measured from. A flipped image is rejected and left unchanged. Call
+ * aom_img_flip() again to restore the original orientation first.
+ *
+ * \return 0 if the requested rectangle is valid and the image is not flipped,
+ *         nonzero (-1) otherwise. The image is unchanged on failure.
  */
 int aom_img_set_rect(aom_image_t *img, unsigned int x, unsigned int y,
                      unsigned int w, unsigned int h, unsigned int border);
