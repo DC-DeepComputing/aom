@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "6a20d1aa_ed8ce489",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-09-10T19:44:50Z",
+      "side": 1,
+      "message": "Presubmit: https://build.aomedia.org/jenkins/job/libaom__commit_trigger/81741/",
+      "revId": "3cb9256e92abfca3137fa60263bef2b29317a47a",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
