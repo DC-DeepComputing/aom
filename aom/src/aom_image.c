@@ -244,6 +244,11 @@ aom_image_t *aom_img_alloc_with_border(aom_image_t *img, aom_img_fmt_t fmt,
 
 int aom_img_set_rect(aom_image_t *img, unsigned int x, unsigned int y,
                      unsigned int w, unsigned int h, unsigned int border) {
+  /* Plane offsets are calculated from the allocation base, which a flipped
+     image no longer points at. Rebuilding them would leave the planes before
+     the allocation, so refuse rather than define a meaning for it. */
+  if (img->stride[AOM_PLANE_Y] < 0) return -1;
+
   if (x <= UINT_MAX - w && x + w <= img->w && y <= UINT_MAX - h &&
       y + h <= img->h) {
     img->d_w = w;

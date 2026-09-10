@@ -180,6 +180,30 @@ TEST(AomImageTest, AomImgFlipOneRow) {
   aom_img_free(img);
 }
 
+TEST(AomImageTest, AomImgSetRectRejectsFlippedImage) {
+  aom_image_t *img = aom_img_alloc(nullptr, AOM_IMG_FMT_I420, 16, 16, 1);
+  ASSERT_NE(img, nullptr);
+  aom_img_flip(img);
+  unsigned char *const y_plane = img->planes[AOM_PLANE_Y];
+  unsigned char *const u_plane = img->planes[AOM_PLANE_U];
+  unsigned char *const v_plane = img->planes[AOM_PLANE_V];
+  const int y_stride = img->stride[AOM_PLANE_Y];
+  const unsigned int d_w = img->d_w;
+  const unsigned int d_h = img->d_h;
+
+  EXPECT_EQ(aom_img_set_rect(img, 0, 0, 8, 8, 0), -1);
+  EXPECT_EQ(aom_img_set_rect(img, 0, 0, 0, 0, 0), -1);
+
+  EXPECT_EQ(img->planes[AOM_PLANE_Y], y_plane);
+  EXPECT_EQ(img->planes[AOM_PLANE_U], u_plane);
+  EXPECT_EQ(img->planes[AOM_PLANE_V], v_plane);
+  EXPECT_EQ(img->stride[AOM_PLANE_Y], y_stride);
+  EXPECT_EQ(img->d_w, d_w);
+  EXPECT_EQ(img->d_h, d_h);
+
+  aom_img_free(img);
+}
+
 TEST(AomImageTest, AomImgFlipOddHeight) {
   static constexpr aom_img_fmt_t kFormats[] = {
     AOM_IMG_FMT_YV12,   AOM_IMG_FMT_I420,   AOM_IMG_FMT_NV12,
