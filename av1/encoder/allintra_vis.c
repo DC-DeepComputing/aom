@@ -65,6 +65,18 @@ void av1_init_mb_wiener_var_buffer(AV1_COMP *cpi) {
   // "compute_num_ai_workers()".
   cpi->weber_bsize = BLOCK_8X8;
 
+  if (cpi->mb_weber_stats_alloc_mi_rows != cpi->frame_info.mi_rows ||
+      cpi->mb_weber_stats_alloc_mi_cols != cpi->frame_info.mi_cols) {
+    aom_free(cpi->mb_weber_stats);
+    cpi->mb_weber_stats = NULL;
+    if (cpi->oxcf.enable_rate_guide_deltaq) {
+      aom_free(cpi->prep_rate_estimates);
+      cpi->prep_rate_estimates = NULL;
+      aom_free(cpi->ext_rate_distribution);
+      cpi->ext_rate_distribution = NULL;
+    }
+  }
+
   if (cpi->oxcf.enable_rate_guide_deltaq) {
     if (cpi->mb_weber_stats && cpi->prep_rate_estimates &&
         cpi->ext_rate_distribution)
@@ -76,6 +88,8 @@ void av1_init_mb_wiener_var_buffer(AV1_COMP *cpi) {
   CHECK_MEM_ERROR(cm, cpi->mb_weber_stats,
                   aom_calloc(cpi->frame_info.mi_rows * cpi->frame_info.mi_cols,
                              sizeof(*cpi->mb_weber_stats)));
+  cpi->mb_weber_stats_alloc_mi_rows = cpi->frame_info.mi_rows;
+  cpi->mb_weber_stats_alloc_mi_cols = cpi->frame_info.mi_cols;
 
   if (cpi->oxcf.enable_rate_guide_deltaq) {
     CHECK_MEM_ERROR(
@@ -775,11 +789,19 @@ int av1_get_sbq_perceptual_ai(const AV1_COMP *const cpi, BLOCK_SIZE bsize,
 void av1_init_mb_ur_var_buffer(AV1_COMP *cpi) {
   AV1_COMMON *cm = &cpi->common;
 
+  if (cpi->mb_delta_q_alloc_mb_rows != cpi->frame_info.mb_rows ||
+      cpi->mb_delta_q_alloc_mb_cols != cpi->frame_info.mb_cols) {
+    aom_free(cpi->mb_delta_q);
+    cpi->mb_delta_q = NULL;
+  }
+
   if (cpi->mb_delta_q) return;
 
   CHECK_MEM_ERROR(cm, cpi->mb_delta_q,
                   aom_calloc(cpi->frame_info.mb_rows * cpi->frame_info.mb_cols,
                              sizeof(*cpi->mb_delta_q)));
+  cpi->mb_delta_q_alloc_mb_rows = cpi->frame_info.mb_rows;
+  cpi->mb_delta_q_alloc_mb_cols = cpi->frame_info.mb_cols;
 }
 
 #if CONFIG_TFLITE
