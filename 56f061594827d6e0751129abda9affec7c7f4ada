@@ -18,6 +18,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": true,
+      "key": {
+        "uuid": "680fa396_05daa291",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 5
+      },
+      "lineNbr": 14,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-09-11T14:19:55Z",
+      "side": 1,
+      "message": "Both fixes were needed for this case to pass cleanly, so I included them in on CL.",
+      "parentUuid": "b040be21_afa2c8a7",
+      "revId": "56f061594827d6e0751129abda9affec7c7f4ada",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": false,
       "key": {
         "uuid": "4993a735_a2fea506",
@@ -54,6 +72,24 @@
     {
       "unresolved": true,
       "key": {
+        "uuid": "bc6ca317_576d4ab3",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 5
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-09-11T14:19:55Z",
+      "side": 1,
+      "message": "Yes, this single failure exposed both issues sequentially:\n1. It encoded an allintra sequence starting with a 17x1 frame under delta-q mode 3 (AV1E_SET_DELTAQ_MODE \u003d 3). At 17x1 (flow_height \u003d 0), border filling exceeded the stride and caused memcpy-param-overlap in disflow.\n\n2. Once the 17x1 frame finished, the testcase switched resolution to 320x240. Because cpi-\u003eframe_info was not updated in av1_update_frame_size() and mb_weber_stats / mb_delta_q were only allocated for the initial 17x1 size, this immediately crashed with a heap-buffer-overflow in perceptual AI.\n\nSo both fixes were needed for this case to pass.",
+      "parentUuid": "846efe57_44892fd4",
+      "revId": "56f061594827d6e0751129abda9affec7c7f4ada",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
         "uuid": "99adfd36_eb25d341",
         "filename": "test/disflow_test.cc",
         "patchSetId": 5
@@ -65,6 +101,24 @@
       "writtenOn": "2026-09-11T02:45:35Z",
       "side": 1,
       "message": "Add `\u003cstring.h\u003e` or `\u003ccstring\u003e` for this.",
+      "revId": "56f061594827d6e0751129abda9affec7c7f4ada",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "52983350_043fd90e",
+        "filename": "test/disflow_test.cc",
+        "patchSetId": 5
+      },
+      "lineNbr": 135,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-09-11T14:19:55Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "99adfd36_eb25d341",
       "revId": "56f061594827d6e0751129abda9affec7c7f4ada",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
