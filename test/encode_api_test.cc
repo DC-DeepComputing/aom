@@ -2809,4 +2809,44 @@ TEST(EncodeAPI, Buganizer558463892_558589747) {
 }
 #endif  // !CONFIG_REALTIME_ONLY
 
+#if !CONFIG_REALTIME_ONLY
+TEST(EncodeAPI, Buganizer558417547) {
+#if !CONFIG_SHARED
+  std::unique_ptr<AV1_COMP> cpi_test(new AV1_COMP());
+  SequenceHeader seq_params = {};
+  seq_params.bit_depth = AOM_BITS_8;
+  seq_params.sb_size = BLOCK_64X64;
+  cpi_test->common.seq_params = &seq_params;
+  cpi_test->common.mi_params.mi_rows = 16;
+  cpi_test->common.mi_params.mi_cols = 16;
+  cpi_test->common.quant_params.base_qindex = 128;
+  cpi_test->common.delta_q_info.delta_q_res = 4;
+  cpi_test->frame_info.mi_rows = 16;
+  cpi_test->frame_info.mi_cols = 16;
+  cpi_test->norm_wiener_variance = 100;
+  struct aom_internal_error_info error = {};
+  if (setjmp(error.jmp)) FAIL();
+  error.setjmp = 1;
+  cpi_test->common.error = &error;
+  av1_init_mb_wiener_var_buffer(cpi_test.get());
+  ASSERT_NE(cpi_test->mb_weber_stats, nullptr);
+
+  // Set large SATD and distortion values exceeding INT32_MAX.
+  for (int i = 0; i < 16 * 16; ++i) {
+    cpi_test->mb_weber_stats[i].satd = 3000000000LL;
+    cpi_test->mb_weber_stats[i].distortion = 3000000000LL;
+    cpi_test->mb_weber_stats[i].rec_pix_max = 255;
+  }
+
+  // Test out-of-bounds / negative mi_row and mi_col without crashing or SIGFPE.
+  int q_neg = av1_get_sbq_perceptual_ai(cpi_test.get(), BLOCK_64X64, -16, -16);
+  EXPECT_GE(q_neg, 0);
+  int q_oob = av1_get_sbq_perceptual_ai(cpi_test.get(), BLOCK_64X64, 100, 100);
+  EXPECT_GE(q_oob, 0);
+
+  aom_free(cpi_test->mb_weber_stats);
+#endif  // !CONFIG_SHARED
+}
+#endif  // !CONFIG_REALTIME_ONLY
+
 }  // namespace
