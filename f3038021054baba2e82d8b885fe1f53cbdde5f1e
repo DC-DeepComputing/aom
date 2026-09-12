@@ -16,6 +16,23 @@
       "message": "Presubmit: https://build.aomedia.org/jenkins/job/libaom__commit_trigger/81763/",
       "revId": "f3038021054baba2e82d8b885fe1f53cbdde5f1e",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "3590b729_ba85457b",
+        "filename": "aom/aomcx.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 1782,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-09-12T19:17:22Z",
+      "side": 1,
+      "message": "This is an API change. For compatibility, you can keep this, mark it as deprecated, and have it be a noop.",
+      "revId": "f3038021054baba2e82d8b885fe1f53cbdde5f1e",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
