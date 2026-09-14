@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "c3b0cd67_6a3edd25",
+        "filename": "av1/encoder/allintra_vis.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 113,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-09-14T19:06:42Z",
+      "side": 1,
+      "message": "Were any of these paths hit by these bugs? The cast removal seems to make sense.",
+      "range": {
+        "startLine": 113,
+        "startChar": 10,
+        "endLine": 113,
+        "endChar": 29
+      },
+      "revId": "0f523449200470976a23e1cdb8bbf8d42cc7c4b1",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
