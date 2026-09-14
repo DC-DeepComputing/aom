@@ -205,6 +205,10 @@ double av1_get_max_bitrate_for_level(AV1_LEVEL level_index, int tier,
 void av1_get_max_tiles_for_level(AV1_LEVEL level_index, int *const max_tiles,
                                  int *const max_tile_cols);
 
+struct TileConfig;
+// Adjust number of tiles and tile columns to be under level limit.
+void av1_clamp_tile_cfg_to_level(struct TileConfig *tile_cfg, AV1_LEVEL level);
+
 // Return minimum compression ratio for given level.
 double av1_get_min_cr_for_level(AV1_LEVEL level_index, int tier,
                                 int is_still_picture);
