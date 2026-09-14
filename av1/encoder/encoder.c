@@ -478,12 +478,14 @@ static inline int does_level_match(int width, int height, double fps,
          height <= lvl_height * lvl_dim_mult;
 }
 
-static void set_bitstream_level_tier(AV1_PRIMARY *const ppi, int width,
-                                     int height, double init_framerate) {
+static void set_bitstream_level_tier(AV1_PRIMARY *const ppi,
+                                     const AV1EncoderConfig *const oxcf,
+                                     int width, int height,
+                                     double init_framerate) {
   SequenceHeader *const seq_params = &ppi->seq_params;
   const AV1LevelParams *const level_params = &ppi->level_params;
-  // TODO(any): This is a placeholder function that only addresses dimensions
-  // and max display sample rates.
+  // TODO(any): This is a placeholder function that only addresses dimensions,
+  // max display sample rates, and tile limits.
   // Need to add checks for max bit rate, max decoded luma sample rate, header
   // rate, etc. that are not covered by this function.
   AV1_LEVEL level = SEQ_LEVEL_MAX;
@@ -549,6 +551,53 @@ static void set_bitstream_level_tier(AV1_PRIMARY *const ppi, int width,
     }
   }
 #endif
+
+  TileConfig temp_tile_cfg = oxcf->tile_cfg;
+  // If one or more operating points specify a target sequence level, clamp the
+  // temporary tile configuration to the strictest (minimum) target level among
+  // active operating points so that all operating points conform.
+  // In auto-level mode (min_target_level == SEQ_LEVEL_MAX), the tile
+  // configuration remains unclamped so that the loop below can promote `level`
+  // if the requested tiling exceeds lower level limits.
+  AV1_LEVEL min_target_level = SEQ_LEVEL_MAX;
+  for (int i = 0; i <= seq_params->operating_points_cnt_minus_1; ++i) {
+    if (level_params->target_seq_level_idx[i] < min_target_level) {
+      min_target_level = level_params->target_seq_level_idx[i];
+    }
+  }
+  if (min_target_level < SEQ_LEVELS) {
+    av1_clamp_tile_cfg_to_level(&temp_tile_cfg, min_target_level);
+  }
+
+  // Compute the tile geometry (tile_cols, tile_rows, total tiles) using the
+  // clamped tile config (if target level specified) or raw tile config (in
+  // auto-level mode).
+  AV1_COMMON cm;
+  memset(&cm, 0, sizeof(cm));
+  cm.seq_params = seq_params;
+  cm.mi_params.mi_cols = size_in_mi(width);
+  cm.mi_params.mi_rows = size_in_mi(height);
+  cm.superres_scale_denominator = SCALE_NUMERATOR;
+  set_tile_info(&cm, &temp_tile_cfg);
+  const int tile_cols = cm.tiles.cols;
+  const int tile_rows = cm.tiles.rows;
+  const int tiles = tile_cols * tile_rows;
+
+  // Bump level if the tile count or tile column count exceeds the level limits
+  // (AV1 Annex A Table A-1: MaxTiles and MaxTileCols).
+  while (level < SEQ_LEVELS) {
+    if (is_valid_seq_level_idx(level)) {
+      int max_tiles, max_tile_cols;
+      av1_get_max_tiles_for_level(level, &max_tiles, &max_tile_cols);
+      if (tile_cols <= max_tile_cols && tiles <= max_tiles) {
+        break;
+      }
+    }
+    ++level;
+  }
+  if (level >= SEQ_LEVELS) {
+    level = SEQ_LEVEL_MAX;
+  }
 
   for (int i = 0; i < MAX_NUM_OPERATING_POINTS; ++i) {
     assert(is_valid_seq_level_idx(level_params->target_seq_level_idx[i]) ||
@@ -663,7 +712,7 @@ static void init_seq_coding_tools(AV1_PRIMARY *const ppi,
   seq->enable_intra_edge_filter = oxcf->intra_mode_cfg.enable_intra_edge_filter;
   seq->enable_filter_intra = oxcf->intra_mode_cfg.enable_filter_intra;
 
-  set_bitstream_level_tier(ppi, frm_dim_cfg->width, frm_dim_cfg->height,
+  set_bitstream_level_tier(ppi, oxcf, frm_dim_cfg->width, frm_dim_cfg->height,
                            oxcf->input_cfg.init_framerate);
   av1_set_svc_seq_params(ppi);
 }
@@ -869,6 +918,8 @@ void av1_change_config_seq(struct AV1_PRIMARY *ppi,
   // number of layers is changed. This is done in the
   // ctrl_set_svc_params().
   if (!ppi->seq_params_locked) {
+    memcpy(ppi->level_params.target_seq_level_idx, oxcf->target_seq_level_idx,
+           sizeof(ppi->level_params.target_seq_level_idx));
     seq_params->operating_points_cnt_minus_1 =
         (ppi->number_spatial_layers > 1 || ppi->number_temporal_layers > 1)
             ? ppi->number_spatial_layers * ppi->number_temporal_layers - 1
@@ -940,10 +991,15 @@ void av1_change_config(struct AV1_COMP *cpi, const AV1EncoderConfig *oxcf,
 
   // TODO(huisu@): level targeting currently only works for the 0th operating
   // point, so scalable coding is not supported yet.
-  if (level_params->target_seq_level_idx[0] < SEQ_LEVELS) {
+  AV1_LEVEL min_target_level = SEQ_LEVEL_MAX;
+  for (int i = 0; i <= seq_params->operating_points_cnt_minus_1; ++i) {
+    if (level_params->target_seq_level_idx[i] < min_target_level) {
+      min_target_level = level_params->target_seq_level_idx[i];
+    }
+  }
+  if (min_target_level < SEQ_LEVELS) {
     // Adjust encoder config in order to meet target level.
-    config_target_level(cpi, level_params->target_seq_level_idx[0],
-                        seq_params->tier[0]);
+    config_target_level(cpi, min_target_level, seq_params->tier[0]);
   }
 
   if (has_no_stats_stage(cpi) && (rc_cfg->mode == AOM_Q)) {

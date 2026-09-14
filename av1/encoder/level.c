@@ -406,6 +406,21 @@ void av1_get_max_tiles_for_level(AV1_LEVEL level_index, int *const max_tiles,
   *max_tile_cols = level_spec->max_tile_cols;
 }
 
+void av1_clamp_tile_cfg_to_level(TileConfig *tile_cfg, AV1_LEVEL level) {
+  if (level >= SEQ_LEVELS || !is_valid_seq_level_idx(level)) return;
+  int max_tiles, max_tile_cols;
+  av1_get_max_tiles_for_level(level, &max_tiles, &max_tile_cols);
+  while (tile_cfg->tile_columns > 0 &&
+         (1 << tile_cfg->tile_columns) > max_tile_cols) {
+    --tile_cfg->tile_columns;
+  }
+  const int tile_cols = (1 << tile_cfg->tile_columns);
+  while (tile_cfg->tile_rows > 0 &&
+         tile_cols * (1 << tile_cfg->tile_rows) > max_tiles) {
+    --tile_cfg->tile_rows;
+  }
+}
+
 // We assume time t to be valid if and only if t >= 0.0.
 // So INVALID_TIME can be defined as anything less than 0.
 #define INVALID_TIME (-1.0)

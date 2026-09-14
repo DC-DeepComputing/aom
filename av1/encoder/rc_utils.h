@@ -90,17 +90,7 @@ static inline void config_target_level(AV1_COMP *const cpi,
   rc_cfg->worst_allowed_q = 255;
 
   // Adjust number of tiles and tile columns to be under level limit.
-  int max_tiles, max_tile_cols;
-  av1_get_max_tiles_for_level(target_level, &max_tiles, &max_tile_cols);
-  while (tile_cfg->tile_columns > 0 &&
-         (1 << tile_cfg->tile_columns) > max_tile_cols) {
-    --tile_cfg->tile_columns;
-  }
-  const int tile_cols = (1 << tile_cfg->tile_columns);
-  while (tile_cfg->tile_rows > 0 &&
-         tile_cols * (1 << tile_cfg->tile_rows) > max_tiles) {
-    --tile_cfg->tile_rows;
-  }
+  av1_clamp_tile_cfg_to_level(tile_cfg, target_level);
 
   // Adjust min compression ratio.
   const int still_picture = seq_params->still_picture;
