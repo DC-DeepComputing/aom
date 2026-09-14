@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "dbf0dc2b_902cf773",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 5
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-09-14T18:47:07Z",
+      "side": 1,
+      "message": "This is safe after looking into the function calls of the RTC rate control library. None of them depends on encoding path guarded by CONFIG_AV1_HIGHBITDEPTH.",
+      "revId": "b7926e61f11b6393d5178805fb6a85b1d8f25daf",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
