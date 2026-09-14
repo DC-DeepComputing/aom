@@ -39,6 +39,30 @@
       },
       "revId": "9ffce8d0a29aac57b7f5d6211fa0cacc1d1fad24",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "9036d1a4_50691030",
+        "filename": "test/forced_max_frame_width_height_test.cc",
+        "patchSetId": 8
+      },
+      "lineNbr": 477,
+      "author": {
+        "id": 3583131
+      },
+      "writtenOn": "2026-09-14T21:14:31Z",
+      "side": 1,
+      "message": "AI-based response:\n\nAdded — AV1E_SET_TARGET_SEQ_LEVEL_IDX(SEQ_LEVEL_KEEP_STATS) to enable the stats, then AV1E_GET_SEQ_LEVEL_IDX asserting SEQ_LEVEL_5_0, which is what 2560x1536@30 requires. Without enabling stats the control returns SEQ_LEVEL_MAX for every OP, since keep_level_stats is only set when a target level is configured (encoder.c:916).\n\nOne caveat worth flagging: this does not actually guard the change. AV1E_GET_SEQ_LEVEL_IDX → av1_get_seq_level_idx (level.c:1366) derives the level from the collected encoding statistics via check_level_constraints(); it never reads seq_params-\u003eseq_level_idx, which is the field this CL fixes. I confirmed this empirically: reverting the set_bitstream_level_tier() hunk leaves the new assertion passing.\n\nI could not find any way to observe the sequence header level through the public API — AV1E_GET_TARGET_SEQ_LEVEL_IDX returns the target, and on the decoder side parse_operating_points() (av1_dx_iface.c:234) reads seq_level_idx and discards it. For reference the values at stake are SEQ_LEVEL_2_1 (from 640x384, before the fix) versus SEQ_LEVEL_5_0 (from the forced max 2560x1536, after), so the pre-fix bitstream declares level 2.1 and then codes a 2560x1536 frame.\n\nHappy to make this a real regression test by parsing seq_level_idx[0] out of the sequence header OBU in the test (~40 lines: leb128 + OBU walk + aom_rb_read_literal), or by adding a control that exposes the header value — let me know if either is preferable to the indirect check.",
+      "parentUuid": "8d2e5aff_34e6f5d5",
+      "range": {
+        "startLine": 477,
+        "startChar": 5,
+        "endLine": 477,
+        "endChar": 46
+      },
+      "revId": "9ffce8d0a29aac57b7f5d6211fa0cacc1d1fad24",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
