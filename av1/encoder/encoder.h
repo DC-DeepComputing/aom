@@ -645,7 +645,7 @@ typedef struct {
   bool enable_auto_brf;
 } GFConfig;
 
-typedef struct {
+typedef struct TileConfig {
   // Indicates the number of tile groups.
   unsigned int num_tile_groups;
   // Indicates the MTU size for a tile group. If mtu is non-zero,
