@@ -3586,7 +3586,7 @@ static aom_codec_err_t encoder_encode(aom_codec_alg_priv_t *ctx,
       av1_compute_num_workers_for_mt(cpi);
       num_workers = av1_get_max_num_workers(cpi);
     }
-    if (num_workers > 1 && ppi->p_mt_info.num_workers < num_workers) {
+    if (num_workers > 1 && ppi->p_mt_info.num_workers != num_workers) {
       // Obtain the maximum no. of frames that can be supported in a parallel
       // encode set.
       if (is_stat_consumption_stage(cpi)) {
