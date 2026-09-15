@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "73556b80_69660a20",
+        "filename": "aom_dsp/flow_estimation/disflow.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 815,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-15T17:51:25Z",
+      "side": 1,
+      "message": "Lin: If `src_layers \u003e\u003d 2`, this `compute_flow_field()` call will also access `src_pyramid-\u003elayers[1]` and `ref_pyramid-\u003elayers[1]`, so the new check at line 798, which covers `layers[0]` only, is insufficient.\n\nCould you please look into this?",
+      "revId": "b5f92a845464db51123572b9b52fcabfc530e06b",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "94f56353_1be4e7b4",
+        "filename": "av1/encoder/global_motion_facade.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 317,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-15T17:51:25Z",
+      "side": 1,
+      "message": "This `y_stride` check seems unrelated to the `xxx_pyramid-\u003elayers[0].stride` checks in the other two files. Are they related?\n\nWhat code requires `ref_buf[frame]-\u003ey_stride \u003d\u003d cpi-\u003esource-\u003ey_stride`?",
+      "revId": "b5f92a845464db51123572b9b52fcabfc530e06b",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
