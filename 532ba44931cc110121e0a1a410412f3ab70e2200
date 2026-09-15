@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "6379a1ab_37943feb",
+        "filename": "av1/encoder/encodeframe.c",
+        "patchSetId": 9
+      },
+      "lineNbr": 2461,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-15T21:56:02Z",
+      "side": 1,
+      "message": "Setting `mt_info-\u003enum_workers` to a new value for the duration of the `av1_encode_tiles_mt(cpi)` call caught my attention. After studying the code and what Marco described in the commit message, I realized that this can be avoided if we pass `num_workers` to `enc_worker_hook()`. Please see https://aomedia-review.googlesource.com/c/aom/+/216781.",
+      "revId": "532ba44931cc110121e0a1a410412f3ab70e2200",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "4cbfcd42_59085353",
+        "filename": "test/encode_api_test.cc",
+        "patchSetId": 9
+      },
+      "lineNbr": 2884,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-15T21:56:02Z",
+      "side": 1,
+      "message": "In this test we first set `g_threads` to 4 and then reduce it to 2. But `mt_info-\u003enum_workers` stays unchanged at 4, which causes problems if we use `mt_info-\u003enum_workers` as the current `g_threads` value.\n\nIt would be good to make `mt_info-\u003enum_workers` match the current `g_threads` value. The following patch does that and seems to work, but it is harder to prove it is correct:\n\n```\ndiff --git a/av1/av1_cx_iface.c b/av1/av1_cx_iface.c\nindex 18922ad304..07c3c6f85c 100644\n--- a/av1/av1_cx_iface.c\n+++ b/av1/av1_cx_iface.c\n@@ -3586,7 +3586,7 @@ static aom_codec_err_t encoder_encode(aom_codec_alg_priv_t *ctx,\n       av1_compute_num_workers_for_mt(cpi);\n       num_workers \u003d av1_get_max_num_workers(cpi);\n     }\n-    if (num_workers \u003e 1 \u0026\u0026 ppi-\u003ep_mt_info.num_workers \u003c num_workers) {\n+    if (num_workers \u003e 1 \u0026\u0026 ppi-\u003ep_mt_info.num_workers !\u003d num_workers) {\n       // Obtain the maximum no. of frames that can be supported in a parallel\n       // encode set.\n       if (is_stat_consumption_stage(cpi)) {\n```",
+      "revId": "532ba44931cc110121e0a1a410412f3ab70e2200",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
