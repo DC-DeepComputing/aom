@@ -33,6 +33,29 @@
       "message": "Presubmit passed: https://build.aomedia.org/jenkins/job/libaom__commit_trigger/81761/",
       "revId": "023743a7d78d9c7d33390c5c45b35495ea013a21",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "d5932165_8180720f",
+        "filename": "aom_dsp/flow_estimation/disflow.c",
+        "patchSetId": 9
+      },
+      "lineNbr": 817,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-15T16:03:50Z",
+      "side": 1,
+      "message": "Lin: Coverity detected duplicate code (likely caused by a merge conflict) here. Lines 811-817 should be deleted because you already added them at lines 822-827 in an [earlier commit](https://aomedia-review.googlesource.com/c/aom/+/216521).\n\nIn your new CL please reference Coverity defect CID 564107 Logically dead code.",
+      "range": {
+        "startLine": 811,
+        "startChar": 0,
+        "endLine": 817,
+        "endChar": 3
+      },
+      "revId": "023743a7d78d9c7d33390c5c45b35495ea013a21",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ],
   "submitRequirementResults": [
