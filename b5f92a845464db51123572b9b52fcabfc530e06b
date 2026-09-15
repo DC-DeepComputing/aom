@@ -20,6 +20,24 @@
     {
       "unresolved": true,
       "key": {
+        "uuid": "32c51490_69f260a4",
+        "filename": "aom_dsp/flow_estimation/disflow.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 815,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-09-15T18:17:55Z",
+      "side": 1,
+      "message": "For layers 1 and above, both src_pyramid and ref_pyramid allocate intermediate buffers internally in aom_alloc_pyramid() (aom_dsp/pyramid.c:162-189). Their dimensions and strides are calculated purely as a function of (width \u003e\u003e level):\n  level_stride \u003d (padded_width + PYRAMID_ALIGNMENT - 1) \u0026 ~(PYRAMID_ALIGNMENT - 1);\n\nSince src_pyramid-\u003elayers[0].width \u003d\u003d ref_pyramid-\u003elayers[0].width is verified, all layers with level \u003e\u003d 1 are guaranteed to have identical strides.",
+      "parentUuid": "73556b80_69660a20",
+      "revId": "b5f92a845464db51123572b9b52fcabfc530e06b",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
         "uuid": "94f56353_1be4e7b4",
         "filename": "av1/encoder/global_motion_facade.c",
         "patchSetId": 3
@@ -31,6 +49,24 @@
       "writtenOn": "2026-09-15T17:51:25Z",
       "side": 1,
       "message": "This `y_stride` check seems unrelated to the `xxx_pyramid-\u003elayers[0].stride` checks in the other two files. Are they related?\n\nWhat code requires `ref_buf[frame]-\u003ey_stride \u003d\u003d cpi-\u003esource-\u003ey_stride`?",
+      "revId": "b5f92a845464db51123572b9b52fcabfc530e06b",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "da77c29b_7af1dfc1",
+        "filename": "av1/encoder/global_motion_facade.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 317,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-09-15T18:17:55Z",
+      "side": 1,
+      "message": "They are directly related: for 8-bit frames, xxx_pyramid-\u003elayers[0].stride is initialized directly from frame-\u003ey_stride in fill_pyramid() (aom_dsp/pyramid.c:300).\n\nSince optical flow and corner matching require matching strides between source and reference for layer 0 (av1_compute_global_motion_disflow and av1_compute_global_motion_feature_match return false when layer 0 strides differ), checking ref_buf[frame]-\u003ey_stride \u003d\u003d cpi-\u003esource-\u003ey_stride in update_valid_ref_frames_for_gm() prunes out incompatible reference frames up front.",
+      "parentUuid": "94f56353_1be4e7b4",
       "revId": "b5f92a845464db51123572b9b52fcabfc530e06b",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
