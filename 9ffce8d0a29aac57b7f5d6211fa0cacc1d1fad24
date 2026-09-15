@@ -63,6 +63,30 @@
       },
       "revId": "9ffce8d0a29aac57b7f5d6211fa0cacc1d1fad24",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "07edc516_8d2b7d6e",
+        "filename": "test/forced_max_frame_width_height_test.cc",
+        "patchSetId": 8
+      },
+      "lineNbr": 477,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-09-15T14:06:24Z",
+      "side": 1,
+      "message": "oh interesting... I didn\u0027t know. this can be done with seq_level_idx later in a followup. let\u0027s not make this CL bigger...",
+      "parentUuid": "9036d1a4_50691030",
+      "range": {
+        "startLine": 477,
+        "startChar": 5,
+        "endLine": 477,
+        "endChar": 46
+      },
+      "revId": "9ffce8d0a29aac57b7f5d6211fa0cacc1d1fad24",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
