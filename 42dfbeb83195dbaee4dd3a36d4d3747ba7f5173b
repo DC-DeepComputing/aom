@@ -1,0 +1,55 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "c9c20ffe_16ccd162",
+        "filename": "aom_dsp/aom_dsp_rtcd_defs.pl",
+        "patchSetId": 3
+      },
+      "lineNbr": 1749,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-16T19:39:16Z",
+      "side": 1,
+      "message": "This is the main function prototype change: split the original `stride` parameter into `src_stride` and `ref_stride`.\n\nAll the changes below implement this split of the `stride` parameter. Some extra plumbing is required.",
+      "revId": "42dfbeb83195dbaee4dd3a36d4d3747ba7f5173b",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "aa48cd2b_f1924f94",
+        "filename": "aom_dsp/flow_estimation/corner_match.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 126,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-16T19:39:16Z",
+      "side": 1,
+      "message": "I reordered the function parameters so that `src` and `src_stride` go together, and `ref` and `ref_stride` go together.\n\nYou can see the new parameter order look nicer at lines 305-306 below.",
+      "revId": "42dfbeb83195dbaee4dd3a36d4d3747ba7f5173b",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "26d2c4c2_05549a88",
+        "filename": "aom_dsp/flow_estimation/disflow.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 657,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-16T19:39:16Z",
+      "side": 1,
+      "message": "I renamed `cur_stride` to `src_stride` so that it matches `src_buffer`.",
+      "revId": "42dfbeb83195dbaee4dd3a36d4d3747ba7f5173b",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
