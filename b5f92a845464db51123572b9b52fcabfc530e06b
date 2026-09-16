@@ -36,6 +36,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "56634eec_6f4a354a",
+        "filename": "aom_dsp/flow_estimation/disflow.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 815,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-16T01:31:52Z",
+      "side": 1,
+      "message": "Thanks for the explanation!",
+      "parentUuid": "32c51490_69f260a4",
+      "revId": "b5f92a845464db51123572b9b52fcabfc530e06b",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "94f56353_1be4e7b4",
@@ -67,6 +85,24 @@
       "side": 1,
       "message": "They are directly related: for 8-bit frames, xxx_pyramid-\u003elayers[0].stride is initialized directly from frame-\u003ey_stride in fill_pyramid() (aom_dsp/pyramid.c:300).\n\nSince optical flow and corner matching require matching strides between source and reference for layer 0 (av1_compute_global_motion_disflow and av1_compute_global_motion_feature_match return false when layer 0 strides differ), checking ref_buf[frame]-\u003ey_stride \u003d\u003d cpi-\u003esource-\u003ey_stride in update_valid_ref_frames_for_gm() prunes out incompatible reference frames up front.",
       "parentUuid": "94f56353_1be4e7b4",
+      "revId": "b5f92a845464db51123572b9b52fcabfc530e06b",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "d1aa65d4_43708264",
+        "filename": "av1/encoder/global_motion_facade.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 317,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-16T01:31:52Z",
+      "side": 1,
+      "message": "Thanks for the explanation!",
+      "parentUuid": "da77c29b_7af1dfc1",
       "revId": "b5f92a845464db51123572b9b52fcabfc530e06b",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
