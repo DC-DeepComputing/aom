@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "4735e0c0_69d390cd",
+        "filename": "av1/encoder/allintra_vis.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 762,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-16T20:33:48Z",
+      "side": 1,
+      "message": "Cheng: Coverity reports that the return value `qindex` may have overflowed. I will send you the Coverity report.",
+      "revId": "46bd978472725e7f0b55f5a8809848c45c012f4f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
