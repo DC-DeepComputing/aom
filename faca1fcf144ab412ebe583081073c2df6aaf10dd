@@ -1,6 +1,23 @@
 {
   "comments": [
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "8a5e3803_68c65612",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-09-16T19:09:36Z",
+      "side": 1,
+      "message": "This will need a rebase.",
+      "revId": "faca1fcf144ab412ebe583081073c2df6aaf10dd",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "88bb4dc5_3d3aab98",
@@ -32,6 +49,24 @@
       "side": 1,
       "message": "Yes. Currently I think the tile cfg is only per frame, shared for every op point. So here we have to find one tile config that works for all operating points.",
       "parentUuid": "88bb4dc5_3d3aab98",
+      "revId": "faca1fcf144ab412ebe583081073c2df6aaf10dd",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "07f3a2b7_c476f294",
+        "filename": "av1/encoder/encoder.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 558,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-09-16T19:09:36Z",
+      "side": 1,
+      "message": "\u003e Yes. Currently I think the tile cfg is only per frame, shared for every op point. So here we have to find one tile config that works for all operating points.\n\nFortunately, I know of any realtime users are setting the target level.",
+      "parentUuid": "5de20b83_3f099ee2",
       "revId": "faca1fcf144ab412ebe583081073c2df6aaf10dd",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
