@@ -54,6 +54,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "fd7d35a7_3ee784a4",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-16T21:47:57Z",
+      "side": 1,
+      "message": "Thank you for the info. I found that the `DisflowTest.MismatchedStrides` test is now passing for the wrong reason (`src_corners-\u003enum_corners \u003d\u003d 0`). I suggest we simply delete this test because the error condition it tests is no longer an error condition.",
+      "parentUuid": "1dd235cb_4ab80c05",
+      "revId": "80872adbed3ca04e53ff9136ebe9f508416340a2",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "d6655ffa_45cabd7b",
@@ -85,6 +103,24 @@
       "side": 1,
       "message": "I don\u0027t think it is necessary. As in disflow.c, av1_compute_corner_list is only called for src? In corner_match.c, both src and ref corners are computed.",
       "parentUuid": "d6655ffa_45cabd7b",
+      "revId": "80872adbed3ca04e53ff9136ebe9f508416340a2",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "23067465_056b2a2a",
+        "filename": "aom_dsp/flow_estimation/disflow.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 819,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-16T21:47:57Z",
+      "side": 1,
+      "message": "You are right! This function doesn\u0027t even have a `ref_corners` variable. Sorry for my confusion.",
+      "parentUuid": "98061955_cd6a6b74",
       "revId": "80872adbed3ca04e53ff9136ebe9f508416340a2",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
