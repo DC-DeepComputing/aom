@@ -1,5 +1,23 @@
 {
-  "comments": [],
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "7d73c286_3c805e58",
+        "filename": "aom/aomcx.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 1792,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-16T20:05:05Z",
+      "side": 1,
+      "message": "The command-line options defined in av1/arg_defs.c are also part of libaom\u0027s public interface. We also need to add the two deleted entries to the following array in av1/arg_defs.c so that it looks like:\n\n```\nstatic const struct arg_enum_list tuning_enum[] \u003d {\n  { \"psnr\", AOM_TUNE_PSNR },\n  { \"ssim\", AOM_TUNE_SSIM },\n  // Deprecated\n  { \"vmaf_with_preprocessing\", AOM_TUNE_VMAF_WITH_PREPROCESSING },\n  // Deprecated\n  { \"vmaf_without_preprocessing\", AOM_TUNE_VMAF_WITHOUT_PREPROCESSING },\n  { \"vmaf\", AOM_TUNE_VMAF_MAX_GAIN },\n  { \"vmaf_neg\", AOM_TUNE_VMAF_NEG_MAX_GAIN },\n  { \"butteraugli\", AOM_TUNE_BUTTERAUGLI },\n  { \"vmaf_saliency_map\", AOM_TUNE_VMAF_SALIENCY_MAP },\n  { \"iq\", AOM_TUNE_IQ },\n  { \"ssimulacra2\", AOM_TUNE_SSIMULACRA2 },\n  { NULL, 0 }\n};\n```",
+      "revId": "0a5ce88769eaedfd3893557f3e081f47a4c139f1",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ],
   "submitRequirementResults": [
     {
       "submitRequirement": {
