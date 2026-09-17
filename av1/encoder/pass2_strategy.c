@@ -4600,13 +4600,26 @@ void av1_twopass_postencode_update(AV1_COMP *cpi) {
       }
       twopass->extend_maxq -= 1;
       // Overshoot
-    } else if ((rc_cfg->over_shoot_pct < 100) &&
-               (p_rc->rolling_actual_bits > p_rc->rolling_target_bits)) {
+    } else if (
+#if CONFIG_AV1_HIGHBITDEPTH
+        ((cpi->common.seq_params->bit_depth > 8 &&
+          cpi->oxcf.algo_cfg.sharpness == 3)
+             ? (rc_cfg->over_shoot_pct <= 100)
+             : (rc_cfg->over_shoot_pct < 100))
+#else
+        (rc_cfg->over_shoot_pct < 100)
+#endif
+        && (p_rc->rolling_actual_bits > p_rc->rolling_target_bits)) {
       int pct_error =
           ((p_rc->rolling_actual_bits - p_rc->rolling_target_bits) * 100) /
           p_rc->rolling_target_bits;
 
-      pct_error = clamp(pct_error, 0, 100);
+#if CONFIG_AV1_HIGHBITDEPTH
+      if (!(cpi->common.seq_params->bit_depth > 8 &&
+            cpi->oxcf.algo_cfg.sharpness == 3))
+#endif
+        pct_error = clamp(pct_error, 0, 100);
+
       if ((pct_error >= rc_cfg->over_shoot_pct) &&
           (p_rc->rate_error_estimate < 0)) {
         twopass->extend_maxq += 1;
@@ -4616,8 +4629,8 @@ void av1_twopass_postencode_update(AV1_COMP *cpi) {
       // Adjustment for extreme local overshoot.
       // Only applies when normal adjustment above is not used (e.g.
       // when threshold is set to 100).
-      if (rc->projected_frame_size > (2 * rc->base_frame_target) &&
-          rc->projected_frame_size > (2 * rc->avg_frame_bandwidth))
+      if ((rc->projected_frame_size > (2 * rc->base_frame_target) &&
+           rc->projected_frame_size > (2 * rc->avg_frame_bandwidth)))
         ++twopass->extend_maxq;
       // Unwind extreme overshoot adjustment.
       else if (p_rc->rolling_target_bits > p_rc->rolling_actual_bits)
@@ -4632,13 +4645,21 @@ void av1_twopass_postencode_update(AV1_COMP *cpi) {
     // frame is unexpectedly almost perfectly predicted by the ARF or GF
     // but not very well predcited by the previous frame.
     if (!frame_is_kf_gf_arf(cpi) && !cpi->rc.is_src_frame_alt_ref) {
-      int fast_extra_thresh = rc->base_frame_target / HIGH_UNDERSHOOT_RATIO;
-      if (rc->projected_frame_size < fast_extra_thresh) {
-        p_rc->vbr_bits_off_target_fast +=
-            fast_extra_thresh - rc->projected_frame_size;
-        p_rc->vbr_bits_off_target_fast =
-            AOMMIN(p_rc->vbr_bits_off_target_fast,
-                   (4 * (int64_t)rc->avg_frame_bandwidth));
+#if CONFIG_AV1_HIGHBITDEPTH
+      if (cpi->common.seq_params->bit_depth > 8 &&
+          cpi->oxcf.algo_cfg.sharpness == 3 && p_rc->vbr_bits_off_target < 0) {
+        p_rc->vbr_bits_off_target_fast = 0;
+      } else
+#endif
+      {
+        int fast_extra_thresh = rc->base_frame_target / HIGH_UNDERSHOOT_RATIO;
+        if (rc->projected_frame_size < fast_extra_thresh) {
+          p_rc->vbr_bits_off_target_fast +=
+              fast_extra_thresh - rc->projected_frame_size;
+          p_rc->vbr_bits_off_target_fast =
+              AOMMIN(p_rc->vbr_bits_off_target_fast,
+                     (4 * (int64_t)rc->avg_frame_bandwidth));
+        }
       }
     }
 
