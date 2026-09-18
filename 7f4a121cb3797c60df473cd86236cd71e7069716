@@ -1,0 +1,55 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "310bb68e_115f5b6c",
+        "filename": "av1/encoder/pass2_strategy.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 4611,
+      "author": {
+        "id": 5022
+      },
+      "writtenOn": "2026-09-18T17:09:51Z",
+      "side": 1,
+      "message": "you can probably simplify this by using \u003c\u003d 100 for all cases",
+      "range": {
+        "startLine": 4604,
+        "startChar": 0,
+        "endLine": 4611,
+        "endChar": 6
+      },
+      "fixSuggestions": [
+        {
+          "fixId": "98de0287_12f24a9d",
+          "description": "prompt_to_edit API",
+          "replacements": [
+            {
+              "path": "av1/encoder/pass2_strategy.c",
+              "range": {
+                "startLine": 4604,
+                "startChar": 0,
+                "endLine": 4605,
+                "endChar": 0
+              },
+              "replacement": ""
+            },
+            {
+              "path": "av1/encoder/pass2_strategy.c",
+              "range": {
+                "startLine": 4609,
+                "startChar": 0,
+                "endLine": 4612,
+                "endChar": 0
+              },
+              "replacement": ""
+            }
+          ]
+        }
+      ],
+      "revId": "7f4a121cb3797c60df473cd86236cd71e7069716",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
