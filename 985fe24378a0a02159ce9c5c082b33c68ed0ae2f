@@ -1,0 +1,76 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "18b82216_d6045d74",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 5
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-09-22T19:03:48Z",
+      "side": 1,
+      "message": "This fixes the immediate issue, but it seems like the lookahead buffer is being torn down prematurely. There\u0027s likely more at work here.",
+      "revId": "985fe24378a0a02159ce9c5c082b33c68ed0ae2f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "db97bfe9_7da60794",
+        "filename": "test/cancellation_test.cc",
+        "patchSetId": 5
+      },
+      "lineNbr": 73,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-09-22T19:03:48Z",
+      "side": 1,
+      "message": "Break this out to a function that takes the number of threads to use as a parameter and add another configuration that uses 4. Adding row and column tiles might give more coverage as well.",
+      "fixSuggestions": [
+        {
+          "fixId": "222deaaf_b098bce0",
+          "description": "prompt_to_edit API",
+          "replacements": [
+            {
+              "path": "test/cancellation_test.cc",
+              "range": {
+                "startLine": 1,
+                "startChar": 0,
+                "endLine": 1,
+                "endChar": 0
+              },
+              "replacement": "\n  void DoSimulateCancellationPass2(int threads) {\n    cfg_.g_threads \u003d threads;\n    ::libaom_test::RandomVideoSource raw_video;\n    raw_video.set_limit(40);  // 40 frames total\n\n    CancellableVideoSource video(\u0026raw_video);\n    video.set_cancel_after(20);  // Cancel after 20 frames in pass 2\n\n    // This should not crash\n    ASSERT_NO_FATAL_FAILURE(RunLoop(\u0026video));\n  }\n"
+            },
+            {
+              "path": "test/cancellation_test.cc",
+              "range": {
+                "startLine": 73,
+                "startChar": 0,
+                "endLine": 78,
+                "endChar": 0
+              },
+              "replacement": "  DoSimulateCancellationPass2(1);\n}\n"
+            },
+            {
+              "path": "test/cancellation_test.cc",
+              "range": {
+                "startLine": 79,
+                "startChar": 0,
+                "endLine": 81,
+                "endChar": 0
+              },
+              "replacement": "TEST_P(CancellationTest, SimulateCancellationPass2Threads4) {\n  DoSimulateCancellationPass2(4);\n"
+            }
+          ]
+        }
+      ],
+      "revId": "985fe24378a0a02159ce9c5c082b33c68ed0ae2f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
