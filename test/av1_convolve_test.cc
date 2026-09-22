@@ -1376,7 +1376,12 @@ class AV1Convolve2DTest : public AV1ConvolveTest<convolve_2d_func> {
 
  private:
   void TestConvolveVmaf() {
+<<<<<<< HEAD   (c729980efa7807dd0d7981e89d1677cd4ea85f1b Adjust real-time PSNR threshold in end-to-end unit test)
     // 8-tap Gaussian blur filter used by tune=vmaf
+||||||| BASE   (de4c1d1edc49723a78954d30a83690aa1937422f Add CVE-2026-13906 to bug 504613867 in CHANGELOG)
+=======
+    // 8-tap Gaussian blur filter used by tune=vmaf_with_preprocessing
+>>>>>>> BRANCH (44d0a57786f432d933ff64b653347c66f4d0fa1d Update CHANGELOG and library version for v3.15.1)
     // in av1/encoder/tune_vmaf.c.
     // The array is of size 9 to allow passing kGaussFilter + 1 to
     // _mm_loadu_si128() in prepare_coeffs_6t().
