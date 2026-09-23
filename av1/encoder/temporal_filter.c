@@ -1164,7 +1164,7 @@ void av1_tf_do_filtering_row(AV1_COMP *cpi, ThreadData *td, int mb_row) {
           frame_type == KEY_FRAME && is_dc_diff_large)
         filter_strength = AOMMIN(filter_strength, 1);
 
-      if (cpi->oxcf.algo_cfg.sharpness == 3 && is_low_cntras)
+      if (cpi->oxcf.algo_cfg.sharpness == 3)
         filter_strength = AOMMIN(filter_strength, mbd->bd > 8 ? 0 : 3);
 
       // Perform weighted averaging.
