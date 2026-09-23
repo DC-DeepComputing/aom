@@ -33,6 +33,24 @@
       "message": "If we add an assertion, I suggest we also assert `rd_stats` and `rd_stats_uv` are not null. I remember that\u0027s also the case. I can double check later.\n\nAlternatively we can remove the assertion.",
       "revId": "9420b79e90accfe71f501bc5b143102fb1117f2c",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "f6d198a3_baf176fc",
+        "filename": "av1/encoder/rdopt.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1577,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-09-23T18:17:09Z",
+      "side": 1,
+      "message": "Removed the assertion as suggested.",
+      "parentUuid": "2f11c47e_574d9ef6",
+      "revId": "9420b79e90accfe71f501bc5b143102fb1117f2c",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
