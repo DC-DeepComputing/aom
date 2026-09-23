@@ -20,6 +20,24 @@
     {
       "unresolved": true,
       "key": {
+        "uuid": "73f6366d_adf35def",
+        "filename": "av1/encoder/rdopt.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 1850,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-09-23T17:24:38Z",
+      "side": 1,
+      "message": "Thanks for sharing the analysis. I prepare a CL for review: https://aomedia-review.git.corp.google.com/c/aom/+/217002",
+      "parentUuid": "7814e0b3_0cd1009f",
+      "revId": "a39b3a41ef3a4dbd8618867262ae57cb282262e0",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
         "uuid": "380fec5c_fa93c516",
         "filename": "av1/encoder/rdopt.c",
         "patchSetId": 4
@@ -31,6 +49,24 @@
       "writtenOn": "2026-09-23T16:04:45Z",
       "side": 1,
       "message": "Lin: Coverity warns that `rd_stats_y` may be a null pointer but `adjust_rdcost()` dereferences its `rd_cost` parameter without checking.\n\nI believe Coverity was misled by the null check for `rd_stats_y` at 1850. Please remove that null check (after double checking my analysis) and reference \"Coverity defect CID 564327 Dereference after null check\" in the commit message of your CL. Thanks!",
+      "revId": "a39b3a41ef3a4dbd8618867262ae57cb282262e0",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "d932fc9a_fee1db64",
+        "filename": "av1/encoder/rdopt.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 1921,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-09-23T17:24:38Z",
+      "side": 1,
+      "message": "Acknowledged",
+      "parentUuid": "380fec5c_fa93c516",
       "revId": "a39b3a41ef3a4dbd8618867262ae57cb282262e0",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
