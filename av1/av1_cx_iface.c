@@ -1283,6 +1283,10 @@ static void set_encoder_config(AV1EncoderConfig *oxcf,
   tool_cfg->cdef_control = (CDEF_CONTROL)extra_cfg->enable_cdef;
   tool_cfg->enable_restoration =
       (cfg->g_usage == AOM_USAGE_REALTIME) ? 0 : extra_cfg->enable_restoration;
+  if (cfg->g_bit_depth > 8 && extra_cfg->sharpness == 3) {
+    tool_cfg->cdef_control = CDEF_NONE;
+    tool_cfg->enable_restoration = 0;
+  }
   tool_cfg->force_video_mode = extra_cfg->force_video_mode;
   tool_cfg->enable_palette = extra_cfg->enable_palette;
   // FIXME(debargha): Should this be:

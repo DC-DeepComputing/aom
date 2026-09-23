@@ -657,6 +657,10 @@ static void init_seq_coding_tools(AV1_PRIMARY *const ppi,
   seq->enable_superres = oxcf->superres_cfg.enable_superres;
   seq->enable_cdef = tool_cfg->cdef_control != CDEF_NONE ? 1 : 0;
   seq->enable_restoration = tool_cfg->enable_restoration;
+  if (seq->bit_depth > 8 && oxcf->algo_cfg.sharpness == 3) {
+    seq->enable_cdef = 0;
+    seq->enable_restoration = 0;
+  }
   seq->enable_warped_motion = oxcf->motion_mode_cfg.enable_warped_motion;
   seq->enable_interintra_compound = tool_cfg->enable_interintra_comp;
   seq->enable_masked_compound = oxcf->comp_type_cfg.enable_masked_comp;
