@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "7814e0b3_0cd1009f",
+        "filename": "av1/encoder/rdopt.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 1850,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-23T16:04:45Z",
+      "side": 1,
+      "message": "Lin: I believe the null check for `rd_stats_y` makes Coverity think the `rd_stats_y` parameter to this function may be a null pointer. Before this point, we already pass `rd_stats_y` to `inter_modes_info_push()` at line 1838 and line 1844, and `inter_modes_info_push()` dereferences its `rd_cost_y` parameter without checking. So that\u0027s a strong evidence that `rd_stats_y` cannot be null.\n\nI checked all the callers of this function and verify that they never pass a null `rd_stats_y` to this function. Once you double check this, we should remove the null pointer check for `rd_stats_y`.",
+      "revId": "a39b3a41ef3a4dbd8618867262ae57cb282262e0",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "380fec5c_fa93c516",
+        "filename": "av1/encoder/rdopt.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 1921,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-23T16:04:45Z",
+      "side": 1,
+      "message": "Lin: Coverity warns that `rd_stats_y` may be a null pointer but `adjust_rdcost()` dereferences its `rd_cost` parameter without checking.\n\nI believe Coverity was misled by the null check for `rd_stats_y` at 1850. Please remove that null check (after double checking my analysis) and reference \"Coverity defect CID 564327 Dereference after null check\" in the commit message of your CL. Thanks!",
+      "revId": "a39b3a41ef3a4dbd8618867262ae57cb282262e0",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
