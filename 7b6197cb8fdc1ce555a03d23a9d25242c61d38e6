@@ -33,6 +33,24 @@
       "message": "I am curious about this change because it is not a PSNR threshold. This is apparently intended to fix the AV1/DatarateTestSVC.BasicRateTargetingSVC3TL1SLResize/1 failure:\n\n```\n/var/jenkins/workspace/libaom__unit_tests-multi-target/CONFIG_LOWBITDEPTH/0/GTEST_SHARD_INDEX/16/arch/realtime-only/aom/test/svc_datarate_test.cc:1539\nExpected: (resize_down_count) \u003e\u003d (1), actual: 0 vs 1\n```\n\nCould you explain why we need to lower `rc_target_bitrate` in this test after your recent commits?",
       "revId": "7b6197cb8fdc1ce555a03d23a9d25242c61d38e6",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "8a171aa5_638c13ad",
+        "filename": "test/svc_datarate_test.cc",
+        "patchSetId": 1
+      },
+      "lineNbr": 1517,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-09-23T17:31:55Z",
+      "side": 1,
+      "message": "In this unit test, dynamic resize decisions are evaluated only on base temporal layer (TL0) frames. Due to the improved rate efficiency from df49183d1a, the encoder buffer level stays slightly higher at 70 kbps and avoids triggering the underflow threshold needed for downscaling. So lowering the test bitrate to 60 kbps ensures that dynamic downscaling is consistently triggered and verified across all speed presets and AQ modes.",
+      "parentUuid": "39985417_5fc469ad",
+      "revId": "7b6197cb8fdc1ce555a03d23a9d25242c61d38e6",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ],
   "submitRequirementResults": [
