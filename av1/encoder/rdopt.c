@@ -1574,6 +1574,7 @@ static int64_t motion_mode_rd(
   int *pts0 = warp_sample_info->pts;
   int *pts_inref0 = warp_sample_info->pts_inref;
 
+  assert(rd_stats_y != NULL);
   assert(mbmi->ref_frame[1] != INTRA_FRAME);
   const MV_REFERENCE_FRAME ref_frame_1 = mbmi->ref_frame[1];
   av1_invalid_rd_stats(&best_rd_stats);
@@ -1847,7 +1848,7 @@ static int64_t motion_mode_rd(
       }
       mbmi->skip_txfm = 0;
       rd_stats->skip_txfm = 0;
-      if (rd_stats_y) rd_stats_y->skip_txfm = 0;
+      rd_stats_y->skip_txfm = 0;
       increase_motion_mode_rdstats(cpi, mbmi, rd_stats, NULL, NULL);
 
     } else {
