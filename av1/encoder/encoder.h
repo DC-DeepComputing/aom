@@ -216,6 +216,12 @@ typedef enum {
   NUM_COST_UPDATE_TYPES, /*!< Number of cost update types. */
 } COST_UPDATE_TYPE;
 
+/*!\cond */
+// Number of taps given to the fixed-wiener-filter option: the 3 outer luma
+// taps, then the 2 outer chroma taps.
+#define FIXED_WIENER_FILTER_TAPS 5
+/*!\endcond */
+
 /*!\enum LOOPFILTER_CONTROL
  * \brief This enum controls to which frames loopfilter is applied.
  */
@@ -910,6 +916,13 @@ typedef struct {
   CDEF_CONTROL cdef_control;
   // Indicates if loop restoration filter should be enabled.
   bool enable_restoration;
+  // Indicates if every frame should use the fixed Wiener filter below instead
+  // of searching for loop restoration filters.
+  bool use_fixed_wiener_filter;
+  // Outer taps of the fixed Wiener filter, in 1/128 units: 3 for luma, then 2
+  // for chroma (whose outermost tap is always 0). Filters are symmetric and
+  // the centre tap is implied.
+  int fixed_wiener_filter[FIXED_WIENER_FILTER_TAPS];
   // When enabled, video mode should be used even for single frame input.
   bool force_video_mode;
   // Indicates if the error resiliency features should be enabled.

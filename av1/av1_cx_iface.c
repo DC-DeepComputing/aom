@@ -249,6 +249,9 @@ struct av1_extracfg {
   aom_screen_detection_mode screen_detection_mode;
   unsigned int validate_hbd_input;
   unsigned int force_max_q;
+  // Number of taps given with fixed-wiener-filter (0: not used) and the taps.
+  int fixed_wiener_filter_count;
+  int fixed_wiener_filter[FIXED_WIENER_FILTER_TAPS];
 };
 
 #if !CONFIG_REALTIME_ONLY
@@ -406,8 +409,10 @@ static const struct av1_extracfg default_extra_cfg = {
   -1,              // kf_max_pyr_height
   0,               // sb_qp_sweep
   AOM_SCREEN_DETECTION_STANDARD,
-  1,  // validate_hbd_input
-  0,  // force_max_q
+  1,      // validate_hbd_input
+  0,      // force_max_q
+  0,      // fixed_wiener_filter_count
+  { 0 },  // fixed_wiener_filter
 };
 #else
 // Some settings are changed for realtime only build.
@@ -565,8 +570,10 @@ static const struct av1_extracfg default_extra_cfg = {
   -1,              // kf_max_pyr_height
   0,               // sb_qp_sweep
   AOM_SCREEN_DETECTION_STANDARD,
-  1,  // validate_hbd_input
-  0,  // force_max_q
+  1,      // validate_hbd_input
+  0,      // force_max_q
+  0,      // fixed_wiener_filter_count
+  { 0 },  // fixed_wiener_filter
 };
 #endif
 
@@ -963,6 +970,30 @@ static aom_codec_err_t validate_config(aom_codec_alg_priv_t *ctx,
   }
 
   RANGE_CHECK(extra_cfg, screen_detection_mode, 1, 2);
+
+  if (extra_cfg->fixed_wiener_filter_count != 0) {
+    if (extra_cfg->fixed_wiener_filter_count != FIXED_WIENER_FILTER_TAPS) {
+      ERROR("fixed-wiener-filter takes 5 taps");
+    }
+    // Luma: taps 0-2; chroma: taps 1-2 (its tap 0 is always 0).
+    static const int kMin[FIXED_WIENER_FILTER_TAPS] = {
+      WIENER_FILT_TAP0_MINV, WIENER_FILT_TAP1_MINV, WIENER_FILT_TAP2_MINV,
+      WIENER_FILT_TAP1_MINV, WIENER_FILT_TAP2_MINV
+    };
+    static const int kMax[FIXED_WIENER_FILTER_TAPS] = {
+      WIENER_FILT_TAP0_MAXV, WIENER_FILT_TAP1_MAXV, WIENER_FILT_TAP2_MAXV,
+      WIENER_FILT_TAP1_MAXV, WIENER_FILT_TAP2_MAXV
+    };
+    for (int i = 0; i < FIXED_WIENER_FILTER_TAPS; ++i) {
+      if (extra_cfg->fixed_wiener_filter[i] < kMin[i] ||
+          extra_cfg->fixed_wiener_filter[i] > kMax[i]) {
+        ERROR("fixed-wiener-filter tap out of range");
+      }
+    }
+    if (cfg->g_usage == AOM_USAGE_REALTIME || !extra_cfg->enable_restoration) {
+      ERROR("fixed-wiener-filter requires loop restoration");
+    }
+  }
   return AOM_CODEC_OK;
 }
 
@@ -1283,6 +1314,9 @@ static void set_encoder_config(AV1EncoderConfig *oxcf,
   tool_cfg->cdef_control = (CDEF_CONTROL)extra_cfg->enable_cdef;
   tool_cfg->enable_restoration =
       (cfg->g_usage == AOM_USAGE_REALTIME) ? 0 : extra_cfg->enable_restoration;
+  tool_cfg->use_fixed_wiener_filter = extra_cfg->fixed_wiener_filter_count != 0;
+  memcpy(tool_cfg->fixed_wiener_filter, extra_cfg->fixed_wiener_filter,
+         sizeof(tool_cfg->fixed_wiener_filter));
   tool_cfg->force_video_mode = extra_cfg->force_video_mode;
   tool_cfg->enable_palette = extra_cfg->enable_palette;
   // FIXME(debargha): Should this be:
@@ -1395,7 +1429,10 @@ static void set_encoder_config(AV1EncoderConfig *oxcf,
   if (cfg->kf_max_dist == 0) {
     kf_cfg->enable_keyframe_filtering = 0;
   }
-  kf_cfg->enable_intrabc = extra_cfg->enable_intrabc;
+  // Loop restoration can't be used in frames that allow intrabc, so intrabc
+  // would stop the fixed Wiener filter being applied to every frame.
+  kf_cfg->enable_intrabc =
+      extra_cfg->enable_intrabc && !tool_cfg->use_fixed_wiener_filter;
 
   oxcf->speed = extra_cfg->cpu_used;
   if (oxcf->mode == REALTIME) {
@@ -4910,6 +4947,11 @@ static aom_codec_err_t encoder_set_option(aom_codec_alg_priv_t *ctx,
   } else if (arg_match_helper(&arg, &g_av1_codec_arg_defs.force_max_q, argv,
                               err_string)) {
     extra_cfg.force_max_q = arg_parse_uint_helper(&arg, err_string);
+  } else if (arg_match_helper(&arg, &g_av1_codec_arg_defs.fixed_wiener_filter,
+                              argv, err_string)) {
+    extra_cfg.fixed_wiener_filter_count =
+        arg_parse_list_helper(&arg, extra_cfg.fixed_wiener_filter,
+                              FIXED_WIENER_FILTER_TAPS, err_string);
   } else if (arg_match_helper(&arg, &g_av1_codec_arg_defs.resize_mode, argv,
                               err_string)) {
     ctx->cfg.rc_resize_mode = arg_parse_uint_helper(&arg, err_string);

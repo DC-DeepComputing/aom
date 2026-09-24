@@ -472,6 +472,7 @@ static const arg_def_t *const av1_key_val_args[] = {
   &g_av1_codec_arg_defs.sharpness,
   &g_av1_codec_arg_defs.enable_adaptive_sharpness,
   &g_av1_codec_arg_defs.validate_hbd_input,
+  &g_av1_codec_arg_defs.fixed_wiener_filter,
   NULL,
 };
 

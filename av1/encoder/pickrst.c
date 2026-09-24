@@ -13,6 +13,7 @@
 #include <float.h>
 #include <limits.h>
 #include <math.h>
+#include <string.h>
 
 #include "config/aom_scale_rtcd.h"
 #include "config/av1_rtcd.h"
@@ -2037,6 +2038,40 @@ static void set_restoration_unit_size(AV1_COMMON *cm, RestorationInfo *rsi,
   rsi->vert_units = vert_units;
 }
 
+// Uses the fixed Wiener filter from the fixed-wiener-filter option for every
+// restoration unit instead of searching. The units are made as large as
+// possible, so the (identical) coefficients are signalled as few times as
+// possible.
+static void set_fixed_wiener_filter(AV1_COMMON *cm, const int *taps) {
+  for (int plane = 0; plane < av1_num_planes(cm); ++plane) {
+    const int is_uv = plane > 0;
+    RestorationInfo *rsi = &cm->rst_info[plane];
+    rsi->restoration_unit_size = RESTORATION_UNITSIZE_MAX;
+    av1_alloc_restoration_struct(cm, rsi, is_uv);
+    rsi->frame_restoration_type = RESTORE_WIENER;
+
+    // Chroma filters are 5-tap: their outermost tap is always 0.
+    const int t0 = is_uv ? 0 : taps[0];
+    const int t1 = is_uv ? taps[3] : taps[1];
+    const int t2 = is_uv ? taps[4] : taps[2];
+    WienerInfo wiener;
+    memset(&wiener, 0, sizeof(wiener));
+    InterpKernel *const filters[2] = { &wiener.vfilter, &wiener.hfilter };
+    for (int i = 0; i < 2; ++i) {
+      int16_t *f = *filters[i];
+      f[0] = f[WIENER_WIN - 1] = (int16_t)t0;
+      f[1] = f[WIENER_WIN - 2] = (int16_t)t1;
+      f[2] = f[WIENER_WIN - 3] = (int16_t)t2;
+      // The central element has an implicit +WIENER_FILT_STEP.
+      f[3] = (int16_t)(-2 * (t0 + t1 + t2));
+    }
+    for (int u = 0; u < rsi->num_rest_units; ++u) {
+      rsi->unit_info[u].restoration_type = RESTORE_WIENER;
+      rsi->unit_info[u].wiener_info = wiener;
+    }
+  }
+}
+
 void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
   AV1_COMMON *const cm = &cpi->common;
   MACROBLOCK *const x = &cpi->td.mb;
@@ -2045,6 +2080,11 @@ void av1_pick_filter_restoration(const YV12_BUFFER_CONFIG *src, AV1_COMP *cpi) {
   const int num_planes = av1_num_planes(cm);
   const int highbd = cm->seq_params->use_highbitdepth;
   assert(!cm->features.all_lossless);
+
+  if (cpi->oxcf.tool_cfg.use_fixed_wiener_filter) {
+    set_fixed_wiener_filter(cm, cpi->oxcf.tool_cfg.fixed_wiener_filter);
+    return;
+  }
 
   av1_fill_lr_rates(&x->mode_costs, x->e_mbd.tile_ctx);
 

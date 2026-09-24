@@ -728,5 +728,14 @@ const av1_codec_arg_definitions_t g_av1_codec_arg_defs = {
   .force_max_q = ARG_DEF(
       NULL, "force-max-q", 1,
       "Force the use of max Q in VBR mode (0: false (default), 1: true)."),
+  .fixed_wiener_filter = ARG_DEF(
+      NULL, "fixed-wiener-filter", 1,
+      "Use this Wiener loop restoration filter for every frame instead of "
+      "searching for one. 5 comma-separated taps in 1/128 units: the 3 outer "
+      "luma taps (-5..10, -23..8, -17..46) then the 2 outer chroma taps "
+      "(-23..8, -17..46); the filters are symmetric and the centre tap is "
+      "implied. E.g. 0,8,32,8,32 applies a low-pass (smoothing) post-filter. "
+      "Requires loop restoration (not available in realtime mode). Disables "
+      "intrabc, as it can't be used with loop restoration"),
 #endif  // CONFIG_AV1_ENCODER
 };
