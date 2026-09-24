@@ -589,9 +589,10 @@ int av1_joint_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
   // and break out of the search loop if it couldn't find a better mv.
   for (ite = 0; ite < (2 * joint_me_num_refine_iter); ite++) {
     int bestsme = INT_MAX;
-    int id = ite % 2;  // Even iterations search in the first reference frame,
-                       // odd iterations search in the second. The predictor
-                       // found for the 'other' reference frame is factored in.
+    const int id = ite % 2;  // Even iterations search in the first reference
+                             // frame, odd iterations search in the second.
+                             // The predictor found for the 'other' reference
+                             // frame is factored in.
     if (ite >= 2 && cur_mv[!id].as_int == init_mv[!id].as_int) {
       if (cur_mv[id].as_int == init_mv[id].as_int) {
         break;
@@ -640,9 +641,12 @@ int av1_joint_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
 
     // Do full-pixel compound motion search on the current reference frame.
     struct buf_2d orig_yv12;
+    const struct scale_factors *orig_sf;
     if (id) {
       orig_yv12 = xd->plane[plane].pre[0];
       xd->plane[plane].pre[0] = xd->plane[plane].pre[id];
+      orig_sf = xd->block_ref_scale_factors[0];
+      xd->block_ref_scale_factors[0] = xd->block_ref_scale_factors[id];
     }
 
     // Make motion search params
@@ -734,7 +738,10 @@ int av1_joint_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
     }
 
     // Restore the pointer to the first prediction buffer.
-    if (id) xd->plane[plane].pre[0] = orig_yv12;
+    if (id) {
+      xd->plane[plane].pre[0] = orig_yv12;
+      xd->block_ref_scale_factors[0] = orig_sf;
+    }
     if (bestsme < last_besterr[id]) {
       cur_mv[id] = best_mv;
       last_besterr[id] = bestsme;
@@ -780,9 +787,12 @@ int av1_compound_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
 
   // Store the first prediction buffer.
   struct buf_2d orig_yv12;
+  const struct scale_factors *orig_sf;
   if (ref_idx) {
     orig_yv12 = pd->pre[0];
     pd->pre[0] = pd->pre[ref_idx];
+    orig_sf = xd->block_ref_scale_factors[0];
+    xd->block_ref_scale_factors[0] = xd->block_ref_scale_factors[ref_idx];
   }
 
   if (scaled_ref_frame) {
@@ -856,7 +866,10 @@ int av1_compound_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,
   }
 
   // Restore the pointer to the first unscaled prediction buffer.
-  if (ref_idx) pd->pre[0] = orig_yv12;
+  if (ref_idx) {
+    pd->pre[0] = orig_yv12;
+    xd->block_ref_scale_factors[0] = orig_sf;
+  }
 
   if (bestsme < INT_MAX) *this_mv = best_mv.as_mv;
 
