@@ -1672,13 +1672,13 @@ static aom_codec_err_t encoder_set_config(aom_codec_alg_priv_t *ctx,
     if (cfg->g_lag_in_frames > 1 || cfg->g_pass != AOM_RC_ONE_PASS)
       ERROR("Cannot change width or height after initialization");
     // Note: function encoder_set_config() is allowed to be called multiple
-    // times. In single-pass realtime mode without lookahead (g_lag_in_frames ==
-    // 0), and with the maximum frame size declared up front via
+    // times. In single-pass mode without lookahead (g_lag_in_frames == 0), and
+    // with the maximum frame size declared up front via
     // g_forced_max_frame_width/height, reference frame scaling allows upscaling
-    // up to 16x and downscaling by up to 2x without forcing a keyframe. The
-    // forced maximum frame size is required because the internal buffers are
-    // then allocated for that maximum; without it they are only sized for the
-    // current frame size and a larger frame would overflow them. Outside of
+    // up to 16x and downscaling by up to 2x without forcing a keyframe.
+    // The forced maximum frame size is required because the internal buffers
+    // are then allocated for that maximum; without it they are only sized for
+    // the current frame size and a larger frame would overflow them. Outside of
     // this mode, or if reference frame scaling constraints are violated, a
     // keyframe is forced (for single spatial layer, since otherwise a previous
     // encoded frame at a lower layer may be the desired reference). To make
@@ -1688,8 +1688,7 @@ static aom_codec_err_t encoder_set_config(aom_codec_alg_priv_t *ctx,
     // actual coded frame size.
     const bool allow_ref_scaled_upscale =
         cfg->g_forced_max_frame_width && cfg->g_forced_max_frame_height &&
-        ctx->oxcf.mode == REALTIME && cfg->g_pass == AOM_RC_ONE_PASS &&
-        cfg->g_lag_in_frames == 0;
+        cfg->g_pass == AOM_RC_ONE_PASS && cfg->g_lag_in_frames == 0;
     if (ctx->ppi->cpi->svc.number_spatial_layers == 1 &&
         ctx->ppi->cpi->last_coded_width && ctx->ppi->cpi->last_coded_height &&
         (!valid_ref_frame_size(ctx->ppi->cpi->last_coded_width,
