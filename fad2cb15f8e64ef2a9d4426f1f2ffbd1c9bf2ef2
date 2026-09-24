@@ -1,0 +1,96 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "dcac5cbd_85890f56",
+        "filename": "aom/aom_image.h",
+        "patchSetId": 7
+      },
+      "lineNbr": 447,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-09-24T22:07:30Z",
+      "side": 1,
+      "message": "Update this block to match the libvpx change:\n\nhttps://chromium-review.googlesource.com/c/webm/libvpx/+/8393177/5/vpx/vpx_image.h",
+      "revId": "fad2cb15f8e64ef2a9d4426f1f2ffbd1c9bf2ef2",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "637a7175_adf16632",
+        "filename": "aom/src/aom_image.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 247,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-09-24T22:07:30Z",
+      "side": 1,
+      "message": "Remove this comment.",
+      "revId": "fad2cb15f8e64ef2a9d4426f1f2ffbd1c9bf2ef2",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "6464bb54_2ffab45f",
+        "filename": "test/aom_image_test.cc",
+        "patchSetId": 7
+      },
+      "lineNbr": 183,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-09-24T22:07:30Z",
+      "side": 1,
+      "message": "Have this name match the one in libvpx: `AomImgSetRectRejectsFlipped`.",
+      "range": {
+        "startLine": 183,
+        "startChar": 19,
+        "endLine": 183,
+        "endChar": 51
+      },
+      "fixSuggestions": [
+        {
+          "fixId": "2edaa6cf_2bb23c7f",
+          "description": "prompt_to_edit API",
+          "replacements": [
+            {
+              "path": "test/aom_image_test.cc",
+              "range": {
+                "startLine": 183,
+                "startChar": 0,
+                "endLine": 184,
+                "endChar": 0
+              },
+              "replacement": "TEST(AomImageTest, AomImgSetRectFlipped) {\n"
+            }
+          ]
+        }
+      ],
+      "revId": "fad2cb15f8e64ef2a9d4426f1f2ffbd1c9bf2ef2",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "2338bab6_87981895",
+        "filename": "test/aom_image_test.cc",
+        "patchSetId": 7
+      },
+      "lineNbr": 189,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-09-24T22:07:30Z",
+      "side": 1,
+      "message": "Update the loop to match too. https://chromium-review.git.corp.google.com/c/webm/libvpx/+/8393177/5/test/vpx_image_test.cc",
+      "revId": "fad2cb15f8e64ef2a9d4426f1f2ffbd1c9bf2ef2",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
