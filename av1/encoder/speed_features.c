@@ -2768,9 +2768,11 @@ void av1_set_speed_features_framesize_independent(AV1_COMP *cpi, int speed) {
     cpi->common.seq_params->enable_dual_filter &=
         !sf->interp_sf.disable_dual_filter;
     // Set the flag 'enable_restoration', if one the Loop restoration filters
-    // (i.e., Wiener or Self-guided) is enabled.
+    // (i.e., Wiener or Self-guided) is enabled. A fixed Wiener filter needs no
+    // search, so it isn't affected by the speed features.
     cpi->common.seq_params->enable_restoration &=
-        (!sf->lpf_sf.disable_wiener_filter || !sf->lpf_sf.disable_sgr_filter);
+        (!sf->lpf_sf.disable_wiener_filter || !sf->lpf_sf.disable_sgr_filter ||
+         cpi->oxcf.tool_cfg.use_fixed_wiener_filter);
 
     cpi->common.seq_params->enable_interintra_compound &=
         (sf->inter_sf.disable_interintra_wedge_var_thresh != UINT_MAX);

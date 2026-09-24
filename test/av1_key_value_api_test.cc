@@ -96,8 +96,8 @@ TEST_P(EncInvalidTest, InvalidParam) {
   EXPECT_GT(strlen(aom_codec_error_detail(&enc_)), 0u);
 }
 
-// No test for ratio / list for now since the API does not support any of the
-// parameters of these type.
+// No test for ratio for now since the API does not support any parameters of
+// that type.
 // The string type typically involves reading a path/file, which brings
 // potential fails.
 const KeyValParam enc_valid_params[] = {
@@ -106,6 +106,9 @@ const KeyValParam enc_valid_params[] = {
   std::make_tuple("min-partition-size", "4"),    // int
   std::make_tuple("resize-mode", "3"),           // uint
   std::make_tuple("tune", "psnr"),               // enum
+#if !CONFIG_REALTIME_ONLY
+  std::make_tuple("fixed-wiener-filter", "0,8,32,8,32"),  // list
+#endif
 };
 
 const KeyValParam enc_invalid_params[] = {
@@ -123,6 +126,18 @@ const KeyValParam enc_invalid_params[] = {
   // out of range
   std::make_tuple("cq-level", "1000"),
   std::make_tuple("resize-mode", "10"),
+  // list: wrong length
+  std::make_tuple("fixed-wiener-filter", "0,8,32"),
+  std::make_tuple("fixed-wiener-filter", "0,8,32,8,32,0"),
+  // list: not a number
+  std::make_tuple("fixed-wiener-filter", "0,8,32,8,a"),
+  // list: luma taps out of range (0 > 10, 1 < -23, 2 > 46)
+  std::make_tuple("fixed-wiener-filter", "11,8,32,8,32"),
+  std::make_tuple("fixed-wiener-filter", "0,-24,32,8,32"),
+  std::make_tuple("fixed-wiener-filter", "0,8,47,8,32"),
+  // list: chroma taps out of range (1 > 8, 2 < -17)
+  std::make_tuple("fixed-wiener-filter", "0,8,32,9,32"),
+  std::make_tuple("fixed-wiener-filter", "0,8,32,8,-18"),
 };
 
 INSTANTIATE_TEST_SUITE_P(KeyValAPI, EncValidTest,
