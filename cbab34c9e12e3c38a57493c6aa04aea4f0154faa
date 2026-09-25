@@ -1,0 +1,140 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "771a443f_925312ef",
+        "filename": "av1/av1_cx_iface.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 1681,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-25T22:15:38Z",
+      "side": 1,
+      "message": "Nit: I suggest undoing the reformatting of these four lines (1678-1681) to minimize the diffs.",
+      "revId": "cbab34c9e12e3c38a57493c6aa04aea4f0154faa",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "0782c23c_dd183749",
+        "filename": "av1/encoder/motion_search_facade.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 646,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-25T22:15:38Z",
+      "side": 1,
+      "message": "Note: I am not familiar with this code, so I am just doing pattern matching.\n\nThis line is exactly the same as line 697. You changed line 697. Should we make the same change to this line?",
+      "revId": "cbab34c9e12e3c38a57493c6aa04aea4f0154faa",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "2ff5abdc_e0ddcd72",
+        "filename": "av1/encoder/motion_search_facade.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 701,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-25T22:15:38Z",
+      "side": 1,
+      "message": "Could you explain why `xd-\u003eblock_ref_scale_factors[0]` also need to be temporarily modified?",
+      "revId": "cbab34c9e12e3c38a57493c6aa04aea4f0154faa",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "7790a1c6_6856cfda",
+        "filename": "av1/encoder/motion_search_facade.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 742,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-25T22:15:38Z",
+      "side": 1,
+      "message": "Nit: put the new statement inside the if block:\n\n```\n    if (id) {\n      xd-\u003eplane[plane].pre[0] \u003d ref_yv12[0];\n      xd-\u003eblock_ref_scale_factors[0] \u003d sf0_backup;\n    }\n```",
+      "revId": "cbab34c9e12e3c38a57493c6aa04aea4f0154faa",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "af24e0fa_fe6a53ac",
+        "filename": "av1/encoder/motion_search_facade.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 787,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-25T22:15:38Z",
+      "side": 1,
+      "message": "Note: I think the way this function backs up the yv12 is better than `av1_joint_motion_search()`, which uses an array of two `yv12` buffers. I may attemtp to port this method to `av1_joint_motion_search()` in a prerequisite CL for you.",
+      "revId": "cbab34c9e12e3c38a57493c6aa04aea4f0154faa",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "4836c779_1255b543",
+        "filename": "av1/encoder/motion_search_facade.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 793,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-25T22:15:38Z",
+      "side": 1,
+      "message": "I suggest we model `orig_sf` after `orig_yv12`:\n\n```\n  struct buf_2d orig_yv12;\n  const struct scale_factors *orig_sf;\n  if (ref_idx) {\n    orig_yv12 \u003d pd-\u003epre[0];\n    pd-\u003epre[0] \u003d pd-\u003epre[ref_idx];\n    orig_sf \u003d xd-\u003eblock_ref_scale_factors[0];\n    xd-\u003eblock_ref_scale_factors[0] \u003d xd-\u003eblock_ref_scale_factors[ref_idx];\n  }\n```",
+      "revId": "cbab34c9e12e3c38a57493c6aa04aea4f0154faa",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "2fc8b5b3_35d738dc",
+        "filename": "av1/encoder/motion_search_facade.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 867,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-25T22:15:38Z",
+      "side": 1,
+      "message": "Put the whole thing inside an if block:\n\n```\n  if (ref_idx) {\n    pd-\u003epre[0] \u003d orig_yv12;\n    xd-\u003eblock_ref_scale_factors[0] \u003d orig_sf;\n  }\n```",
+      "revId": "cbab34c9e12e3c38a57493c6aa04aea4f0154faa",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "552d4a60_cf3f323e",
+        "filename": "test/frame_size_tests.cc",
+        "patchSetId": 2
+      },
+      "lineNbr": 236,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-25T22:15:38Z",
+      "side": 1,
+      "message": "Inside this block, we know the conditional expression at line 232 is false, i.e., the following is true:\n\n```\n  usage_ !\u003d AOM_USAGE_ALL_INTRA \u0026\u0026 frame_count !\u003d 0\n```\n\nTherefore `scales_references` is true. So we can simplify `if (scales_references)`.",
+      "revId": "cbab34c9e12e3c38a57493c6aa04aea4f0154faa",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
