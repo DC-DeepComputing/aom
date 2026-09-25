@@ -70,6 +70,24 @@
       "parentUuid": "a3df7b49_2675b88f",
       "revId": "a39b3a41ef3a4dbd8618867262ae57cb282262e0",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "bfdbad14_720d378f",
+        "filename": "av1/encoder/ethread.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 1040,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-25T18:59:16Z",
+      "side": 0,
+      "message": "A careful analysis shows that everything in the conditional expression in `is_gradient_caching_for_hog_enabled()` may change from frame to frame. So it is safest to remove the `is_gradient_caching_for_hog_enabled()` call completely as Yunqing did.\n\nHere are the details:\n\nEvery speed feature tested in `is_gradient_caching_for_hog_enabled()` may change when the speed changes. For example,\n\n- `sf-\u003ert_sf.use_nonrd_pick_mode`: In realtime mode, `sf-\u003ert_sf.use_nonrd_pick_mode` changes from 0 to 1 if speed changes from \u003c 7 to \u003e\u003d 7.\n- `sf-\u003epart_sf.partition_search_type`: In all-intra mode, `sf-\u003epart_sf.partition_search_type` changes from `SEARCH_PARTITION` to `VAR_BASED_PARTITION` if speed changes from \u003c 7 to \u003e\u003d 7.\n- `sf-\u003eintra_sf.intra_pruning_with_hog`: In realtime mode, `sf-\u003eintra_sf.intra_pruning_with_hog` changes from 0 to 1 if speed changes from \u003c 8 to \u003e\u003d 8.\n- `sf-\u003eintra_sf.chroma_intra_pruning_with_hog`: In good mode, `sf-\u003eintra_sf.chroma_intra_pruning_with_hog` changes from 0 to nonzero if speed changes from \u003c 3 to \u003e\u003d 3.\n\nNote: `sf-\u003epart_sf.partition_search_type` is also set to `FIXED_PARTITION` temporarily inside the `av1_determine_sc_tools_with_encoding()` function.\n\nSome of these speed features are constant (for all speeds) in a certain mode:\n- `sf-\u003eintra_sf.chroma_intra_pruning_with_hog` is always 0 in good mode.\n- `sf-\u003epart_sf.partition_search_type` is always `SEARCH_PARTITION` in good mode and is always `VAR_BASED_PARTITION` in realtiome mode.\n- `sf-\u003eintra_sf.intra_pruning_with_hog` is always nonzero in all-intra mode and good mode.\n- `sf-\u003eintra_sf.chroma_intra_pruning_with_hog` is always 0 in realtime mode.\n\nFrom this list, we see that there is no mode in which all these speed features are constant.\n\nThis shows that we cannot do better than this CL unless we take a completely different approach, such as checking whether we need to allocate `td-\u003epixel_gradient_info` inside the `allocate_gradient_info_for_hog()` function.",
+      "parentUuid": "1d04d44e_c9bc7a87",
+      "revId": "a39b3a41ef3a4dbd8618867262ae57cb282262e0",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
