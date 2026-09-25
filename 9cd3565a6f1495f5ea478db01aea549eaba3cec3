@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "000ee30a_f2a27876",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-25T22:54:56Z",
+      "side": 1,
+      "message": "Yuan: I first ask you to review this CL. Thanks!",
+      "revId": "9cd3565a6f1495f5ea478db01aea549eaba3cec3",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "624be688_bd7d78b7",
+        "filename": "av1/encoder/motion_search_facade.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 642,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-25T22:54:56Z",
+      "side": 1,
+      "message": "In short,\n* `orig_yv12` plays the role of `ref_yv12[0]` in the original code\n* `ref_yv12[1]` is replaced by `xd-\u003eplane[plane].pre[1]`.",
+      "revId": "9cd3565a6f1495f5ea478db01aea549eaba3cec3",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
