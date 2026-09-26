@@ -16,6 +16,24 @@
       "message": "Why was the `if (i \u003d\u003d 0)` check after `else` removed?",
       "revId": "3e5b38c63e59b829896e0198e1a5b035b1811e6c",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "b7f61382_87cdb411",
+        "filename": "test/frame_size_tests.cc",
+        "patchSetId": 6
+      },
+      "lineNbr": 234,
+      "author": {
+        "id": 26549
+      },
+      "writtenOn": "2026-09-26T14:52:53Z",
+      "side": 1,
+      "message": "For simplicity and align with the comment: \"only the very first frame is a keyframe\".\n\nWith `i \u003d\u003d 0` check, we only verify that frames that changed resolution are inter frames; now we check every but the first frame is a inter frame.\n\nWe can keep the check and update comments instead (we only care about whether resolution changes makes a frame keyframe, so we only test them here), but I found the current shape simpler.\n\nWe may also argue that: if some frame can become keyframe here even without resolution change, then there\u0027s a fundamental change to how AOM inserts keyframe, making the test methodology of this case broken, so we should fix it anyway.",
+      "parentUuid": "1905c0da_26e720f9",
+      "revId": "3e5b38c63e59b829896e0198e1a5b035b1811e6c",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
