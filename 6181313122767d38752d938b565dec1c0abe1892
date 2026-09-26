@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "63470a1b_675fe0b2",
+        "filename": "av1/encoder/rdopt.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 1556,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-26T13:45:19Z",
+      "side": 1,
+      "message": "Coverity scan did not run yesterday. Coverity defect CID 564327 was fixed in today\u0027s Coverity scan.",
+      "revId": "6181313122767d38752d938b565dec1c0abe1892",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
