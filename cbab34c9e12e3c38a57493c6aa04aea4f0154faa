@@ -18,6 +18,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "420dedb5_ec8b5ce8",
+        "filename": "av1/av1_cx_iface.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 1675,
+      "author": {
+        "id": 26549
+      },
+      "writtenOn": "2026-09-26T08:59:50Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "4f8d26c9_611b4a64",
+      "revId": "cbab34c9e12e3c38a57493c6aa04aea4f0154faa",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "771a443f_925312ef",
@@ -35,6 +53,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "01dfc8d7_f5221d7e",
+        "filename": "av1/av1_cx_iface.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 1681,
+      "author": {
+        "id": 26549
+      },
+      "writtenOn": "2026-09-26T08:59:50Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "771a443f_925312ef",
+      "revId": "cbab34c9e12e3c38a57493c6aa04aea4f0154faa",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "6fe5577e_2d0725a6",
@@ -48,6 +84,24 @@
       "writtenOn": "2026-09-25T23:09:38Z",
       "side": 1,
       "message": "Yuan: https://aomedia-review.googlesource.com/c/aom/+/216241 also added the `cfg-\u003eg_lag_in_frames \u003d\u003d 0` check here. Is that problematic for your use case in libavif?",
+      "revId": "cbab34c9e12e3c38a57493c6aa04aea4f0154faa",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "1d4dbb1c_10a5626a",
+        "filename": "av1/av1_cx_iface.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 1691,
+      "author": {
+        "id": 26549
+      },
+      "writtenOn": "2026-09-26T08:59:50Z",
+      "side": 1,
+      "message": "No. In fact, we requires `cfg-\u003eg_lag_in_frames \u003d\u003d 0` when encoding progressive images: https://github.com/AOMediaCodec/libavif/blob/0b5ac4acfdda02a9f50d322829db0feda54878c5/src/codec_aom.c#L921-L925.",
+      "parentUuid": "6fe5577e_2d0725a6",
       "revId": "cbab34c9e12e3c38a57493c6aa04aea4f0154faa",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
@@ -71,6 +125,24 @@
     {
       "unresolved": true,
       "key": {
+        "uuid": "30bdb5d5_d478dcc7",
+        "filename": "av1/encoder/motion_search_facade.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 646,
+      "author": {
+        "id": 26549
+      },
+      "writtenOn": "2026-09-26T08:59:50Z",
+      "side": 1,
+      "message": "Line 648-676 are searching the scaled frames we swapped in at line 618, so they don\u0027t need the `block_ref_scale_factors`.\n\nLine 689 swaps the original frames back, which subpel search (line 702-736) works on, so they need the corresponding `block_ref_scale_factors`.",
+      "parentUuid": "0782c23c_dd183749",
+      "revId": "cbab34c9e12e3c38a57493c6aa04aea4f0154faa",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
         "uuid": "2ff5abdc_e0ddcd72",
         "filename": "av1/encoder/motion_search_facade.c",
         "patchSetId": 2
@@ -88,6 +160,24 @@
     {
       "unresolved": true,
       "key": {
+        "uuid": "10110690_99d48a8c",
+        "filename": "av1/encoder/motion_search_facade.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 701,
+      "author": {
+        "id": 26549
+      },
+      "writtenOn": "2026-09-26T08:59:50Z",
+      "side": 1,
+      "message": "Both motion search functions has 2 steps:\n- full-pixel search, which does not understand scaling and requires `av1_get_scaled_ref_frame` to prepare the **scaled** ref frames.\n- sub-pixel search, which understands scaling and search on the raw ref frame.\n\nAnother awkward thing is that motion search routines always look at the 0th slot, so we have to swap the frame we want them to search into that slot.\n\nSo `block_ref_scale_factors` have to be swapped as well or sub-pixel search will see mismatched scale factors.",
+      "parentUuid": "2ff5abdc_e0ddcd72",
+      "revId": "cbab34c9e12e3c38a57493c6aa04aea4f0154faa",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
         "uuid": "7790a1c6_6856cfda",
         "filename": "av1/encoder/motion_search_facade.c",
         "patchSetId": 2
@@ -99,6 +189,24 @@
       "writtenOn": "2026-09-25T22:15:38Z",
       "side": 1,
       "message": "Nit: put the new statement inside the if block:\n\n```\n    if (id) {\n      xd-\u003eplane[plane].pre[0] \u003d ref_yv12[0];\n      xd-\u003eblock_ref_scale_factors[0] \u003d sf0_backup;\n    }\n```",
+      "revId": "cbab34c9e12e3c38a57493c6aa04aea4f0154faa",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "692bad1f_a5ef32b2",
+        "filename": "av1/encoder/motion_search_facade.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 742,
+      "author": {
+        "id": 26549
+      },
+      "writtenOn": "2026-09-26T08:59:50Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "7790a1c6_6856cfda",
       "revId": "cbab34c9e12e3c38a57493c6aa04aea4f0154faa",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
@@ -155,6 +263,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "bc74ca29_347827ff",
+        "filename": "av1/encoder/motion_search_facade.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 793,
+      "author": {
+        "id": 26549
+      },
+      "writtenOn": "2026-09-26T08:59:50Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "4836c779_1255b543",
+      "revId": "cbab34c9e12e3c38a57493c6aa04aea4f0154faa",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "2fc8b5b3_35d738dc",
@@ -172,6 +298,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "ed2ff6e4_1958b76a",
+        "filename": "av1/encoder/motion_search_facade.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 867,
+      "author": {
+        "id": 26549
+      },
+      "writtenOn": "2026-09-26T08:59:50Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "2fc8b5b3_35d738dc",
+      "revId": "cbab34c9e12e3c38a57493c6aa04aea4f0154faa",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "552d4a60_cf3f323e",
@@ -185,6 +329,24 @@
       "writtenOn": "2026-09-25T22:15:38Z",
       "side": 1,
       "message": "Inside this block, we know the conditional expression at line 232 is false, i.e., the following is true:\n\n```\n  usage_ !\u003d AOM_USAGE_ALL_INTRA \u0026\u0026 frame_count !\u003d 0\n```\n\nTherefore `scales_references` is true. So we can simplify `if (scales_references)`.",
+      "revId": "cbab34c9e12e3c38a57493c6aa04aea4f0154faa",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "b8f6ee96_d1c10a93",
+        "filename": "test/frame_size_tests.cc",
+        "patchSetId": 2
+      },
+      "lineNbr": 236,
+      "author": {
+        "id": 26549
+      },
+      "writtenOn": "2026-09-26T08:59:50Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "552d4a60_cf3f323e",
       "revId": "cbab34c9e12e3c38a57493c6aa04aea4f0154faa",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
