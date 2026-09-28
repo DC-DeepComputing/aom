@@ -1053,6 +1053,8 @@ void av1_change_config(struct AV1_COMP *cpi, const AV1EncoderConfig *oxcf,
   int last_height = cm->height;
   cm->width = frm_dim_cfg->width;
   cm->height = frm_dim_cfg->height;
+  cm->superres_upscaled_width = frm_dim_cfg->width;
+  cm->superres_upscaled_height = frm_dim_cfg->height;
 
   if (cm->width > cpi->data_alloc_width ||
       cm->height > cpi->data_alloc_height || is_sb_size_changed) {
@@ -2719,7 +2721,7 @@ void av1_set_frame_size(AV1_COMP *cpi, int width, int height) {
   if (!is_stat_generation_stage(cpi)) av1_init_cdef_worker(cpi);
 
 #if !CONFIG_REALTIME_ONLY
-  if (is_restoration_used(cm)) {
+  if (cm->seq_params->enable_restoration && !cm->tiles.large_scale) {
     for (int i = 0; i < num_planes; ++i)
       cm->rst_info[i].frame_restoration_type = RESTORE_NONE;
 
