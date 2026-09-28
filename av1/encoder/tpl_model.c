@@ -1941,13 +1941,10 @@ static inline int eval_gop_length(double *beta, int gop_eval) {
       // dependency factors.
       return (beta[0] >= beta[1] + 0.7) && beta[0] > 3.0;
     case 2:
-      if ((beta[0] >= beta[1] + 0.4) && beta[0] > 1.6)
-        return 1;  // Don't shorten the gf interval
-      else if ((beta[0] < beta[1] + 0.1) || beta[0] <= 1.4)
+      if ((beta[0] < beta[1] + 0.1) || beta[0] <= 1.4)
         return 0;  // Shorten the gf interval
       else
-        return 2;  // Cannot decide the gf interval, so redo the
-                   // tpl stats calculation.
+        return 1;  // Don't shorten the gf interval
     case 3: return beta[0] > 1.1;
     default: return 2;
   }
