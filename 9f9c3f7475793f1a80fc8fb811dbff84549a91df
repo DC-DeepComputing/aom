@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "d26bf664_344056bc",
+        "filename": "av1/encoder/encoder.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 2722,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-09-30T18:26:15Z",
+      "side": 0,
+      "message": "Can this check remain the same? It also checks `cm-\u003efeatures.all_lossless`.",
+      "revId": "9f9c3f7475793f1a80fc8fb811dbff84549a91df",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
