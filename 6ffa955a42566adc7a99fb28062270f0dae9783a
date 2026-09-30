@@ -1,0 +1,89 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "ba527ab2_caf5e490",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 7
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-30T16:52:08Z",
+      "side": 1,
+      "message": "Yuan: This is just my preliminary review. I will request a formal review from my coworkers after this round.",
+      "revId": "6ffa955a42566adc7a99fb28062270f0dae9783a",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "2f80f4ad_3411d940",
+        "filename": "av1/av1_cx_iface.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 1676,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-30T16:52:08Z",
+      "side": 1,
+      "message": "Nit: I suggest moving \"0),\" to the previous line so that these two lines look like:\n\n```\n    // times. In one-pass mode without lookahead (g_lag_in_frames \u003d\u003d 0),\n    // and with the maximum frame size declared up front via\n```",
+      "revId": "6ffa955a42566adc7a99fb28062270f0dae9783a",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "3012426b_0f47c608",
+        "filename": "av1/encoder/motion_search_facade.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 643,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-30T16:52:08Z",
+      "side": 1,
+      "message": "Nit/optional: It should be unnecessary to initialize `orig_sf`. Note that `orig_yv12` is uninitialized.",
+      "revId": "6ffa955a42566adc7a99fb28062270f0dae9783a",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "3cd087a8_f8ecc6e4",
+        "filename": "av1/encoder/motion_search_facade.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 649,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-30T16:52:08Z",
+      "side": 1,
+      "message": "Nit: delete the comma (,) before \"in order to\"",
+      "revId": "6ffa955a42566adc7a99fb28062270f0dae9783a",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "969b29d0_04521bf9",
+        "filename": "av1/encoder/motion_search_facade.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 801,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-09-30T16:52:08Z",
+      "side": 1,
+      "message": "Yuan: The code below does both full-pixel motion search (see comment line 842) and subpel motion search (see comment at line 847). Is it harmless to set `xd-\u003eblock_ref_scale_factors[0]` here for the full-pixel motion search?",
+      "revId": "6ffa955a42566adc7a99fb28062270f0dae9783a",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
