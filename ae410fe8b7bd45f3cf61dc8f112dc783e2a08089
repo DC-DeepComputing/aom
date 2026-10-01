@@ -33,6 +33,23 @@
       "message": "REALTIME and GOOD mode have 2 lookahead buffers and alternate the slot to use, so `buf[0]` (which `buf-\u003e` always reads) does not always give the correct value. Probably need to read from `cpi-\u003eunscaled_source` instead.\n\nIf you revert the changes to the other 2 files, you will see that REALTIME and GOOD cases still fail.",
       "revId": "ae410fe8b7bd45f3cf61dc8f112dc783e2a08089",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "b97f2148_394f2119",
+        "filename": "av1/encoder/encoder.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 2525,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-01T04:36:23Z",
+      "side": 1,
+      "message": "I am not familiar with this code. I am just doing pattern matching.\n\nNote the `av1_init_motion_fpf()` call at line 2542 below:\n\n```\n  // First pass search site config initialization.\n  av1_init_motion_fpf(\u0026mv_search_params-\u003esearch_site_cfg[SS_CFG_FPF][DIAMOND],\n                      fpf_y_stride);\n```\n\nBy analogy, should we also test\n\n```\n    !mv_search_params-\u003esearch_site_cfg[SS_CFG_FPF][DIAMOND].stride ||\n    (fpf_y_stride !\u003d mv_search_params-\u003esearch_site_cfg[SS_CFG_FPF][DIAMOND].stride)\n```\n\nhere?",
+      "revId": "ae410fe8b7bd45f3cf61dc8f112dc783e2a08089",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ],
   "submitRequirementResults": [
