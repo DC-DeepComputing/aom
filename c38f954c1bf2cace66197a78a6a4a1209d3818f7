@@ -68,6 +68,24 @@
       "parentUuid": "2a670115_6e7ff841",
       "revId": "c38f954c1bf2cace66197a78a6a4a1209d3818f7",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "06254386_ab727c02",
+        "filename": "av1/encoder/encoder.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 2546,
+      "author": {
+        "id": 5190
+      },
+      "writtenOn": "2026-10-01T22:24:53Z",
+      "side": 1,
+      "message": "sorry typed done by mistake here.\n\nwill take a look",
+      "parentUuid": "8da4580f_53069945",
+      "revId": "c38f954c1bf2cace66197a78a6a4a1209d3818f7",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
