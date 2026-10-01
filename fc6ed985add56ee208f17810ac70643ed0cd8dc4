@@ -1,6 +1,78 @@
 {
   "comments": [
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "77ab2429_5ca4db2b",
+        "filename": "av1/common/arm/resize_neon.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 4977036
+      },
+      "writtenOn": "2026-10-01T23:52:59Z",
+      "side": 1,
+      "message": "Done for the 2-output and 1-output blocks as well. The 2-output block now uses load_u8_8x4() and store_u8_8x2(), and the 1-output block uses load_u8_8x2(). I also unrolled the two-iteration bottom-edge loop and used store_u8_8x2() there.",
+      "parentUuid": "d1b58d91_d768b452",
+      "revId": "fc6ed985add56ee208f17810ac70643ed0cd8dc4",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "3f1c4f13_f373e050",
+        "filename": "av1/common/arm/resize_neon.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 4977036
+      },
+      "writtenOn": "2026-10-01T23:52:59Z",
+      "side": 1,
+      "message": "Done. Renamed the variables to s0-sD and the pair sums in resize_down2_symeven_8 to p0-p3. The first three rows now use load_u8_8x3().",
+      "parentUuid": "9bb6db3a_439d556a",
+      "revId": "fc6ed985add56ee208f17810ac70643ed0cd8dc4",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "106ea134_a277b799",
+        "filename": "av1/common/arm/resize_neon.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 4977036
+      },
+      "writtenOn": "2026-10-01T23:52:59Z",
+      "side": 1,
+      "message": "Done, using load_u8_8x8() for s6-sD.",
+      "parentUuid": "74c168f0_c4adf128",
+      "revId": "fc6ed985add56ee208f17810ac70643ed0cd8dc4",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "6372316b_b2006c6b",
+        "filename": "av1/common/arm/resize_neon.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 4977036
+      },
+      "writtenOn": "2026-10-01T23:52:59Z",
+      "side": 1,
+      "message": "Done. The outputs are now d0-d3 and use store_u8_8x4(). I also moved the dst increment next to the src increment.",
+      "parentUuid": "69e11758_fd9c06f1",
+      "revId": "fc6ed985add56ee208f17810ac70643ed0cd8dc4",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "9bb6db3a_439d556a",
