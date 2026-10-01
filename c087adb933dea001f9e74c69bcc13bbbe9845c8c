@@ -1,6 +1,24 @@
 {
   "comments": [
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "c5630c38_c3bbafdf",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 8
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 4977036
+      },
+      "writtenOn": "2026-10-01T23:53:11Z",
+      "side": 1,
+      "message": "The numbers are against the C implementation; there isn\u0027t an existing Armv8.0 Neon version of this function. I tried Neon versions of the horizontal path as well, but they did not beat C at the larger pyramid widths on N1. I\u0027ll make the C baseline explicit in the commit message.",
+      "parentUuid": "ff72649d_3e7ff82f",
+      "revId": "c087adb933dea001f9e74c69bcc13bbbe9845c8c",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "ff72649d_3e7ff82f",
@@ -20,6 +38,24 @@
         "endLine": 49,
         "endChar": 43
       },
+      "revId": "c087adb933dea001f9e74c69bcc13bbbe9845c8c",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "852b9ded_7e023132",
+        "filename": "av1/common/arm/resize_neon_dotprod.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 4977036
+      },
+      "writtenOn": "2026-10-01T23:53:11Z",
+      "side": 1,
+      "message": "I tried batching 2 and 4 rows on Neoverse N1. Both were slower across all tested sizes: 6-34% for 2 rows and 27-41% for 4 rows, with larger regressions at smaller sizes. This may be because the rows don\u0027t share data, unlike the sliding window in vert_dir. I kept the row-at-a-time version.",
+      "parentUuid": "16c991a0_b1d75f82",
       "revId": "c087adb933dea001f9e74c69bcc13bbbe9845c8c",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
