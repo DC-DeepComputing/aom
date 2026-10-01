@@ -16,6 +16,24 @@
       "message": "So for these cases, we\u0027ll always do the allocation, but when `all_lossless \u003d\u003d 0` it will go unused?",
       "revId": "8d3c82dd1c1ee26cd1b54f3ea188bf6d35094783",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "22b4731e_7dbc52a9",
+        "filename": "av1/encoder/ethread.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 915,
+      "author": {
+        "id": 6585
+      },
+      "writtenOn": "2026-10-01T16:21:18Z",
+      "side": 1,
+      "message": "Before the change, when all_lossless \u003d\u003d 0, is_restoration_used is true.\nDo you mean all_lossless \u003d\u003d 1? If yes, then previously is_restoration_used is false, and these are unused.",
+      "parentUuid": "6cab9036_5b8b58e8",
+      "revId": "8d3c82dd1c1ee26cd1b54f3ea188bf6d35094783",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
