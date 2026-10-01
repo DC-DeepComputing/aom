@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "323900cb_d49c2032",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5128162
+      },
+      "writtenOn": "2026-10-01T02:47:20Z",
+      "side": 1,
+      "message": "This has been adopted at the CWG call yesterday. It was agreed to add it into a separate branch.",
+      "revId": "53cd6b0888ebd3b36329638cb83d069b86698f75",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
