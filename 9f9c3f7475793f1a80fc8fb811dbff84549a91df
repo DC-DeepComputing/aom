@@ -88,6 +88,24 @@
       "parentUuid": "7b0e5614_d63905fd",
       "revId": "9f9c3f7475793f1a80fc8fb811dbff84549a91df",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "34b41e32_e7ee1229",
+        "filename": "av1/encoder/encoder.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 2722,
+      "author": {
+        "id": 6585
+      },
+      "writtenOn": "2026-10-01T17:07:56Z",
+      "side": 0,
+      "message": "For cm-\u003etiles.large_scale, it turns out it could also be altered between frames. So it could also cause the overflow bug as all_lossless. I have made changes accordingly and covered with unit tests.",
+      "parentUuid": "485b1d22_1179a1b3",
+      "revId": "9f9c3f7475793f1a80fc8fb811dbff84549a91df",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
