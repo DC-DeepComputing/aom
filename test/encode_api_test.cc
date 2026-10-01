@@ -19,6 +19,7 @@
 #include <initializer_list>
 #include <memory>
 #include <tuple>
+#include <vector>
 
 #include "gtest/gtest.h"
 
@@ -1611,6 +1612,147 @@ TEST(EncodeAPI, AllIntraAndNoRefLast) {
 
   aom_img_free(image);
   ASSERT_EQ(aom_codec_destroy(&enc), AOM_CODEC_OK);
+}
+
+// Fills |img| (8-bit 4:2:0) with a pseudo-random mosaic of 4x4 blocks, zoomed
+// by a factor of |zoom_q10| / 1024 about the center of the frame. Frames with
+// different zoom factors are related by a global zoom, which global motion can
+// model.
+void FillZoomedMosaic(aom_image_t *img, int zoom_q10) {
+  const int w = static_cast<int>(img->d_w);
+  const int h = static_cast<int>(img->d_h);
+  for (int r = 0; r < h; ++r) {
+    uint8_t *const row =
+        img->planes[AOM_PLANE_Y] + r * img->stride[AOM_PLANE_Y];
+    for (int c = 0; c < w; ++c) {
+      // Mosaic coordinates, offset to keep them nonnegative.
+      const int x = (c - w / 2) * 1024 / zoom_q10 + 1024;
+      const int y = (r - h / 2) * 1024 / zoom_q10 + 1024;
+      uint32_t hash = static_cast<uint32_t>(x >> 2) * 73856093u ^
+                      static_cast<uint32_t>(y >> 2) * 19349663u;
+      hash ^= hash >> 13;
+      hash *= 0x5bd1e995u;
+      hash ^= hash >> 15;
+      row[c] = static_cast<uint8_t>(16 + hash % 224);
+    }
+  }
+  const int uv_w = (w + 1) / 2;
+  const int uv_h = (h + 1) / 2;
+  for (int r = 0; r < uv_h; ++r) {
+    memset(img->planes[AOM_PLANE_U] + r * img->stride[AOM_PLANE_U], 128, uv_w);
+    memset(img->planes[AOM_PLANE_V] + r * img->stride[AOM_PLANE_V], 128, uv_w);
+  }
+}
+
+// Encodes 5 frames of zooming content in good-quality mode with no lag and
+// stores the compressed data in |data|. Before frame i is encoded,
+// AV1E_SET_ENABLE_GLOBAL_MOTION is set to each value in
+// enable_global_motion[i], in order. If |large_scale_tile_on_first_frame| is
+// true, large_scale_tile is set to 1 for the first frame and to 0 after it.
+void EncodeZoomingFrames(
+    const std::vector<std::vector<int>> &enable_global_motion,
+    std::vector<uint8_t> *data, bool large_scale_tile_on_first_frame = false) {
+  constexpr int kNumFrames = 5;
+  aom_codec_iface_t *const iface = aom_codec_av1_cx();
+  aom_codec_enc_cfg_t cfg;
+  ASSERT_EQ(aom_codec_enc_config_default(iface, &cfg, AOM_USAGE_GOOD_QUALITY),
+            AOM_CODEC_OK);
+  cfg.g_w = 128;
+  cfg.g_h = 128;
+  cfg.g_lag_in_frames = 0;
+  cfg.large_scale_tile = large_scale_tile_on_first_frame;
+  aom_codec_ctx_t enc;
+  ASSERT_EQ(aom_codec_enc_init(&enc, iface, &cfg, 0), AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&enc, AOME_SET_CPUUSED, 5), AOM_CODEC_OK);
+
+  aom_image_t *const image =
+      aom_img_alloc(nullptr, AOM_IMG_FMT_I420, cfg.g_w, cfg.g_h, 1);
+  ASSERT_NE(image, nullptr);
+  data->clear();
+  for (int i = 0; i < kNumFrames; ++i) {
+    if (i == 1 && large_scale_tile_on_first_frame) {
+      cfg.large_scale_tile = 0;
+      ASSERT_EQ(aom_codec_enc_config_set(&enc, &cfg), AOM_CODEC_OK);
+    }
+    if (i < static_cast<int>(enable_global_motion.size())) {
+      for (const int enable : enable_global_motion[i]) {
+        ASSERT_EQ(
+            aom_codec_control(&enc, AV1E_SET_ENABLE_GLOBAL_MOTION, enable),
+            AOM_CODEC_OK);
+      }
+    }
+    FillZoomedMosaic(image, 1024 + 32 * i);
+    ASSERT_EQ(aom_codec_encode(&enc, image, i, 1, 0), AOM_CODEC_OK);
+    aom_codec_iter_t iter = nullptr;
+    const aom_codec_cx_pkt_t *pkt;
+    while ((pkt = aom_codec_get_cx_data(&enc, &iter)) != nullptr) {
+      ASSERT_EQ(pkt->kind, AOM_CODEC_CX_FRAME_PKT);
+      const uint8_t *const buf =
+          static_cast<const uint8_t *>(pkt->data.frame.buf);
+      data->insert(data->end(), buf, buf + pkt->data.frame.sz);
+    }
+  }
+  aom_img_free(image);
+  ASSERT_EQ(aom_codec_destroy(&enc), AOM_CODEC_OK);
+}
+
+// Global motion needs an image pyramid in every source and reference frame
+// buffer, but pyramids are only allocated while global motion is enabled. So
+// global motion can only be enabled before the first frame is passed to
+// aom_codec_encode(); later requests to enable it are ignored. Such requests
+// used to cause an assertion failure in av1_encode_frame() in debug builds and
+// a crash in global motion search in release builds.
+//
+// The tests below compare the output of encoders that make the same sequence
+// of control calls, so that the only difference is the global motion setting.
+
+TEST(EncodeAPI, EnableGlobalMotionBeforeFirstFrame) {
+  std::vector<uint8_t> on, off_on, off;
+  ASSERT_NO_FATAL_FAILURE(EncodeZoomingFrames({ { 1, 1 } }, &on));
+  ASSERT_NO_FATAL_FAILURE(EncodeZoomingFrames({ { 0, 1 } }, &off_on));
+  ASSERT_NO_FATAL_FAILURE(EncodeZoomingFrames({ { 0, 0 } }, &off));
+  // Global motion makes a difference for this content.
+  EXPECT_NE(on, off);
+  // Global motion can be enabled (again) before the first frame.
+  EXPECT_EQ(off_on, on);
+}
+
+TEST(EncodeAPI, EnableGlobalMotionAfterFirstFrame) {
+  std::vector<uint8_t> off, off_on;
+  ASSERT_NO_FATAL_FAILURE(EncodeZoomingFrames({ { 0 }, { 0 } }, &off));
+  ASSERT_NO_FATAL_FAILURE(EncodeZoomingFrames({ { 0 }, { 1 } }, &off_on));
+  // The request to enable global motion after the first frame is ignored.
+  EXPECT_EQ(off_on, off);
+}
+
+TEST(EncodeAPI, DisableGlobalMotionAfterFirstFrame) {
+  std::vector<uint8_t> off, on_off;
+  ASSERT_NO_FATAL_FAILURE(EncodeZoomingFrames({ { 0 }, { 0 } }, &off));
+  ASSERT_NO_FATAL_FAILURE(EncodeZoomingFrames({ { 1 }, { 0 } }, &on_off));
+  // Global motion can be disabled after the first frame. The first frame is a
+  // key frame, which does not use global motion, so this is equivalent to
+  // disabling global motion before the first frame.
+  EXPECT_EQ(on_off, off);
+
+  std::vector<uint8_t> on_off_off, on_off_on;
+  ASSERT_NO_FATAL_FAILURE(
+      EncodeZoomingFrames({ { 1 }, { 0 }, { 0 } }, &on_off_off));
+  ASSERT_NO_FATAL_FAILURE(
+      EncodeZoomingFrames({ { 1 }, { 0 }, { 1 } }, &on_off_on));
+  // Once disabled, global motion cannot be enabled again.
+  EXPECT_EQ(on_off_on, on_off_off);
+}
+
+// large_scale_tile = 1 forces global motion off, so setting large_scale_tile to
+// 0 after the first frame implicitly requests global motion to be enabled. That
+// request is ignored, too.
+TEST(EncodeAPI, DisableLargeScaleTileAfterFirstFrame) {
+  std::vector<uint8_t> on, off;
+  ASSERT_NO_FATAL_FAILURE(EncodeZoomingFrames(
+      { { 1 } }, &on, /*large_scale_tile_on_first_frame=*/true));
+  ASSERT_NO_FATAL_FAILURE(EncodeZoomingFrames(
+      { { 0 } }, &off, /*large_scale_tile_on_first_frame=*/true));
+  EXPECT_EQ(on, off);
 }
 #endif  // !CONFIG_REALTIME_ONLY
 
