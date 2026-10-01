@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "106dff5d_567ec625",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 9101
+      },
+      "writtenOn": "2026-10-01T20:02:46Z",
+      "side": 1,
+      "message": "Hi Yunqing,\nIn `gop_length_decision_method \u003d 1`, a second TPL call is performed when sub-gop size could not be determined by the first TPL call. As per our experiments the BD-Rate loss without the second TPL call is negligible (~0.02%). Hence, this patch removes the second TPL evaluation in `gop_length_decision_method \u003d 1`.\n\nThis patch impacts the encoder output for speed 0 to 4. We ensured that the encoder’s output is bit exact for speed \u003e 4 and for `gop_length_decision_method` \u003d 0, 2 and 3.\n \nBD-Rate results are as follows:\n```\n                 Enc. Instruction                 BD-Rate Loss(%)\ncpu   Resolution   Reduction (%)    avg.psnr     ovr.psnr    ssim     vmaf   vmaf_neg\n 0       LOWRES2      0.297          0.0381     0.0271    0.0244    0.1130    0.0956\n 0       MIDRES2      0.306          0.0304     0.0439    0.0472   -0.0039    0.0242\n 0    SHORTS608P      0.361          0.0494     0.0451    0.0496    0.0969    0.0751\n 0   SHORTS1080P      0.252          0.0032     0.0000   -0.0092   -0.0156   -0.0106\n 0        HDRES2      0.349          0.0063     0.0044    0.0159    0.0200    0.0150\n 0       Average      0.312          0.0256     0.0240    0.0252    0.0420    0.0393\n\n 1       LOWRES2      0.637          0.0326     0.0252    0.0029    0.0679    0.0644\n 1       MIDRES2      0.736          0.0293     0.0324    0.0272    0.0043    0.0234\n 1    SHORTS608P      0.721          0.0439     0.0515    0.0564    0.0279    0.0296\n 1   SHORTS1080P      0.576          0.0201     0.0078    0.0109    0.0235    0.0197\n 1        HDRES2      0.748          0.0056     0.0067    0.0075    0.0061    0.0108\n 1       Average      0.681          0.0267     0.0251    0.0219    0.0259    0.0292\n\n 2       LOWRES2      0.320          0.0260     0.0367    0.0247    0.0581    0.0213\n 2       MIDRES2      0.351          0.0060     0.0103    0.0029   -0.0351   -0.0243\n 2    SHORTS608P      0.354          0.0200     0.0151    0.0522    0.0785    0.0802\n 2   SHORTS1080P      0.453          0.0230     0.0038    0.0077    0.0088    0.0032\n 2        HDRES2      0.388          0.0098     0.0082   -0.0003    0.0140    0.0101\n 2       Average      0.376          0.0173     0.0144    0.0183    0.0262    0.0199\n\n 3       LOWRES2      0.340          0.0293     0.0439    0.0438    0.0288   -0.0004\n 3       MIDRES2      0.439          0.0193     0.0284    0.0144    0.0515    0.0429\n 3    SHORTS608P      0.412          0.0265     0.0255    0.0203    0.0809    0.0480\n 3   SHORTS1080P      0.400          0.0049    -0.0127   -0.0079    0.0001   -0.0174\n 3        HDRES2      0.417         -0.0061    -0.0120   -0.0213    0.0002   -0.0068\n 3       Average      0.402          0.0148     0.0140    0.0096    0.0329    0.0134\n\n 4       LOWRES2      0.269          0.0166     0.0298    0.0265    0.0257   -0.0192\n 4       MIDRES2      0.442          0.0047     0.0146    0.0025    0.0476    0.0307\n 4    SHORTS608P      0.496          0.0673     0.0644    0.0764    0.1088    0.0954\n 4   SHORTS1080P      0.405          0.0262     0.0381    0.0496    0.0279    0.0338\n 4        HDRES2      0.454          0.0174     0.0221    0.0351    0.0348    0.0290\n 4       Average      0.416          0.0280     0.0351    0.0398    0.0504    0.0362\n ```",
+      "revId": "902bc63beb8f4a98e0581a82a3edbd1005be2058",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
