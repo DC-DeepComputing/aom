@@ -2506,11 +2506,14 @@ static void init_motion_estimation(AV1_COMP *cpi) {
   const int aligned_width = (cm->width + 7) & ~7;
   const int y_stride =
       aom_calc_y_stride(aligned_width, cpi->oxcf.border_in_pixels);
+  const int lookahead_y_stride = cpi->unscaled_source != NULL
+                                     ? cpi->unscaled_source->y_stride
+                                     : cpi->ppi->lookahead->buf[0].img.y_stride;
   const int y_stride_src = ((cpi->oxcf.frm_dim_cfg.width != cm->width ||
                              cpi->oxcf.frm_dim_cfg.height != cm->height) ||
                             av1_superres_scaled(cm))
                                ? y_stride
-                               : cpi->ppi->lookahead->buf->img.y_stride;
+                               : lookahead_y_stride;
   int fpf_y_stride =
       cm->cur_frame != NULL ? cm->cur_frame->buf.y_stride : y_stride;
 
@@ -2519,10 +2522,13 @@ static void init_motion_estimation(AV1_COMP *cpi) {
   const int should_update =
       !mv_search_params->search_site_cfg[SS_CFG_SRC][DIAMOND].stride ||
       !mv_search_params->search_site_cfg[SS_CFG_LOOKAHEAD][DIAMOND].stride ||
+      !mv_search_params->search_site_cfg[SS_CFG_FPF][DIAMOND].stride ||
       (y_stride !=
        mv_search_params->search_site_cfg[SS_CFG_SRC][DIAMOND].stride) ||
       (y_stride_src !=
-       mv_search_params->search_site_cfg[SS_CFG_LOOKAHEAD][DIAMOND].stride);
+       mv_search_params->search_site_cfg[SS_CFG_LOOKAHEAD][DIAMOND].stride) ||
+      (fpf_y_stride !=
+       mv_search_params->search_site_cfg[SS_CFG_FPF][DIAMOND].stride);
 
   if (!should_update) {
     return;
