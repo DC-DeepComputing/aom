@@ -33,6 +33,23 @@
       "message": "Nit: Could you take the opportunity to use the array notation for `cpi-\u003eppi-\u003elookahead-\u003ebuf`?\n\n```\n                                     : cpi-\u003eppi-\u003elookahead-\u003ebuf[0].img.y_stride;\n```",
       "revId": "c38f954c1bf2cace66197a78a6a4a1209d3818f7",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "2a670115_6e7ff841",
+        "filename": "av1/encoder/encoder.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 2546,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-01T22:07:05Z",
+      "side": 1,
+      "message": "Marco: Do you think we need to check whether `search_site_cfg[SS_CFG_FPF]` should be updated?",
+      "revId": "c38f954c1bf2cace66197a78a6a4a1209d3818f7",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
