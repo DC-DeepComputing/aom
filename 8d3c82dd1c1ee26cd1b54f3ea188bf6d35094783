@@ -34,6 +34,24 @@
       "parentUuid": "6cab9036_5b8b58e8",
       "revId": "8d3c82dd1c1ee26cd1b54f3ea188bf6d35094783",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "dc376339_e4b38125",
+        "filename": "av1/encoder/ethread.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 915,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-10-02T23:29:18Z",
+      "side": 1,
+      "message": "Yes, I guess I meant 1. So now we allocate, but they\u0027re unused in that case, right? Is `lr_sync` freeed in between? Can we use that as a sentinel to determine allocation is needed with the old check?",
+      "parentUuid": "22b4731e_7dbc52a9",
+      "revId": "8d3c82dd1c1ee26cd1b54f3ea188bf6d35094783",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
