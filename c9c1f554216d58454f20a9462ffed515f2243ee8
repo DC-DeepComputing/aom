@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "98472940_e04b5810",
+        "filename": "av1/encoder/encoder.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 2511,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-02T15:19:35Z",
+      "side": 1,
+      "message": "Marco, Yuan: Could you please add a comment to explain why `cpi-\u003eunscaled_source-\u003ey_stride` should be used with `SS_CFG_LOOKAHEAD`? There is no obvious connection between the two.\n\nNote: I am going to run the code in the debugger to see if we need the null check for `cpi-\u003eunscaled_source`.",
+      "revId": "c9c1f554216d58454f20a9462ffed515f2243ee8",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
