@@ -1,6 +1,23 @@
 {
   "comments": [
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "e5b601be_338882a2",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 9
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-02T21:16:54Z",
+      "side": 1,
+      "message": "LGTM. I have verified that every change in this CL is needed to pass all the `*AV1ResolutionChange.RandomInput*` tests under ASAN.",
+      "revId": "f23deea3a5bf3066f108a9017902e925dc308d42",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "d746d298_b7e1a17f",
@@ -14,6 +31,24 @@
       "writtenOn": "2026-10-02T20:15:43Z",
       "side": 1,
       "message": "Yuan: I just noticed that this is added to the wrong if statement. Please add this to the if statement at line 705 instead:\n\n```\n    // Do sub-pixel compound motion search on the current reference frame.\n    if (id) {\n      orig_yv12 \u003d xd-\u003eplane[plane].pre[0];\n      xd-\u003eplane[plane].pre[0] \u003d xd-\u003eplane[plane].pre[id];\n    }\n```\n\nNote: I believe it is harmless to add this here, but it is confusing.",
+      "revId": "f23deea3a5bf3066f108a9017902e925dc308d42",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "7be18d05_ae547deb",
+        "filename": "av1/encoder/motion_search_facade.c",
+        "patchSetId": 9
+      },
+      "lineNbr": 655,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-02T21:16:54Z",
+      "side": 1,
+      "message": "Yuan: Here is my proposed patch. I have tested it under ASAN.\n\n```\ndiff --git a/av1/encoder/motion_search_facade.c b/av1/encoder/motion_search_facade.c\nindex 569b2ec4ea..dc620faf65 100644\n--- a/av1/encoder/motion_search_facade.c\n+++ b/av1/encoder/motion_search_facade.c\n@@ -640,19 +640,9 @@ int av1_joint_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,\n \n     // Do full-pixel compound motion search on the current reference frame.\n     struct buf_2d orig_yv12;\n-    const struct scale_factors *orig_sf \u003d NULL;\n     if (id) {\n       orig_yv12 \u003d xd-\u003eplane[plane].pre[0];\n       xd-\u003eplane[plane].pre[0] \u003d xd-\u003eplane[plane].pre[id];\n-      // Sub-pixel motion search works on raw reference frames that may not\n-      // match the resolution of the current frame, so block_ref_scale_factors\n-      // must be kept in sync with the frame data in order to perform the\n-      // motion search correctly.\n-      // Full-pixel motion search works on scaled reference frames, so it\n-      // doesn\u0027t need to update block_ref_scale_factors when swapping in\n-      // scaled_ref_frame.\n-      orig_sf \u003d xd-\u003eblock_ref_scale_factors[0];\n-      xd-\u003eblock_ref_scale_factors[0] \u003d xd-\u003eblock_ref_scale_factors[id];\n     }\n \n     // Make motion search params\n@@ -702,9 +692,19 @@ int av1_joint_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,\n     }\n \n     // Do sub-pixel compound motion search on the current reference frame.\n+    const struct scale_factors *orig_sf \u003d NULL;\n     if (id) {\n       orig_yv12 \u003d xd-\u003eplane[plane].pre[0];\n       xd-\u003eplane[plane].pre[0] \u003d xd-\u003eplane[plane].pre[id];\n+      // Sub-pixel motion search works on raw reference frames that may not\n+      // match the resolution of the current frame, so block_ref_scale_factors\n+      // must be kept in sync with the frame data in order to perform the\n+      // motion search correctly.\n+      // Full-pixel motion search works on scaled reference frames, so it\n+      // doesn\u0027t need to update block_ref_scale_factors when swapping in\n+      // scaled_ref_frame.\n+      orig_sf \u003d xd-\u003eblock_ref_scale_factors[0];\n+      xd-\u003eblock_ref_scale_factors[0] \u003d xd-\u003eblock_ref_scale_factors[id];\n     }\n \n     if (cpi-\u003ecommon.features.cur_frame_force_integer_mv) {\n```",
+      "parentUuid": "d746d298_b7e1a17f",
       "revId": "f23deea3a5bf3066f108a9017902e925dc308d42",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }

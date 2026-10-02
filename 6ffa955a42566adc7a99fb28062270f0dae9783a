@@ -106,6 +106,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": true,
+      "key": {
+        "uuid": "faaea36e_086e5532",
+        "filename": "av1/av1_cx_iface.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 1691,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-02T21:16:54Z",
+      "side": 1,
+      "message": "I just realized that AV1ResolutionChange.RandomInput is the test modified in this CL. So the commit message just needs to say run `test_libaom --gtest_filter\u003d*AV1ResolutionChange.RandomInput*` under ASAN.",
+      "parentUuid": "1c737708_8d2b24fa",
+      "revId": "6ffa955a42566adc7a99fb28062270f0dae9783a",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": false,
       "key": {
         "uuid": "3012426b_0f47c608",
