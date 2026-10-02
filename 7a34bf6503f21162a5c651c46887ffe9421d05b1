@@ -72,6 +72,24 @@
     {
       "unresolved": false,
       "key": {
+        "uuid": "9ae6041c_a929fdac",
+        "filename": "av1/encoder/encoder.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 2513,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-10-02T20:38:36Z",
+      "side": 1,
+      "message": "It looks like `av1_tpl_setup_stats` can be called before `cpi-\u003eunscaled_source` is set?",
+      "parentUuid": "1342ef6e_c92e7dee",
+      "revId": "7a34bf6503f21162a5c651c46887ffe9421d05b1",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
         "uuid": "566b0311_c9a18815",
         "filename": "test/encode_api_test.cc",
         "patchSetId": 4
