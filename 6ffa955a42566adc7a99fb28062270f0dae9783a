@@ -35,6 +35,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "af4f85d3_74847d03",
+        "filename": "av1/av1_cx_iface.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 1676,
+      "author": {
+        "id": 26549
+      },
+      "writtenOn": "2026-10-02T04:02:19Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "2f80f4ad_3411d940",
+      "revId": "6ffa955a42566adc7a99fb28062270f0dae9783a",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "125fee18_9003343b",
@@ -48,6 +66,24 @@
       "writtenOn": "2026-09-30T17:01:54Z",
       "side": 1,
       "message": "Yuan: I found that this change alone is sufficient to pass the modified test in test/frame_size_tests.cc:\n\n```\n./test_libaom --gtest_filter\u003d*AV1ResolutionChange.RandomInput*\n```\n\nThis seems to imply we don\u0027t have any tests to defend the changes to av1/encoder/motion_search_facade.c. Can you suggest how to add a new test or modify an existing test to exercises the new code in av1/encoder/motion_search_facade.c?",
+      "revId": "6ffa955a42566adc7a99fb28062270f0dae9783a",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "cba16638_9c846341",
+        "filename": "av1/av1_cx_iface.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 1691,
+      "author": {
+        "id": 26549
+      },
+      "writtenOn": "2026-10-02T04:02:19Z",
+      "side": 1,
+      "message": "ASAN can catch the bug running this very test, and that\u0027s how I discovered it:\n\n\nav1_joint_motion_search (GoodQuality/AV1ResolutionChange.RandomInput/4: GOOD, AOM_CBR, cpu-used 2):\n\n```\n\u003d\u003dERROR: AddressSanitizer: heap-buffer-overflow on address 0x01e783cdff61\nREAD of size 16 at 0x01e783cdff61 thread T0\n    #0 xx_loadu_128 aom_dsp/x86/synonyms.h:46:10\n    #1 aom_upsampled_pred_sse2 av1/encoder/x86/reconinter_enc_sse2.c:56:36\n    #2 aom_comp_avg_upsampled_pred_sse2 av1/encoder/x86/reconinter_enc_sse2.c:243:3\n    #3 upsampled_pref_error av1/encoder/mcomp.c:2577:9\n    #4 upsampled_setup_center_error av1/encoder/mcomp.c:2966:26\n    #5 av1_find_best_sub_pixel_tree av1/encoder/mcomp.c:3303:17\n    #6 av1_joint_motion_search av1/encoder/motion_search_facade.c:718:17\n    #7 do_masked_motion_search_indexed av1/encoder/motion_search_facade.c:954:5\n    #8 av1_interinter_compound_motion_search av1/encoder/motion_search_facade.c:978:5\n    #9 av1_compound_type_rd av1/encoder/compound_type.c:1400:25\n    #10 process_compound_inter_mode av1/encoder/rdopt.c:2743:31\n    #11 handle_inter_mode av1/encoder/rdopt.c:3305:33\n    #12 av1_rd_pick_inter_mode av1/encoder/rdopt.c:6437:23\n    #13 pick_sb_modes av1/encoder/partition_search.c:954:7\n    #14 none_partition_search av1/encoder/partition_search.c:4444:3\n    #15 av1_rd_pick_partition av1/encoder/partition_search.c:5841:3\n    #16 split_partition_search av1/encoder/partition_search.c:4592:10\n    #17 av1_rd_pick_partition av1/encoder/partition_search.c:5853:3\n    #18 encode_rd_sb av1/encoder/encodeframe.c:996:7\n    #19 encode_sb_row av1/encoder/encodeframe.c:1343:7\n    #20 av1_encode_sb_row av1/encoder/encodeframe.c:1524:3\n    #21 av1_encode_tile av1/encoder/encodeframe.c:1559:5\n    #22 encode_tiles av1/encoder/encodeframe.c:1596:7\n    #23 encode_frame_internal av1/encoder/encodeframe.c:2472:7\n    #24 av1_encode_frame av1/encoder/encodeframe.c:2811:5\n    #25 encode_without_recode av1/encoder/encoder.c:3232:3\n    #26 encode_with_recode_loop_and_filter av1/encoder/encoder.c:3750:11\n    #27 encode_frame_to_data_rate av1/encoder/encoder.c:4456:9\n    #28 av1_encode av1/encoder/encoder.c:4701:9\n    #29 denoise_and_encode av1/encoder/encode_strategy.c:928:7\n    #30 av1_encode_strategy av1/encoder/encode_strategy.c:1742:14\n    #31 av1_get_compressed_data av1/encoder/encoder.c:5447:22\n    #32 encoder_encode av1/av1_cx_iface.c:3717:20\n    #33 aom_codec_encode aom/src/aom_encoder.c:194:11\n    #34 (anonymous namespace)::AV1ResolutionChange_RandomInput_Test::TestBody() test/frame_size_tests.cc:218:17\n\n0x01e783cdff61 is located 2106 bytes after 188199-byte region [0x01e783cb1800,0x01e783cdf727)\nfreed by thread T0 here:\n    #0 free (C:\\msys64\\clang64\\bin\\libclang_rt.asan_dynamic-x86_64.dll+0x18004d981)\n    #1 aom_free aom_mem/aom_mem.c:80:5\n    #2 realloc_frame_buffer_aligned aom_scale/generic/yv12config.c:126:7\n    #3 aom_realloc_frame_buffer aom_scale/generic/yv12config.c:259:12\n    #4 av1_realloc_and_scale_if_required av1/common/resize.c:1222:9\n    #5 encode_without_recode av1/encoder/encoder.c:3088:24\n    #6 encode_with_recode_loop_and_filter av1/encoder/encoder.c:3750:11\n    #7 encode_frame_to_data_rate av1/encoder/encoder.c:4456:9\n    #8 av1_encode av1/encoder/encoder.c:4701:9\n    #9 denoise_and_encode av1/encoder/encode_strategy.c:928:7\n    #10 av1_encode_strategy av1/encoder/encode_strategy.c:1742:14\n    #11 av1_get_compressed_data av1/encoder/encoder.c:5447:22\n    #12 encoder_encode av1/av1_cx_iface.c:3717:20\n    #13 aom_codec_encode aom/src/aom_encoder.c:194:11\n    #14 (anonymous namespace)::AV1ResolutionChange_RandomInput_Test::TestBody() test/frame_size_tests.cc:218:17\n\npreviously allocated by thread T0 here:\n    #0 malloc (C:\\msys64\\clang64\\bin\\libclang_rt.asan_dynamic-x86_64.dll+0x18004da91)\n    #1 aom_memalign aom_mem/aom_mem.c:59:22\n    #2 realloc_frame_buffer_aligned aom_scale/generic/yv12config.c:132:38\n    #3 aom_realloc_frame_buffer aom_scale/generic/yv12config.c:259:12\n    #4 av1_realloc_and_scale_if_required av1/common/resize.c:1222:9\n    #5 encode_without_recode av1/encoder/encoder.c:3088:24\n    #6 encode_with_recode_loop_and_filter av1/encoder/encoder.c:3750:11\n    #7 encode_frame_to_data_rate av1/encoder/encoder.c:4456:9\n    #8 av1_encode av1/encoder/encoder.c:4701:9\n    #9 denoise_and_encode av1/encoder/encode_strategy.c:928:7\n    #10 av1_encode_strategy av1/encoder/encode_strategy.c:1742:14\n    #11 av1_get_compressed_data av1/encoder/encoder.c:5447:22\n    #12 encoder_encode av1/av1_cx_iface.c:3717:20\n    #13 aom_codec_encode aom/src/aom_encoder.c:194:11\n    #14 (anonymous namespace)::AV1ResolutionChange_RandomInput_Test::TestBody() test/frame_size_tests.cc:218:17\n\nSUMMARY: AddressSanitizer: heap-buffer-overflow aom_dsp/x86/synonyms.h:46:10 in xx_loadu_128\n```\n\nav1_compound_single_motion_search (GoodQualityLarge/AV1ResolutionChange.RandomInput/0: GOOD, AOM_VBR, cpu-used 0):\n\n```\n\u003d\u003dERROR: AddressSanitizer: heap-buffer-overflow on address 0x024f85a5176c\nREAD of size 16 at 0x024f85a5176c thread T0\n    #0 yy_loadu2_128 aom_dsp/x86/synonyms_avx2.h:81:17\n    #1 aom_filter_block1d16_v8_avx2 aom_dsp/x86/aom_subpixel_8t_intrin_avx2.c:1169:16\n    #2 aom_convolve8_vert_avx2 aom_dsp/x86/aom_subpixel_8t_intrin_avx2.c:1436:1\n    #3 aom_upsampled_pred_sse2 av1/encoder/x86/reconinter_enc_sse2.c\n    #4 aom_comp_avg_upsampled_pred_sse2 av1/encoder/x86/reconinter_enc_sse2.c:243:3\n    #5 upsampled_pref_error av1/encoder/mcomp.c:2577:9\n    #6 check_better av1/encoder/mcomp.c:2656:15\n    #7 first_level_check av1/encoder/mcomp.c:2827:7\n    #8 av1_find_best_sub_pixel_tree av1/encoder/mcomp.c:3323:19\n    #9 av1_compound_single_motion_search av1/encoder/motion_search_facade.c:853:15\n    #10 compound_single_motion_search_interinter av1/encoder/motion_search_facade.c:927:10\n    #11 do_masked_motion_search_indexed av1/encoder/motion_search_facade.c:947:5\n    #12 av1_interinter_compound_motion_search av1/encoder/motion_search_facade.c:986:5\n    #13 av1_compound_type_rd av1/encoder/compound_type.c:1400:25\n    #14 process_compound_inter_mode av1/encoder/rdopt.c:2743:31\n    #15 handle_inter_mode av1/encoder/rdopt.c:3305:33\n    #16 av1_rd_pick_inter_mode av1/encoder/rdopt.c:6437:23\n    #17 pick_sb_modes av1/encoder/partition_search.c:954:7\n    #18 none_partition_search av1/encoder/partition_search.c:4444:3\n    #19 av1_rd_pick_partition av1/encoder/partition_search.c:5841:3\n    #20 split_partition_search av1/encoder/partition_search.c:4592:10\n    #21 av1_rd_pick_partition av1/encoder/partition_search.c:5853:3\n    #22 encode_rd_sb av1/encoder/encodeframe.c:996:7\n    #23 encode_sb_row av1/encoder/encodeframe.c:1343:7\n    #24 av1_encode_sb_row av1/encoder/encodeframe.c:1524:3\n    #25 av1_encode_tile av1/encoder/encodeframe.c:1559:5\n    #26 encode_tiles av1/encoder/encodeframe.c:1596:7\n    #27 encode_frame_internal av1/encoder/encodeframe.c:2472:7\n    #28 av1_encode_frame av1/encoder/encodeframe.c:2811:5\n    #29 encode_without_recode av1/encoder/encoder.c:3232:3\n    #30 encode_with_recode_loop_and_filter av1/encoder/encoder.c:3750:11\n    #31 encode_frame_to_data_rate av1/encoder/encoder.c:4456:9\n    #32 av1_encode av1/encoder/encoder.c:4701:9\n    #33 denoise_and_encode av1/encoder/encode_strategy.c:928:7\n    #34 av1_encode_strategy av1/encoder/encode_strategy.c:1742:14\n    #35 av1_get_compressed_data av1/encoder/encoder.c:5447:22\n    #36 encoder_encode av1/av1_cx_iface.c:3717:20\n    #37 aom_codec_encode aom/src/aom_encoder.c:194:11\n    #38 (anonymous namespace)::AV1ResolutionChange_RandomInput_Test::TestBody() test/frame_size_tests.cc:218:17\n\n0x024f85a5176c is located 148 bytes before 299559-byte region [0x024f85a51800,0x024f85a9aa27)\nallocated by thread T0 here:\n    #0 malloc (C:\\msys64\\clang64\\bin\\libclang_rt.asan_dynamic-x86_64.dll+0x18004da91)\n    #1 aom_memalign aom_mem/aom_mem.c:59:22\n    #2 realloc_frame_buffer_aligned aom_scale/generic/yv12config.c:132:38\n    #3 aom_realloc_frame_buffer aom_scale/generic/yv12config.c:259:12\n    #4 av1_set_frame_size av1/encoder/encoder.c:2712:7\n    #5 denoise_and_encode av1/encoder/encode_strategy.c:786:3\n    #6 av1_encode_strategy av1/encoder/encode_strategy.c:1742:14\n    #7 av1_get_compressed_data av1/encoder/encoder.c:5447:22\n    #8 encoder_encode av1/av1_cx_iface.c:3717:20\n    #9 aom_codec_encode aom/src/aom_encoder.c:194:11\n    #10 (anonymous namespace)::AV1ResolutionChange_RandomInput_Test::TestBody() test/frame_size_tests.cc:218:17\n\nSUMMARY: AddressSanitizer: heap-buffer-overflow aom_dsp/x86/synonyms_avx2.h:81:17 in yy_loadu2_128\n```\n\nI also ran some tests on larger size inputs, up to 4K, but didn\u0027t found other issues. Those tests took a few hours to run on a full 7950X CPU which has 32 threads, so I\u0027m not sure we want them on CI.",
+      "parentUuid": "125fee18_9003343b",
       "revId": "6ffa955a42566adc7a99fb28062270f0dae9783a",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
@@ -69,6 +105,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "c322bda8_78fb4a0a",
+        "filename": "av1/encoder/motion_search_facade.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 643,
+      "author": {
+        "id": 26549
+      },
+      "writtenOn": "2026-10-02T04:02:19Z",
+      "side": 1,
+      "message": "GCC doesn\u0027t like it unfortunately:\n\nhttps://build.aomedia.org/jenkins/job/libaom__compile/63704/arch\u003darmv8.4-linux-gcc,config\u003dshared/gcc/\nhttps://build.aomedia.org/jenkins/job/libaom__example_test/45117/arch\u003dx86_64-linux-gcc,shard\u003d0/gcc/",
+      "parentUuid": "3012426b_0f47c608",
+      "revId": "6ffa955a42566adc7a99fb28062270f0dae9783a",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "3cd087a8_f8ecc6e4",
@@ -86,6 +140,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "f7411822_8c748128",
+        "filename": "av1/encoder/motion_search_facade.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 649,
+      "author": {
+        "id": 26549
+      },
+      "writtenOn": "2026-10-02T04:02:19Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "3cd087a8_f8ecc6e4",
+      "revId": "6ffa955a42566adc7a99fb28062270f0dae9783a",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "969b29d0_04521bf9",
@@ -99,6 +171,24 @@
       "writtenOn": "2026-09-30T16:52:08Z",
       "side": 1,
       "message": "Yuan: The code below does both full-pixel motion search (see comment line 842) and subpel motion search (see comment at line 847). Is it harmless to set `xd-\u003eblock_ref_scale_factors[0]` here for the full-pixel motion search?",
+      "revId": "6ffa955a42566adc7a99fb28062270f0dae9783a",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "d648cb0a_9b069933",
+        "filename": "av1/encoder/motion_search_facade.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 801,
+      "author": {
+        "id": 26549
+      },
+      "writtenOn": "2026-10-02T04:02:19Z",
+      "side": 1,
+      "message": "Yes.\nBecause full-pixel motion search works on the scaled (vs raw) reference frame, it ignores `block_ref_scale_factors`.",
+      "parentUuid": "969b29d0_04521bf9",
       "revId": "6ffa955a42566adc7a99fb28062270f0dae9783a",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
