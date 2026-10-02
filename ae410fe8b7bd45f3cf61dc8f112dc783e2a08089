@@ -53,6 +53,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "74d33e4c_5451f0c5",
+        "filename": "av1/encoder/encoder.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 2513,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-02T02:30:38Z",
+      "side": 1,
+      "message": "Thanks!",
+      "parentUuid": "0c2994d5_fe421015",
+      "revId": "ae410fe8b7bd45f3cf61dc8f112dc783e2a08089",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "b97f2148_394f2119",
@@ -66,6 +84,24 @@
       "writtenOn": "2026-10-01T04:36:23Z",
       "side": 1,
       "message": "I am not familiar with this code. I am just doing pattern matching.\n\nNote the `av1_init_motion_fpf()` call at line 2542 below:\n\n```\n  // First pass search site config initialization.\n  av1_init_motion_fpf(\u0026mv_search_params-\u003esearch_site_cfg[SS_CFG_FPF][DIAMOND],\n                      fpf_y_stride);\n```\n\nBy analogy, should we also test\n\n```\n    !mv_search_params-\u003esearch_site_cfg[SS_CFG_FPF][DIAMOND].stride ||\n    (fpf_y_stride !\u003d mv_search_params-\u003esearch_site_cfg[SS_CFG_FPF][DIAMOND].stride)\n```\n\nhere?",
+      "revId": "ae410fe8b7bd45f3cf61dc8f112dc783e2a08089",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "b3ecb4a0_2dd10259",
+        "filename": "av1/encoder/encoder.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 2525,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-02T02:30:38Z",
+      "side": 1,
+      "message": "See https://aomedia-review.git.corp.google.com/c/aom/+/217362.",
+      "parentUuid": "b97f2148_394f2119",
       "revId": "ae410fe8b7bd45f3cf61dc8f112dc783e2a08089",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
