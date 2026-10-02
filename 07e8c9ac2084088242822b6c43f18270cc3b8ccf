@@ -24,6 +24,30 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "9aaa7374_2462d15e",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 2
+      },
+      "lineNbr": 17,
+      "author": {
+        "id": 6585
+      },
+      "writtenOn": "2026-10-02T21:53:00Z",
+      "side": 1,
+      "message": "When we debug Bug:565488030, we found the global motion flag problem.\nI added Bug:565488030 to the CL description.",
+      "parentUuid": "90360c94_fd665e3a",
+      "range": {
+        "startLine": 17,
+        "startChar": 2,
+        "endLine": 17,
+        "endChar": 40
+      },
+      "revId": "07e8c9ac2084088242822b6c43f18270cc3b8ccf",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "3a1b4c37_531466f1",
@@ -37,6 +61,24 @@
       "writtenOn": "2026-10-02T21:41:56Z",
       "side": 1,
       "message": "If we provide an API for this, should we support it instead of disabling it for some cases?",
+      "revId": "07e8c9ac2084088242822b6c43f18270cc3b8ccf",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "d81e4fb7_23dd4d48",
+        "filename": "aom/aomcx.h",
+        "patchSetId": 2
+      },
+      "lineNbr": 1046,
+      "author": {
+        "id": 6585
+      },
+      "writtenOn": "2026-10-02T21:53:00Z",
+      "side": 1,
+      "message": "The API works now for usual use cases.\nThe problem occurs only when global motion is turned off (buffer not allocated) on the first frame, but later turned on via this API. I think such a rare use case is not actually used in any scenario, so we don\u0027t have to support it.\nBut we need the fix to avoid potential memory issues. That\u0027s why this CL adds some safe guards.",
+      "parentUuid": "3a1b4c37_531466f1",
       "revId": "07e8c9ac2084088242822b6c43f18270cc3b8ccf",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
