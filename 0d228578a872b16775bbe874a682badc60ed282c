@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "f260e9bc_29af36de",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 1
+      },
+      "lineNbr": 10,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-10-02T23:30:11Z",
+      "side": 1,
+      "message": "Note https://aomedia-review.googlesource.com/c/aom/+/216821 added some checks on the return value. I\u0027m not sure if it\u0027s relevant here.",
+      "revId": "0d228578a872b16775bbe874a682badc60ed282c",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
