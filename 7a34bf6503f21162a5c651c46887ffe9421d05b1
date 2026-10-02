@@ -124,6 +124,24 @@
     {
       "unresolved": false,
       "key": {
+        "uuid": "a6b5664f_1fe6c6d1",
+        "filename": "test/encode_api_test.cc",
+        "patchSetId": 4
+      },
+      "lineNbr": 1648,
+      "author": {
+        "id": 5190
+      },
+      "writtenOn": "2026-10-02T21:28:26Z",
+      "side": 1,
+      "message": "Added comment.",
+      "parentUuid": "7cf33563_3c72f8c7",
+      "revId": "7a34bf6503f21162a5c651c46887ffe9421d05b1",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
         "uuid": "f78e17c1_c2ea4714",
         "filename": "test/encode_api_test.cc",
         "patchSetId": 4
@@ -156,6 +174,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "b6fb7569_761800cd",
+        "filename": "test/encode_api_test.cc",
+        "patchSetId": 4
+      },
+      "lineNbr": 1673,
+      "author": {
+        "id": 5190
+      },
+      "writtenOn": "2026-10-02T21:28:26Z",
+      "side": 1,
+      "message": "No, so removed that. Done.",
+      "parentUuid": "2044fe92_b17c7db1",
+      "revId": "7a34bf6503f21162a5c651c46887ffe9421d05b1",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "48e80a06_8b3f4a2e",
@@ -169,6 +205,24 @@
       "writtenOn": "2026-10-02T18:45:23Z",
       "side": 1,
       "message": "Nit: Could you explain why we need to flush the encoder five times?",
+      "revId": "7a34bf6503f21162a5c651c46887ffe9421d05b1",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "0bb5eb46_9b9277dd",
+        "filename": "test/encode_api_test.cc",
+        "patchSetId": 4
+      },
+      "lineNbr": 1679,
+      "author": {
+        "id": 5190
+      },
+      "writtenOn": "2026-10-02T21:28:26Z",
+      "side": 1,
+      "message": "Done. Added comment.",
+      "parentUuid": "48e80a06_8b3f4a2e",
       "revId": "7a34bf6503f21162a5c651c46887ffe9421d05b1",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
