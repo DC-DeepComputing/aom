@@ -22,6 +22,30 @@
       },
       "revId": "aa2f63d18417185c50aa6883fdfd0a1c60ace9c6",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "947751f8_d46daff7",
+        "filename": "av1/encoder/rdopt.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 757,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-10-02T18:21:04Z",
+      "side": 1,
+      "message": "Because x is const, writing x-\u003esub_block_energy_diff \u003d energy_diff; directly will trigger a compiler error. Alternatively, we can also update the function input to MACROBLOCK *x.",
+      "parentUuid": "2ef31cfc_d17f1c8f",
+      "range": {
+        "startLine": 757,
+        "startChar": 3,
+        "endLine": 757,
+        "endChar": 17
+      },
+      "revId": "aa2f63d18417185c50aa6883fdfd0a1c60ace9c6",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
