@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "67f0d4d7_d6da8523",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 4
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-02T16:39:10Z",
+      "side": 1,
+      "message": "Marco: Thanks a lot for the CL. Although this CL affects my work, I am not qualified to review it. Please ask someone familiar with the code (Jingning?) to review this CL.",
+      "revId": "7a34bf6503f21162a5c651c46887ffe9421d05b1",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "7fe8290f_02787960",
+        "filename": "av1/encoder/encoder.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 2513,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-02T16:39:10Z",
+      "side": 1,
+      "message": "Marco: I found that it is necessary to check if `cpi-\u003eunscaled_source` is null because `init_motion_estimation()` is also called before `av1_encode()` sets `cpi-\u003eunscaled_source` to `frame_input-\u003esource`.\n\nThis raises an interesting issue: `init_motion_estimation()` may be called when `cpi-\u003eunscaled_source` is uninitialized (null) or contains a stale value from the previous `aom_codec_encode()` call. Is this okay?\n\nIt seems that as long as `init_motion_estimation()` is eventually called with the correct value of `cpi-\u003eunscaled_source` before we perform motion search, the earlier calls with uninitialized or stale values of `cpi-\u003eunscaled_source` are wasteful but harmless.",
+      "revId": "7a34bf6503f21162a5c651c46887ffe9421d05b1",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
