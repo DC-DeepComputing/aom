@@ -52,6 +52,24 @@
       "parentUuid": "22b4731e_7dbc52a9",
       "revId": "8d3c82dd1c1ee26cd1b54f3ea188bf6d35094783",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "6764d9f7_da6d1574",
+        "filename": "av1/encoder/ethread.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 915,
+      "author": {
+        "id": 6585
+      },
+      "writtenOn": "2026-10-03T00:15:15Z",
+      "side": 1,
+      "message": "Perhaps we can\u0027t check if lr_sync is allocated as a condition.\nFirst, lr_sync is allocated at encoder when is_restoration_used \u003d true. In the reported bug, a case could be created that is_restoration_used is true for the first frame, then false for the second frame.\nSo, lr_sync is allocated for the first frame, in the second frame, we still need this section of code to be accessed.\nThe current solution makes more sense.",
+      "parentUuid": "dc376339_e4b38125",
+      "revId": "8d3c82dd1c1ee26cd1b54f3ea188bf6d35094783",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
