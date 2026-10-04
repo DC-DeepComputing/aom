@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "4165037a_435566d6",
+        "filename": "av1/encoder/motion_search_facade.c",
+        "patchSetId": 12
+      },
+      "lineNbr": 817,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-04T02:06:54Z",
+      "side": 1,
+      "message": "Comparing this function with `av1_joint_motion_search()`, I see some differences.\n\nThe first difference is the order of backing up in `orig_yv12` and backing up in the `backup_yv12` array.\n\nIn `av1_joint_motion_search()`, the order is `backup_yv12` (line 617), then `orig_yv12` (line 644).\n\nIn this function, the order is opposite: `orig_yv12` (line 797), then `backup_yv12` (line 807). But the comment at lines 811-814 mentions this order. So this should be fine.",
+      "revId": "49932c0b8b6e8874edf6b622e16f7ca55e406d2f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "6324677f_108f5e9e",
+        "filename": "av1/encoder/motion_search_facade.c",
+        "patchSetId": 12
+      },
+      "lineNbr": 846,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-04T02:06:54Z",
+      "side": 1,
+      "message": "Yuan: The second difference is that this function uses different index for `xd-\u003eplane[i].pre[]` in the back-up and swap-back operations: `ref_idx` at line 807 vs. 0 at line 846. This seems like a bug.\n\nI think we should use 0 at line 807 also. Since this issue is unrelated to your CL, we can address it in a separate CL.",
+      "revId": "49932c0b8b6e8874edf6b622e16f7ca55e406d2f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
