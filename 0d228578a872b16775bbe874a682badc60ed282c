@@ -16,6 +16,24 @@
       "message": "Note https://aomedia-review.googlesource.com/c/aom/+/216821 added some checks on the return value. I\u0027m not sure if it\u0027s relevant here.",
       "revId": "0d228578a872b16775bbe874a682badc60ed282c",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "86a43243_03e3956d",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 1
+      },
+      "lineNbr": 10,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-04T10:12:52Z",
+      "side": 1,
+      "message": "Yes, Christopher Trask\u0027s https://aomedia-review.googlesource.com/c/aom/+/216821 is relevant. I inspected Christopher Trask\u0027s CL in my analysis and included a summary in the commit message. Here are the details.\n\n1. Christopher Trask\u0027s CL added two new av1_lookahead_peek() calls. He checks if those two new av1_lookahead_peek() calls return null. **No existing av1_lookahead_peek() calls were modified, and the av1_lookahead_peek() function itself was not modified in his CL.**\n2. No other commits were related to av1_lookahead_peek().\n3. Coverity started to warn the existing av1_lookahead_peek() call in av1_init_parallel_frame_context() may return null.\n\nApparently Christopher Trask\u0027s CL influenced Coverity\u0027s analysis of that av1_lookahead_peek() call in av1_init_parallel_frame_context(). But based on #1 alone, one cannot conclude that an unrelated av1_lookahead_peek() call may start to return null after Christopher Trask\u0027s CL. This is why I think this Coverity defect is a false positive, and it is safe to suppress it with this assertion or simply ignore it.\n\nThis kind of assertion is already used in temporal_filter.c. For example,\n\n```\n  // Estimate noises for each plane.\n  const struct lookahead_entry *to_filter_buf \u003d av1_lookahead_peek(\n      cpi-\u003eppi-\u003elookahead, filter_frame_lookahead_idx, cpi-\u003ecompressor_stage);\n  assert(to_filter_buf !\u003d NULL);\n  const YV12_BUFFER_CONFIG *to_filter_frame \u003d \u0026to_filter_buf-\u003eimg;\n```",
+      "parentUuid": "f260e9bc_29af36de",
+      "revId": "0d228578a872b16775bbe874a682badc60ed282c",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
