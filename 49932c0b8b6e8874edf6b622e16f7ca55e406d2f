@@ -33,6 +33,24 @@
       "message": "Yuan: The second difference is that this function uses different index for `xd-\u003eplane[i].pre[]` in the back-up and swap-back operations: `ref_idx` at line 807 vs. 0 at line 846. This seems like a bug.\n\nI think we should use 0 at line 807 also. Since this issue is unrelated to your CL, we can address it in a separate CL.",
       "revId": "49932c0b8b6e8874edf6b622e16f7ca55e406d2f",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "fc376449_99911492",
+        "filename": "av1/encoder/motion_search_facade.c",
+        "patchSetId": 12
+      },
+      "lineNbr": 846,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-04T03:21:09Z",
+      "side": 1,
+      "message": "We can consider the following patch:\n\n```\ndiff --git a/av1/encoder/motion_search_facade.c b/av1/encoder/motion_search_facade.c\nindex 57a41612e5..bcdca3c34c 100644\n--- a/av1/encoder/motion_search_facade.c\n+++ b/av1/encoder/motion_search_facade.c\n@@ -803,15 +803,15 @@ int av1_compound_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,\n     // match the resolution of the current frame, allowing the existing\n     // full-pixel motion search code to be used without additional\n     // modifications.\n-    for (int i \u003d 0; i \u003c num_planes; i++) {\n-      backup_yv12[i] \u003d xd-\u003eplane[i].pre[ref_idx];\n-    }\n-    const int mi_row \u003d xd-\u003emi_row;\n-    const int mi_col \u003d xd-\u003emi_col;\n     // The index below needs to be 0 instead of ref_idx since we assume the\n     // 0th slot to be used for subsequent searches. Note that the ref_idx\n     // reference buffer has been copied to the 0th slot in the code above.\n     // Now we need to swap the reference frame for the 0th slot.\n+    for (int i \u003d 0; i \u003c num_planes; i++) {\n+      backup_yv12[i] \u003d xd-\u003eplane[i].pre[0];\n+    }\n+    const int mi_row \u003d xd-\u003emi_row;\n+    const int mi_col \u003d xd-\u003emi_col;\n     av1_setup_pre_planes(xd, 0, scaled_ref_frame, mi_row, mi_col, NULL,\n                          num_planes);\n   }\n```",
+      "parentUuid": "6324677f_108f5e9e",
+      "revId": "49932c0b8b6e8874edf6b622e16f7ca55e406d2f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
