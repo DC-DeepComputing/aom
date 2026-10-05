@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "78c0d02e_cba42b62",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5128162
+      },
+      "writtenOn": "2026-10-05T22:34:20Z",
+      "side": 1,
+      "message": "Here is the submission of the extended QP range, made on a separate branch. Please review",
+      "revId": "c0d3dfee9cd474395c36605ea7c6356870d9de7b",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
