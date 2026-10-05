@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "729f7f02_b558221a",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-05T18:01:57Z",
+      "side": 1,
+      "message": "Cherry-picking to the quibblepants branch for libaom v3.15.2.\n\nMarco: I haven\u0027t decided whether this fix needs to be cherry-picked, but I\u0027d like to get your approval in advance.",
+      "revId": "af52815f9a917cf23cce19f128626e591c0ad546",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
