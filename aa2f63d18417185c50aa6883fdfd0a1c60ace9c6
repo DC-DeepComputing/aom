@@ -46,6 +46,30 @@
       },
       "revId": "aa2f63d18417185c50aa6883fdfd0a1c60ace9c6",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "8f212c03_8608d8dc",
+        "filename": "av1/encoder/rdopt.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 757,
+      "author": {
+        "id": 5022
+      },
+      "writtenOn": "2026-10-05T15:48:37Z",
+      "side": 1,
+      "message": "Acknowledged",
+      "parentUuid": "947751f8_d46daff7",
+      "range": {
+        "startLine": 757,
+        "startChar": 3,
+        "endLine": 757,
+        "endChar": 17
+      },
+      "revId": "aa2f63d18417185c50aa6883fdfd0a1c60ace9c6",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
