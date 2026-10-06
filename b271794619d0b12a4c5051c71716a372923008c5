@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "7b19fd0f_72a8c516",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-06T21:33:27Z",
+      "side": 1,
+      "message": "Cherry-picking to the quibblepants branch for libaom v3.15.2.\n\nErik\u0027s CL is also useful to the encoding of progressive AVIF images.",
+      "revId": "b271794619d0b12a4c5051c71716a372923008c5",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
