@@ -3,6 +3,23 @@
     {
       "unresolved": false,
       "key": {
+        "uuid": "583c17c7_6ce49879",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 12
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-06T01:24:17Z",
+      "side": 1,
+      "message": "Jingning, Urvang: Please review. Thanks!",
+      "revId": "49932c0b8b6e8874edf6b622e16f7ca55e406d2f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
         "uuid": "4165037a_435566d6",
         "filename": "av1/encoder/motion_search_facade.c",
         "patchSetId": 12
@@ -14,6 +31,24 @@
       "writtenOn": "2026-10-04T02:06:54Z",
       "side": 1,
       "message": "Comparing this function with `av1_joint_motion_search()`, I see some differences.\n\nThe first difference is the order of backing up in `orig_yv12` and backing up in the `backup_yv12` array.\n\nIn `av1_joint_motion_search()`, the order is `backup_yv12` (line 617), then `orig_yv12` (line 644).\n\nIn this function, the order is opposite: `orig_yv12` (line 797), then `backup_yv12` (line 807). But the comment at lines 811-814 mentions this order. So this should be fine.",
+      "revId": "49932c0b8b6e8874edf6b622e16f7ca55e406d2f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "0423352d_57d0ed48",
+        "filename": "av1/encoder/motion_search_facade.c",
+        "patchSetId": 12
+      },
+      "lineNbr": 817,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-06T01:24:17Z",
+      "side": 1,
+      "message": "Jingning, Urvang: Please ignore this comment. I will deal with this issue separately.",
+      "parentUuid": "4165037a_435566d6",
       "revId": "49932c0b8b6e8874edf6b622e16f7ca55e406d2f",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
@@ -49,6 +84,24 @@
       "side": 1,
       "message": "We can consider the following patch:\n\n```\ndiff --git a/av1/encoder/motion_search_facade.c b/av1/encoder/motion_search_facade.c\nindex 57a41612e5..bcdca3c34c 100644\n--- a/av1/encoder/motion_search_facade.c\n+++ b/av1/encoder/motion_search_facade.c\n@@ -803,15 +803,15 @@ int av1_compound_single_motion_search(const AV1_COMP *cpi, MACROBLOCK *x,\n     // match the resolution of the current frame, allowing the existing\n     // full-pixel motion search code to be used without additional\n     // modifications.\n-    for (int i \u003d 0; i \u003c num_planes; i++) {\n-      backup_yv12[i] \u003d xd-\u003eplane[i].pre[ref_idx];\n-    }\n-    const int mi_row \u003d xd-\u003emi_row;\n-    const int mi_col \u003d xd-\u003emi_col;\n     // The index below needs to be 0 instead of ref_idx since we assume the\n     // 0th slot to be used for subsequent searches. Note that the ref_idx\n     // reference buffer has been copied to the 0th slot in the code above.\n     // Now we need to swap the reference frame for the 0th slot.\n+    for (int i \u003d 0; i \u003c num_planes; i++) {\n+      backup_yv12[i] \u003d xd-\u003eplane[i].pre[0];\n+    }\n+    const int mi_row \u003d xd-\u003emi_row;\n+    const int mi_col \u003d xd-\u003emi_col;\n     av1_setup_pre_planes(xd, 0, scaled_ref_frame, mi_row, mi_col, NULL,\n                          num_planes);\n   }\n```",
       "parentUuid": "6324677f_108f5e9e",
+      "revId": "49932c0b8b6e8874edf6b622e16f7ca55e406d2f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "e8455210_d738ffe5",
+        "filename": "av1/encoder/motion_search_facade.c",
+        "patchSetId": 12
+      },
+      "lineNbr": 846,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-06T01:24:17Z",
+      "side": 1,
+      "message": "[Jingning, Urvang: please ignore this thread.]\n\nI found the CL that introduced this bug:\nhttps://aomedia-review.googlesource.com/c/aom/+/169472",
+      "parentUuid": "fc376449_99911492",
       "revId": "49932c0b8b6e8874edf6b622e16f7ca55e406d2f",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
