@@ -3445,4 +3445,42 @@ TEST(EncodeAPI, Buganizer565488030) {
 }
 #endif  // !CONFIG_REALTIME_ONLY
 
+TEST(EncodeAPI, NonrdBlockYrdRateOverflow) {
+  aom_codec_iface_t *const iface = aom_codec_av1_cx();
+  aom_codec_enc_cfg_t cfg;
+  ASSERT_EQ(aom_codec_enc_config_default(iface, &cfg, AOM_USAGE_REALTIME),
+            AOM_CODEC_OK);
+
+  cfg.g_w = 128;
+  cfg.g_h = 128;
+  cfg.g_lag_in_frames = 0;
+
+  aom_codec_ctx_t enc;
+  ASSERT_EQ(aom_codec_enc_init(&enc, iface, &cfg, 0), AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&enc, AOME_SET_CPUUSED, 10), AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&enc, AV1E_SET_LOSSLESS, 1), AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&enc, AV1E_SET_SUPERBLOCK_SIZE,
+                              AOM_SUPERBLOCK_SIZE_128X128),
+            AOM_CODEC_OK);
+
+  aom_image_t *img = aom_img_alloc(nullptr, AOM_IMG_FMT_I420, 128, 128, 16);
+  ASSERT_NE(img, nullptr);
+  FillImage(img, 0);
+  EncodeOne(&enc, img, 0);
+
+  // Fill with a low-variance pattern (253/255) that has a large inter residual
+  // against Frame 0 and non-zero AC coefficients so av1_block_yrd evaluates a
+  // large partition in lossless mode without overflowing this_rdc->rate.
+  for (int r = 0; r < 128; ++r) {
+    for (int c = 0; c < 128; ++c) {
+      img->planes[AOM_PLANE_Y][r * img->stride[AOM_PLANE_Y] + c] =
+          ((r ^ c) & 1) ? 255 : 253;
+    }
+  }
+  EncodeOne(&enc, img, 1);
+
+  aom_img_free(img);
+  ASSERT_EQ(aom_codec_destroy(&enc), AOM_CODEC_OK);
+}
+
 }  // namespace
