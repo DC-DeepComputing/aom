@@ -59,6 +59,30 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "0b5e8b4d_02ab502f",
+        "filename": "av1/encoder/pass2_strategy.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1140,
+      "author": {
+        "id": 9101
+      },
+      "writtenOn": "2026-10-06T12:28:09Z",
+      "side": 1,
+      "message": "Acknowledged",
+      "parentUuid": "5dc10795_583ecf50",
+      "range": {
+        "startLine": 1140,
+        "startChar": 9,
+        "endLine": 1140,
+        "endChar": 45
+      },
+      "revId": "902bc63beb8f4a98e0581a82a3edbd1005be2058",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "49e44809_3dc5f890",
@@ -90,6 +114,24 @@
       "side": 1,
       "message": "+1 on this",
       "parentUuid": "49e44809_3dc5f890",
+      "revId": "902bc63beb8f4a98e0581a82a3edbd1005be2058",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "039d8e01_dde29bdd",
+        "filename": "av1/encoder/tpl_model.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1949,
+      "author": {
+        "id": 9101
+      },
+      "writtenOn": "2026-10-06T12:28:09Z",
+      "side": 1,
+      "message": "We have updated the patch as per your suggestions. Please review.",
+      "parentUuid": "6ee4e87e_5aa8098a",
       "revId": "902bc63beb8f4a98e0581a82a3edbd1005be2058",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
