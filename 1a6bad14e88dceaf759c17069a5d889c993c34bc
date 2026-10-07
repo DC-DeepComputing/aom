@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "cf867f4f_9d5f2d17",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 1
+      },
+      "lineNbr": 15,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-07T17:19:27Z",
+      "side": 1,
+      "message": "I am curious why this was onlhy a problem in realtime-only builds.",
+      "revId": "1a6bad14e88dceaf759c17069a5d889c993c34bc",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "8048b407_1d046358",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 1
+      },
+      "lineNbr": 16,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-07T17:19:27Z",
+      "side": 1,
+      "message": "Please add\n\n```\nBug: 568565869\n```\n\nThis will help people who needs to cherry-pick the fix for that bug.",
+      "revId": "1a6bad14e88dceaf759c17069a5d889c993c34bc",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
