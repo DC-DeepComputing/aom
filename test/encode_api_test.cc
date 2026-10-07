@@ -30,9 +30,12 @@
 #include "aom/aom_image.h"
 #include "aom_mem/aom_mem.h"
 
+#if !CONFIG_SHARED
+// Private headers
 #include "av1/common/blockd.h"
 #include "av1/common/reconintra.h"
 #include "av1/encoder/allintra_vis.h"
+#endif  // !CONFIG_SHARED
 #include "test/acm_random.h"
 #include "test/codec_factory.h"
 #include "test/encode_test_driver.h"
