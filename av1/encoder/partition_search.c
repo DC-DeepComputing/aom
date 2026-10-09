@@ -473,8 +473,14 @@ static void encode_superblock(const AV1_COMP *const cpi, TileDataEnc *tile_data,
          !seg_skip && cm->seq_params->bit_depth == AOM_BITS_8)
             ? 1
             : 0;
-    av1_enc_build_inter_predictor(cm, xd, mi_row, mi_col, NULL, bsize,
-                                  start_plane, av1_num_planes(cm) - 1);
+    // A zero MV block of a copied superblock already holds its prediction.
+    const int is_copied =
+        seg_skip && !is_compound && mbmi->ref_frame[0] == x->sb_copied_ref &&
+        mbmi->motion_mode == SIMPLE_TRANSLATION && mbmi->mv[0].as_int == 0;
+    if (!is_copied) {
+      av1_enc_build_inter_predictor(cm, xd, mi_row, mi_col, NULL, bsize,
+                                    start_plane, av1_num_planes(cm) - 1);
+    }
     if (mbmi->motion_mode == OBMC_CAUSAL) {
       assert(cpi->oxcf.motion_mode_cfg.enable_obmc);
       av1_build_obmc_inter_predictors_sb(cm, xd);
