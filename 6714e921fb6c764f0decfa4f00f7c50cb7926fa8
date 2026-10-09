@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "f4fc0065_197f1f68",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5216012
+      },
+      "writtenOn": "2026-10-09T08:45:35Z",
+      "side": 1,
+      "message": "As far as I understand, selective_disable_cdf_rtc() should keep CDF\nupdates on for about 30 frames after a key frame or scene change, and\nafter that selective_cdf_update skips most of them. With aq 3 those 30\nframes are counted with counter_encode_maxq_scene_change, but that\ncounter only moves on frames that apply cyclic refresh. When cyclic\nrefresh stays off, for example with an active map where most blocks\nare inactive, the counter never reaches 30 and CDF updates run on\nevery frame for the whole stream. I don\u0027t think that\u0027s intended, so\nthis change uses frames_since_scene_change when cyclic refresh is off.\nIf the counter is meant to work this way, I\u0027m happy to rework or drop\nthe change.",
+      "revId": "6714e921fb6c764f0decfa4f00f7c50cb7926fa8",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
