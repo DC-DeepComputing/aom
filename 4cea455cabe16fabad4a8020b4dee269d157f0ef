@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "d501ca25_7036fdbb",
+        "filename": "av1/encoder/bitstream.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 3119,
+      "author": {
+        "id": 5190
+      },
+      "writtenOn": "2026-10-09T19:05:31Z",
+      "side": 0,
+      "message": "The change overall looks good to me, just wondering why we constrained it to #spatial_layers\u003d1 when we fixed this for the bitstream a while back. Will take another look on Monday.",
+      "revId": "4cea455cabe16fabad4a8020b4dee269d157f0ef",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
