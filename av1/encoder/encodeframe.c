@@ -1204,6 +1204,106 @@ static inline void grade_source_content_sb(AV1_COMP *cpi, MACROBLOCK *const x,
     av1_source_content_sb(cpi, x, tile_data, mi_row, mi_col);
 }
 
+static uint8_t get_sb_segment_id(const AV1_COMP *cpi, int mi_row, int mi_col) {
+  const AV1_COMMON *const cm = &cpi->common;
+  const struct segmentation *const seg = &cm->seg;
+  const uint8_t *const map =
+      seg->update_map ? cpi->enc_seg.map : cm->last_frame_seg_map;
+  if (!map) return 0;
+  return get_segment_id(&cm->mi_params, map, cm->seq_params->sb_size, mi_row,
+                        mi_col);
+}
+
+// Returns true when skip segment superblocks of this frame may be copied from
+// their reference before they are coded.
+static bool can_copy_skip_sbs(const AV1_COMP *cpi) {
+  const AV1_COMMON *const cm = &cpi->common;
+  return cm->seg.enabled && !frame_is_intra_only(cm) &&
+         cpi->sf.rt_sf.use_nonrd_pick_mode;
+}
+
+// Returns the reference that a superblock in this segment predicts from with
+// a plain copy, or NONE_FRAME when it needs the normal prediction build.
+static MV_REFERENCE_FRAME get_skip_sb_copy_ref(const AV1_COMMON *cm,
+                                               uint8_t segment_id) {
+  const struct segmentation *const seg = &cm->seg;
+  if (!segfeature_active(seg, segment_id, SEG_LVL_SKIP)) return NONE_FRAME;
+
+  // Same reference as av1_nonrd_pick_inter_mode_sb_seg_skip().
+  const MV_REFERENCE_FRAME ref =
+      segfeature_active(seg, segment_id, SEG_LVL_REF_FRAME)
+          ? (MV_REFERENCE_FRAME)get_segdata(seg, segment_id, SEG_LVL_REF_FRAME)
+          : LAST_FRAME;
+  if (ref <= INTRA_FRAME || cm->global_motion[ref].wmtype != IDENTITY)
+    return NONE_FRAME;
+
+  const YV12_BUFFER_CONFIG *const ref_buf = get_ref_frame_yv12_buf(cm, ref);
+  if (!ref_buf || (ref_buf->flags & YV12_FLAG_HIGHBITDEPTH) ||
+      av1_is_scaled(get_ref_scale_factors_const(cm, ref)))
+    return NONE_FRAME;
+  return ref;
+}
+
+// Copies the reference into the superblocks from mi_col_start to mi_col_end
+// of one superblock row, inside the frame area.
+static void copy_sb_span(const AV1_COMMON *cm, MV_REFERENCE_FRAME ref,
+                         int mi_row, int mi_col_start, int mi_col_end) {
+  const YV12_BUFFER_CONFIG *const src = get_ref_frame_yv12_buf(cm, ref);
+  YV12_BUFFER_CONFIG *const dst = &cm->cur_frame->buf;
+  const int mi_row_end =
+      AOMMIN(mi_row + cm->seq_params->mib_size, cm->mi_params.mi_rows);
+  mi_col_end = AOMMIN(mi_col_end, cm->mi_params.mi_cols);
+
+  for (int plane = 0; plane < av1_num_planes(cm); ++plane) {
+    const int is_uv = plane > 0;
+    const int ss_x = is_uv && cm->seq_params->subsampling_x;
+    const int ss_y = is_uv && cm->seq_params->subsampling_y;
+    const int x = (mi_col_start * MI_SIZE) >> ss_x;
+    const int width = ((mi_col_end - mi_col_start) * MI_SIZE) >> ss_x;
+    const int y_start = (mi_row * MI_SIZE) >> ss_y;
+    const int y_end = (mi_row_end * MI_SIZE) >> ss_y;
+    const int src_stride = src->strides[is_uv];
+    const int dst_stride = dst->strides[is_uv];
+    const uint8_t *src_row = src->buffers[plane] + y_start * src_stride + x;
+    uint8_t *dst_row = dst->buffers[plane] + y_start * dst_stride + x;
+    for (int y = y_start; y < y_end; ++y) {
+      memcpy(dst_row, src_row, width);
+      src_row += src_stride;
+      dst_row += dst_stride;
+    }
+  }
+}
+
+// Fills the skip segment superblocks of a row from their reference before the
+// row is coded. Wide row copies are much faster than copying every 64x64 block
+// plane by plane, so encode_superblock() then skips their prediction.
+static void copy_skip_sbs_of_row(const AV1_COMP *cpi, const TileInfo *tile_info,
+                                 int mi_row) {
+  if (!can_copy_skip_sbs(cpi)) return;
+
+  const AV1_COMMON *const cm = &cpi->common;
+  const int mib_size = cm->seq_params->mib_size;
+  int span_start = -1;
+  MV_REFERENCE_FRAME span_ref = NONE_FRAME;
+
+  for (int mi_col = tile_info->mi_col_start;; mi_col += mib_size) {
+    const int in_tile = mi_col < tile_info->mi_col_end;
+    const MV_REFERENCE_FRAME ref =
+        in_tile
+            ? get_skip_sb_copy_ref(cm, get_sb_segment_id(cpi, mi_row, mi_col))
+            : NONE_FRAME;
+    if (span_start >= 0 && ref != span_ref) {
+      copy_sb_span(cm, span_ref, mi_row, span_start, mi_col);
+      span_start = -1;
+    }
+    if (span_start < 0 && ref != NONE_FRAME) {
+      span_start = mi_col;
+      span_ref = ref;
+    }
+    if (!in_tile) break;
+  }
+}
+
 /*!\brief Encode a superblock row by breaking it into superblocks
  *
  * \ingroup partition_search
@@ -1247,6 +1347,7 @@ static inline void encode_sb_row(AV1_COMP *cpi, ThreadData *td,
   }
 
   reset_thresh_freq_fact(x);
+  copy_skip_sbs_of_row(cpi, tile_info, mi_row);
 
   // Code each SB in the row
   for (int mi_col = tile_info->mi_col_start, sb_col_in_tile = 0;
@@ -1318,13 +1419,12 @@ static inline void encode_sb_row(AV1_COMP *cpi, ThreadData *td,
     // Get segment id and skip flag
     const struct segmentation *const seg = &cm->seg;
     int seg_skip = 0;
+    x->sb_copied_ref = NONE_FRAME;
     if (seg->enabled) {
-      const uint8_t *const map =
-          seg->update_map ? cpi->enc_seg.map : cm->last_frame_seg_map;
-      const uint8_t segment_id =
-          map ? get_segment_id(&cm->mi_params, map, sb_size, mi_row, mi_col)
-              : 0;
+      const uint8_t segment_id = get_sb_segment_id(cpi, mi_row, mi_col);
       seg_skip = segfeature_active(seg, segment_id, SEG_LVL_SKIP);
+      if (can_copy_skip_sbs(cpi))
+        x->sb_copied_ref = get_skip_sb_copy_ref(cm, segment_id);
     }
 
     produce_gradients_for_sb(cpi, x, sb_size, mi_row, mi_col);
