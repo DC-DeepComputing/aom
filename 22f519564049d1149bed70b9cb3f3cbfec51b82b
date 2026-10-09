@@ -16,6 +16,41 @@
       "message": "Here is the submission on a separation branch",
       "revId": "22f519564049d1149bed70b9cb3f3cbfec51b82b",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "e25e11dc_1905469d",
+        "filename": "aom/aomcx.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 1672,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-10-09T21:28:58Z",
+      "side": 1,
+      "message": "Make this value explicit.",
+      "fixSuggestions": [
+        {
+          "fixId": "1bf193e3_cd1061aa",
+          "description": "prompt_to_edit API",
+          "replacements": [
+            {
+              "path": "aom/aomcx.h",
+              "range": {
+                "startLine": 1672,
+                "startChar": 0,
+                "endLine": 1673,
+                "endChar": 0
+              },
+              "replacement": "  AOME_SET_CQ_QINDEX \u003d 177,\n"
+            }
+          ]
+        }
+      ],
+      "revId": "22f519564049d1149bed70b9cb3f3cbfec51b82b",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
