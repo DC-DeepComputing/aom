@@ -10,8 +10,11 @@
  */
 
 #include <arm_neon.h>
+#include <assert.h>
 
 #include "aom_dsp/arm/sum_neon.h"
+#include "aom_ports/mem.h"
+#include "av1/encoder/random.h"
 #include "config/aom_config.h"
 #include "config/av1_rtcd.h"
 
@@ -112,5 +115,47 @@ void av1_calc_indices_dim2_neon(const int16_t *data, const int16_t *centroids,
   }
   if (total_dist) {
     *total_dist = horizontal_add_s64x2(sum);
+  }
+}
+
+void av1_calc_centroids_dim1_neon(const int16_t *data, int16_t *centroids,
+                                  const uint8_t *indices, int n, int k) {
+  int count[PALETTE_MAX_SIZE];
+  int sum[PALETTE_MAX_SIZE];
+  const int n16 = n & ~15;
+  assert(n <= 32768);
+
+  for (int j = 0; j < k; ++j) {
+    const uint8x16_t index = vdupq_n_u8(j);
+    int16x8_t count_acc = vdupq_n_s16(0);
+    int32x4_t sum_acc[2] = { vdupq_n_s32(0), vdupq_n_s32(0) };
+    for (int i = 0; i < n16; i += 16) {
+      // All ones in the lanes that belong to centroid j.
+      const uint8x16_t mask = vceqq_u8(vld1q_u8(indices + i), index);
+      const uint8x16x2_t mask16 = vzipq_u8(mask, mask);
+      const int16x8_t d0 = vld1q_s16(data + i);
+      const int16x8_t d1 = vld1q_s16(data + i + 8);
+      count_acc = vpadalq_s8(count_acc, vreinterpretq_s8_u8(mask));
+      sum_acc[0] = vpadalq_s16(
+          sum_acc[0], vandq_s16(d0, vreinterpretq_s16_u8(mask16.val[0])));
+      sum_acc[1] = vpadalq_s16(
+          sum_acc[1], vandq_s16(d1, vreinterpretq_s16_u8(mask16.val[1])));
+    }
+    count[j] = -horizontal_add_s16x8(count_acc);
+    sum[j] = horizontal_add_s32x4(vaddq_s32(sum_acc[0], sum_acc[1]));
+  }
+
+  for (int i = n16; i < n; ++i) {
+    ++count[indices[i]];
+    sum[indices[i]] += data[i];
+  }
+
+  unsigned int rand_state = (unsigned int)data[0];
+  for (int j = 0; j < k; ++j) {
+    if (count[j] == 0) {
+      centroids[j] = data[lcg_rand16(&rand_state) % n];
+    } else {
+      centroids[j] = DIVIDE_AND_ROUND(sum[j], count[j]);
+    }
   }
 }
