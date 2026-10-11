@@ -12,6 +12,8 @@
 #ifndef AOM_AV1_ENCODER_ENCODEFRAME_H_
 #define AOM_AV1_ENCODER_ENCODEFRAME_H_
 
+#include <stdbool.h>
+
 #include "aom/aom_integer.h"
 #include "av1/common/blockd.h"
 #include "av1/common/enums.h"
@@ -48,6 +50,10 @@ void av1_encode_tile(struct AV1_COMP *cpi, struct ThreadData *td, int tile_row,
                      int tile_col);
 void av1_encode_sb_row(struct AV1_COMP *cpi, struct ThreadData *td,
                        int tile_row, int tile_col, int mi_row);
+
+// Builds the intrabc hash table with the given index, for the area of its
+// tile. Returns false if it runs out of memory.
+bool av1_build_intrabc_hash_table(struct AV1_COMP *cpi, int table_idx);
 #ifdef __cplusplus
 }  // extern "C"
 #endif
