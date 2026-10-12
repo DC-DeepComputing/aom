@@ -814,6 +814,7 @@ static void set_good_speed_feature_framesize_dependent(
   }
 
   if (speed >= 2) {
+    sf->inter_sf.skip_newmv_in_drl = boosted ? 1 : !is_720p_or_larger ? 2 : 3;
     sf->part_sf.ml_4_partition_search_level_index = 2;
     if (is_720p_or_larger) {
       sf->part_sf.use_square_partition_only_threshold = BLOCK_64X64;
@@ -887,7 +888,7 @@ static void set_good_speed_feature_framesize_dependent(
 
   if (speed >= 3) {
     sf->inter_sf.enable_fast_wedge_mask_search = 1;
-    sf->inter_sf.skip_newmv_in_drl = 2;
+    sf->inter_sf.skip_newmv_in_drl = 4;
     sf->inter_sf.skip_ext_comp_nearmv_mode = 1;
     sf->inter_sf.limit_inter_mode_cands = is_lf_frame ? 3 : 0;
     sf->inter_sf.disable_interinter_wedge_newmv_search = boosted ? 0 : 1;
@@ -968,7 +969,7 @@ static void set_good_speed_feature_framesize_dependent(
     sf->inter_sf.disable_interinter_wedge_var_thresh = UINT_MAX;
     sf->inter_sf.prune_obmc_prob_thresh = INT_MAX;
     sf->inter_sf.limit_txfm_eval_per_mode = boosted ? 0 : 2;
-    if (is_480p_or_lesser) sf->inter_sf.skip_newmv_in_drl = 3;
+    if (is_480p_or_lesser) sf->inter_sf.skip_newmv_in_drl = 5;
 
     if (is_720p_or_larger) {
       sf->inter_sf.prune_comp_ref_frames = 2;
@@ -994,7 +995,7 @@ static void set_good_speed_feature_framesize_dependent(
     }
     if (is_720p_or_larger) sf->hl_sf.recode_tolerance = 40;
 
-    sf->inter_sf.skip_newmv_in_drl = 4;
+    sf->inter_sf.skip_newmv_in_drl = 6;
     sf->inter_sf.prune_comp_ref_frames = 2;
     sf->mv_sf.skip_fullpel_search_using_startmv_refmv = boosted ? 0 : 1;
 
@@ -1998,7 +1999,7 @@ static void set_rt_speed_features_framesize_independent(AV1_COMP *cpi,
   sf->inter_sf.prune_inter_modes_if_skippable = 1;
   sf->inter_sf.prune_nearmv_using_neighbors = PRUNE_NEARMV_LEVEL3;
   sf->inter_sf.reduce_inter_modes = boosted ? 1 : 3;
-  sf->inter_sf.skip_newmv_in_drl = 4;
+  sf->inter_sf.skip_newmv_in_drl = 6;
 
   sf->interp_sf.use_fast_interpolation_filter_search = 1;
   sf->interp_sf.use_interp_filter = 1;
@@ -2645,8 +2646,8 @@ static inline void init_rt_sf(REAL_TIME_SPEED_FEATURES *rt_sf) {
   rt_sf->skip_newmv_mode_sad_screen = 0;
 }
 
-static fractional_mv_step_fp *const
-    fractional_mv_search[SUBPEL_SEARCH_METHODS] = {
+static fractional_mv_step_fp
+    *const fractional_mv_search[SUBPEL_SEARCH_METHODS] = {
       av1_find_best_sub_pixel_tree,             // SUBPEL_TREE = 0
       av1_find_best_sub_pixel_tree_pruned,      // SUBPEL_TREE_PRUNED = 1
       av1_find_best_sub_pixel_tree_pruned_more  // SUBPEL_TREE_PRUNED_MORE = 2
