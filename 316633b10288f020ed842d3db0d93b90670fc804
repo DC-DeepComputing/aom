@@ -52,6 +52,23 @@
       "parentUuid": "4a056394_21796804",
       "revId": "316633b10288f020ed842d3db0d93b90670fc804",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "c7504212_2d540be8",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-13T23:20:17Z",
+      "side": 1,
+      "message": "I see a fix has been submitted. Removed approval.",
+      "revId": "316633b10288f020ed842d3db0d93b90670fc804",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
