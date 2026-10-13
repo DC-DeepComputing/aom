@@ -16,6 +16,24 @@
       "message": "Hi Jerome, the bug is in the unit test, not the encoder change. The fix itself it correct. I checked the failing builds, it forces the FORCE_HIGHBITDEPTH_DECODING\u003d1, so the decoder returns 16-bit images for an 8-bit stream. The encoder recon from AV1_GET_NEW_FRAME_IMAGE stays 8-bit, and MD5::Add() hashes 2 bytes per sample for high bitdepth images, so the hashes can never match.\n\nI can create a fix, init the test decoder with allow_lowbitdepth \u003d 1, like encode_test_driver.cc does.\n\nInstead of reverting, could I send a small follow-up that fixes only the test? I can upload it today.",
       "revId": "316633b10288f020ed842d3db0d93b90670fc804",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "4a056394_21796804",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-10-13T14:43:06Z",
+      "side": 1,
+      "message": "Hi Ihor, yes you can send a follow-up email. I will hold onto this revert for now. Please do so before end of day. Thanks!",
+      "parentUuid": "e3f04f19_9174af56",
+      "revId": "316633b10288f020ed842d3db0d93b90670fc804",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
