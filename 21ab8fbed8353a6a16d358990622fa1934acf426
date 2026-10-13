@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "f89dcef0_e216c88a",
+        "filename": "av1/encoder/encodeframe.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 1428,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-10-13T17:11:18Z",
+      "side": 1,
+      "message": "When segmentation is enabled for cyclic refresh (aq-mode\u003d3) without active maps, or on active SBs when active maps are used, `seg_skip` is 0, yet `can_copy_skip_sbs(cpi)` still iterates over all `MAX_SEGMENTS` (8) for every SB in the frame. Since `seg_skip` is already computed on the line above, gating with `seg_skip` avoids both `can_copy_skip_sbs` and `get_skip_sb_copy_ref` on non-skip SBs:\n  \n```\n    if (seg-\u003eenabled) {\n      const uint8_t segment_id \u003d get_sb_segment_id(cpi, mi_row, mi_col);\n      seg_skip \u003d segfeature_active(seg, segment_id, SEG_LVL_SKIP);\n      if (seg_skip \u0026\u0026 !frame_is_intra_only(cm) \u0026\u0026 use_nonrd_mode)\n        x-\u003esb_copied_ref \u003d get_skip_sb_copy_ref(cm, segment_id);\n    }                                                                                      \n```",
+      "range": {
+        "startLine": 1428,
+        "startChar": 10,
+        "endLine": 1428,
+        "endChar": 27
+      },
+      "revId": "21ab8fbed8353a6a16d358990622fa1934acf426",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
