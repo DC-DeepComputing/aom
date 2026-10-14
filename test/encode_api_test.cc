@@ -4693,4 +4693,50 @@ TEST(EncodeAPI, Avg16x16IntegerOverflow) {
 }
 #endif  // CONFIG_AV1_HIGHBITDEPTH
 
+TEST(EncodeAPI, ConfigSetAllKeyFramesAndLargerSize) {
+  // Growing the frame size reallocates the compressor data and frees the
+  // motion vector costs and the simple-motion-search tree; reconfiguring to all
+  // key frames (kf_max_dist 0) means the costs are not reallocated. A later
+  // frame, on the main thread and on worker threads, must not use the freed
+  // buffers.
+  for (const unsigned int threads : { 1u, 4u }) {
+    SCOPED_TRACE(threads);
+    aom_codec_iface_t *iface = aom_codec_av1_cx();
+    aom_codec_enc_cfg_t cfg;
+    ASSERT_EQ(aom_codec_enc_config_default(iface, &cfg, AOM_USAGE_GOOD_QUALITY),
+              AOM_CODEC_OK);
+    cfg.g_w = 16;
+    cfg.g_h = 16;
+    cfg.g_lag_in_frames = 0;
+    cfg.g_threads = threads;
+    aom_codec_ctx_t enc;
+    ASSERT_EQ(aom_codec_enc_init(&enc, iface, &cfg, 0), AOM_CODEC_OK);
+    ASSERT_EQ(aom_codec_control(&enc, AOME_SET_CPUUSED, 6), AOM_CODEC_OK);
+    ASSERT_EQ(aom_codec_control(&enc, AV1E_SET_ROW_MT, 1), AOM_CODEC_OK);
+    ASSERT_EQ(aom_codec_control(&enc, AV1E_SET_TILE_COLUMNS, 1), AOM_CODEC_OK);
+
+    aom_image_t *img =
+        aom_img_alloc(nullptr, AOM_IMG_FMT_I420, cfg.g_w, cfg.g_h, 1);
+    ASSERT_NE(img, nullptr);
+    FillImageRandom(img);
+    ASSERT_EQ(aom_codec_encode(&enc, img, 0, 1, 0), AOM_CODEC_OK)
+        << aom_codec_error_detail(&enc);
+    aom_img_free(img);
+
+    cfg.g_w = 320;
+    cfg.g_h = 240;
+    cfg.kf_max_dist = 0;
+    ASSERT_EQ(aom_codec_enc_config_set(&enc, &cfg), AOM_CODEC_OK)
+        << aom_codec_error_detail(&enc);
+    img = aom_img_alloc(nullptr, AOM_IMG_FMT_I420, cfg.g_w, cfg.g_h, 1);
+    ASSERT_NE(img, nullptr);
+    FillImageRandom(img);
+    // Without a forced maximum frame size the larger frame exceeds the
+    // sequence header's maximum and is rejected, after it has been prepared.
+    EXPECT_EQ(aom_codec_encode(&enc, img, 1, 1, 0), AOM_CODEC_UNSUP_BITSTREAM);
+    aom_img_free(img);
+    ASSERT_EQ(aom_codec_destroy(&enc), AOM_CODEC_OK);
+  }
+}
+
 }  // namespace
