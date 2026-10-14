@@ -3149,6 +3149,37 @@ TEST(EncodeAPI, Buganizer504317456) {
   aom_img_free(img);
   ASSERT_EQ(aom_codec_destroy(&enc), AOM_CODEC_OK);
 }
+
+// A lag larger than the key frame interval sizes the LAP stats buffer from
+// the key frame interval, so the stats window wraps while the lookahead is
+// still filling. The window must stay valid across the wrap.
+TEST(EncodeAPI, LapStatsBufferWrapShortKeyFrameInterval) {
+  aom_codec_iface_t *iface = aom_codec_av1_cx();
+  aom_codec_enc_cfg_t cfg;
+  ASSERT_EQ(aom_codec_enc_config_default(iface, &cfg, AOM_USAGE_GOOD_QUALITY),
+            AOM_CODEC_OK);
+  cfg.g_w = 96;
+  cfg.g_h = 64;
+  cfg.g_lag_in_frames = 48;
+  cfg.kf_min_dist = 0;
+  cfg.kf_max_dist = 1;
+  cfg.g_threads = 1;
+
+  aom_codec_ctx_t enc;
+  ASSERT_EQ(aom_codec_enc_init(&enc, iface, &cfg, 0), AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&enc, AOME_SET_CPUUSED, 6), AOM_CODEC_OK);
+
+  aom_image_t *img =
+      aom_img_alloc(nullptr, AOM_IMG_FMT_I420, cfg.g_w, cfg.g_h, 1);
+  ASSERT_NE(img, nullptr);
+  for (int i = 0; i < 80; ++i) {
+    FillImage(img, static_cast<uint8_t>(i * 3));
+    ASSERT_EQ(aom_codec_encode(&enc, img, i, 1, 0), AOM_CODEC_OK);
+  }
+  ASSERT_EQ(aom_codec_encode(&enc, nullptr, 0, 0, 0), AOM_CODEC_OK);
+  aom_img_free(img);
+  ASSERT_EQ(aom_codec_destroy(&enc), AOM_CODEC_OK);
+}
 #endif  // !CONFIG_REALTIME_ONLY
 
 // Test for issue: 505976409.
