@@ -1949,24 +1949,19 @@ int av1_copy_reference_enc(AV1_COMP *cpi, int idx, YV12_BUFFER_CONFIG *sd) {
   AV1_COMMON *const cm = &cpi->common;
   const int num_planes = av1_num_planes(cm);
   YV12_BUFFER_CONFIG *cfg = get_ref_frame(cm, idx);
-  if (cfg) {
-    aom_yv12_copy_frame(cfg, sd, num_planes);
-    return 0;
-  } else {
-    return -1;
-  }
+  if (cfg == NULL || !aom_yv12_same_size_and_format(cfg, sd)) return -1;
+  // sd is the caller's image, which has no border to extend.
+  aom_yv12_copy_frame_planes(cfg, sd, num_planes);
+  return 0;
 }
 
 int av1_set_reference_enc(AV1_COMP *cpi, int idx, YV12_BUFFER_CONFIG *sd) {
   AV1_COMMON *const cm = &cpi->common;
   const int num_planes = av1_num_planes(cm);
   YV12_BUFFER_CONFIG *cfg = get_ref_frame(cm, idx);
-  if (cfg) {
-    aom_yv12_copy_frame(sd, cfg, num_planes);
-    return 0;
-  } else {
-    return -1;
-  }
+  if (cfg == NULL || !aom_yv12_same_size_and_format(cfg, sd)) return -1;
+  aom_yv12_copy_frame(sd, cfg, num_planes);
+  return 0;
 }
 
 #ifdef OUTPUT_YUV_REC

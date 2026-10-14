@@ -3906,7 +3906,8 @@ static aom_codec_err_t ctrl_set_reference(aom_codec_alg_priv_t *ctx,
     YV12_BUFFER_CONFIG sd;
 
     image2yuvconfig(&frame->img, &sd);
-    av1_set_reference_enc(ctx->ppi->cpi, frame->idx, &sd);
+    if (av1_set_reference_enc(ctx->ppi->cpi, frame->idx, &sd) != 0)
+      return AOM_CODEC_ERROR;
     return AOM_CODEC_OK;
   } else {
     return AOM_CODEC_INVALID_PARAM;
@@ -3923,7 +3924,8 @@ static aom_codec_err_t ctrl_copy_reference(aom_codec_alg_priv_t *ctx,
     YV12_BUFFER_CONFIG sd;
 
     image2yuvconfig(&frame->img, &sd);
-    av1_copy_reference_enc(ctx->ppi->cpi, frame->idx, &sd);
+    if (av1_copy_reference_enc(ctx->ppi->cpi, frame->idx, &sd) != 0)
+      return AOM_CODEC_ERROR;
     return AOM_CODEC_OK;
   } else {
     return AOM_CODEC_INVALID_PARAM;

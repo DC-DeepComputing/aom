@@ -194,11 +194,12 @@ static void memcpy_short_addr(uint8_t *dst8, const uint8_t *src8, int num) {
 }
 #endif
 
-// Copies the source image into the destination image and updates the
-// destination's UMV borders.
+// Copies the planes of the source image into the destination image, without
+// touching the destination's borders.
 // Note: The frames are assumed to be identical in size.
-void aom_yv12_copy_frame_c(const YV12_BUFFER_CONFIG *src_bc,
-                           YV12_BUFFER_CONFIG *dst_bc, const int num_planes) {
+void aom_yv12_copy_frame_planes_c(const YV12_BUFFER_CONFIG *src_bc,
+                                  YV12_BUFFER_CONFIG *dst_bc,
+                                  const int num_planes) {
   assert(src_bc->y_width == dst_bc->y_width);
   assert(src_bc->y_height == dst_bc->y_height);
 
@@ -218,7 +219,6 @@ void aom_yv12_copy_frame_c(const YV12_BUFFER_CONFIG *src_bc,
         plane_dst += dst_bc->strides[is_uv];
       }
     }
-    aom_extend_frame_borders_c(dst_bc, num_planes);
     return;
   }
 #endif
@@ -233,6 +233,15 @@ void aom_yv12_copy_frame_c(const YV12_BUFFER_CONFIG *src_bc,
       plane_dst += dst_bc->strides[is_uv];
     }
   }
+}
+
+// Copies the source image into the destination image and updates the
+// destination's UMV borders. The destination must be a frame buffer with a
+// border of dst_bc->border pixels around each plane.
+// Note: The frames are assumed to be identical in size.
+void aom_yv12_copy_frame_c(const YV12_BUFFER_CONFIG *src_bc,
+                           YV12_BUFFER_CONFIG *dst_bc, const int num_planes) {
+  aom_yv12_copy_frame_planes_c(src_bc, dst_bc, num_planes);
   aom_extend_frame_borders_c(dst_bc, num_planes);
 }
 
