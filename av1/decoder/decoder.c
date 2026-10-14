@@ -255,12 +255,6 @@ void av1_visit_palette(AV1Decoder *const pbi, MACROBLOCKD *const xd,
   }
 }
 
-static int equal_dimensions(const YV12_BUFFER_CONFIG *a,
-                            const YV12_BUFFER_CONFIG *b) {
-  return a->y_height == b->y_height && a->y_width == b->y_width &&
-         a->uv_height == b->uv_height && a->uv_width == b->uv_width;
-}
-
 aom_codec_err_t av1_copy_reference_dec(AV1Decoder *pbi, int idx,
                                        YV12_BUFFER_CONFIG *sd) {
   AV1_COMMON *cm = &pbi->common;
@@ -271,12 +265,13 @@ aom_codec_err_t av1_copy_reference_dec(AV1Decoder *pbi, int idx,
     aom_set_error(&pbi->error, AOM_CODEC_ERROR, "No reference frame");
     return pbi->error.error_code;
   }
-  if (!equal_dimensions(cfg, sd)) {
+  if (!aom_yv12_same_size_and_format(cfg, sd)) {
     aom_set_error(&pbi->error, AOM_CODEC_ERROR, "Incorrect buffer dimensions");
     return pbi->error.error_code;
   }
 
-  aom_yv12_copy_frame(cfg, sd, num_planes);
+  // sd is the caller's image, which has no border to extend.
+  aom_yv12_copy_frame_planes(cfg, sd, num_planes);
 
   return AOM_CODEC_OK;
 }
@@ -305,7 +300,7 @@ aom_codec_err_t av1_set_reference_dec(AV1_COMMON *cm, int idx,
   }
 
   if (!use_external_ref) {
-    if (!equal_dimensions(ref_buf, sd)) {
+    if (!aom_yv12_same_size_and_format(ref_buf, sd)) {
       aom_internal_error(cm->error, AOM_CODEC_ERROR,
                          "Incorrect buffer dimensions");
     }

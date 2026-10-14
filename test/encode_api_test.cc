@@ -3151,6 +3151,148 @@ TEST(EncodeAPI, Buganizer504317456) {
 }
 #endif  // !CONFIG_REALTIME_ONLY
 
+// With internal resizing the reference frames are smaller than the configured
+// frame size, so a configured-size image does not match them and must be
+// rejected by AV1_SET_REFERENCE and AV1_COPY_REFERENCE.
+TEST(EncodeAPI, SetReferenceRejectsMismatchedSize) {
+  aom_codec_iface_t *iface = aom_codec_av1_cx();
+  aom_codec_enc_cfg_t cfg;
+  ASSERT_EQ(aom_codec_enc_config_default(iface, &cfg, AOM_USAGE_REALTIME),
+            AOM_CODEC_OK);
+  cfg.g_w = 1280;
+  cfg.g_h = 720;
+  cfg.g_lag_in_frames = 0;
+  cfg.rc_resize_mode = 1;  // RESIZE_FIXED
+  cfg.rc_resize_denominator = 16;
+  cfg.rc_resize_kf_denominator = 16;
+  aom_codec_ctx_t enc;
+  ASSERT_EQ(aom_codec_enc_init(&enc, iface, &cfg, 0), AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&enc, AOME_SET_CPUUSED, 10), AOM_CODEC_OK);
+
+  aom_image_t *img =
+      aom_img_alloc(nullptr, AOM_IMG_FMT_I420, cfg.g_w, cfg.g_h, 1);
+  ASSERT_NE(img, nullptr);
+  FillImage(img, 128);
+  ASSERT_EQ(aom_codec_encode(&enc, img, 0, 1, 0), AOM_CODEC_OK);
+  aom_codec_iter_t iter = nullptr;
+  while (aom_codec_get_cx_data(&enc, &iter) != nullptr) {
+  }
+
+  av1_ref_frame_t ref;
+  ref.idx = 0;
+  ref.use_external_ref = 0;
+  ref.img = *img;
+  EXPECT_EQ(aom_codec_control(&enc, AV1_SET_REFERENCE, &ref),
+            AOM_CODEC_ERROR);
+  EXPECT_EQ(aom_codec_control(&enc, AV1_COPY_REFERENCE, &ref),
+            AOM_CODEC_ERROR);
+
+  aom_img_free(img);
+  ASSERT_EQ(aom_codec_destroy(&enc), AOM_CODEC_OK);
+}
+
+// AV1_COPY_REFERENCE copies into the caller's image, which has no border
+// around its planes even when its stride is larger than its width.
+TEST(EncodeAPI, CopyReferenceToImageWithWideStride) {
+  aom_codec_iface_t *iface = aom_codec_av1_cx();
+  aom_codec_enc_cfg_t cfg;
+  ASSERT_EQ(aom_codec_enc_config_default(iface, &cfg, AOM_USAGE_REALTIME),
+            AOM_CODEC_OK);
+  cfg.g_w = 1288;
+  cfg.g_h = 720;
+  cfg.g_lag_in_frames = 0;
+  aom_codec_ctx_t enc;
+  ASSERT_EQ(aom_codec_enc_init(&enc, iface, &cfg, 0), AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&enc, AOME_SET_CPUUSED, 10), AOM_CODEC_OK);
+
+  // A stride alignment of 64 gives a stride of 1344 for a width of 1288.
+  aom_image_t *img =
+      aom_img_alloc(nullptr, AOM_IMG_FMT_I420, cfg.g_w, cfg.g_h, 64);
+  ASSERT_NE(img, nullptr);
+  FillImage(img, 128);
+  ASSERT_EQ(aom_codec_encode(&enc, img, 0, 1, 0), AOM_CODEC_OK);
+  aom_codec_iter_t iter = nullptr;
+  while (aom_codec_get_cx_data(&enc, &iter) != nullptr) {
+  }
+
+  av1_ref_frame_t ref;
+  ref.idx = 0;
+  ref.use_external_ref = 0;
+  ref.img = *img;
+  EXPECT_EQ(aom_codec_control(&enc, AV1_COPY_REFERENCE, &ref), AOM_CODEC_OK);
+
+  aom_img_free(img);
+  ASSERT_EQ(aom_codec_destroy(&enc), AOM_CODEC_OK);
+}
+
+#if CONFIG_AV1_DECODER && CONFIG_AV1_HIGHBITDEPTH
+// The bit depth of the decoder's reference frames comes from the stream, so
+// AV1_COPY_REFERENCE and AV1_SET_REFERENCE must reject an 8-bit image when the
+// stream is 10-bit.
+TEST(EncodeAPI, DecoderCopyReferenceRejectsBitDepthMismatch) {
+  constexpr int kWidth = 320;
+  constexpr int kHeight = 192;
+  aom_codec_iface_t *iface = aom_codec_av1_cx();
+  aom_codec_enc_cfg_t cfg;
+  ASSERT_EQ(aom_codec_enc_config_default(iface, &cfg, AOM_USAGE_REALTIME),
+            AOM_CODEC_OK);
+  cfg.g_w = kWidth;
+  cfg.g_h = kHeight;
+  cfg.g_lag_in_frames = 0;
+  cfg.g_bit_depth = AOM_BITS_10;
+  cfg.g_input_bit_depth = 10;
+  aom_codec_ctx_t enc;
+  ASSERT_EQ(aom_codec_enc_init(&enc, iface, &cfg, AOM_CODEC_USE_HIGHBITDEPTH),
+            AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&enc, AOME_SET_CPUUSED, 10), AOM_CODEC_OK);
+
+  aom_image_t *img16 =
+      aom_img_alloc(nullptr, AOM_IMG_FMT_I42016, kWidth, kHeight, 32);
+  ASSERT_NE(img16, nullptr);
+  for (int p = 0; p < 3; ++p) {
+    const int h = p == 0 ? kHeight : kHeight / 2;
+    const int w = p == 0 ? kWidth : kWidth / 2;
+    for (int r = 0; r < h; ++r) {
+      uint16_t *row =
+          reinterpret_cast<uint16_t *>(img16->planes[p] + r * img16->stride[p]);
+      for (int c = 0; c < w; ++c) row[c] = 512;
+    }
+  }
+  ASSERT_EQ(aom_codec_encode(&enc, img16, 0, 1, 0), AOM_CODEC_OK);
+
+  aom_codec_ctx_t dec;
+  ASSERT_EQ(aom_codec_dec_init(&dec, aom_codec_av1_dx(), nullptr, 0),
+            AOM_CODEC_OK);
+  aom_codec_iter_t iter = nullptr;
+  while (const aom_codec_cx_pkt_t *pkt = aom_codec_get_cx_data(&enc, &iter)) {
+    if (pkt->kind != AOM_CODEC_CX_FRAME_PKT) continue;
+    ASSERT_EQ(
+        aom_codec_decode(&dec, static_cast<const uint8_t *>(pkt->data.frame.buf),
+                         pkt->data.frame.sz, nullptr),
+        AOM_CODEC_OK);
+  }
+  aom_codec_iter_t dec_iter = nullptr;
+  ASSERT_NE(aom_codec_get_frame(&dec, &dec_iter), nullptr);
+
+  aom_image_t *img8 =
+      aom_img_alloc(nullptr, AOM_IMG_FMT_I420, kWidth, kHeight, 32);
+  ASSERT_NE(img8, nullptr);
+  av1_ref_frame_t ref;
+  ref.idx = 0;
+  ref.use_external_ref = 0;
+  ref.img = *img8;
+  EXPECT_EQ(aom_codec_control(&dec, AV1_COPY_REFERENCE, &ref),
+            AOM_CODEC_ERROR);
+  EXPECT_EQ(aom_codec_control(&dec, AV1_SET_REFERENCE, &ref),
+            AOM_CODEC_ERROR);
+
+  aom_img_free(img8);
+  aom_img_free(img16);
+  ASSERT_EQ(aom_codec_destroy(&dec), AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_destroy(&enc), AOM_CODEC_OK);
+}
+#endif  // CONFIG_AV1_DECODER && CONFIG_AV1_HIGHBITDEPTH
+
 // Test for issue: 505976409.
 TEST(EncodeAPI, SvcSourceLastTL0Uninitialized) {
   aom_codec_iface_t *iface = aom_codec_av1_cx();

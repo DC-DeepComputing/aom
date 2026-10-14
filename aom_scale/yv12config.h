@@ -216,6 +216,20 @@ static inline int aom_calc_y_stride(int aligned_width, int border) {
   return ((aligned_width + 2 * border) + 31) & ~31;
 }
 
+/*!\brief Checks that two frames can be copied into each other.
+ *
+ * Returns 1 if the frames have the same plane sizes and sample format, so
+ * that aom_yv12_copy_frame() or aom_yv12_copy_frame_planes() can copy one into
+ * the other.
+ */
+static inline int aom_yv12_same_size_and_format(
+    const YV12_BUFFER_CONFIG *a, const YV12_BUFFER_CONFIG *b) {
+  return a->y_width == b->y_width && a->y_height == b->y_height &&
+         a->uv_width == b->uv_width && a->uv_height == b->uv_height &&
+         (a->flags & YV12_FLAG_HIGHBITDEPTH) ==
+             (b->flags & YV12_FLAG_HIGHBITDEPTH);
+}
+
 #ifdef __cplusplus
 }
 #endif
