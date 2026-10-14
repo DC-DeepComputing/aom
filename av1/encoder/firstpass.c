@@ -11,6 +11,7 @@
 
 #include <limits.h>
 #include <math.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -901,6 +902,32 @@ static void normalize_firstpass_stats(FIRSTPASS_STATS *fps,
   fps->new_mv_count /= num_mbs_16x16;
 }
 
+// In LAP mode the LAP stage compressor appends stats to the buffer and the
+// encode stage compressors read them through twopass_frame.stats_in. Drops
+// the stats before the oldest read position (but one, which is read as
+// stats_in[-1]) and moves the read positions with them.
+static void compact_lap_stats(AV1_PRIMARY *ppi) {
+  STATS_BUFFER_CTX *const ctx = ppi->twopass.stats_buf_ctx;
+  const FIRSTPASS_STATS *oldest = ctx->stats_in_end;
+  for (int i = 0; i < ppi->num_fp_contexts; i++) {
+    const FIRSTPASS_STATS *stats_in =
+        ppi->parallel_cpi[i]->twopass_frame.stats_in;
+    if (stats_in != NULL && stats_in < oldest) oldest = stats_in;
+  }
+  if (oldest > ctx->stats_in_start) --oldest;
+  const ptrdiff_t shift = oldest - ctx->stats_in_start;
+  if (shift <= 0) return;
+  memmove(ctx->stats_in_start, oldest,
+          (ctx->stats_in_end - oldest) * sizeof(*oldest));
+  ctx->stats_in_end -= shift;
+  for (int i = 0; i < ppi->num_fp_contexts; i++) {
+    AV1_COMP *const cpi = ppi->parallel_cpi[i];
+    if (cpi->twopass_frame.stats_in != NULL) {
+      cpi->twopass_frame.stats_in -= shift;
+    }
+  }
+}
+
 // Updates the first pass stats of this frame.
 // Input:
 //   cpi: the encoder setting. Only a few params in it will be used.
@@ -915,15 +942,25 @@ static void normalize_firstpass_stats(FIRSTPASS_STATS *fps,
 //   twopass->stats_buf_ctx->stats_in_end: the pointer to the current stats,
 //                                         update its value and its position
 //                                         in the buffer.
-static void update_firstpass_stats(AV1_COMP *cpi,
-                                   const FRAME_STATS *const stats,
-                                   const double raw_err_stdev,
-                                   const int frame_number,
-                                   const int64_t ts_duration,
-                                   const BLOCK_SIZE fp_block_size) {
+// Returns the stats written for this frame.
+static const FIRSTPASS_STATS *update_firstpass_stats(
+    AV1_COMP *cpi, const FRAME_STATS *const stats, const double raw_err_stdev,
+    const int frame_number, const int64_t ts_duration,
+    const BLOCK_SIZE fp_block_size) {
   TWO_PASS *twopass = &cpi->ppi->twopass;
   AV1_COMMON *const cm = &cpi->common;
   const CommonModeInfoParams *const mi_params = &cm->mi_params;
+  // When ducky encode is on, we always use linear buffer for stats_buf_ctx.
+  if (cpi->use_ducky_encode == 0 && cpi->ppi->lap_enabled &&
+      twopass->stats_buf_ctx->stats_in_end >=
+          twopass->stats_buf_ctx->stats_in_buf_end) {
+    compact_lap_stats(cpi->ppi);
+  }
+  if (twopass->stats_buf_ctx->stats_in_end >=
+      twopass->stats_buf_ctx->stats_in_buf_end) {
+    aom_internal_error(cm->error, AOM_CODEC_ERROR,
+                       "First pass stats buffer is full");
+  }
   FIRSTPASS_STATS *this_frame_stats = twopass->stats_buf_ctx->stats_in_end;
   FIRSTPASS_STATS fps;
   // The minimum error here insures some bit allocation to frames even
@@ -1015,21 +1052,9 @@ static void update_firstpass_stats(AV1_COMP *cpi,
          twopass->stats_buf_ctx->stats_in_buf_end)) {
       twopass->stats_buf_ctx->stats_in_end =
           twopass->stats_buf_ctx->stats_in_start;
-    } else if (cpi->ppi->lap_enabled &&
-               (twopass->stats_buf_ctx->stats_in_end >=
-                twopass->stats_buf_ctx->stats_in_buf_end)) {
-      const int num_valid = (int)(twopass->stats_buf_ctx->stats_in_end -
-                                  cpi->twopass_frame.stats_in);
-      if (num_valid > 0) {
-        memmove(twopass->stats_buf_ctx->stats_in_start,
-                cpi->twopass_frame.stats_in,
-                num_valid * sizeof(FIRSTPASS_STATS));
-      }
-      cpi->twopass_frame.stats_in = twopass->stats_buf_ctx->stats_in_start;
-      twopass->stats_buf_ctx->stats_in_end =
-          twopass->stats_buf_ctx->stats_in_start + num_valid;
     }
   }
+  return this_frame_stats;
 }
 
 static void print_reconstruction_frame(
@@ -1497,10 +1522,10 @@ void av1_first_pass(AV1_COMP *cpi, const int64_t ts_duration) {
   const int num_mbs = get_num_mbs(fp_block_size, num_mbs_16X16);
   stats.intra_factor = stats.intra_factor / (double)num_mbs;
   stats.brightness_factor = stats.brightness_factor / (double)num_mbs;
-  FIRSTPASS_STATS *this_frame_stats = twopass->stats_buf_ctx->stats_in_end;
-  update_firstpass_stats(cpi, &stats, raw_err_stdev,
-                         current_frame->frame_number, ts_duration,
-                         fp_block_size);
+  const FIRSTPASS_STATS *this_frame_stats =
+      update_firstpass_stats(cpi, &stats, raw_err_stdev,
+                             current_frame->frame_number, ts_duration,
+                             fp_block_size);
 
   if (this_frame_stats->pcnt_inter < 0.2 && last2_frame != NULL) {
     assign_frame_buffer_p(
