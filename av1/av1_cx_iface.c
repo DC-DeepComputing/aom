@@ -3287,7 +3287,10 @@ static aom_codec_frame_flags_t get_frame_pkt_flags(const AV1_COMP *cpi,
 }
 
 static inline int get_src_border_in_pixels(AV1_COMP *cpi, BLOCK_SIZE sb_size) {
-  if (cpi->oxcf.mode != REALTIME || av1_is_resize_needed(&cpi->oxcf))
+  // With lag_in_frames > 0 the temporal filter runs motion search on the
+  // lookahead frames, which needs the full encoder border.
+  if (cpi->oxcf.mode != REALTIME || cpi->oxcf.gf_cfg.lag_in_frames > 0 ||
+      av1_is_resize_needed(&cpi->oxcf))
     return cpi->oxcf.border_in_pixels;
 
   const int sb_size_in_pixels_log2 = mi_size_wide_log2[sb_size] + MI_SIZE_LOG2;
