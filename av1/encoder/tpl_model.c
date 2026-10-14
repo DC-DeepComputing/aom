@@ -307,11 +307,11 @@ static uint32_t motion_estimation(AV1_COMP *cpi, MACROBLOCK *x,
   step_param = tpl_sf->reduce_first_step_size;
   step_param = AOMMIN(step_param, MAX_MVSEARCH_STEPS - 2);
 
+  // The reference may be a reconstructed frame whose stride matches neither
+  // the source nor the lookahead buffers, e.g. after the frame border size
+  // changed mid-stream.
   const search_site_config *search_site_cfg =
-      cpi->mv_search_params.search_site_cfg[SS_CFG_SRC];
-  if (search_site_cfg->stride != ref_stride)
-    search_site_cfg = cpi->mv_search_params.search_site_cfg[SS_CFG_LOOKAHEAD];
-  assert(search_site_cfg->stride == ref_stride);
+      av1_get_search_site_config(cpi, x, tpl_sf->search_method);
 
   FULLPEL_MOTION_SEARCH_PARAMS full_ms_params;
   av1_make_default_fullpel_ms_params(&full_ms_params, cpi, x, bsize, &center_mv,

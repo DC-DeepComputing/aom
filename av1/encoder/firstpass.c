@@ -694,10 +694,6 @@ static void accumulate_mv_stats(const MV best_mv, const FULLPEL_MV mv,
 //   golden_frame: the frame buffer of the golden frame.
 //   unit_row: row index in the unit of first pass block size.
 //   unit_col: column index in the unit of first pass block size.
-//   recon_yoffset: the y offset of the reconstructed frame buffer,
-//                  indicating the starting point of the current block.
-//   recon_uvoffset: the u/v offset of the reconstructed frame buffer,
-//                   indicating the starting point of the current block.
 //   src_yoffset: the y offset of the source frame buffer.
 //   fp_block_size: first pass block size.
 //   this_intra_error: the intra prediction error of this block.
@@ -718,8 +714,7 @@ static int firstpass_inter_prediction(
     AV1_COMP *cpi, ThreadData *td, const YV12_BUFFER_CONFIG *const last_frame,
     const YV12_BUFFER_CONFIG *const golden_frame,
     const YV12_BUFFER_CONFIG *const last2_frame, const int unit_row,
-    const int unit_col, const int recon_yoffset, const int recon_uvoffset,
-    const int src_yoffset, const BLOCK_SIZE fp_block_size,
+    const int unit_col, const int src_yoffset, const BLOCK_SIZE fp_block_size,
     const int this_intra_error, const int raw_motion_err_counts,
     int *raw_motion_err_list, const MV ref_mv, MV *best_mv,
     MV *last_non_zero_mv, FRAME_STATS *stats) {
@@ -738,9 +733,14 @@ static int firstpass_inter_prediction(
   const int unit_width = mi_size_wide[fp_block_size];
   const int unit_rows = get_unit_rows(fp_block_size, mi_params->mb_rows);
   const int unit_cols = get_unit_cols(fp_block_size, mi_params->mb_cols);
+  // The reference buffers may have a different border, and so a different
+  // stride, from the current frame (e.g. after the border size changed
+  // mid-stream), so locate the block in each of them from its own layout.
+  const int mi_row = unit_row * unit_scale;
+  const int mi_col = unit_col * unit_scale;
   // Assume 0,0 motion with no mv overhead.
   FULLPEL_MV mv = kZeroFullMv;
-  xd->plane[0].pre[0].buf = last_frame->y_buffer + recon_yoffset;
+  av1_setup_pre_planes(xd, 0, last_frame, mi_row, mi_col, NULL, 1);
   // Set up limit values for motion vectors to prevent them extending
   // outside the UMV borders.
   av1_set_mv_col_limits(mi_params, &x->mv_limits, unit_col * unit_width,
@@ -789,8 +789,7 @@ static int firstpass_inter_prediction(
   if ((current_frame->frame_number > 2) && last2_frame != NULL) {
     FULLPEL_MV tmp_mv = kZeroFullMv;
     // Assume 0,0 motion with no mv overhead.
-    av1_setup_pre_planes(xd, 0, last2_frame, 0, 0, NULL, 1);
-    xd->plane[0].pre[0].buf += recon_yoffset;
+    av1_setup_pre_planes(xd, 0, last2_frame, mi_row, mi_col, NULL, 1);
     last2_motion_error =
         get_prediction_error_bitdepth(is_high_bitdepth, bitdepth, bsize,
                                       &x->plane[0].src, &xd->plane[0].pre[0]);
@@ -803,8 +802,7 @@ static int firstpass_inter_prediction(
   if ((current_frame->frame_number > 1) && golden_frame != NULL) {
     FULLPEL_MV tmp_mv = kZeroFullMv;
     // Assume 0,0 motion with no mv overhead.
-    av1_setup_pre_planes(xd, 0, golden_frame, 0, 0, NULL, 1);
-    xd->plane[0].pre[0].buf += recon_yoffset;
+    av1_setup_pre_planes(xd, 0, golden_frame, mi_row, mi_col, NULL, 1);
     gf_motion_error =
         get_prediction_error_bitdepth(is_high_bitdepth, bitdepth, bsize,
                                       &x->plane[0].src, &xd->plane[0].pre[0]);
@@ -826,11 +824,8 @@ static int firstpass_inter_prediction(
   }
 
   // Reset to last frame as reference buffer.
-  xd->plane[0].pre[0].buf = last_frame->y_buffer + recon_yoffset;
-  if (av1_num_planes(&cpi->common) > 1) {
-    xd->plane[1].pre[0].buf = last_frame->u_buffer + recon_uvoffset;
-    xd->plane[2].pre[0].buf = last_frame->v_buffer + recon_uvoffset;
-  }
+  av1_setup_pre_planes(xd, 0, last_frame, mi_row, mi_col, NULL,
+                       av1_num_planes(&cpi->common));
 
   // Start by assuming that intra mode is best.
   *best_mv = kZeroMv;
@@ -1279,9 +1274,8 @@ void av1_first_pass_row(AV1_COMP *cpi, ThreadData *td, TileDataEnc *tile_data,
     if (!frame_is_intra_only(cm)) {
       const int this_inter_error = firstpass_inter_prediction(
           cpi, td, last_frame, golden_frame, last2_frame, unit_row, unit_col,
-          recon_yoffset, recon_uvoffset, src_yoffset, fp_block_size,
-          this_intra_error, raw_motion_err_counts, raw_motion_err_list,
-          best_ref_mv, &best_ref_mv, &last_mv, mb_stats);
+          src_yoffset, fp_block_size, this_intra_error, raw_motion_err_counts,
+          raw_motion_err_list, best_ref_mv, &best_ref_mv, &last_mv, mb_stats);
       if (unit_col_in_tile == 0) {
         *first_top_mv = last_mv;
       }
