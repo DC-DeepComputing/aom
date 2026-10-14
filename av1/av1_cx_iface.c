@@ -1707,6 +1707,14 @@ static aom_codec_err_t encoder_set_config(aom_codec_alg_priv_t *ctx,
     ERROR("Cannot change to monochrome = 0 after init with monochrome");
   }
 
+  // With kf_max_dist == 0 every frame is a key frame, so the encoder selects
+  // the frame border and superblock size for intra-only coding and skips the
+  // motion vector costs and the buffers used by inter frames, on the main
+  // thread and on the worker threads. None of these are set up again by a
+  // later reconfiguration, so inter frames cannot be enabled after that.
+  if (ctx->cfg.kf_max_dist == 0 && cfg->kf_max_dist != 0)
+    ERROR("Cannot change kf_max_dist from 0");
+
   // Prevent increasing lag_in_frames. This check is stricter than it needs
   // to be -- the limit is not increasing past the first lag_in_frames
   // value, but we don't track the initial config, only the last successful
