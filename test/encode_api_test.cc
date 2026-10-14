@@ -4693,4 +4693,56 @@ TEST(EncodeAPI, Avg16x16IntegerOverflow) {
 }
 #endif  // CONFIG_AV1_HIGHBITDEPTH
 
+// An encoder that codes every frame as a key frame (kf_max_dist 0) does not
+// set up what inter frames need, so it cannot be reconfigured to code inter
+// frames, whether kf_max_dist was 0 at init or was set to 0 later.
+TEST(EncodeAPI, ConfigSetKeyFrameDistanceFromZero) {
+  const unsigned int kInitialKfMaxDist[] = { 0, 30 };
+  const int kSpeeds[] = { 7, 10 };
+  for (const unsigned int initial_kf_max_dist : kInitialKfMaxDist) {
+    for (const int speed : kSpeeds) {
+      SCOPED_TRACE(initial_kf_max_dist);
+      SCOPED_TRACE(speed);
+      aom_codec_iface_t *iface = aom_codec_av1_cx();
+      aom_codec_enc_cfg_t cfg;
+      ASSERT_EQ(
+          aom_codec_enc_config_default(iface, &cfg, AOM_USAGE_REALTIME),
+          AOM_CODEC_OK);
+      cfg.g_w = 176;
+      cfg.g_h = 144;
+      cfg.g_lag_in_frames = 0;
+      cfg.kf_max_dist = initial_kf_max_dist;
+      aom_codec_ctx_t enc;
+      ASSERT_EQ(aom_codec_enc_init(&enc, iface, &cfg, 0), AOM_CODEC_OK);
+      ASSERT_EQ(aom_codec_control(&enc, AOME_SET_CPUUSED, speed),
+                AOM_CODEC_OK);
+
+      aom_image_t *img =
+          aom_img_alloc(nullptr, AOM_IMG_FMT_I420, cfg.g_w, cfg.g_h, 1);
+      ASSERT_NE(img, nullptr);
+      int pts = 0;
+      for (; pts < 2; ++pts) {
+        FillImageRandom(img);
+        ASSERT_EQ(aom_codec_encode(&enc, img, pts, 1, 0), AOM_CODEC_OK);
+      }
+      if (cfg.kf_max_dist != 0) {
+        cfg.kf_max_dist = 0;
+        ASSERT_EQ(aom_codec_enc_config_set(&enc, &cfg), AOM_CODEC_OK);
+        FillImageRandom(img);
+        ASSERT_EQ(aom_codec_encode(&enc, img, pts++, 1, 0), AOM_CODEC_OK);
+      }
+
+      cfg.kf_max_dist = 30;
+      EXPECT_EQ(aom_codec_enc_config_set(&enc, &cfg), AOM_CODEC_INVALID_PARAM);
+      for (const int end = pts + 4; pts < end; ++pts) {
+        FillImageRandom(img);
+        ASSERT_EQ(aom_codec_encode(&enc, img, pts, 1, 0), AOM_CODEC_OK);
+      }
+      ASSERT_EQ(aom_codec_encode(&enc, nullptr, 0, 1, 0), AOM_CODEC_OK);
+      aom_img_free(img);
+      ASSERT_EQ(aom_codec_destroy(&enc), AOM_CODEC_OK);
+    }
+  }
+}
+
 }  // namespace
