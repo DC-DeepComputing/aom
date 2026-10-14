@@ -3149,6 +3149,53 @@ TEST(EncodeAPI, Buganizer504317456) {
   aom_img_free(img);
   ASSERT_EQ(aom_codec_destroy(&enc), AOM_CODEC_OK);
 }
+
+// Turning resize mode off mid-stream shrinks the frame border, so the new
+// frames have a smaller stride than the reference frames coded before the
+// change. The first pass (LAP) and TPL motion searches must use each
+// reference frame's own stride.
+TEST(EncodeAPI, ResizeModeOffMidStreamChangesBorder) {
+  aom_codec_iface_t *iface = aom_codec_av1_cx();
+  aom_codec_enc_cfg_t cfg;
+  ASSERT_EQ(aom_codec_enc_config_default(iface, &cfg, AOM_USAGE_GOOD_QUALITY),
+            AOM_CODEC_OK);
+  cfg.g_w = 352;
+  cfg.g_h = 288;
+  cfg.g_lag_in_frames = 19;
+  cfg.rc_end_usage = AOM_Q;
+  cfg.rc_resize_mode = 1;  // RESIZE_FIXED
+  cfg.rc_resize_denominator = 16;
+  cfg.rc_resize_kf_denominator = 16;
+  aom_codec_ctx_t enc;
+  ASSERT_EQ(aom_codec_enc_init(&enc, iface, &cfg, 0), AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&enc, AOME_SET_CPUUSED, 4), AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&enc, AOME_SET_CQ_LEVEL, 40), AOM_CODEC_OK);
+
+  std::vector<unsigned char> buf(cfg.g_w * cfg.g_h * 3 / 2);
+  aom_image_t img;
+  ASSERT_EQ(&img, aom_img_wrap(&img, AOM_IMG_FMT_I420, cfg.g_w, cfg.g_h, 1,
+                               buf.data()));
+  for (int f = 0; f < 80; ++f) {
+    if (f == 40) {
+      cfg.rc_resize_mode = 0;  // RESIZE_NONE
+      ASSERT_EQ(aom_codec_enc_config_set(&enc, &cfg), AOM_CODEC_OK);
+    }
+    // A moving pattern, so that the motion searches look around.
+    for (unsigned int y = 0; y < cfg.g_h; ++y) {
+      for (unsigned int x = 0; x < cfg.g_w; ++x) {
+        buf[y * cfg.g_w + x] =
+            static_cast<unsigned char>(((x + 2 * f) * 7) ^ ((y + f) * 13));
+      }
+    }
+    memset(buf.data() + cfg.g_w * cfg.g_h, 128, buf.size() - cfg.g_w * cfg.g_h);
+    ASSERT_EQ(aom_codec_encode(&enc, &img, f, 1, 0), AOM_CODEC_OK);
+    aom_codec_iter_t iter = nullptr;
+    while (aom_codec_get_cx_data(&enc, &iter) != nullptr) {
+    }
+  }
+  ASSERT_EQ(aom_codec_encode(&enc, nullptr, 0, 0, 0), AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_destroy(&enc), AOM_CODEC_OK);
+}
 #endif  // !CONFIG_REALTIME_ONLY
 
 // Test for issue: 505976409.
