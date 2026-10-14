@@ -1386,6 +1386,12 @@ int av1_is_integer_mv(const YV12_BUFFER_CONFIG *cur_picture,
 
   const int pic_width = cur_picture->y_width;
   const int pic_height = cur_picture->y_height;
+  // The collocated blocks are read from last_picture at the same offsets, so
+  // it must have the same size (it does not after a frame size change).
+  if (last_picture->y_width != pic_width ||
+      last_picture->y_height != pic_height) {
+    return 0;
+  }
   for (int i = 0; i + block_size <= pic_height; i += block_size) {
     for (int j = 0; j + block_size <= pic_width; j += block_size) {
       const int x_pos = j;

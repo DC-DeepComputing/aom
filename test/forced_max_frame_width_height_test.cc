@@ -633,4 +633,57 @@ TEST(EncodeForcedMaxFrameWidthHeight, RaiseForcedMaxGoodQuality) {
 }
 #endif  // !CONFIG_REALTIME_ONLY
 
+#if !CONFIG_REALTIME_ONLY
+// Screen content in good-quality mode decides cur_frame_force_integer_mv on
+// every inter frame by comparing the source with the previous source. After an
+// upscale without a keyframe the previous source is still the smaller frame.
+TEST(EncodeForcedMaxFrameWidthHeight, ScreenContentUpscaleIntegerMv) {
+  constexpr int kMax = 1024;
+  std::vector<unsigned char> buffer(kMax * kMax * 3 / 2);
+  for (size_t i = 0; i < buffer.size(); ++i) {
+    buffer[i] = ((i / 8) & 1) ? 16 : 235;
+  }
+
+  aom_codec_iface_t *iface = aom_codec_av1_cx();
+  aom_codec_enc_cfg_t cfg;
+  ASSERT_EQ(AOM_CODEC_OK,
+            aom_codec_enc_config_default(iface, &cfg, AOM_USAGE_GOOD_QUALITY));
+  cfg.g_w = 64;
+  cfg.g_h = 64;
+  cfg.g_forced_max_frame_width = kMax;
+  cfg.g_forced_max_frame_height = kMax;
+  cfg.g_lag_in_frames = 0;
+  aom_codec_ctx_t enc;
+  ASSERT_EQ(AOM_CODEC_OK, aom_codec_enc_init(&enc, iface, &cfg, 0));
+  EXPECT_EQ(AOM_CODEC_OK, aom_codec_control(&enc, AOME_SET_CPUUSED, 6));
+  EXPECT_EQ(AOM_CODEC_OK,
+            aom_codec_control(&enc, AV1E_SET_TUNE_CONTENT, AOM_CONTENT_SCREEN));
+
+  aom_image_t img;
+  ASSERT_EQ(&img,
+            aom_img_wrap(&img, AOM_IMG_FMT_I420, 64, 64, 1, buffer.data()));
+  ASSERT_EQ(AOM_CODEC_OK, aom_codec_encode(&enc, &img, 0, 1, 0));
+
+  cfg.g_w = kMax;
+  cfg.g_h = kMax;
+  ASSERT_EQ(AOM_CODEC_OK, aom_codec_enc_config_set(&enc, &cfg));
+  ASSERT_EQ(&img,
+            aom_img_wrap(&img, AOM_IMG_FMT_I420, kMax, kMax, 1, buffer.data()));
+  ASSERT_EQ(AOM_CODEC_OK, aom_codec_encode(&enc, &img, 1, 1, 0));
+  const aom_codec_cx_pkt_t *pkt;
+  aom_codec_iter_t iter = nullptr;
+  bool got_frame = false;
+  while ((pkt = aom_codec_get_cx_data(&enc, &iter)) != nullptr) {
+    if (pkt->kind != AOM_CODEC_CX_FRAME_PKT) continue;
+    got_frame = true;
+    // The upscale must not have forced a keyframe.
+    EXPECT_EQ(pkt->data.frame.flags & AOM_FRAME_IS_KEY, 0u);
+  }
+  EXPECT_TRUE(got_frame);
+
+  EXPECT_EQ(AOM_CODEC_OK, aom_codec_encode(&enc, nullptr, 0, 0, 0));
+  EXPECT_EQ(AOM_CODEC_OK, aom_codec_destroy(&enc));
+}
+#endif  // !CONFIG_REALTIME_ONLY
+
 }  // namespace
