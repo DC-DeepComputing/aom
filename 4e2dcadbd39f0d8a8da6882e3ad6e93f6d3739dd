@@ -40,6 +40,30 @@
       ],
       "revId": "4e2dcadbd39f0d8a8da6882e3ad6e93f6d3739dd",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "99990468_c6303e76",
+        "filename": "av1/encoder/aq_cyclicrefresh.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 682,
+      "author": {
+        "id": 5216012
+      },
+      "writtenOn": "2026-10-14T15:41:59Z",
+      "side": 1,
+      "message": "Thanks for the review Jerome, done.",
+      "parentUuid": "5d65a58b_53d3c164",
+      "range": {
+        "startLine": 682,
+        "startChar": 33,
+        "endLine": 682,
+        "endChar": 38
+      },
+      "revId": "4e2dcadbd39f0d8a8da6882e3ad6e93f6d3739dd",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
