@@ -438,6 +438,18 @@ void av1_apply_roi_map(AV1_COMP *cpi) {
   int skip_enabled = 0;
   int qindex = cm->quant_params.base_qindex;
 
+  // The ROI map is sized for the frame dimensions at the time it was set
+  // (av1_set_roi_map() requires an exact match). If this frame has a different
+  // size (e.g. after a resize or for another spatial layer), the map does not
+  // describe it, so do not apply it to this frame.
+  if (roi->enabled && ((int)roi->rows != cm->mi_params.mi_rows ||
+                       (int)roi->cols != cm->mi_params.mi_cols)) {
+    av1_disable_segmentation(seg);
+    roi->delta_qp_enabled = 0;
+    roi->reference_enabled = 0;
+    return;
+  }
+
   // Force disable of ROI if active_map is enabled. ROI for now
   // only supported/tested for realtime mode with speed >= 7.
   if (!roi->enabled || cpi->active_map.enabled || cpi->oxcf.speed < 7 ||
