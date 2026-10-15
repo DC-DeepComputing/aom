@@ -24,6 +24,30 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "474c1ac2_6ef29aa8",
+        "filename": "av1/encoder/arm/av1_k_means_neon.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 128,
+      "author": {
+        "id": 5216012
+      },
+      "writtenOn": "2026-10-15T17:42:37Z",
+      "side": 1,
+      "message": "Thanks a lot for the review. I checked the performance with unroll by 2, so big blocks (n\u003d1024 and 4096) get 11-28% faster, and small blocks (n\u003d64 and 256) stay about the same. Great idea, thanks.",
+      "parentUuid": "ef1a32fd_ba9a2925",
+      "range": {
+        "startLine": 128,
+        "startChar": 0,
+        "endLine": 128,
+        "endChar": 31
+      },
+      "revId": "cb022c2b89eb5246b315c65fbfc3b29a740a22b0",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "9c6fc187_423dcb64",
@@ -37,6 +61,30 @@
       "writtenOn": "2026-10-15T16:16:03Z",
       "side": 1,
       "message": "You can move this up after initializing `count` and `sum` to zero and the two `for` loops of `j \u003d 0 -\u003e k` can be merged.",
+      "range": {
+        "startLine": 148,
+        "startChar": 1,
+        "endLine": 152,
+        "endChar": 0
+      },
+      "revId": "cb022c2b89eb5246b315c65fbfc3b29a740a22b0",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "0fcdd106_91441f05",
+        "filename": "av1/encoder/arm/av1_k_means_neon.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 152,
+      "author": {
+        "id": 5216012
+      },
+      "writtenOn": "2026-10-15T17:42:37Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "9c6fc187_423dcb64",
       "range": {
         "startLine": 148,
         "startChar": 1,
@@ -84,6 +132,30 @@
           ]
         }
       ],
+      "revId": "cb022c2b89eb5246b315c65fbfc3b29a740a22b0",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "67e30761_78768588",
+        "filename": "test/av1_k_means_test.cc",
+        "patchSetId": 1
+      },
+      "lineNbr": 276,
+      "author": {
+        "id": 5216012
+      },
+      "writtenOn": "2026-10-15T17:42:37Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "a0bfc659_20f4671e",
+      "range": {
+        "startLine": 276,
+        "startChar": 22,
+        "endLine": 276,
+        "endChar": 23
+      },
       "revId": "cb022c2b89eb5246b315c65fbfc3b29a740a22b0",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
