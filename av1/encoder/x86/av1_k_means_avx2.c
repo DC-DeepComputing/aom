@@ -8,10 +8,13 @@
  * Media Patent License 1.0 was not distributed with this source code in the
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
+#include <assert.h>
 #include <immintrin.h>  // AVX2
 
 #include "config/av1_rtcd.h"
 #include "aom_dsp/x86/synonyms.h"
+#include "aom_ports/mem.h"
+#include "av1/encoder/random.h"
 
 static int64_t k_means_horizontal_sum_avx2(__m256i a) {
   const __m128i low = _mm256_castsi256_si128(a);
@@ -128,5 +131,54 @@ void av1_calc_indices_dim2_avx2(const int16_t *data, const int16_t *centroids,
   }
   if (total_dist) {
     *total_dist = k_means_horizontal_sum_avx2(sum);
+  }
+}
+
+void av1_calc_centroids_dim1_avx2(const int16_t *data, int16_t *centroids,
+                                  const uint8_t *indices, int n, int k) {
+  const __m256i ones = _mm256_set1_epi16(1);
+  int count[PALETTE_MAX_SIZE];
+  int sum[PALETTE_MAX_SIZE];
+  const int n16 = n & ~15;
+  assert(n <= 32768);
+
+  for (int j = 0; j < k; ++j) {
+    const __m128i index = _mm_set1_epi8(j);
+    __m256i count_acc = _mm256_setzero_si256();
+    __m256i sum_acc = _mm256_setzero_si256();
+    for (int i = 0; i < n16; i += 16) {
+      // All ones in the lanes that belong to centroid j. The sign extension
+      // keeps the 16 bit mask in the same order as the data.
+      const __m256i mask = _mm256_cvtepi8_epi16(_mm_cmpeq_epi8(
+          _mm_loadu_si128((const __m128i *)(indices + i)), index));
+      const __m256i d = _mm256_and_si256(
+          _mm256_loadu_si256((const __m256i *)(data + i)), mask);
+      count_acc = _mm256_sub_epi16(count_acc, mask);
+      sum_acc = _mm256_add_epi32(sum_acc, _mm256_madd_epi16(d, ones));
+    }
+    // Add up the sum and the count together, they end up in lanes 0 and 2.
+    const __m256i count32 = _mm256_madd_epi16(count_acc, ones);
+    const __m256i t256 =
+        _mm256_add_epi32(_mm256_unpacklo_epi64(sum_acc, count32),
+                         _mm256_unpackhi_epi64(sum_acc, count32));
+    __m128i t = _mm_add_epi32(_mm256_castsi256_si128(t256),
+                              _mm256_extracti128_si256(t256, 1));
+    t = _mm_add_epi32(t, _mm_srli_epi64(t, 32));
+    sum[j] = _mm_cvtsi128_si32(t);
+    count[j] = _mm_cvtsi128_si32(_mm_srli_si128(t, 8));
+  }
+
+  for (int i = n16; i < n; ++i) {
+    ++count[indices[i]];
+    sum[indices[i]] += data[i];
+  }
+
+  unsigned int rand_state = (unsigned int)data[0];
+  for (int j = 0; j < k; ++j) {
+    if (count[j] == 0) {
+      centroids[j] = data[lcg_rand16(&rand_state) % n];
+    } else {
+      centroids[j] = DIVIDE_AND_ROUND(sum[j], count[j]);
+    }
   }
 }
