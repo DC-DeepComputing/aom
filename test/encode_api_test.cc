@@ -4376,4 +4376,70 @@ TEST(EncodeAPI, SvcRefFrameConfigUnusedRefIdxWithResolutionChange) {
 }
 #endif  // CONFIG_AV1_DECODER
 
+// Verify that when handle_inter_mode_nonrd() reuses the superblock motion
+// vector (x->sb_me_mv, searched relative to zero) for NEWMV on screen content,
+// the vector is clamped to the valid subpel range relative to the block's
+// reference MV predictor (ref_mv) so that |mv - ref_mv| does not exceed MV_MAX.
+TEST(EncodeAPI, NonrdSbMeForcedNewmvRange) {
+  constexpr int kWidth = 2160;
+  constexpr int kHeight = 3840;
+  constexpr int kActiveW = 128;
+  constexpr int kActiveH = 2312;
+
+  aom_codec_iface_t *const iface = aom_codec_av1_cx();
+  aom_codec_enc_cfg_t cfg;
+  ASSERT_EQ(aom_codec_enc_config_default(iface, &cfg, AOM_USAGE_REALTIME),
+            AOM_CODEC_OK);
+  cfg.g_w = kWidth;
+  cfg.g_h = kHeight;
+  cfg.g_lag_in_frames = 0;
+  cfg.g_threads = 1;
+  cfg.rc_min_quantizer = 1;
+  cfg.rc_max_quantizer = 1;
+
+  aom_codec_ctx_t enc;
+  ASSERT_EQ(aom_codec_enc_init(&enc, iface, &cfg, 0), AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&enc, AOME_SET_CPUUSED, 7), AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&enc, AV1E_SET_TUNE_CONTENT, AOM_CONTENT_SCREEN),
+            AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&enc, AV1E_SET_QUANTIZER_ONE_PASS, 1),
+            AOM_CODEC_OK);
+
+  aom_image_t *img0 =
+      aom_img_alloc(nullptr, AOM_IMG_FMT_I420, kWidth, kHeight, 1);
+  aom_image_t *img1 =
+      aom_img_alloc(nullptr, AOM_IMG_FMT_I420, kWidth, kHeight, 1);
+  ASSERT_NE(img0, nullptr);
+  ASSERT_NE(img1, nullptr);
+  FillImage(img0, 128);
+  FillImage(img1, 128);
+
+  ::libaom_test::ACMRandom rnd(::libaom_test::ACMRandom::DeterministicSeed());
+  for (int y = 0; y < kActiveH; ++y) {
+    uint8_t *const row0 = img0->planes[AOM_PLANE_Y] + y * img0->stride[0];
+    for (int x = 0; x < kActiveW; ++x) {
+      row0[x] = rnd.Rand8();
+    }
+  }
+
+  // Three vertically adjacent superblock regions in img1:
+  // - y in [0, 1152): displaced by +1023 px (found by int_pro ME -> +1023 px)
+  // - y in [1152, 1280): displaced by +1031 px (+8 px from neighbor +1023 px)
+  // - y in [1280, 1408): displaced by -1023 px (found by int_pro ME -> -1023 px
+  //   while its top neighbor predictor is +1031 px, giving a 2054 px delta).
+  for (int y = 0; y < 1408; ++y) {
+    const int dy = (y < 1152) ? 1023 : (y < 1280) ? 1031 : -1023;
+    memcpy(img1->planes[AOM_PLANE_Y] + y * img1->stride[0],
+           img0->planes[AOM_PLANE_Y] + (y + dy) * img0->stride[0], kActiveW);
+  }
+
+  ASSERT_EQ(aom_codec_encode(&enc, img0, 0, 1, AOM_EFLAG_FORCE_KF),
+            AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_encode(&enc, img1, 1, 1, 0), AOM_CODEC_OK);
+
+  aom_img_free(img1);
+  aom_img_free(img0);
+  ASSERT_EQ(aom_codec_destroy(&enc), AOM_CODEC_OK);
+}
+
 }  // namespace
