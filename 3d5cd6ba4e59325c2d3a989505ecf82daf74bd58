@@ -33,6 +33,24 @@
       "message": "IIRC, in libaom, setjmp/longjmp are used to handle error, and that should also work in multithread case. Not sure if this change is necessary? Any kind of test can demonstrate that?",
       "revId": "3d5cd6ba4e59325c2d3a989505ecf82daf74bd58",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "59b990a4_aea81460",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5216012
+      },
+      "writtenOn": "2026-10-16T07:23:17Z",
+      "side": 1,
+      "message": "Thanks for looking. setjmp/longjmp still handles the error, and this patch doesn\u0027t change that. But longjmp only unwinds the worker that hit the error. The other workers keep filtering until they see lf_mt_exit, and before this patch they read it by locking job_mutex once per superblock. With row MT all the workers end up fighting over that one mutex, and that lock is what the patch removes.\n\nThe exit signal now goes through the row sync instead. On error, av1_set_vert_loop_filter_done() writes LF_SYNC_EXIT into every row counter and wakes the waiting workers. sync_read() already holds the row mutex when it reads that counter, so the check costs nothing extra. get_lf_job_info() still checks lf_mt_exit, so no new jobs start after an error.\n\nAt 8 and 12 threads on 1440p screen content, encode time drops 2 to 4% on a Ryzen 9 5900X. On an M3 Pro with an active map it drops 6 to 12% at 4 and 8 threads, At 2 threads I see no change. All streams are bit exact.\n\nFor the error path, libaom has no test that makes a loop filter worker fail. I checked it locally with a fault injection hack that isn\u0027t part of the patch: 4, 8 and 16 threads, Release and TSan builds, about 170 runs. Every run returned the error, with no hangs and no TSan reports. I can turn that into a unit test if you want, but it needs a test-only hook to force the error.",
+      "parentUuid": "58780cd6_a0631cfd",
+      "revId": "3d5cd6ba4e59325c2d3a989505ecf82daf74bd58",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
