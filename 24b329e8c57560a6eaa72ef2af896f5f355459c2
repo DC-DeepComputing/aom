@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "1b8ac555_26c2a7ea",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5216012
+      },
+      "writtenOn": "2026-10-16T13:11:47Z",
+      "side": 1,
+      "message": "These two changes in chain are fairly large, so I wrote up the background in one place:\nhttps://freedbrt.github.io/av1-notes/posts/av1-intrabc/\n\nIn short: in real time screen mode, almost all of the IntraBC cost on key frames comes from building the hash table, not from the search. This change stores the table in flat arrays and is bit exact. 218282 builds one table per tile on the worker threads. Together they cut key frame time at 4 threads by 44 to 50% on an M3 Pro and by 51 to 55% on a Ryzen 9 5900X.\n\nThe post covers the design, why counting sort fits here, how correctness was checked, memory use, and per stage timings with hardware counters on both machines. The commit messages have the main numbers, so the post is only extra context.",
+      "revId": "24b329e8c57560a6eaa72ef2af896f5f355459c2",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
