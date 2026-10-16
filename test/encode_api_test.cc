@@ -4376,4 +4376,90 @@ TEST(EncodeAPI, SvcRefFrameConfigUnusedRefIdxWithResolutionChange) {
 }
 #endif  // CONFIG_AV1_DECODER
 
+// Verify that when handle_inter_mode_nonrd() reuses the superblock motion
+// vector (x->sb_me_mv, searched relative to zero) for NEWMV on screen content,
+// the vector is clamped to the valid subpel range relative to the block's
+// reference MV predictor (ref_mv) so that |mv - ref_mv| does not exceed MV_MAX.
+TEST(EncodeAPI, NonrdSbMeForcedNewmvRange) {
+  constexpr int kWidth = 2160;
+  constexpr int kHeight = 3840;
+  constexpr int kActiveW = 128;
+  constexpr int kActiveH = 2304;
+
+  aom_codec_iface_t *const iface = aom_codec_av1_cx();
+  aom_codec_enc_cfg_t cfg;
+  ASSERT_EQ(aom_codec_enc_config_default(iface, &cfg, AOM_USAGE_REALTIME),
+            AOM_CODEC_OK);
+  cfg.g_w = kWidth;
+  cfg.g_h = kHeight;
+  cfg.g_lag_in_frames = 0;
+  cfg.g_threads = 2;
+  cfg.rc_end_usage = AOM_CBR;
+  cfg.rc_target_bitrate = 13996;
+  cfg.rc_min_quantizer = 1;
+  cfg.rc_max_quantizer = 63;
+
+  aom_codec_ctx_t enc;
+  ASSERT_EQ(aom_codec_enc_init(&enc, iface, &cfg, 0), AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&enc, AOME_SET_CPUUSED, 7), AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&enc, AV1E_SET_ROW_MT, 1), AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&enc, AV1E_SET_TILE_COLUMNS, 1), AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&enc, AV1E_SET_TILE_ROWS, 0), AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&enc, AV1E_SET_AQ_MODE, 3), AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&enc, AV1E_SET_TUNE_CONTENT, AOM_CONTENT_SCREEN),
+            AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&enc, AV1E_SET_ENABLE_PALETTE, 1), AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&enc, AV1E_SET_QUANTIZER_ONE_PASS, 1),
+            AOM_CODEC_OK);
+
+  auto hash_pixel = [](int x, int y) -> uint32_t {
+    uint32_t z = (static_cast<uint32_t>(x) * 0x1f123bb5u) ^
+                 (static_cast<uint32_t>(y) * 0x5f356495u) ^ 6u;
+    z ^= z >> 16;
+    z *= 0x7feb352du;
+    z ^= z >> 15;
+    z *= 0x846ca68bu;
+    z ^= z >> 16;
+    return z >> 24;
+  };
+
+  aom_image_t *img0 =
+      aom_img_alloc(nullptr, AOM_IMG_FMT_I420, kWidth, kHeight, 1);
+  aom_image_t *img1 =
+      aom_img_alloc(nullptr, AOM_IMG_FMT_I420, kWidth, kHeight, 1);
+  ASSERT_NE(img0, nullptr);
+  ASSERT_NE(img1, nullptr);
+  FillImage(img0, 128);
+  FillImage(img1, 128);
+
+  for (int y = 0; y < kActiveH; ++y) {
+    const int iy = y >> 4, fy = y & 15;
+    uint8_t *const row0 = img0->planes[AOM_PLANE_Y] + y * img0->stride[0];
+    for (int x = 0; x < kActiveW; ++x) {
+      const int ix = x >> 4, fx = x & 15;
+      const uint32_t p =
+          hash_pixel(ix, iy) * (16 - fx) + hash_pixel(ix + 1, iy) * fx;
+      const uint32_t q =
+          hash_pixel(ix, iy + 1) * (16 - fx) + hash_pixel(ix + 1, iy + 1) * fx;
+      const uint32_t smooth = (p * (16 - fy) + q * fy) >> 8;
+      row0[x] = static_cast<uint8_t>((3 * smooth + hash_pixel(x, y)) >> 2);
+    }
+  }
+
+  for (int y = 0; y < 1792; ++y) {
+    const int dy = (y < 1152) ? 1023 : (y < 1280) ? 1040 : -1023;
+    const int sy = std::max(0, std::min(kActiveH - 1, y + dy));
+    memcpy(img1->planes[AOM_PLANE_Y] + y * img1->stride[0],
+           img0->planes[AOM_PLANE_Y] + sy * img0->stride[0], kActiveW);
+  }
+
+  ASSERT_EQ(aom_codec_encode(&enc, img0, 0, 1, AOM_EFLAG_FORCE_KF),
+            AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_encode(&enc, img1, 1, 1, 0), AOM_CODEC_OK);
+
+  aom_img_free(img1);
+  aom_img_free(img0);
+  ASSERT_EQ(aom_codec_destroy(&enc), AOM_CODEC_OK);
+}
+
 }  // namespace
