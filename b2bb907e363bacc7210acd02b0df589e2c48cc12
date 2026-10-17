@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "d1923dc4_6c2a78e9",
+        "filename": "av1/encoder/var_based_part.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1180,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-17T15:15:54Z",
+      "side": 1,
+      "message": "The signed integer overflow occurs in this addtion:\n\naom/av1/encoder/var_based_part.c:1180:42: runtime error: signed integer overflow: 1538995776 + 789353984 cannot be represented in type \u0027int\u0027",
+      "revId": "b2bb907e363bacc7210acd02b0df589e2c48cc12",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
