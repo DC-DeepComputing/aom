@@ -1104,7 +1104,7 @@ static inline void chroma_check(AV1_COMP *cpi, MACROBLOCK *x, BLOCK_SIZE bsize,
 
 static void fill_variance_tree_leaves(
     AV1_COMP *cpi, MACROBLOCK *x, VP128x128 *vt, PART_EVAL_STATUS *force_split,
-    int avg_16x16[][4], int maxvar_16x16[][4], int minvar_16x16[][4],
+    int64_t avg_16x16[][4], int maxvar_16x16[][4], int minvar_16x16[][4],
     int64_t *thresholds, const uint8_t *src_buf, int src_stride,
     const uint8_t *dst_buf, int dst_stride, bool is_key_frame,
     const bool is_small_sb) {
@@ -1617,7 +1617,7 @@ int av1_choose_var_based_partitioning(AV1_COMP *cpi, const TileInfo *const tile,
   int var_64x64;
   int min_var_64x64 = INT_MAX;
   int max_var_64x64 = 0;
-  int avg_16x16[4][4];
+  int64_t avg_16x16[4][4];
   int maxvar_16x16[4][4];
   int minvar_16x16[4][4];
   const uint8_t *src_buf;
