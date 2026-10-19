@@ -16,6 +16,23 @@
       "message": "The results for different resolutions are given below:\n\n```\n               Encoder Instruction                              BD-Rate Loss (%)\ncpu  Resolution  Count Reduction(%) avg.psnr   ssim      vmaf    vmaf_neg  uvq_1p5\n----------------------------------------------------------------------------------------\n1    LOWRES2         5.213         0.0777     0.1311\t   0.0128   0.0482\t  0.1809 \n1    MIDRES2         5.213         0.107      0.1431\t   0.0694   0.1037\t -0.7006 \n1    SHORTS608p      3.868         0.0571     0.0812\t  -0.0024  -0.0064\t -0.0088 \n1    SHORTS720p      3.602         0.0485     0.0471\t   0.0671   0.0603\t  0.5618\n1    SHORTS1080p     3.02          0.0513     0.066\t   0.0889   0.0573\t  0.9038\n1    HDRES2          4.454         0.0796     0.1027\t   0.0237   0.0395\t  0.2466 \n1    Average         4.162         0.0686     0.0924\t   0.044    0.0492\t  0.2235\n\n2    LOWRES2        -0.004         0          0\t   0\t     0\t         0\n2    MIDRES2         4.276         0.0776     0.0955\t   0.0212   0.0265\t  1.0269 \n2    SHORTS608p      3.197         0.0502     0.0409\t   0.0822   0.0229\t -0.2579 \n2    SHORTS720p      2.9           0.0331     0.0078\t  -0.0671  -0.0165\t  0.4804 \n2    SHORTS1080p     2.462         0.0613     0.0972\t   0.019    0.0415\t  1.7969 \n2    HDRES2          3.619         0.0859     0.1182\t   0.0327   0.3124\t  0.7224 \n2    Average         2.752         0.0511     0.0589\t   0.0144   0.06\t  0.6322\n```\n\nThe instruction count reduction specified has been measured using command:\n```\n$ perf stat -e instructions:u ./aomenc\n```",
       "revId": "8594a8d8abbc3fa20bb476b71d8bc2bc5c018dcd",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "d336df14_32393d0d",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5185
+      },
+      "writtenOn": "2026-10-19T21:21:35Z",
+      "side": 1,
+      "message": "Good tradeoff!",
+      "revId": "8594a8d8abbc3fa20bb476b71d8bc2bc5c018dcd",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
