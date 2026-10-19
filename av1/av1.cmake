@@ -481,6 +481,13 @@ list(APPEND AOM_AV1_ENCODER_INTRIN_SSE4_2
 
 list(APPEND AOM_AV1_COMMON_INTRIN_VSX "${AOM_ROOT}/av1/common/ppc/cfl_ppc.c")
 
+list(APPEND AOM_AV1_COMMON_INTRIN_SIMD128
+            "${AOM_ROOT}/av1/common/wasm/av1_inv_txfm_simd128.c"
+            "${AOM_ROOT}/av1/common/wasm/av1_inv_txfm1d_simd128.inc")
+
+list(APPEND AOM_AV1_ENCODER_INTRIN_SIMD128
+            "${AOM_ROOT}/av1/encoder/wasm/encodetxb_simd128.c")
+
 list(APPEND AOM_AV1_COMMON_INTRIN_RVV
             "${AOM_ROOT}/av1/common/riscv/cdef_block_rvv.c"
             "${AOM_ROOT}/av1/common/riscv/compound_convolve_rvv.c"
@@ -888,6 +895,19 @@ function(setup_av1_targets)
     if(AOM_AV1_COMMON_INTRIN_VSX)
       add_intrinsics_object_library("-mvsx -maltivec" "vsx" "aom_av1_common"
                                     "AOM_AV1_COMMON_INTRIN_VSX")
+    endif()
+  endif()
+
+  if(HAVE_SIMD128)
+    if(AOM_AV1_COMMON_INTRIN_SIMD128)
+      add_intrinsics_object_library("${AOM_SIMD128_FLAG}" "simd128"
+                                    "aom_av1_common"
+                                    "AOM_AV1_COMMON_INTRIN_SIMD128")
+    endif()
+    if(CONFIG_AV1_ENCODER AND AOM_AV1_ENCODER_INTRIN_SIMD128)
+      add_intrinsics_object_library("${AOM_SIMD128_FLAG}" "simd128"
+                                    "aom_av1_encoder"
+                                    "AOM_AV1_ENCODER_INTRIN_SIMD128")
     endif()
   endif()
 

@@ -160,7 +160,12 @@ if(CONFIG_AV1_DECODER)
               "${AOM_ROOT}/aom_dsp/entdec.h")
 endif()
 
+list(APPEND AOM_DSP_COMMON_SOURCES "${AOM_ROOT}/aom_dsp/wasm/simd128_utils.h")
+
 if(CONFIG_AV1_ENCODER)
+  list(APPEND AOM_DSP_ENCODER_INTRIN_SIMD128
+              "${AOM_ROOT}/aom_dsp/wasm/avg_simd128.c")
+
   list(APPEND AOM_DSP_ENCODER_SOURCES
               "${AOM_ROOT}/aom_dsp/avg.c"
               "${AOM_ROOT}/aom_dsp/bitwriter.c"
@@ -510,6 +515,12 @@ function(setup_aom_dsp_targets)
     add_intrinsics_object_library("-march=skylake-avx512" "avx512"
                                   "aom_dsp_common"
                                   "AOM_DSP_COMMON_INTRIN_AVX512")
+  endif()
+
+  if(HAVE_SIMD128 AND CONFIG_AV1_ENCODER)
+    add_intrinsics_object_library("${AOM_SIMD128_FLAG}" "simd128"
+                                  "aom_dsp_encoder"
+                                  "AOM_DSP_ENCODER_INTRIN_SIMD128")
   endif()
 
   if(HAVE_NEON)
