@@ -286,4 +286,10 @@ INSTANTIATE_TEST_SUITE_P(
     ::testing::Combine(::testing::Values(&av1_txb_init_levels_neon),
                        ::testing::Range(0, static_cast<int>(TX_SIZES_ALL), 1)));
 #endif
+#if HAVE_SIMD128
+INSTANTIATE_TEST_SUITE_P(
+    SIMD128, EncodeTxbInitLevelTest,
+    ::testing::Combine(::testing::Values(&av1_txb_init_levels_simd128),
+                       ::testing::Range(0, static_cast<int>(TX_SIZES_ALL), 1)));
+#endif
 }  // namespace

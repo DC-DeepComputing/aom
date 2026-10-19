@@ -1006,6 +1006,16 @@ INSTANTIATE_TEST_SUITE_P(
                       SatdTestParam<SatdFunc>(256, &aom_satd_c, &aom_satd_c),
                       SatdTestParam<SatdFunc>(1024, &aom_satd_c, &aom_satd_c)));
 
+#if HAVE_SIMD128
+INSTANTIATE_TEST_SUITE_P(
+    SIMD128, SatdTest,
+    ::testing::Values(
+        SatdTestParam<SatdFunc>(16, &aom_satd_c, &aom_satd_simd128),
+        SatdTestParam<SatdFunc>(64, &aom_satd_c, &aom_satd_simd128),
+        SatdTestParam<SatdFunc>(256, &aom_satd_c, &aom_satd_simd128),
+        SatdTestParam<SatdFunc>(1024, &aom_satd_c, &aom_satd_simd128)));
+#endif  // HAVE_SIMD128
+
 #if HAVE_NEON
 INSTANTIATE_TEST_SUITE_P(
     NEON, SatdTest,
