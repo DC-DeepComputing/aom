@@ -451,6 +451,12 @@ INSTANTIATE_TEST_SUITE_P(
         HadamardFuncWithSize(&aom_highbd_hadamard_32x32_neon, 32, 32)));
 #endif  // HAVE_NEON
 
+#if HAVE_SIMD128
+INSTANTIATE_TEST_SUITE_P(SIMD128, HadamardHighbdTest,
+                         ::testing::Values(HadamardFuncWithSize(
+                             &aom_highbd_hadamard_8x8_simd128, 8, 8)));
+#endif  // HAVE_SIMD128
+
 #endif  // CONFIG_AV1_HIGHBITDEPTH
 
 // Tests for low precision

@@ -373,4 +373,9 @@ INSTANTIATE_TEST_SUITE_P(NEON, AV1HighbdInvTxfm2d,
                          ::testing::Values(av1_highbd_inv_txfm_add_neon));
 #endif
 
+#if HAVE_SIMD128
+INSTANTIATE_TEST_SUITE_P(SIMD128, AV1HighbdInvTxfm2d,
+                         ::testing::Values(av1_highbd_inv_txfm_add_simd128));
+#endif
+
 }  // namespace
