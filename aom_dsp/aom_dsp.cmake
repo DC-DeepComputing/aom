@@ -162,6 +162,11 @@ endif()
 
 list(APPEND AOM_DSP_COMMON_SOURCES "${AOM_ROOT}/aom_dsp/wasm/simd128_utils.h")
 
+if(CONFIG_AV1_HIGHBITDEPTH)
+  list(APPEND AOM_DSP_COMMON_INTRIN_SIMD128
+              "${AOM_ROOT}/aom_dsp/wasm/highbd_intrapred_simd128.c")
+endif()
+
 if(CONFIG_AV1_ENCODER)
   list(APPEND AOM_DSP_ENCODER_INTRIN_SIMD128
               "${AOM_ROOT}/aom_dsp/wasm/avg_simd128.c")
@@ -517,10 +522,15 @@ function(setup_aom_dsp_targets)
                                   "AOM_DSP_COMMON_INTRIN_AVX512")
   endif()
 
-  if(HAVE_SIMD128 AND CONFIG_AV1_ENCODER)
+  if(HAVE_SIMD128)
     add_intrinsics_object_library("${AOM_SIMD128_FLAG}" "simd128"
-                                  "aom_dsp_encoder"
-                                  "AOM_DSP_ENCODER_INTRIN_SIMD128")
+                                  "aom_dsp_common"
+                                  "AOM_DSP_COMMON_INTRIN_SIMD128")
+    if(CONFIG_AV1_ENCODER)
+      add_intrinsics_object_library("${AOM_SIMD128_FLAG}" "simd128"
+                                    "aom_dsp_encoder"
+                                    "AOM_DSP_ENCODER_INTRIN_SIMD128")
+    endif()
   endif()
 
   if(HAVE_NEON)
