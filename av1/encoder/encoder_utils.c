@@ -921,7 +921,7 @@ void av1_scale_references(AV1_COMP *cpi, const InterpFilter filter,
           }
 #if CONFIG_AV1_HIGHBITDEPTH
           if (use_optimized_scaler && has_optimized_scaler &&
-              cm->seq_params->bit_depth == AOM_BITS_8) {
+              !(ref->flags & YV12_FLAG_HIGHBITDEPTH)) {
             av1_resize_and_extend_frame(ref, &new_fb->buf, filter, phase,
                                         num_planes);
           } else if (!av1_resize_and_extend_frame_nonnormative(
