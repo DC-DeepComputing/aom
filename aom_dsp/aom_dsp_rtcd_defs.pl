@@ -304,6 +304,14 @@ if ((aom_config("CONFIG_REALTIME_ONLY") ne "yes") || (aom_config("CONFIG_AV1_DEC
 }  # !CONFIG_REALTIME_ONLY || CONFIG_AV1_DECODER
 
 if (aom_config("CONFIG_AV1_HIGHBITDEPTH") eq "yes") {
+  # WebAssembly SIMD128 implements every high bit-depth intra predictor.
+  foreach (@tx_sizes) {
+    ($w, $h) = @$_;
+    foreach $pred_name (@pred_names) {
+      specialize "aom_highbd_${pred_name}_predictor_${w}x${h}", "simd128";
+    }
+  }
+
   specialize qw/aom_highbd_v_predictor_4x4 sse2 neon/;
   specialize qw/aom_highbd_v_predictor_4x8 sse2 neon/;
   specialize qw/aom_highbd_v_predictor_8x4 sse2 neon/;
