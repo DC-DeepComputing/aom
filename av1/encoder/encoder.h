@@ -1330,16 +1330,15 @@ typedef struct inter_modes_info {
 
 /*!\cond */
 typedef struct {
-  // TODO(kyslov): consider changing to 64bit
-
   // This struct is used for computing variance in choose_partitioning(), where
   // the max number of samples within a superblock is 32x32 (with 4x4 avg).
-  // With 8bit bitdepth, uint32_t is enough for sum_square_error (2^8 * 2^8 * 32
-  // * 32 = 2^26). For high bitdepth we need to consider changing this to 64 bit
-  uint32_t sum_square_error;
+  // With 12bit bitdepth, sum_square_error can reach 2^12 * 2^12 * 32 * 32 =
+  // 2^34, and variance (256 * the per-sample variance) can reach 2^32, so both
+  // need 64 bits. |sum_error| is at most 2^12 * 32 * 32 = 2^22.
+  int64_t sum_square_error;
   int32_t sum_error;
   int log2_count;
-  int variance;
+  int64_t variance;
 } VPartVar;
 
 typedef struct {
