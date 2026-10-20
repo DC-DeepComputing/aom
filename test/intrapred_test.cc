@@ -464,6 +464,24 @@ INSTANTIATE_TEST_SUITE_P(NEON, HighbdIntraPredTest,
                          ::testing::ValuesIn(HighbdIntraPredTestVectorNeon));
 #endif  // HAVE_NEON
 
+#if HAVE_SIMD128
+const IntraPredFunc<HighbdIntraPred> HighbdIntraPredTestVectorSimd128[] = {
+  highbd_intrapred(dc, simd128, 12),
+  highbd_intrapred(dc_top, simd128, 12),
+  highbd_intrapred(dc_left, simd128, 12),
+  highbd_intrapred(dc_128, simd128, 12),
+  highbd_intrapred(v, simd128, 12),
+  highbd_intrapred(h, simd128, 12),
+  highbd_intrapred(paeth, simd128, 12),
+  highbd_intrapred(smooth, simd128, 12),
+  highbd_intrapred(smooth_v, simd128, 12),
+  highbd_intrapred(smooth_h, simd128, 12),
+};
+
+INSTANTIATE_TEST_SUITE_P(SIMD128, HighbdIntraPredTest,
+                         ::testing::ValuesIn(HighbdIntraPredTestVectorSimd128));
+#endif  // HAVE_SIMD128
+
 #if HAVE_SSE2
 const IntraPredFunc<HighbdIntraPred> HighbdIntraPredTestVectorSse2[] = {
   highbd_entry(dc, 4, 4, sse2, 12),
