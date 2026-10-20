@@ -452,9 +452,12 @@ INSTANTIATE_TEST_SUITE_P(
 #endif  // HAVE_NEON
 
 #if HAVE_SIMD128
-INSTANTIATE_TEST_SUITE_P(SIMD128, HadamardHighbdTest,
-                         ::testing::Values(HadamardFuncWithSize(
-                             &aom_highbd_hadamard_8x8_simd128, 8, 8)));
+INSTANTIATE_TEST_SUITE_P(
+    SIMD128, HadamardHighbdTest,
+    ::testing::Values(
+        HadamardFuncWithSize(&aom_highbd_hadamard_8x8_simd128, 8, 8),
+        HadamardFuncWithSize(&aom_highbd_hadamard_16x16_simd128, 16, 16),
+        HadamardFuncWithSize(&aom_highbd_hadamard_32x32_simd128, 32, 32)));
 #endif  // HAVE_SIMD128
 
 #endif  // CONFIG_AV1_HIGHBITDEPTH

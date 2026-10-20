@@ -1311,10 +1311,10 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
     specialize qw/aom_highbd_hadamard_8x8 avx2 neon simd128/;
 
     add_proto qw/void aom_highbd_hadamard_16x16/, "const int16_t *src_diff, ptrdiff_t src_stride, tran_low_t *coeff";
-    specialize qw/aom_highbd_hadamard_16x16 avx2 neon/;
+    specialize qw/aom_highbd_hadamard_16x16 avx2 neon simd128/;
 
     add_proto qw/void aom_highbd_hadamard_32x32/, "const int16_t *src_diff, ptrdiff_t src_stride, tran_low_t *coeff";
-    specialize qw/aom_highbd_hadamard_32x32 avx2 neon/;
+    specialize qw/aom_highbd_hadamard_32x32 avx2 neon simd128/;
   }
   add_proto qw/int aom_satd/, "const tran_low_t *coeff, int length";
   specialize qw/aom_satd neon sse2 avx2 simd128/;
