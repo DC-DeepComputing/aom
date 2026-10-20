@@ -3597,7 +3597,7 @@ void av1_nonrd_pick_inter_mode_sb(AV1_COMP *cpi, TileDataEnc *tile_data,
   DECLARE_ALIGNED(16, uint8_t, pred_buf[MAX_MB_PLANE * MAX_SB_SQUARE]);
   PRED_BUFFER *this_mode_pred = NULL;
   const int reuse_inter_pred =
-      rt_sf->reuse_inter_pred_nonrd && cm->seq_params->bit_depth == AOM_BITS_8;
+      rt_sf->reuse_inter_pred_nonrd && !is_cur_buf_hbd(xd);
   InterModeSearchStateNonrd search_state;
   av1_zero(search_state.use_ref_frame_mask);
   av1_zero(search_state.use_scaled_ref_frame);

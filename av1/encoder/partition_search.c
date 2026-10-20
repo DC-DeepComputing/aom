@@ -481,7 +481,7 @@ static void encode_superblock(const AV1_COMP *const cpi, TileDataEnc *tile_data,
     // segment blocks are picked without building a prediction.
     const int start_plane =
         (x->reuse_inter_pred && (!cpi->sf.rt_sf.nonrd_check_partition_split) &&
-         !seg_skip && cm->seq_params->bit_depth == AOM_BITS_8)
+         !seg_skip && !is_cur_buf_hbd(xd))
             ? 1
             : 0;
     if (!is_prediction_copied(x, mbmi, seg_skip)) {

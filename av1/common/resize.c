@@ -1240,7 +1240,7 @@ YV12_BUFFER_CONFIG *av1_realloc_and_scale_if_required(
 
 #if CONFIG_AV1_HIGHBITDEPTH
     if (use_optimized_scaler && has_optimized_scaler &&
-        cm->seq_params->bit_depth == AOM_BITS_8) {
+        !(unscaled->flags & YV12_FLAG_HIGHBITDEPTH)) {
       av1_resize_and_extend_frame(unscaled, scaled, filter, phase, num_planes);
     } else {
       if (!av1_resize_and_extend_frame_nonnormative(
