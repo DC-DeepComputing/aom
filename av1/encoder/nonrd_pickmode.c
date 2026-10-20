@@ -253,7 +253,7 @@ static int combined_motion_search(AV1_COMP *cpi, MACROBLOCK *x,
     av1_make_default_subpel_ms_params(&ms_params, cpi, x, bsize, &ref_mv,
                                       cost_list);
     const bool fullpel_performed_well =
-        (bsize == BLOCK_64X64 && full_var_rd * 40 < 62267 * 7) ||
+        (bsize == BLOCK_64X64 && (int64_t)full_var_rd * 40 < 62267 * 7) ||
         (bsize == BLOCK_32X32 && full_var_rd * 8 < 42380) ||
         (bsize == BLOCK_16X16 && full_var_rd * 8 < 10127);
     if (sf->rt_sf.reduce_mv_pel_precision_highmotion ||
@@ -483,7 +483,7 @@ static TX_SIZE calculate_tx_size(const AV1_COMP *const cpi, BLOCK_SIZE bsize,
     }
     // Choose larger transform size for blocks where dc component is dominant or
     // the ac component is low.
-    if (sse > ((var * multiplier) >> 2) || (var < var_thresh))
+    if (sse > (((int64_t)var * multiplier) >> 2) || (var < var_thresh))
       tx_size =
           AOMMIN(max_txsize_lookup[bsize],
                  tx_mode_to_biggest_tx_size[txfm_params->tx_mode_search_type]);
