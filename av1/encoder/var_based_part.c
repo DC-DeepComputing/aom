@@ -493,19 +493,19 @@ static inline void tune_thresh_based_on_qindex(
       thresholds[0] = (3 * thresholds[0]) >> 1;
       thresholds[3] = INT64_MAX;
       if (current_qindex > QINDEX_LARGE_BLOCK_THR) {
-        thresholds[1] =
-            (int)((1 - weight) * (thresholds[1] << 1) + weight * thresholds[1]);
-        thresholds[2] =
-            (int)((1 - weight) * (thresholds[2] << 1) + weight * thresholds[2]);
+        thresholds[1] = (int64_t)((1 - weight) * (thresholds[1] << 1) +
+                                  weight * thresholds[1]);
+        thresholds[2] = (int64_t)((1 - weight) * (thresholds[2] << 1) +
+                                  weight * thresholds[2]);
       }
     } else if (current_qindex > QINDEX_LARGE_BLOCK_THR &&
                is_segment_id_boosted == false &&
                (source_sad_nonrd != kHighSad ||
                 cpi->rc.avg_source_sad > 50000)) {
-      thresholds[1] =
-          (int)((1 - weight) * (thresholds[1] << 2) + weight * thresholds[1]);
-      thresholds[2] =
-          (int)((1 - weight) * (thresholds[2] << 4) + weight * thresholds[2]);
+      thresholds[1] = (int64_t)((1 - weight) * (thresholds[1] << 2) +
+                                weight * thresholds[1]);
+      thresholds[2] = (int64_t)((1 - weight) * (thresholds[2] << 4) +
+                                weight * thresholds[2]);
       thresholds[3] = INT64_MAX;
     }
   } else if (cpi->sf.rt_sf.prefer_large_partition_blocks >= 2) {
@@ -521,11 +521,11 @@ static inline void tune_thresh_based_on_qindex(
     else
       weight = 1.0 - (current_qindex - QINDEX_LARGE_BLOCK_THR + 45) / (2 * 45);
     thresholds[1] =
-        (int)((1 - weight) * (thresholds[1] << 1) + weight * thresholds[1]);
+        (int64_t)((1 - weight) * (thresholds[1] << 1) + weight * thresholds[1]);
     thresholds[2] =
-        (int)((1 - weight) * (thresholds[2] << 1) + weight * thresholds[2]);
-    thresholds[3] =
-        (int)((1 - weight) * (thresholds[3] << fac) + weight * thresholds[3]);
+        (int64_t)((1 - weight) * (thresholds[2] << 1) + weight * thresholds[2]);
+    thresholds[3] = (int64_t)((1 - weight) * (thresholds[3] << fac) +
+                              weight * thresholds[3]);
   }
   if (cpi->sf.part_sf.disable_8x8_part_based_on_qidx && (current_qindex < 128))
     thresholds[3] = INT64_MAX;
@@ -659,8 +659,12 @@ static inline void set_vbp_thresholds(AV1_COMP *cpi, int64_t thresholds[],
   AV1_COMMON *const cm = &cpi->common;
   const int is_key_frame = frame_is_intra_only(cm);
   const int threshold_multiplier = is_key_frame ? 120 : 1;
-  const int ac_q = av1_ac_quant_QTX(qindex, 0, cm->seq_params->bit_depth);
-  int64_t threshold_base = (int64_t)(threshold_multiplier * ac_q);
+  const int bit_depth = cm->seq_params->bit_depth;
+  const int ac_q = av1_ac_quant_QTX(qindex, 0, bit_depth);
+  // The variances scale with 4^(bit_depth - 8) but ac_q only scales with
+  // 2^(bit_depth - 8), so scale the thresholds by the remaining factor.
+  int64_t threshold_base = (int64_t)(threshold_multiplier * ac_q)
+                           << (bit_depth - 8);
   const int current_qindex = cm->quant_params.base_qindex;
   const int threshold_left_shift = cpi->sf.rt_sf.var_part_split_threshold_shift;
   const int num_pixels = cm->width * cm->height;
