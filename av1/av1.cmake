@@ -483,9 +483,12 @@ list(APPEND AOM_AV1_COMMON_INTRIN_VSX "${AOM_ROOT}/av1/common/ppc/cfl_ppc.c")
 
 list(APPEND AOM_AV1_COMMON_INTRIN_SIMD128
             "${AOM_ROOT}/av1/common/wasm/av1_inv_txfm_simd128.c"
-            "${AOM_ROOT}/av1/common/wasm/av1_inv_txfm1d_simd128.inc")
+            "${AOM_ROOT}/av1/common/wasm/av1_inv_txfm1d_simd128.inc"
+            "${AOM_ROOT}/av1/common/wasm/av1_txfm_simd128.h")
 
 list(APPEND AOM_AV1_ENCODER_INTRIN_SIMD128
+            "${AOM_ROOT}/av1/encoder/wasm/av1_fwd_txfm1d_simd128.inc"
+            "${AOM_ROOT}/av1/encoder/wasm/av1_fwd_txfm2d_simd128.c"
             "${AOM_ROOT}/av1/encoder/wasm/encodetxb_simd128.c")
 
 list(APPEND AOM_AV1_COMMON_INTRIN_RVV
