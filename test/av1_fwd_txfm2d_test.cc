@@ -704,4 +704,18 @@ INSTANTIATE_TEST_SUITE_P(NEON, AV1HighbdFwdTxfm2dTest,
                                  Values(av1_highbd_fwd_txfm)));
 #endif  // HAVE_NEON
 
+#if HAVE_SIMD128
+static constexpr TX_SIZE Highbd_fwd_txfm_for_simd128[] = {
+  TX_4X4,  TX_8X8,  TX_16X16, TX_32X32, TX_4X8,
+  TX_8X4,  TX_8X16, TX_16X8,  TX_16X32, TX_32X16,
+#if !CONFIG_REALTIME_ONLY
+  TX_4X16, TX_16X4, TX_8X32,  TX_32X8,
+#endif  // !CONFIG_REALTIME_ONLY
+};
+
+INSTANTIATE_TEST_SUITE_P(SIMD128, AV1HighbdFwdTxfm2dTest,
+                         Combine(ValuesIn(Highbd_fwd_txfm_for_simd128),
+                                 Values(av1_highbd_fwd_txfm)));
+#endif  // HAVE_SIMD128
+
 }  // namespace

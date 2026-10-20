@@ -28,34 +28,9 @@
 #include "av1/common/av1_txfm.h"
 #include "av1/common/enums.h"
 #include "av1/common/idct.h"
-
-static inline v128_t half_btf_v(int32_t w0, v128_t in0, int32_t w1, v128_t in1,
-                                int bit) {
-  v128_t r = wasm_i32x4_add(wasm_i32x4_mul(in0, wasm_i32x4_splat(w0)),
-                            wasm_i32x4_mul(in1, wasm_i32x4_splat(w1)));
-  r = wasm_i32x4_add(r, wasm_i32x4_splat(1 << (bit - 1)));
-  return wasm_i32x4_shr(r, bit);
-}
-
-static inline v128_t clamp_v(v128_t v, int8_t bit) {
-  if (bit <= 0 || bit >= 32) return v;
-  const v128_t hi = wasm_i32x4_splat((1 << (bit - 1)) - 1);
-  const v128_t lo = wasm_i32x4_splat(-(1 << (bit - 1)));
-  return wasm_i32x4_max(wasm_i32x4_min(v, hi), lo);
-}
+#include "av1/common/wasm/av1_txfm_simd128.h"
 
 #include "av1/common/wasm/av1_inv_txfm1d_simd128.inc"
-
-// round_shift((int64_t)m * x, 12) per lane, in 64-bit like the C code.
-static inline v128_t mul_round_shift12_64(v128_t x, int32_t m) {
-  const v128_t mm = wasm_i64x2_splat(m);
-  const v128_t rnd = wasm_i64x2_splat(1 << (NewSqrt2Bits - 1));
-  v128_t lo = wasm_i64x2_mul(wasm_i64x2_extend_low_i32x4(x), mm);
-  v128_t hi = wasm_i64x2_mul(wasm_i64x2_extend_high_i32x4(x), mm);
-  lo = wasm_i64x2_shr(wasm_i64x2_add(lo, rnd), NewSqrt2Bits);
-  hi = wasm_i64x2_shr(wasm_i64x2_add(hi, rnd), NewSqrt2Bits);
-  return wasm_i32x4_shuffle(lo, hi, 0, 2, 4, 6);  // (int32_t) truncation.
-}
 
 static void iidentity4_simd128(const v128_t *in, v128_t *out, int8_t cos_bit,
                                const int8_t *stage_range) {
@@ -157,15 +132,6 @@ static TxfmFuncV txfm_func_v(TXFM_TYPE t) {
   }
 }
 
-static inline v128_t round_shift_v(v128_t v, int bit) {
-  // av1_round_shift_array(): bit > 0 rounds right; bit < 0 is a saturating
-  // left shift (never used by inverse transforms with these configs).
-  if (bit == 0) return v;
-  assert(bit > 0);
-  return wasm_i32x4_shr(wasm_i32x4_add(v, wasm_i32x4_splat(1 << (bit - 1))),
-                        bit);
-}
-
 // Mirrors inv_txfm2d_add_c() in av1_inv_txfm2d.c for sizes up to 32x32.
 static void inv_txfm2d_add_simd128(const int32_t *input, uint16_t *output,
                                    int stride, TX_TYPE tx_type, TX_SIZE tx_size,
@@ -196,7 +162,7 @@ static void inv_txfm2d_add_simd128(const int32_t *input, uint16_t *output,
     for (int c = 0; c < w; c += 4) {
       v128_t blk[4], tr[4];
       for (int i = 0; i < 4; ++i)
-        blk[i] = round_shift_v(tout[c + i], -shift[0]);
+        blk[i] = round_shift_right_v(tout[c + i], -shift[0]);
       aom_transpose_i32_4x4(blk, tr);  // tr[l] = row r + l, cols c..c+3.
       for (int l = 0; l < 4; ++l) wasm_v128_store(buf + (r + l) * w + c, tr[l]);
     }
@@ -221,7 +187,7 @@ static void inv_txfm2d_add_simd128(const int32_t *input, uint16_t *output,
     col_fn(tin, tout, cfg.cos_bit_col, stage_range_col);
     for (int r = 0; r < h; ++r) {
       const v128_t res =
-          round_shift_v(tout[cfg.ud_flip ? h - r - 1 : r], -shift[1]);
+          round_shift_right_v(tout[cfg.ud_flip ? h - r - 1 : r], -shift[1]);
       uint16_t *dst = output + r * stride + c;
       const v128_t d = wasm_u32x4_load16x4(dst);
       v128_t s = wasm_i32x4_add(d, res);
