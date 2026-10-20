@@ -3472,8 +3472,8 @@ void av1_rc_scene_detection_onepass_rt(AV1_COMP *cpi,
       // Compute fast coarse/global motion for 128x128 superblock centered
       // at middle of frame, and one to the upper left and one to lower right.
       // to determine if motion is scroll. Only test 3 points (pts) for now.
-      // TODO(marpan): Only allow for 8 bit-depth for now.
-      if (cm->seq_params->bit_depth == 8) {
+      // TODO(marpan): Only allow for low bitdepth frame buffers for now.
+      if (!cm->seq_params->use_highbitdepth) {
         int sw_row = (cpi->rc.frame_source_sad > 20000) ? 512 : 192;
         int sw_col = (cpi->rc.frame_source_sad > 20000) ? 512 : 160;
         if (cm->width * cm->height >= 3840 * 2160 &&

@@ -2140,7 +2140,7 @@ unsigned int av1_int_pro_motion_estimation(
   }
   const int ref_stride = xd->plane[0].pre[0].stride;
 
-  if (xd->bd != 8) {
+  if (is_cur_buf_hbd(xd)) {
     best_int_mv->as_fullmv = kZeroFullMv;
     best_sad = cpi->ppi->fn_ptr[bsize].sdf(x->plane[0].src.buf, src_stride,
                                            xd->plane[0].pre[0].buf, ref_stride);

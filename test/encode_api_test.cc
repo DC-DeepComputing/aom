@@ -696,6 +696,92 @@ TEST(EncodeAPI, LowBDEncoderHighBDImage) {
   ASSERT_EQ(aom_codec_destroy(&enc), AOM_CODEC_OK);
 }
 
+#if CONFIG_AV1_HIGHBITDEPTH
+// Encodes frames of random 8-bit noise with the realtime encoder at 8-bit
+// depth, using high bitdepth frame buffers. If |halve_size_at_frame| is
+// positive, the frame size is halved from that frame on.
+void Encode8BitNoiseHighbdBuffers(unsigned int width, unsigned int height,
+                                  int speed, aom_tune_content content,
+                                  int frames, int halve_size_at_frame = 0) {
+  aom_codec_iface_t *iface = aom_codec_av1_cx();
+  aom_codec_enc_cfg_t cfg;
+  ASSERT_EQ(aom_codec_enc_config_default(iface, &cfg, AOM_USAGE_REALTIME),
+            AOM_CODEC_OK);
+  cfg.g_w = width;
+  cfg.g_h = height;
+  cfg.g_forced_max_frame_width = width;
+  cfg.g_forced_max_frame_height = height;
+  cfg.g_lag_in_frames = 0;
+  cfg.rc_end_usage = AOM_CBR;
+
+  aom_codec_ctx_t enc;
+  ASSERT_EQ(aom_codec_enc_init(&enc, iface, &cfg, AOM_CODEC_USE_HIGHBITDEPTH),
+            AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&enc, AOME_SET_CPUUSED, speed), AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&enc, AV1E_SET_TUNE_CONTENT, content),
+            AOM_CODEC_OK);
+
+  aom_image_t *image =
+      aom_img_alloc(nullptr, AOM_IMG_FMT_I42016, width, height, 1);
+  ASSERT_NE(image, nullptr);
+  const unsigned int uv_h = (height + 1) / 2;
+  const unsigned int uv_w = (width + 1) / 2;
+  for (unsigned int i = 0; i < uv_h; ++i) {
+    Memset16(image->planes[1] + i * image->stride[1], 128, uv_w);
+    Memset16(image->planes[2] + i * image->stride[2], 128, uv_w);
+  }
+
+  ::libaom_test::ACMRandom rnd;
+  rnd.Reset(::libaom_test::ACMRandom::DeterministicSeed());
+  for (int frame = 0; frame < frames; ++frame) {
+    if (halve_size_at_frame > 0 && frame == halve_size_at_frame) {
+      cfg.g_w = width / 2;
+      cfg.g_h = height / 2;
+      ASSERT_EQ(aom_codec_enc_config_set(&enc, &cfg), AOM_CODEC_OK);
+      image->d_w = cfg.g_w;
+      image->d_h = cfg.g_h;
+    }
+    for (unsigned int i = 0; i < image->d_h; ++i) {
+      uint16_t *row =
+          reinterpret_cast<uint16_t *>(image->planes[0] + i * image->stride[0]);
+      for (unsigned int j = 0; j < image->d_w; ++j) row[j] = rnd.Rand8();
+    }
+    ASSERT_EQ(aom_codec_encode(&enc, image, frame, 1, 0), AOM_CODEC_OK);
+  }
+  ASSERT_EQ(aom_codec_encode(&enc, nullptr, 0, 0, 0), AOM_CODEC_OK);
+
+  aom_img_free(image);
+  ASSERT_EQ(aom_codec_destroy(&enc), AOM_CODEC_OK);
+}
+
+// The following tests encode 8-bit video in high bitdepth frame buffers. Code
+// that chose low bitdepth functions by bit depth instead of by frame buffer
+// type used to access the high bitdepth buffers as low bitdepth ones.
+
+// av1_int_pro_motion_estimation(), called by search_new_mv() for GOLDEN_FRAME.
+TEST(EncodeAPI, IntProMotionEstimation8BitHighbdBuffers) {
+  Encode8BitNoiseHighbdBuffers(64, 64, 9, AOM_CONTENT_DEFAULT, 3);
+}
+
+// Prediction reuse in av1_nonrd_pick_inter_mode_sb(), which is enabled for
+// screen content.
+TEST(EncodeAPI, ReuseInterPred8BitHighbdBuffers) {
+  Encode8BitNoiseHighbdBuffers(64, 64, 9, AOM_CONTENT_SCREEN, 2);
+}
+
+// The optimized scaler, used to scale the source and the references.
+TEST(EncodeAPI, OptimizedScaler8BitHighbdBuffers) {
+  Encode8BitNoiseHighbdBuffers(128, 128, 7, AOM_CONTENT_DEFAULT, 3,
+                               /*halve_size_at_frame=*/2);
+}
+
+// estimate_scroll_motion(), which is used for high motion screen content.
+// The estimation code only runs for input at least 720p large.
+TEST(EncodeAPI, ScrollMotionEstimation8BitHighbdBuffers) {
+  Encode8BitNoiseHighbdBuffers(1280, 720, 11, AOM_CONTENT_SCREEN, 16);
+}
+#endif  // CONFIG_AV1_HIGHBITDEPTH
+
 aom_image_t *CreateGrayImage(aom_img_fmt_t fmt, unsigned int w,
                              unsigned int h) {
   aom_image_t *const image = aom_img_alloc(nullptr, fmt, w, h, 1);
