@@ -202,6 +202,11 @@ INSTANTIATE_TEST_SUITE_P(NEON, EncodeTxbTest,
                          ::testing::Values(av1_get_nz_map_contexts_neon));
 #endif
 
+#if HAVE_SIMD128
+INSTANTIATE_TEST_SUITE_P(SIMD128, EncodeTxbTest,
+                         ::testing::Values(av1_get_nz_map_contexts_simd128));
+#endif
+
 using av1_txb_init_levels_func = void (*)(const tran_low_t *const coeff,
                                           const int width, const int height,
                                           uint8_t *const levels);
