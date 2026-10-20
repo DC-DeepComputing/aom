@@ -92,4 +92,46 @@ void aom_highbd_hadamard_8x8_simd128(const int16_t *src_diff,
     }
   }
 }
+
+// Combines four n-coefficient sub-transforms at coeff[0], [n], [2n], [3n] with
+// one more Hadamard butterfly stage, shifting the first stage by `shift`.
+static inline void highbd_hadamard_combine(tran_low_t *coeff, int n,
+                                           int shift) {
+  for (int i = 0; i < n; i += 4) {
+    const v128_t a0 = wasm_v128_load(coeff + i);
+    const v128_t a1 = wasm_v128_load(coeff + i + n);
+    const v128_t a2 = wasm_v128_load(coeff + i + 2 * n);
+    const v128_t a3 = wasm_v128_load(coeff + i + 3 * n);
+    const v128_t b0 = wasm_i32x4_shr(wasm_i32x4_add(a0, a1), shift);
+    const v128_t b1 = wasm_i32x4_shr(wasm_i32x4_sub(a0, a1), shift);
+    const v128_t b2 = wasm_i32x4_shr(wasm_i32x4_add(a2, a3), shift);
+    const v128_t b3 = wasm_i32x4_shr(wasm_i32x4_sub(a2, a3), shift);
+    wasm_v128_store(coeff + i, wasm_i32x4_add(b0, b2));
+    wasm_v128_store(coeff + i + n, wasm_i32x4_add(b1, b3));
+    wasm_v128_store(coeff + i + 2 * n, wasm_i32x4_sub(b0, b2));
+    wasm_v128_store(coeff + i + 3 * n, wasm_i32x4_sub(b1, b3));
+  }
+}
+
+void aom_highbd_hadamard_16x16_simd128(const int16_t *src_diff,
+                                       ptrdiff_t src_stride,
+                                       tran_low_t *coeff) {
+  for (int idx = 0; idx < 4; ++idx) {
+    const int16_t *src_ptr =
+        src_diff + (idx >> 1) * 8 * src_stride + (idx & 0x01) * 8;
+    aom_highbd_hadamard_8x8_simd128(src_ptr, src_stride, coeff + idx * 64);
+  }
+  highbd_hadamard_combine(coeff, 64, 1);
+}
+
+void aom_highbd_hadamard_32x32_simd128(const int16_t *src_diff,
+                                       ptrdiff_t src_stride,
+                                       tran_low_t *coeff) {
+  for (int idx = 0; idx < 4; ++idx) {
+    const int16_t *src_ptr =
+        src_diff + (idx >> 1) * 16 * src_stride + (idx & 0x01) * 16;
+    aom_highbd_hadamard_16x16_simd128(src_ptr, src_stride, coeff + idx * 256);
+  }
+  highbd_hadamard_combine(coeff, 256, 2);
+}
 #endif  // CONFIG_AV1_HIGHBITDEPTH
