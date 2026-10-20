@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "f3c09597_60e07f8b",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-20T16:01:05Z",
+      "side": 1,
+      "message": "Yuan: Just wanted to confirm with you that I should still submit my CL first. I am planning to cherry-pick my CL to the quibblepants branch for libaom v3.15.3.",
+      "revId": "162dfb93284fe3f56065650a415ff50c6ea23ca5",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "039211f7_425862ca",
+        "filename": "av1/encoder/encoder.h",
+        "patchSetId": 2
+      },
+      "lineNbr": 1341,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-20T16:01:05Z",
+      "side": 1,
+      "message": "Yuan: I also considered exactly these two changes, so I support both of these changes. Thank you very much for attempting these changes. In my CL I decided to only fix the overflows identified by the fuzz test repro (which I converted to a unit test).\n\nThe first change is a TODO, so the only design decision is whether to use `int64_t` or `uint64_t`. I would also use `int64_t` because it is more commonly used in libvpx.\n\nThe second change makes sense because `variance` is often compared with an `int64_t` threshold.",
+      "revId": "162dfb93284fe3f56065650a415ff50c6ea23ca5",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
