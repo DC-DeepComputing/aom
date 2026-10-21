@@ -1,0 +1,78 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "032cfbc9_bebd3ee6",
+        "filename": "av1/encoder/encodeframe.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 54,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-21T22:31:47Z",
+      "side": 1,
+      "message": "Nit: Add \"for a tile\" after \"hash table\"?\n\nMy suggestion may be wrong. The goal is to make it clear how the tile is related to the hash table or the given index.",
+      "revId": "0e99fc9da2fa799f60efa85abedafafda2f83f84",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "62b89813_bcb004d2",
+        "filename": "av1/encoder/encodeframe.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 54,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-21T22:31:47Z",
+      "side": 1,
+      "message": "[This comment applies to the entire CL.]\n\nThe use of the term \"area\" in this CL is confusing. The word \"area\" could mean a region or the area (the size) of the region. At first I thought it\u0027s the second meaning, but after reading some more code I realized it\u0027s the first meaning.\n\nIt would be better to replace \"area\" with \"region\" or \"rectangle\".",
+      "range": {
+        "startLine": 54,
+        "startChar": 63,
+        "endLine": 54,
+        "endChar": 67
+      },
+      "revId": "0e99fc9da2fa799f60efa85abedafafda2f83f84",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "ab5b0242_e60c244d",
+        "filename": "av1/encoder/encodeframe.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 56,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-21T22:31:47Z",
+      "side": 1,
+      "message": "Nit: Add a blank line after this line.",
+      "revId": "0e99fc9da2fa799f60efa85abedafafda2f83f84",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "c27621fe_da1a28a1",
+        "filename": "av1/encoder/hash_motion.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 43,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-21T22:31:47Z",
+      "side": 1,
+      "message": "Nit: Add `IntraBC` before `HashRegion`.",
+      "revId": "0e99fc9da2fa799f60efa85abedafafda2f83f84",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
