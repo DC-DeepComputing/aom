@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "bcdabfd1_e22b5cff",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-21T18:04:53Z",
+      "side": 1,
+      "message": "Please review. This fixes the nightly test failures. Thanks!",
+      "revId": "2b54b6d2f6c272b44d316d6717af075071a58f3d",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "8468dc4f_500d4061",
+        "filename": "test/encode_api_test.cc",
+        "patchSetId": 1
+      },
+      "lineNbr": 4590,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-21T18:04:53Z",
+      "side": 1,
+      "message": "Note the use of bit depth 12 here and the `AOM_CODEC_USE_HIGHBITDEPTH` flag is passed to the `aom_codec_enc_init()` call at line 4602.",
+      "revId": "2b54b6d2f6c272b44d316d6717af075071a58f3d",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
