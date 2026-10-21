@@ -1,0 +1,129 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "e938eb66_6c645da2",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 4
+      },
+      "lineNbr": 22,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-21T21:45:09Z",
+      "side": 1,
+      "message": "Ihor: Could you please confirm that this CL does not change the encoder output and is a pure speedup? That is great!",
+      "revId": "1f64de19a06ab90dccc7b9c96ee2ff3710383d75",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "09c8cf21_6bc1d527",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 4
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-21T21:45:09Z",
+      "side": 1,
+      "message": "Ihor: I cc\u0027ed Julio Barba, who last modified the IntraBC hash tables (last year?).\n\nI made a pass through the CL. Since I am not familiar with the code, some of my questions may not make sense. Please bear with me.",
+      "revId": "1f64de19a06ab90dccc7b9c96ee2ff3710383d75",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "0e5ab6d0_a222120b",
+        "filename": "av1/encoder/hash_motion.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 124,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-21T21:45:09Z",
+      "side": 1,
+      "message": "Nit: Add \"even when the function fails\" after \"Its old entries are lost.\"\n\nI also wanted to confirm that this function does not need to preserve the old values. I.e., after growing the array, it does not need to copy the old values from the original array to the new array.",
+      "range": {
+        "startLine": 124,
+        "startChar": 50,
+        "endLine": 124,
+        "endChar": 74
+      },
+      "revId": "1f64de19a06ab90dccc7b9c96ee2ff3710383d75",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "da85d419_3ff33894",
+        "filename": "av1/encoder/hash_motion.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 253,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-21T21:45:09Z",
+      "side": 1,
+      "message": "Is it normal for `x_end` or `y_end` to be \u003c\u003d 0? If not, then we should return false to indicate an error.",
+      "revId": "1f64de19a06ab90dccc7b9c96ee2ff3710383d75",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "261fead2_8531641b",
+        "filename": "av1/encoder/hash_motion.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 255,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-21T21:45:09Z",
+      "side": 1,
+      "message": "If I understand it correctly, the code below sets up the `bucket_start` entries.\n\nI think it assumes `bucket_count[bucket]` is equal to 0 before it starts, right?\n\nAfter it finishes, `bucket_count[bucket]` is reset to 0.\n\nIt would be good to include these points in the comment.",
+      "revId": "1f64de19a06ab90dccc7b9c96ee2ff3710383d75",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "98778620_dc0172fa",
+        "filename": "av1/encoder/hash_motion.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 325,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-21T21:45:09Z",
+      "side": 1,
+      "message": "If I understand it correctly, `bucket_count[bucket]` is equal to 0 before we enter this while loop, and the code here keep `bucket_count[bucket]` \u003c\u003d `kMaxCandidatesPerHashBucket`. So `count \u003e kMaxCandidatesPerHashBucket` cannot be true. Correct?\n\nIf that\u0027s correct, then this statement is equivalent to:\n\n```\n        if (count \u003e kMaxCandidatesPerHashBucket) return false; // Internal error.\n        if (count \u003d\u003d kMaxCandidatesPerHashBucket) continue;\n```",
+      "revId": "1f64de19a06ab90dccc7b9c96ee2ff3710383d75",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "4e115dca_0bfbf313",
+        "filename": "av1/encoder/hash_motion.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 42,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-21T21:45:09Z",
+      "side": 1,
+      "message": "Please document that the `bucket_count` and `bucket_start` arrays have `kMaxAddr` elements.\n\nQuestion: Since these two arrays are fixed-sized, why don\u0027t we statically allocate them as follows?\n\n```\n  uint16_t bucket_count[kMaxAddr];\n  uint32_t bucket_start[kMaxAddr];\n```\n\nIs it to avoid wasting memory when IntraBC is not used?",
+      "revId": "1f64de19a06ab90dccc7b9c96ee2ff3710383d75",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
