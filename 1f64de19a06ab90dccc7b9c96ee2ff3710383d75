@@ -20,6 +20,24 @@
     {
       "unresolved": false,
       "key": {
+        "uuid": "c90a563f_bd51dd3f",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 4
+      },
+      "lineNbr": 22,
+      "author": {
+        "id": 5216012
+      },
+      "writtenOn": "2026-10-21T22:18:02Z",
+      "side": 1,
+      "message": "Yes correct, in this change the output does not change. But in the next patch, where I added parallel processing, the output will be different if more than one thread is used. Thanks for looking in!",
+      "parentUuid": "e938eb66_6c645da2",
+      "revId": "1f64de19a06ab90dccc7b9c96ee2ff3710383d75",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
         "uuid": "09c8cf21_6bc1d527",
         "filename": "/PATCHSET_LEVEL",
         "patchSetId": 4
@@ -75,6 +93,30 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "27772a69_dbca1079",
+        "filename": "av1/encoder/hash_motion.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 124,
+      "author": {
+        "id": 5216012
+      },
+      "writtenOn": "2026-10-21T22:18:02Z",
+      "side": 1,
+      "message": "Done. And no, nothing needs to be copied. hash_table_reserve() is called after the count pass, and the fill then writes every entry of that block size from scratch. Each block size is built once per frame, so no old entry is ever read. If the allocation fails, the array is NULL with size 0, and the caller reports AOM_CODEC_MEM_ERROR.",
+      "parentUuid": "0e5ab6d0_a222120b",
+      "range": {
+        "startLine": 124,
+        "startChar": 50,
+        "endLine": 124,
+        "endChar": 74
+      },
+      "revId": "1f64de19a06ab90dccc7b9c96ee2ff3710383d75",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "da85d419_3ff33894",
@@ -88,6 +130,24 @@
       "writtenOn": "2026-10-21T21:45:09Z",
       "side": 1,
       "message": "Is it normal for `x_end` or `y_end` to be \u003c\u003d 0? If not, then we should return false to indicate an error.",
+      "revId": "1f64de19a06ab90dccc7b9c96ee2ff3710383d75",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "5beb4d36_9548f80b",
+        "filename": "av1/encoder/hash_motion.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 253,
+      "author": {
+        "id": 5216012
+      },
+      "writtenOn": "2026-10-21T22:18:02Z",
+      "side": 1,
+      "message": "Yes, it\u0027s normal. It happens when the frame is smaller than the block size, for example the 64x64 table on a frame 48 pixels tall. The caller builds every size from 4 up to the superblock size without checking the frame size. That isn\u0027t an error, the frame just has no blocks of that size. The old code returned true here too, because its loops simply didn\u0027t run. The early return just skips the passes. The counts for that size stay 0 from av1_hash_table_create().",
+      "parentUuid": "da85d419_3ff33894",
       "revId": "1f64de19a06ab90dccc7b9c96ee2ff3710383d75",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
@@ -109,6 +169,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "0888be21_ea87d580",
+        "filename": "av1/encoder/hash_motion.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 255,
+      "author": {
+        "id": 5216012
+      },
+      "writtenOn": "2026-10-21T22:18:02Z",
+      "side": 1,
+      "message": "The first part is right. av1_hash_table_create() clears all kMaxAddr counts once per frame, each block size has its own range of 1 \u003c\u003c 16 buckets, and each size is built once. The second part is only half right. The counts are reset to 0 after the prefix sum, but then the fill counts them up again. When the function returns, bucket_count[bucket] is the number of entries in the bucket, which is what av1_hash_table_count() returns. I\u0027ll put both points in the comment.",
+      "parentUuid": "261fead2_8531641b",
+      "revId": "1f64de19a06ab90dccc7b9c96ee2ff3710383d75",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "98778620_dc0172fa",
@@ -126,6 +204,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "0e0a38bf_7684a1bd",
+        "filename": "av1/encoder/hash_motion.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 325,
+      "author": {
+        "id": 5216012
+      },
+      "writtenOn": "2026-10-21T22:18:02Z",
+      "side": 1,
+      "message": "Correct. The fill visits each block exactly once, and they are the same blocks the count pass counted. So a bucket gets exactly as many entries as the prefix sum made room for, and never more than 256. I used \u003e\u003d only because it mirrors the old cap check. I\u0027d rather not return false here. It can\u0027t happen, and the caller would report it as a memory error. I\u0027ll change it to:\n\nassert(count \u003c\u003d kMaxCandidatesPerHashBucket);\nif (count \u003d\u003d kMaxCandidatesPerHashBucket) continue;",
+      "parentUuid": "98778620_dc0172fa",
+      "revId": "1f64de19a06ab90dccc7b9c96ee2ff3710383d75",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "4e115dca_0bfbf313",
@@ -139,6 +235,24 @@
       "writtenOn": "2026-10-21T21:45:09Z",
       "side": 1,
       "message": "Please document that the `bucket_count` and `bucket_start` arrays have `kMaxAddr` elements.\n\nQuestion: Since these two arrays are fixed-sized, why don\u0027t we statically allocate them as follows?\n\n```\n  uint16_t bucket_count[kMaxAddr];\n  uint32_t bucket_start[kMaxAddr];\n```\n\nIs it to avoid wasting memory when IntraBC is not used?",
+      "revId": "1f64de19a06ab90dccc7b9c96ee2ff3710383d75",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "9eb8fe5c_28f488f1",
+        "filename": "av1/encoder/hash_motion.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 42,
+      "author": {
+        "id": 5216012
+      },
+      "writtenOn": "2026-10-21T22:18:02Z",
+      "side": 1,
+      "message": "Yes. kMaxAddr is 6 \u003c\u003c 16, so as fixed arrays the two would take 2.25 MB (768 KB + 1.5 MB) in every hash_table. The table lives in MACROBLOCK through IntraBCHashInfo, and ethread.c copies MACROBLOCK into each worker with thread_data-\u003etd-\u003emb \u003d cpi-\u003etd.mb, so every thread would pay for it, and each copy would become a 2.25 MB memcpy, even when IntraBC is off.\n\nAs pointers they\u0027re allocated only the first time an IntraBC frame builds the table, and then kept for later frames. An encoder that never uses IntraBC never allocates them. This is also less than before: main allocated a 3 MB array of kMaxAddr Vector pointers in the same lazy way, plus a Vector for each used bucket. 218282 cuts it further by allocating the bucket arrays only for the block sizes that get built, which is 384 KB at speed 11.",
+      "parentUuid": "4e115dca_0bfbf313",
       "revId": "1f64de19a06ab90dccc7b9c96ee2ff3710383d75",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
