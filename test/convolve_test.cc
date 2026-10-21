@@ -843,7 +843,7 @@ INSTANTIATE_TEST_SUITE_P(SSE2, HighbdConvolveTest,
 #endif
 #endif
 
-#if HAVE_SSSE3
+#if HAVE_SSSE3 && HAVE_X86_ASM
 const ConvolveFunctions convolve8_ssse3(aom_convolve8_horiz_ssse3,
                                         aom_convolve8_vert_ssse3, 0);
 
