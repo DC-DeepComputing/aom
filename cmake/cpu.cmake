@@ -106,6 +106,7 @@ elseif("${AOM_TARGET_CPU}" MATCHES "ppc")
     set(AOM_RTCD_FLAGS ${AOM_RTCD_FLAGS} --disable-vsx)
   endif()
 elseif("${AOM_TARGET_CPU}" MATCHES "^x86")
+  set(HAVE_X86_ASM 1)
   if("${AOM_TARGET_CPU}" STREQUAL "x86")
     set(AOM_ARCH_X86 1)
     # Disable avx512
