@@ -1,0 +1,55 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "f65f94b8_d3a54c53",
+        "filename": "av1/encoder/encoder_utils.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 445,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-10-21T17:59:10Z",
+      "side": 1,
+      "message": "two things:\n\n1. this block of code should be moved after the next `if` block because this early return will disable segmentation if both ROI and active map are applied AND ROI now should be disabled due to frame size changes.\n\n2. you probably want to set `roi-\u003eenabled \u003d 0` here too.",
+      "range": {
+        "startLine": 445,
+        "startChar": 0,
+        "endLine": 445,
+        "endChar": 65
+      },
+      "fixSuggestions": [
+        {
+          "fixId": "1a493c9e_28a6bd3c",
+          "description": "prompt_to_edit API",
+          "replacements": [
+            {
+              "path": "av1/encoder/encoder_utils.c",
+              "range": {
+                "startLine": 1,
+                "startChar": 0,
+                "endLine": 1,
+                "endChar": 0
+              },
+              "replacement": "  // Force disable of ROI if active_map is enabled. ROI for now\n  // only supported/tested for realtime mode with speed \u003e\u003d 7.\n  if (!roi-\u003eenabled || cpi-\u003eactive_map.enabled || cpi-\u003eoxcf.speed \u003c 7 ||\n      cpi-\u003eoxcf.mode !\u003d REALTIME) {\n    roi-\u003eenabled \u003d 0;\n    roi-\u003edelta_qp_enabled \u003d 0;\n    roi-\u003ereference_enabled \u003d 0;\n    return;\n  }\n\n"
+            },
+            {
+              "path": "av1/encoder/encoder_utils.c",
+              "range": {
+                "startLine": 453,
+                "startChar": 0,
+                "endLine": 463,
+                "endChar": 0
+              },
+              "replacement": ""
+            }
+          ]
+        }
+      ],
+      "revId": "57ed0b284b496365bf78ec78be69dc46843381b7",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
