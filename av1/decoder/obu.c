@@ -449,6 +449,16 @@ static void copy_decoded_tile_to_tile_list_buffer(AV1Decoder *pbi, int tile_idx,
     int vend1 = vstart1 + h;
     int hstart1 = pbi->dec_tile_col * w;
     int hend1 = hstart1 + w;
+    const int crop_height =
+        plane > 0 ? cur_frame->uv_crop_height : cur_frame->y_crop_height;
+    const int crop_width =
+        plane > 0 ? cur_frame->uv_crop_width : cur_frame->y_crop_width;
+    if (vstart1 >= crop_height || hstart1 >= crop_width) {
+      aom_internal_error(&pbi->error, AOM_CODEC_CORRUPT_FRAME,
+                         "Tile starts outside the frame");
+    }
+    vend1 = AOMMIN(vend1, crop_height);
+    hend1 = AOMMIN(hend1, crop_width);
     // dst offset
     int vstart2 = tr * h;
     int hstart2 = tc * w;
