@@ -16,6 +16,24 @@
       "message": "Let me look into this. I verified that `cm-\u003eframe_presentation_time` is only used under the condition you added. But I want to see if we can change the type to `int64_t`.",
       "revId": "1dab7aa38b295df5d545c38cbc4acfff218e1054",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "8ab37461_33e0d677",
+        "filename": "av1/encoder/encode_strategy.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1522,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-21T18:25:35Z",
+      "side": 1,
+      "message": "The relevant AV1 bitstream syntax is as follows:\n\n```\ndecoder_model_info( ) {\n    ...\n    frame_presentation_time_length_minus_1            f(5)\n}\n\ntemporal_point_info( ) {\n    n \u003d frame_presentation_time_length_minus_1 + 1\n    frame_presentation_time                           f(n)\n}\n```\n\nSo `n` \u003c\u003d 2^5 \u003d 32. Therefore `uint32_t` is the correct type for `cm-\u003eframe_presentation_time`. But the AV1 spec also says:\n\n\u003e The syntax element is signaled as a fixed length unsigned integer with a length in bits given by frame_presentation_time_length_minus_1 + 1. The frame_presentation_time is the remainder of a modulo 1 \u003c\u003c (frame_presentation_time_length_minus_1 + 1) counter.\n\nSo the range check here is incorrect. I will clean that up in a follow-up CL.",
+      "parentUuid": "cf9ed925_998a3dae",
+      "revId": "1dab7aa38b295df5d545c38cbc4acfff218e1054",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
