@@ -156,7 +156,7 @@ endfunction()
 # directory/target/object names are updated to include _shared and _static
 # suffixes.
 function(add_asm_library lib_name asm_sources)
-  if("${${asm_sources}}" STREQUAL "")
+  if("${${asm_sources}}" STREQUAL "" OR "${AOM_TARGET_CPU}" STREQUAL "wasm32")
     return()
   endif()
 
