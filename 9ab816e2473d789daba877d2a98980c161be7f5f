@@ -1,0 +1,73 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "9dbbf8b4_12be3314",
+        "filename": "cmake/aom_configure.cmake",
+        "patchSetId": 2
+      },
+      "lineNbr": 22,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-10-21T02:01:09Z",
+      "side": 1,
+      "message": "Seems we aren\u0027t getting a default `CMAKE_BUILD_TYPE` with the emscripten toolchain:\n\n```\nCMake Error at cmake/compiler_tests.cmake:43 (string):\nstring no output variable specified\nCall Stack (most recent call first):\ncmake/compiler_flags.cmake:18 (include)\ncmake/aom_configure.cmake:22 (include)\nCMakeLists.txt:73 (include)\n```\n\nSomething similar to [libwebp](https://chromium.googlesource.com/webm/libwebp/+/1844042d1ca751e62e61df7617dba19c98588339/CMakeLists.txt#106) can be done. Later, if needed, we can add `EMSCRIPTEN` to that check to preserve compatibility.",
+      "revId": "9ab816e2473d789daba877d2a98980c161be7f5f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "d30606f4_ac1024cd",
+        "filename": "cmake/aom_configure.cmake",
+        "patchSetId": 2
+      },
+      "lineNbr": 59,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-10-21T02:01:09Z",
+      "side": 1,
+      "message": "This was only added in cmake 4.2. When using the Emscripten(.cmake) toolchain, the `EMSCRIPTEN` variable is available to identify the target. Prefer that for now.",
+      "fixSuggestions": [
+        {
+          "fixId": "77393bbe_c962bcbb",
+          "description": "prompt_to_edit API",
+          "replacements": [
+            {
+              "path": "cmake/aom_configure.cmake",
+              "range": {
+                "startLine": 59,
+                "startChar": 0,
+                "endLine": 60,
+                "endChar": 0
+              },
+              "replacement": "  if(EMSCRIPTEN)\n"
+            }
+          ]
+        }
+      ],
+      "revId": "9ab816e2473d789daba877d2a98980c161be7f5f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "0ec7294c_5bdaa0fa",
+        "filename": "cmake/aom_configure.cmake",
+        "patchSetId": 2
+      },
+      "lineNbr": 62,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-10-21T02:01:09Z",
+      "side": 1,
+      "message": "As far as I know, it\u0027s true that currently wasm32 is the only target used in production cases (vs. wasm64).",
+      "revId": "9ab816e2473d789daba877d2a98980c161be7f5f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
