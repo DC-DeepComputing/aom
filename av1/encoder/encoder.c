@@ -1108,6 +1108,13 @@ void av1_change_config(struct AV1_COMP *cpi, const AV1EncoderConfig *oxcf,
     }
   }
 
+  // av1_reset_segment_features() turned segmentation off, so set the active
+  // map up again. A map set for the old frame size is turned off.
+  if (cm->width != last_width || cm->height != last_height) {
+    cpi->active_map.enabled = 0;
+  }
+  cpi->active_map.update = 1;
+
   rc->is_src_frame_alt_ref = 0;
 
   if (!cpi->ppi->rtc_ref.set_ref_frame_config)
