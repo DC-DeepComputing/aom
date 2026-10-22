@@ -244,8 +244,7 @@ static int obudec_read_one_obu(struct AvxInputContext *input_ctx,
       *obu_length = bytes_read;
       return -1;
     }
-    available_buffer_capacity +=
-        AOMMAX(*obu_buffer_capacity, OBU_MAX_HEADER_SIZE);
+    available_buffer_capacity = *obu_buffer_capacity - obu_bytes_buffered;
   }
 
   const int status = obudec_read_obu_header_and_size(
