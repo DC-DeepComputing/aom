@@ -18,6 +18,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "ec1918e6_191468e7",
+        "filename": "av1/encoder/hash_motion.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 125,
+      "author": {
+        "id": 5216012
+      },
+      "writtenOn": "2026-10-22T06:56:45Z",
+      "side": 1,
+      "message": "Done. Renamed it to hash_table_reserve_block_hashes().",
+      "parentUuid": "9671e1f9_976269ae",
+      "revId": "ecca5e7734dc7bdf767715b6839deee464bea85b",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "6f39901d_5bcbc798",
@@ -35,6 +53,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "55ce0157_4158c794",
+        "filename": "av1/encoder/hash_motion.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 260,
+      "author": {
+        "id": 5216012
+      },
+      "writtenOn": "2026-10-22T06:56:45Z",
+      "side": 1,
+      "message": "Marked as resolved.",
+      "parentUuid": "6f39901d_5bcbc798",
+      "revId": "ecca5e7734dc7bdf767715b6839deee464bea85b",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "b4150329_a1fe671e",
@@ -48,6 +84,24 @@
       "writtenOn": "2026-10-21T22:55:14Z",
       "side": 1,
       "message": "Please document which object owns the buffers in the table. Based on your answer to my previous question, I think `cpi-\u003etd.mb` is the owner and `thread_data-\u003etd-\u003emb` is a shallow copy?",
+      "revId": "ecca5e7734dc7bdf767715b6839deee464bea85b",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "a2066d0a_ae096add",
+        "filename": "av1/encoder/hash_motion.h",
+        "patchSetId": 5
+      },
+      "lineNbr": 37,
+      "author": {
+        "id": 5216012
+      },
+      "writtenOn": "2026-10-22T06:56:45Z",
+      "side": 1,
+      "message": "Yes, that\u0027s right. cpi-\u003etd.mb owns the buffers. They\u0027re allocated the first time an IntraBC frame builds the table and freed with the encoder in encoder_alloc.h. The worker threads get thread_data-\u003etd-\u003emb \u003d cpi-\u003etd.mb in ethread.c, so their table is a shallow copy that points to the same buffers. They only read it, and they never allocate or free anything in it. The main thread uses cpi-\u003etd.mb itself.",
+      "parentUuid": "b4150329_a1fe671e",
       "revId": "ecca5e7734dc7bdf767715b6839deee464bea85b",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
