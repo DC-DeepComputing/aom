@@ -121,7 +121,7 @@ static uint8_t read_coeffs_txb(const AV1_COMMON *const cm,
   struct macroblockd_plane *const pd = &xd->plane[plane];
   const int16_t *const dequant = pd->seg_dequant_QTX[mbmi->segment_id];
   tran_low_t *const tcoeffs = dcb->dqcoeff_block[plane] + dcb->cb_offset[plane];
-  const int shift = av1_get_tx_scale(tx_size);
+  const int shift = get_tx_scale(tx_size);
   const int bhl = get_txb_bhl(tx_size);
   const int width = get_txb_wide(tx_size);
   const int height = get_txb_high(tx_size);

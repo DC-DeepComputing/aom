@@ -131,38 +131,6 @@ static void write_golomb(aom_writer *w, int level) {
   for (i = length - 1; i >= 0; --i) aom_write_bit(w, (x >> i) & 0x01);
 }
 
-static const int8_t eob_to_pos_small[33] = {
-  0, 1, 2,                                        // 0-2
-  3, 3,                                           // 3-4
-  4, 4, 4, 4,                                     // 5-8
-  5, 5, 5, 5, 5, 5, 5, 5,                         // 9-16
-  6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6  // 17-32
-};
-
-static const int8_t eob_to_pos_large[17] = {
-  6,                               // place holder
-  7,                               // 33-64
-  8,  8,                           // 65-128
-  9,  9,  9,  9,                   // 129-256
-  10, 10, 10, 10, 10, 10, 10, 10,  // 257-512
-  11                               // 513-
-};
-
-int av1_get_eob_pos_token(const int eob, int *const extra) {
-  int t;
-
-  if (eob < 33) {
-    t = eob_to_pos_small[eob];
-  } else {
-    const int e = AOMMIN((eob - 1) >> 5, 16);
-    t = eob_to_pos_large[e];
-  }
-
-  *extra = eob - av1_eob_group_start[t];
-
-  return t;
-}
-
 #if CONFIG_ENTROPY_STATS
 static void update_eob_context(int cdf_idx, int eob, TX_SIZE tx_size,
                                TX_CLASS tx_class, PLANE_TYPE plane,
@@ -174,7 +142,7 @@ static void update_eob_context(int eob, TX_SIZE tx_size, TX_CLASS tx_class,
                                uint8_t allow_update_cdf) {
 #endif
   int eob_extra;
-  const int eob_pt = av1_get_eob_pos_token(eob, &eob_extra);
+  const int eob_pt = get_eob_pos_token(eob, &eob_extra);
   TX_SIZE txs_ctx = get_txsize_entropy_ctx(tx_size);
 
   const int eob_multi_size = txsize_log2_minus4[tx_size];
@@ -326,7 +294,7 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
   }
 
   int eob_extra;
-  const int eob_pt = av1_get_eob_pos_token(eob, &eob_extra);
+  const int eob_pt = get_eob_pos_token(eob, &eob_extra);
   const int eob_multi_size = txsize_log2_minus4[tx_size];
   const TX_CLASS tx_class = tx_type_to_class[tx_type];
   const int eob_multi_ctx = (tx_class == TX_CLASS_2D) ? 0 : 1;

@@ -1132,7 +1132,7 @@ static inline void dist_block_tx_domain(MACROBLOCK *x, int plane, int block,
   int64_t this_sse;
   // TX-domain results need to shift down to Q2/D10 to match pixel
   // domain distortion values which are in Q2^2
-  int shift = (MAX_TX_SCALE - av1_get_tx_scale(tx_size)) * 2;
+  int shift = (MAX_TX_SCALE - get_tx_scale(tx_size)) * 2;
   const int block_offset = BLOCK_OFFSET(block);
   tran_low_t *const coeff = p->coeff + block_offset;
   tran_low_t *const dqcoeff = p->dqcoeff + block_offset;
@@ -1982,7 +1982,7 @@ static int skip_trellis_opt_based_on_satd(MACROBLOCK *x,
   const int block_offset = BLOCK_OFFSET(block);
   tran_low_t *const coeff_ptr = p->coeff + block_offset;
   const int n_coeffs = av1_get_max_eob(tx_size);
-  const int shift = (MAX_TX_SCALE - av1_get_tx_scale(tx_size));
+  const int shift = (MAX_TX_SCALE - get_tx_scale(tx_size));
   int satd = (dc_only_blk) ? abs(coeff_ptr[0]) : aom_satd(coeff_ptr, n_coeffs);
   satd = RIGHT_SIGNED_SHIFT(satd, shift);
   satd >>= (x->e_mbd.bd - 8);

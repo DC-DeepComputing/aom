@@ -408,7 +408,7 @@ int av1_optimize_txb(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
   const struct macroblock_plane *p = &x->plane[plane];
   const SCAN_ORDER *scan_order = get_scan(tx_size, tx_type);
   const int16_t *scan = scan_order->scan;
-  const int shift = av1_get_tx_scale(tx_size);
+  const int shift = get_tx_scale(tx_size);
   int eob = p->eobs[block];
   const int16_t *dequant = p->dequant_QTX;
   const qm_val_t *iqmatrix =
@@ -816,7 +816,7 @@ int av1_cost_coeffs_txb_laplacian(const MACROBLOCK *x, const int plane,
     tran_low_t *tcoeff = p->coeff + BLOCK_OFFSET(block);
     tran_low_t *qcoeff = p->qcoeff + BLOCK_OFFSET(block);
     tran_low_t *dqcoeff = p->dqcoeff + BLOCK_OFFSET(block);
-    update_coeff_eob_fast(&eob, av1_get_tx_scale(tx_size), p->dequant_QTX, scan,
+    update_coeff_eob_fast(&eob, get_tx_scale(tx_size), p->dequant_QTX, scan,
                           tcoeff, qcoeff, dqcoeff);
     p->eobs[block] = eob;
   }

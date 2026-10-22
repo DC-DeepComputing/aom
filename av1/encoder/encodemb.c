@@ -473,7 +473,7 @@ void av1_setup_xform(const AV1_COMMON *cm, MACROBLOCK *x, TX_SIZE tx_size,
 }
 void av1_setup_quant(TX_SIZE tx_size, int use_optimize_b, int xform_quant_idx,
                      int use_quant_b_adapt, QUANT_PARAM *qparam) {
-  qparam->log_scale = av1_get_tx_scale(tx_size);
+  qparam->log_scale = get_tx_scale(tx_size);
   qparam->tx_size = tx_size;
 
   qparam->use_quant_b_adapt = use_quant_b_adapt;

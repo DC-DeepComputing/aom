@@ -66,7 +66,7 @@ static inline int64_t get_coeff_dist(tran_low_t tcoeff, tran_low_t dqcoeff,
 static int get_eob_cost(int eob, const LV_MAP_EOB_COST *txb_eob_costs,
                         const LV_MAP_COEFF_COST *txb_costs, TX_CLASS tx_class) {
   int eob_extra;
-  const int eob_pt = av1_get_eob_pos_token(eob, &eob_extra);
+  const int eob_pt = get_eob_pos_token(eob, &eob_extra);
   int eob_cost = 0;
   const int eob_multi_ctx = (tx_class == TX_CLASS_2D) ? 0 : 1;
   eob_cost = txb_eob_costs->eob_cost[eob_multi_ctx][eob_pt - 1];
