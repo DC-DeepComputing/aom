@@ -60,6 +60,30 @@
     {
       "unresolved": true,
       "key": {
+        "uuid": "e63bb568_a3181951",
+        "filename": "av1/decoder/obu.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 459,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-22T13:47:55Z",
+      "side": 1,
+      "message": "I got the answer in the bug report. This check is not necessary and can be safely removed.",
+      "parentUuid": "b2e8f94a_c50cd014",
+      "range": {
+        "startLine": 456,
+        "startChar": 0,
+        "endLine": 459,
+        "endChar": 5
+      },
+      "revId": "3b15300982762c530f9fcd284e367fcb2642f757",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
         "uuid": "f7a5b89c_e7715088",
         "filename": "av1/decoder/obu.c",
         "patchSetId": 2
@@ -71,6 +95,24 @@
       "writtenOn": "2026-10-22T01:14:03Z",
       "side": 1,
       "message": "The bug reporter also suggests that we ensure that the destination copy remains within its allocated tile-list buffer. Do we need to do that?",
+      "revId": "3b15300982762c530f9fcd284e367fcb2642f757",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "75360ea1_b4f17787",
+        "filename": "av1/decoder/obu.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 464,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-22T13:47:55Z",
+      "side": 1,
+      "message": "I also asked about this in the bug report. For now let\u0027s assume the claming of `vend1` and `hend1` ensures this.",
+      "parentUuid": "f7a5b89c_e7715088",
       "revId": "3b15300982762c530f9fcd284e367fcb2642f757",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
