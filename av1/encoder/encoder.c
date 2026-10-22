@@ -1078,6 +1078,8 @@ void av1_change_config(struct AV1_COMP *cpi, const AV1EncoderConfig *oxcf,
   av1_update_frame_size(cpi);
 
   if (cm->width != last_width || cm->height != last_height) {
+    // The active map was set for the old frame size.
+    cpi->active_map.enabled = 0;
     if (cpi->oxcf.q_cfg.aq_mode == CYCLIC_REFRESH_AQ) {
       int mi_rows = cpi->common.mi_params.mi_rows;
       int mi_cols = cpi->common.mi_params.mi_cols;
@@ -1107,6 +1109,10 @@ void av1_change_config(struct AV1_COMP *cpi, const AV1EncoderConfig *oxcf,
       }
     }
   }
+
+  // av1_reset_segment_features() turned segmentation off, so set the active
+  // map up again.
+  cpi->active_map.update = cpi->active_map.enabled;
 
   rc->is_src_frame_alt_ref = 0;
 
