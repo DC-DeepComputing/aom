@@ -366,6 +366,7 @@ constexpr int kDocHeight = 1024;
 constexpr int kNumFrames = 60;
 constexpr int kEdgeMargin = 8;
 constexpr int kResizeFrame = 20;
+constexpr int kConfigFrame = 30;
 
 void WindowPos(int frame, int *x, int *y) {
   static const int kPos[4][2] = {
@@ -519,6 +520,12 @@ class InactiveAreaTest
       aom_scaling_mode_t mode = { AOME_ONETWO, AOME_ONETWO };
       encoder->Control(AOME_SET_SCALEMODE, &mode);
     }
+    if (config_change_ && frame == kConfigFrame) {
+      cfg_.g_w = kSrcWidth;
+      cfg_.g_h = kSrcHeight;
+      cfg_.rc_target_bitrate = 2000;
+      encoder->Config(&cfg_);
+    }
     if (map_once_ && frame > 1) return;
 
     uint8_t map[kMapRows * kMapCols];
@@ -610,11 +617,12 @@ class InactiveAreaTest
   }
 
   void DoTest(bool use_roi, bool skip_ref_golden = false, bool map_once = false,
-              bool resize = false) {
+              bool resize = false, bool config_change = false) {
     use_roi_ = use_roi;
     skip_ref_golden_ = skip_ref_golden;
     map_once_ = map_once;
     resize_ = resize;
+    config_change_ = config_change;
     // More bits let q drop low enough while the map stays set.
     if (map_once) cfg_.rc_target_bitrate = 1000;
     ScrollingWindowSource video(map_once);
@@ -628,6 +636,7 @@ class InactiveAreaTest
   bool skip_ref_golden_ = false;
   bool map_once_ = false;
   bool resize_ = false;
+  bool config_change_ = false;
   std::vector<uint8_t> prev_[3];
 };
 
@@ -644,6 +653,11 @@ TEST_P(InactiveAreaTest, ActiveMapSetOnce) { DoTest(false, false, true); }
 // map of the frame before them.
 TEST_P(InactiveAreaTest, ActiveMapSetOnceResize) {
   DoTest(false, false, true, true);
+}
+
+// A new bitrate set with aom_codec_enc_config_set() keeps the map.
+TEST_P(InactiveAreaTest, ActiveMapSetOnceConfigChange) {
+  DoTest(false, false, true, false, true);
 }
 
 AV1_INSTANTIATE_TEST_SUITE(
