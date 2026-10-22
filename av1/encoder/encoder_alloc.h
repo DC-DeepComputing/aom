@@ -73,8 +73,8 @@ static inline void alloc_compressor_data(AV1_COMP *cpi) {
   if (cpi->oxcf.kf_cfg.key_freq_max != 0) {
     CHECK_MEM_ERROR(cm, cpi->td.mv_costs_alloc,
                     (MvCosts *)aom_calloc(1, sizeof(*cpi->td.mv_costs_alloc)));
-    cpi->td.mb.mv_costs = cpi->td.mv_costs_alloc;
   }
+  cpi->td.mb.mv_costs = cpi->td.mv_costs_alloc;
 
   av1_setup_shared_coeff_buffer(cm->seq_params, &cpi->td.shared_coeff_buf,
                                 cm->error);

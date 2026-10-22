@@ -4961,4 +4961,84 @@ const IntraBCTilesParams kIntraBCTilesParams[] = {
 INSTANTIATE_TEST_SUITE_P(AV1, IntraBCTilesTest,
                          ::testing::ValuesIn(kIntraBCTilesParams));
 
+// Starts in all intra mode (kf_max_dist = 0) and then enables inter frames
+// through aom_codec_enc_config_set() without changing the frame size. The
+// inter frames that follow run motion search and need the motion vector costs.
+void KfMaxDistIncreaseTest(unsigned int threads) {
+  aom_codec_iface_t *iface = aom_codec_av1_cx();
+  aom_codec_enc_cfg_t cfg;
+  ASSERT_EQ(aom_codec_enc_config_default(iface, &cfg, AOM_USAGE_REALTIME),
+            AOM_CODEC_OK);
+  cfg.g_w = 256;
+  cfg.g_h = 128;
+  cfg.g_threads = threads;
+  cfg.kf_max_dist = 0;
+
+  aom_codec_ctx_t enc;
+  ASSERT_EQ(aom_codec_enc_init(&enc, iface, &cfg, 0), AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&enc, AOME_SET_CPUUSED, 10), AOM_CODEC_OK);
+
+  aom_image_t *img =
+      aom_img_alloc(nullptr, AOM_IMG_FMT_I420, cfg.g_w, cfg.g_h, 1);
+  ASSERT_NE(img, nullptr);
+  FillImageRandom(img);
+  EncodeOne(&enc, img, 0);
+
+  cfg.kf_max_dist = 30;
+  ASSERT_EQ(aom_codec_enc_config_set(&enc, &cfg), AOM_CODEC_OK);
+  for (int i = 1; i < 4; ++i) {
+    EncodeOne(&enc, img, i);
+  }
+
+  aom_img_free(img);
+  ASSERT_EQ(aom_codec_destroy(&enc), AOM_CODEC_OK);
+}
+
+TEST(EncodeAPI, KfMaxDistIncreaseNoThreads) { KfMaxDistIncreaseTest(1); }
+
+TEST(EncodeAPI, KfMaxDistIncreaseThreads) { KfMaxDistIncreaseTest(4); }
+
+// Sets kf_max_dist to 0 in the same aom_codec_enc_config_set() call that
+// raises the forced maximum frame size before the first frame. The encoder
+// buffers then grow to the new maximum and are reallocated for all intra
+// coding.
+TEST(EncodeAPI, KfMaxDistZeroWithForcedMaxFrameSize) {
+  aom_codec_iface_t *iface = aom_codec_av1_cx();
+  aom_codec_enc_cfg_t cfg;
+  ASSERT_EQ(aom_codec_enc_config_default(iface, &cfg, AOM_USAGE_REALTIME),
+            AOM_CODEC_OK);
+  cfg.g_w = 64;
+  cfg.g_h = 64;
+  cfg.g_threads = 1;
+
+  aom_codec_ctx_t enc;
+  ASSERT_EQ(aom_codec_enc_init(&enc, iface, &cfg, 0), AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&enc, AOME_SET_CPUUSED, 10), AOM_CODEC_OK);
+  cfg.g_forced_max_frame_width = 128;
+  cfg.g_forced_max_frame_height = 128;
+  cfg.kf_max_dist = 0;
+  ASSERT_EQ(aom_codec_enc_config_set(&enc, &cfg), AOM_CODEC_OK);
+
+  aom_image_t *img_small = aom_img_alloc(nullptr, AOM_IMG_FMT_I420, 64, 64, 1);
+  ASSERT_NE(img_small, nullptr);
+  FillImageRandom(img_small);
+  aom_image_t *img_large =
+      aom_img_alloc(nullptr, AOM_IMG_FMT_I420, 128, 128, 1);
+  ASSERT_NE(img_large, nullptr);
+  FillImageRandom(img_large);
+
+  EncodeOne(&enc, img_small, 0);
+  EncodeOne(&enc, img_small, 1);
+
+  cfg.g_w = 128;
+  cfg.g_h = 128;
+  ASSERT_EQ(aom_codec_enc_config_set(&enc, &cfg), AOM_CODEC_OK);
+  EncodeOne(&enc, img_large, 2);
+  EncodeOne(&enc, img_large, 3);
+
+  aom_img_free(img_small);
+  aom_img_free(img_large);
+  ASSERT_EQ(aom_codec_destroy(&enc), AOM_CODEC_OK);
+}
+
 }  // namespace

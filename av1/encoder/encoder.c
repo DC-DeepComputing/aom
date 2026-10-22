@@ -975,6 +975,13 @@ void av1_change_config(struct AV1_COMP *cpi, const AV1EncoderConfig *oxcf,
   // for allintra encoding mode. Hence, the memory allocations for these buffers
   // are avoided for allintra encoding mode.
   if (cpi->oxcf.kf_cfg.key_freq_max != 0) {
+    // 'mv_costs_alloc' is not allocated in allintra encoding mode.
+    if (cpi->td.mv_costs_alloc == NULL) {
+      CHECK_MEM_ERROR(
+          cm, cpi->td.mv_costs_alloc,
+          (MvCosts *)aom_calloc(1, sizeof(*cpi->td.mv_costs_alloc)));
+      x->mv_costs = cpi->td.mv_costs_alloc;
+    }
     if (x->comp_rd_buffer.pred0 == NULL)
       alloc_compound_type_rd_buffers(cm->error, &x->comp_rd_buffer);
 
