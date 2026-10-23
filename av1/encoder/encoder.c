@@ -5386,9 +5386,16 @@ int av1_get_compressed_data(AV1_COMP *cpi, AV1_COMP_DATA *const cpi_data) {
   // before it returns.
   if (setjmp(cm->error->jmp)) {
     cm->error->setjmp = 0;
+    // Drop the source frame that failed to encode. Left in the lookahead, it
+    // would be retried on every later call and block the frames behind it.
+    if (cpi_data->pop_lookahead == 1) {
+      av1_lookahead_pop(cpi->ppi->lookahead, cpi_data->flush,
+                        cpi->compressor_stage);
+    }
     return cm->error->error_code;
   }
   cm->error->setjmp = 1;
+  cpi_data->pop_lookahead = 0;
 
 #if CONFIG_INTERNAL_STATS
   cpi->frame_recode_hits = 0;
