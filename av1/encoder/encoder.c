@@ -590,6 +590,30 @@ void av1_set_svc_seq_params(AV1_PRIMARY *const ppi) {
   }
 }
 
+// Sets the maximum frame size of the sequence header. Without a forced
+// maximum it never shrinks. Returns true if it changed.
+static bool set_max_frame_size(SequenceHeader *seq,
+                               const FrameDimensionCfg *frm_dim_cfg) {
+  const int max_width = frm_dim_cfg->forced_max_frame_width
+                            ? frm_dim_cfg->forced_max_frame_width
+                            : AOMMAX(seq->max_frame_width, frm_dim_cfg->width);
+  const int max_height =
+      frm_dim_cfg->forced_max_frame_height
+          ? frm_dim_cfg->forced_max_frame_height
+          : AOMMAX(seq->max_frame_height, frm_dim_cfg->height);
+  if (max_width == seq->max_frame_width &&
+      max_height == seq->max_frame_height) {
+    return false;
+  }
+  seq->max_frame_width = max_width;
+  seq->max_frame_height = max_height;
+  seq->num_bits_width = (max_width > 1) ? get_msb(max_width - 1) + 1 : 1;
+  seq->num_bits_height = (max_height > 1) ? get_msb(max_height - 1) + 1 : 1;
+  assert(seq->num_bits_width <= 16);
+  assert(seq->num_bits_height <= 16);
+  return true;
+}
+
 static void init_seq_coding_tools(AV1_PRIMARY *const ppi,
                                   const AV1EncoderConfig *oxcf,
                                   int disable_frame_id_numbers) {
@@ -618,19 +642,7 @@ static void init_seq_coding_tools(AV1_PRIMARY *const ppi,
           ? DEFAULT_EXPLICIT_ORDER_HINT_BITS - 1
           : -1;
 
-  seq->max_frame_width = frm_dim_cfg->forced_max_frame_width
-                             ? frm_dim_cfg->forced_max_frame_width
-                             : AOMMAX(seq->max_frame_width, frm_dim_cfg->width);
-  seq->max_frame_height =
-      frm_dim_cfg->forced_max_frame_height
-          ? frm_dim_cfg->forced_max_frame_height
-          : AOMMAX(seq->max_frame_height, frm_dim_cfg->height);
-  seq->num_bits_width =
-      (seq->max_frame_width > 1) ? get_msb(seq->max_frame_width - 1) + 1 : 1;
-  seq->num_bits_height =
-      (seq->max_frame_height > 1) ? get_msb(seq->max_frame_height - 1) + 1 : 1;
-  assert(seq->num_bits_width <= 16);
-  assert(seq->num_bits_height <= 16);
+  set_max_frame_size(seq, frm_dim_cfg);
 
   seq->frame_id_length = FRAME_ID_LENGTH;
   seq->delta_frame_id_length = DELTA_FRAME_ID_LENGTH;
@@ -4577,6 +4589,19 @@ int av1_encode(AV1_COMP *const cpi, uint8_t *const dest, size_t dest_size,
   cpi->speed = frame_params->speed;
   cm->show_existing_frame = frame_params->show_existing_frame;
   cpi->existing_fb_idx_to_show = frame_params->existing_fb_idx_to_show;
+
+  // A shown key frame starts a new coded video sequence, so its sequence
+  // header can raise the maximum frame size to fit a larger frame.
+  if (cpi->ppi->seq_params_locked && !is_stat_generation_stage(cpi) &&
+      cm->current_frame.frame_type == KEY_FRAME && cm->show_frame &&
+      !cm->show_existing_frame) {
+    SequenceHeader *const seq_params = cm->seq_params;
+    if (set_max_frame_size(seq_params, &cpi->oxcf.frm_dim_cfg)) {
+      set_bitstream_level_tier(cpi->ppi, seq_params->max_frame_width,
+                               seq_params->max_frame_height,
+                               cpi->oxcf.input_cfg.init_framerate);
+    }
+  }
 
   if (cpi->oxcf.mode == GOOD &&
       cpi->oxcf.q_cfg.deltaq_mode == DELTA_Q_OBJECTIVE &&
