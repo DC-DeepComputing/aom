@@ -20,6 +20,25 @@
     {
       "unresolved": false,
       "key": {
+        "uuid": "57c38468_f1b10c0e",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 2
+      },
+      "lineNbr": 21,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-10-23T23:01:14Z",
+      "side": 1,
+      "message": "Done.",
+      "parentUuid": "c083a16f_926b4ce1",
+      "isAi": true,
+      "revId": "3b15300982762c530f9fcd284e367fcb2642f757",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
         "uuid": "5b604d76_fa99e8c0",
         "filename": "/PATCHSET_LEVEL",
         "patchSetId": 2
@@ -78,6 +97,31 @@
         "endLine": 459,
         "endChar": 5
       },
+      "revId": "3b15300982762c530f9fcd284e367fcb2642f757",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "aecd236a_a3e54f72",
+        "filename": "av1/decoder/obu.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 459,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-10-23T23:01:14Z",
+      "side": 1,
+      "message": "Done. Removed the check.",
+      "parentUuid": "e63bb568_a3181951",
+      "range": {
+        "startLine": 456,
+        "startChar": 0,
+        "endLine": 459,
+        "endChar": 5
+      },
+      "isAi": true,
       "revId": "3b15300982762c530f9fcd284e367fcb2642f757",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
