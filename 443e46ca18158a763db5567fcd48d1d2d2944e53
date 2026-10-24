@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "70f786f0_778e1130",
+        "filename": "test/test.cmake",
+        "patchSetId": 3
+      },
+      "lineNbr": 497,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-10-24T05:35:36Z",
+      "side": 1,
+      "message": "```\nemsdk/upstream/emscripten/em++ -O3 -DNDEBUG -std\u003dc++17 -Wall -Wdisabled-optimization -Wextra -Wextra-semi -Wextra-semi-stmt -Wfloat-conversion -Wformat\u003d2 -Wmissing-declarations -Wmissing-prototypes -Wpointer-arith -Wshadow -Wshorten-64-to-32 -Wsign-compare -Wstring-conversion -Wtype-limits -Wundef -Wuninitialized -Wunreachable-code-aggressive -Wunused -Wvla -Wc++20-extensions -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS\u003d64 -flax-vector-conversions\u003dnone -sSTACK_SIZE\u003d4MB -sALLOW_MEMORY_GROWTH\u003d1 @CMakeFiles/test_libaom.dir/objects1.rsp -o test_libaom.js @CMakeFiles/test_libaom.dir/linkLibs.rsp\nem++: error: Attempt to set a non-existent setting: \u0027STACK_SIZE\u0027\n- did you mean one of ASYNCIFY_STACK_SIZE?\n- perhaps a typo in emcc\u0027s  -sX\u003dY  notation?\n- (see src/settings.js for valid values)\n```\n\nI thought I updated my sdk before testing this before, but I guess not. `EMSCRIPTEN_VERSION` reports 3.1.16.\n\n[libwebp](https://chromium.googlesource.com/webm/libwebp/+/1844042d1ca751e62e61df7617dba19c98588339/CMakeLists.txt#701) does this:\n\n```\n  # The default stack size changed from 5MB to 64KB in 3.1.27. See\n  # https://crbug.com/webp/614.\n  if(EMSCRIPTEN_VERSION VERSION_GREATER_EQUAL \"3.1.27\")\n    # TOTAL_STACK size was renamed to STACK_SIZE in 3.1.27. The old name was\n    # kept for compatibility, but prefer the new one in case it is removed in\n    # the future.\n    set(emscripten_stack_size \"-sSTACK_SIZE\u003d5MB\")\n  else()\n    set(emscripten_stack_size \"-sTOTAL_STACK\u003d5MB\")\n  endif()\n```\n\nIf we don\u0027t want to care about older emscripten then failing early in CMakeLists.txt would be best.",
+      "revId": "443e46ca18158a763db5567fcd48d1d2d2944e53",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
