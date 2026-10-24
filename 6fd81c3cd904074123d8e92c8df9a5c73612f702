@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "2bc9245d_5e62adc3",
+        "filename": "test/test.cmake",
+        "patchSetId": 6
+      },
+      "lineNbr": 45,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-24T06:51:25Z",
+      "side": 1,
+      "message": "Delete this. This file needs to be added inside the `if(NOT BUILD_SHARED_LIBS)` block that starts at line 146.",
+      "revId": "6fd81c3cd904074123d8e92c8df9a5c73612f702",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "363ab3c3_16fbfdb5",
+        "filename": "test/test.cmake",
+        "patchSetId": 6
+      },
+      "lineNbr": 196,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-24T06:51:25Z",
+      "side": 1,
+      "message": "Add the following here:\n\n```\n  list(APPEND AOM_UNIT_TEST_DECODER_SOURCES\n              \"${AOM_ROOT}/test/obudec_test.cc\")\n```",
+      "revId": "6fd81c3cd904074123d8e92c8df9a5c73612f702",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
