@@ -52,6 +52,25 @@
       "parentUuid": "451c2e7a_30566949",
       "revId": "443e46ca18158a763db5567fcd48d1d2d2944e53",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "5fc7378a_87bb240d",
+        "filename": "test/test.cmake",
+        "patchSetId": 3
+      },
+      "lineNbr": 497,
+      "author": {
+        "id": 5248551
+      },
+      "writtenOn": "2026-10-24T18:20:03Z",
+      "side": 1,
+      "message": "Done, following libwebp: -sSTACK_SIZE\u003d5MB for 3.1.27 and later, -sTOTAL_STACK\u003d5MB before. Checked with Emscripten 3.1.16 (TOTAL_STACK is selected; configure and test_libaom build cleanly with ENABLE_WASM_X86_INTRINSICS off and on, and tests pass) and with 6.0.13 (STACK_SIZE is selected). I kept the older versions working rather than failing early, since it was cheap.",
+      "parentUuid": "70f786f0_778e1130",
+      "isAi": true,
+      "revId": "443e46ca18158a763db5567fcd48d1d2d2944e53",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }

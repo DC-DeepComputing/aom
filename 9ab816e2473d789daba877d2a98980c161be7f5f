@@ -36,6 +36,25 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "f4ff60a1_d65267e6",
+        "filename": "cmake/aom_configure.cmake",
+        "patchSetId": 2
+      },
+      "lineNbr": 22,
+      "author": {
+        "id": 5248551
+      },
+      "writtenOn": "2026-10-24T18:20:03Z",
+      "side": 1,
+      "message": "Done. CMakeLists.txt now defaults CMAKE_BUILD_TYPE to Release for Emscripten too (the \u0027if(NOT EMSCRIPTEN)\u0027 guard is removed), as libwebp does. A plain \u0027emcmake cmake \u003csrc\u003e\u0027 configures and builds. Running test_libaom then hit Emscripten\u0027s 64 KiB default stack (out-of-bounds in AV1HighbdInvTxfm2d.match), so test/test.cmake now links test_libaom with -sSTACK_SIZE\u003d4MB -sALLOW_MEMORY_GROWTH\u003d1. With that, all SIMD128 tests pass under Node.",
+      "parentUuid": "9dbbf8b4_12be3314",
+      "isAi": true,
+      "revId": "9ab816e2473d789daba877d2a98980c161be7f5f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "d30606f4_ac1024cd",
@@ -85,6 +104,25 @@
       "side": 1,
       "message": "Done",
       "parentUuid": "d30606f4_ac1024cd",
+      "revId": "9ab816e2473d789daba877d2a98980c161be7f5f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "6ef5f53e_b0bfaee0",
+        "filename": "cmake/aom_configure.cmake",
+        "patchSetId": 2
+      },
+      "lineNbr": 59,
+      "author": {
+        "id": 5248551
+      },
+      "writtenOn": "2026-10-24T18:20:03Z",
+      "side": 1,
+      "message": "Done, switched to if(EMSCRIPTEN).",
+      "parentUuid": "d30606f4_ac1024cd",
+      "isAi": true,
       "revId": "9ab816e2473d789daba877d2a98980c161be7f5f",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
