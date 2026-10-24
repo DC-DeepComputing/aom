@@ -33,6 +33,24 @@
       "message": "This is good, but there\u0027s no way to force the assembly off like with libvpx\u0027s `configure --disable-x86-asm`. So a CMake flag like `AOM_ENABLE_X86_ASM` could work.",
       "revId": "15cb35019070d550890e7f17331c987271e0ced5",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "87de6154_0397b73e",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5020
+      },
+      "writtenOn": "2026-10-24T17:30:21Z",
+      "side": 1,
+      "message": "\u003e This is good, but there\u0027s no way to force the assembly off like with libvpx\u0027s `configure --disable-x86-asm`. So a CMake flag like `AOM_ENABLE_X86_ASM` could work.\n\nIn general these can be marked done so reviewers know to take a look. I\u0027m watching this one so it\u0027s not that big of a deal.",
+      "parentUuid": "84e6d44e_4df641db",
+      "revId": "15cb35019070d550890e7f17331c987271e0ced5",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
