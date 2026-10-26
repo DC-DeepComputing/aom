@@ -1793,6 +1793,90 @@ TEST(EncodeAPI, IntraBCFarCopyAboveRealtime) {
 TEST(EncodeAPI, IntraBCFarCopyAboveRightRealtime) {
   IntraBCFarCopyTest(2120, 576, 2056, 0, 0, 512);
 }
+
+#if !CONFIG_REALTIME_ONLY
+// The list of output frames stays valid until the next aom_codec_decode()
+// call, so the caller may get an output frame more than once, by iterating
+// over the list again or with a copy of the iterator. Each time it gets the
+// same film grain image.
+// Bug: 574106934.
+TEST(EncodeAPI, GetFilmGrainFrameAgain) {
+  constexpr int kWidth = 64;
+  constexpr int kHeight = 64;
+  constexpr int kNumSpatialLayers = 2;
+
+  aom_codec_iface_t *iface = aom_codec_av1_cx();
+  aom_codec_enc_cfg_t cfg;
+  ASSERT_EQ(aom_codec_enc_config_default(iface, &cfg, AOM_USAGE_GOOD_QUALITY),
+            AOM_CODEC_OK);
+  cfg.g_w = kWidth;
+  cfg.g_h = kHeight;
+  cfg.g_lag_in_frames = 0;
+  aom_codec_ctx_t enc;
+  ASSERT_EQ(aom_codec_enc_init(&enc, iface, &cfg, 0), AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&enc, AOME_SET_CPUUSED, 6), AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&enc, AV1E_SET_FILM_GRAIN_TEST_VECTOR, 1),
+            AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&enc, AOME_SET_NUMBER_SPATIAL_LAYERS,
+                              kNumSpatialLayers),
+            AOM_CODEC_OK);
+
+  aom_image_t *img =
+      aom_img_alloc(nullptr, AOM_IMG_FMT_I420, kWidth, kHeight, 1);
+  ASSERT_NE(img, nullptr);
+  memset(img->img_data, 128, img->sz);
+  // One temporal unit with a frame in each spatial layer.
+  std::vector<uint8_t> tu;
+  for (int layer = 0; layer < kNumSpatialLayers; ++layer) {
+    ASSERT_EQ(aom_codec_control(&enc, AOME_SET_SPATIAL_LAYER_ID, layer),
+              AOM_CODEC_OK);
+    ASSERT_EQ(aom_codec_encode(&enc, img, layer, 1, 0), AOM_CODEC_OK);
+    aom_codec_iter_t iter = nullptr;
+    while (const aom_codec_cx_pkt_t *pkt = aom_codec_get_cx_data(&enc, &iter)) {
+      if (pkt->kind != AOM_CODEC_CX_FRAME_PKT) continue;
+      const uint8_t *buf = static_cast<const uint8_t *>(pkt->data.frame.buf);
+      tu.insert(tu.end(), buf, buf + pkt->data.frame.sz);
+    }
+  }
+  aom_img_free(img);
+  ASSERT_EQ(aom_codec_destroy(&enc), AOM_CODEC_OK);
+
+  aom_codec_ctx_t dec;
+  ASSERT_EQ(aom_codec_dec_init(&dec, aom_codec_av1_dx(), nullptr, 0),
+            AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&dec, AV1D_SET_OUTPUT_ALL_LAYERS, 1),
+            AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_decode(&dec, tu.data(), tu.size(), nullptr),
+            AOM_CODEC_OK);
+
+  // Iterate over the list of output frames several times.
+  const unsigned char *y_planes[kNumSpatialLayers] = {};
+  for (int i = 0; i < 8; ++i) {
+    aom_codec_iter_t iter = nullptr;
+    for (int layer = 0; layer < kNumSpatialLayers; ++layer) {
+      aom_image_t *frame = aom_codec_get_frame(&dec, &iter);
+      ASSERT_NE(frame, nullptr) << "iteration " << i << " layer " << layer;
+      if (i == 0) y_planes[layer] = frame->planes[AOM_PLANE_Y];
+      EXPECT_EQ(frame->planes[AOM_PLANE_Y], y_planes[layer])
+          << "iteration " << i << " layer " << layer;
+    }
+    EXPECT_EQ(aom_codec_get_frame(&dec, &iter), nullptr);
+  }
+
+  // Get the second output frame several times with a copy of the iterator.
+  aom_codec_iter_t iter = nullptr;
+  ASSERT_NE(aom_codec_get_frame(&dec, &iter), nullptr);
+  for (int i = 0; i < 8; ++i) {
+    aom_codec_iter_t iter_copy = iter;
+    aom_image_t *frame = aom_codec_get_frame(&dec, &iter_copy);
+    ASSERT_NE(frame, nullptr) << "copy " << i;
+    EXPECT_EQ(frame->planes[AOM_PLANE_Y], y_planes[1]) << "copy " << i;
+  }
+
+  EXPECT_EQ(aom_codec_decode(&dec, nullptr, 0, nullptr), AOM_CODEC_OK);
+  EXPECT_EQ(aom_codec_destroy(&dec), AOM_CODEC_OK);
+}
+#endif  // !CONFIG_REALTIME_ONLY
 #endif  // CONFIG_AV1_DECODER
 
 #if !CONFIG_REALTIME_ONLY
