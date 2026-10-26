@@ -12,6 +12,11 @@
 #ifndef AOM_AV1_ENCODER_ENCODEMB_H_
 #define AOM_AV1_ENCODER_ENCODEMB_H_
 
+// Macro toggle for SATD early exit in transform type search
+#ifndef ENABLE_TX_SATD_EARLY_EXIT
+#define ENABLE_TX_SATD_EARLY_EXIT 1
+#endif
+
 #include "config/aom_config.h"
 
 #include "av1/common/av1_common_int.h"
