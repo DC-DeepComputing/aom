@@ -18,6 +18,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "ed8cc2d1_062b685c",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 2
+      },
+      "lineNbr": 17,
+      "author": {
+        "id": 5244124
+      },
+      "writtenOn": "2026-10-26T23:37:06Z",
+      "side": 1,
+      "message": "Done. Changed to \"retrieved\".",
+      "parentUuid": "98cfaec8_6f19b306",
+      "revId": "fb8a3422af1913d4ed55807ad299005d629337bb",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "8b04a9f8_79f71c6a",
@@ -35,6 +53,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "bf4b5e26_de365e0d",
+        "filename": "test/decode_api_test.cc",
+        "patchSetId": 2
+      },
+      "lineNbr": 21,
+      "author": {
+        "id": 5244124
+      },
+      "writtenOn": "2026-10-26T23:37:06Z",
+      "side": 1,
+      "message": "Done. Moved the test to test/encode_api_test.cc (EncodeAPI.GetFilmGrainFrameAgain), in its CONFIG_AV1_DECODER section with the other tests that encode a stream and then decode it. decode_api_test.cc is unchanged now.",
+      "parentUuid": "8b04a9f8_79f71c6a",
+      "revId": "fb8a3422af1913d4ed55807ad299005d629337bb",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "ad9fa52c_067b1e33",
@@ -48,6 +84,24 @@
       "writtenOn": "2026-10-26T23:22:52Z",
       "side": 1,
       "message": "After a successful `aom_codec_decode()` call, we usually call `aom_codec_get_frame()` as follows only once:\n\n```\n    aom_codec_iter_t iter \u003d nullptr;\n    aom_image_t *img \u003d nullptr;\n    while ((img \u003d aom_codec_get_frame(\u0026dec, \u0026iter)) !\u003d nullptr) {\n      // Use img.\n    }\n```\n\nSo this test calls `aom_codec_get_frame()` in an unusual (but legal) way. Still, I am surprised that the fix is that large.\n\nThe commit message says:\n\n```\nadd_grain_if_needed() took the next slot of\ngrain_image_frame_buffers[MAX_NUM_SPATIAL_LAYERS] from a counter that\ngrew on every aom_codec_get_frame() call and was reset only by the next\ndecode call.\n```\n\nIt seems that we can make the bug fix smaller if we can reset this counter whenever `aom_codec_get_frame()` is called with `iter \u003d nullptr`. I took a quick look. Something like the following seems to work:\n\n```\ndiff --git a/av1/av1_dx_iface.c b/av1/av1_dx_iface.c\nindex 3fbe5e53f2..f57b48d59e 100644\n--- a/av1/av1_dx_iface.c\n+++ b/av1/av1_dx_iface.c\n@@ -577,13 +577,6 @@ static void release_pending_output_frames(aom_codec_alg_priv_t *ctx) {\n     }\n     pbi-\u003enum_output_frames \u003d 0;\n     unlock_buffer_pool(pool);\n-    for (size_t j \u003d 0; j \u003c ctx-\u003enum_grain_image_frame_buffers; j++) {\n-      pool-\u003erelease_fb_cb(pool-\u003ecb_priv, \u0026ctx-\u003egrain_image_frame_buffers[j]);\n-      ctx-\u003egrain_image_frame_buffers[j].data \u003d NULL;\n-      ctx-\u003egrain_image_frame_buffers[j].size \u003d 0;\n-      ctx-\u003egrain_image_frame_buffers[j].priv \u003d NULL;\n-    }\n-    ctx-\u003enum_grain_image_frame_buffers \u003d 0;\n   }\n }\n \n@@ -842,6 +835,16 @@ static aom_image_t *decoder_get_frame(aom_codec_alg_priv_t *ctx,\n     frame_worker_data-\u003ereceived_frame \u003d 0;\n     check_resync(ctx, frame_worker_data-\u003epbi);\n   }\n+  if (*index \u003d\u003d 0) {\n+    BufferPool *const pool \u003d ctx-\u003ebuffer_pool;\n+    for (size_t j \u003d 0; j \u003c ctx-\u003enum_grain_image_frame_buffers; j++) {\n+      pool-\u003erelease_fb_cb(pool-\u003ecb_priv, \u0026ctx-\u003egrain_image_frame_buffers[j]);\n+      ctx-\u003egrain_image_frame_buffers[j].data \u003d NULL;\n+      ctx-\u003egrain_image_frame_buffers[j].size \u003d 0;\n+      ctx-\u003egrain_image_frame_buffers[j].priv \u003d NULL;\n+    }\n+    ctx-\u003enum_grain_image_frame_buffers \u003d 0;\n+  }\n   YV12_BUFFER_CONFIG *sd;\n   aom_film_grain_t *grain_params;\n   if (av1_get_raw_frame(frame_worker_data-\u003epbi, *index, \u0026sd, \u0026grain_params) !\u003d\n```",
+      "revId": "fb8a3422af1913d4ed55807ad299005d629337bb",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "a404e985_46da1963",
+        "filename": "test/decode_api_test.cc",
+        "patchSetId": 2
+      },
+      "lineNbr": 133,
+      "author": {
+        "id": 5244124
+      },
+      "writtenOn": "2026-10-26T23:37:06Z",
+      "side": 1,
+      "message": "Thanks for looking into a smaller fix. Resetting the counter when `*index \u003d\u003d 0` handles the repeated iteration, but the counter still grows on every call with `*index \u003e 0`, and those calls are not limited to one per output frame: the caller can retrieve the same output frame again with a copy of the iterator. With AV1D_SET_OUTPUT_ALL_LAYERS and two spatial layers, the fourth retrieval of output frame 1 through a copy of the iterator writes `grain_image_frame_buffers[4]`, that is, over `num_grain_image_frame_buffers`, `need_resync` and `buffer_pool`.\n\nPatch set 3 adds that case to the test. I ran it with your diff applied (ASan + UBSan build): each copy gets a new grain image, and the fifth retrieval returns NULL because `need_resync` was overwritten. Patch set 3 passes it.\n\nIndexing the slot by the output frame index bounds it by construction (`*index \u003c pbi-\u003enum_output_frames \u003c\u003d MAX_NUM_SPATIAL_LAYERS`), however the frames are retrieved. The rest of the size is that a second retrieval of the same output frame returns the grain image already made, so the planes of an image the caller already has stay valid until the next `aom_codec_decode()` call, as they do for frames without film grain, instead of being released when the iteration restarts (with external frame buffers, a released buffer goes back to the application). That needs one `aom_image_t` per output frame (`images_with_grain[]`). The two small helpers replace the two copies of the release loop.",
+      "parentUuid": "ad9fa52c_067b1e33",
       "revId": "fb8a3422af1913d4ed55807ad299005d629337bb",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
