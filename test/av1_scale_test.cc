@@ -21,6 +21,7 @@
 
 #include "config/aom_config.h"
 #include "config/aom_dsp_rtcd.h"
+#include "config/aom_scale_rtcd.h"
 
 #include "aom_dsp/aom_dsp_common.h"
 #include "aom_dsp/aom_filter.h"
@@ -109,13 +110,6 @@ class ResizeAndExtendTest : public ::testing::TestWithParam<ResizeFrameFunc> {
                 const int sf_down = kScaleFactors[sf_down_idx];
                 const int dst_width = src_width * sf_up / sf_down;
                 const int dst_height = src_height * sf_up / sf_down;
-                // TODO: bug aomedia:363916152 - Enable unit tests for 4 to 3
-                // scaling when Neon and SSSE3 implementation of
-                // av1_resize_and_extend_frame do not differ from scalar version
-                if (sf_down == 4 && sf_up == 3) {
-                  continue;
-                }
-
                 if (sf_up == sf_down && sf_up != 1) {
                   continue;
                 }
@@ -156,6 +150,51 @@ class ResizeAndExtendTest : public ::testing::TestWithParam<ResizeFrameFunc> {
               }
             }
           }
+        }
+      }
+    }
+  }
+
+  void RunTest4To3() {
+    static const int kSizes[] = { 8, 16, 24, 40, 72, 136 };
+    static const int kBorders[] = { 0, AOM_BORDER_IN_PIXELS };
+    static const InterpFilter kFilters[] = { EIGHTTAP_REGULAR, EIGHTTAP_SMOOTH,
+                                             BILINEAR };
+    libaom_test::ACMRandom rnd(libaom_test::ACMRandom::DeterministicSeed());
+    for (const int border : kBorders) {
+      for (const int height : kSizes) {
+        for (const int width : kSizes) {
+          ASSERT_NO_FATAL_FAILURE(ResetResizeImages(
+              width, height, 3 * width / 4, 3 * height / 4, border));
+          for (int plane = 0; plane < MAX_MB_PLANE; ++plane) {
+            const int is_uv = plane > 0;
+            for (int y = 0; y < img_.crop_heights[is_uv]; ++y) {
+              for (int x = 0; x < img_.crop_widths[is_uv]; ++x) {
+                img_.buffers[plane][y * img_.strides[is_uv] + x] = rnd.Rand8();
+              }
+            }
+          }
+          for (const InterpFilter filter : kFilters) {
+            for (int phase = 0; phase < SUBPEL_SHIFTS; ++phase) {
+              for (int num_planes = 1; num_planes <= MAX_MB_PLANE;
+                   ++num_planes) {
+                SCOPED_TRACE(::testing::Message()
+                             << "size=" << width << "x" << height
+                             << ", border=" << border << ", filter=" << filter
+                             << ", phase=" << phase
+                             << ", num_planes=" << num_planes);
+                memset(ref_img_.buffer_alloc, kBufFiller, ref_img_.frame_size);
+                memset(dst_img_.buffer_alloc, kBufFiller, dst_img_.frame_size);
+                av1_resize_and_extend_frame_c(&img_, &ref_img_, filter, phase,
+                                              num_planes);
+                resize_fn_(&img_, &dst_img_, filter, phase, num_planes);
+                EXPECT_EQ(0,
+                          memcmp(ref_img_.buffer_alloc, dst_img_.buffer_alloc,
+                                 ref_img_.frame_size));
+              }
+            }
+          }
+          DeallocResizeImages();
         }
       }
     }
@@ -217,13 +256,6 @@ class ResizeAndExtendTest : public ::testing::TestWithParam<ResizeFrameFunc> {
             const int sf_down = kScaleFactors[sf_down_idx];
             const int dst_width = src_width * sf_up / sf_down;
             const int dst_height = src_height * sf_up / sf_down;
-            // TODO: bug aomedia:363916152 - Enable unit tests for 4 to 3
-            // scaling when Neon and SSSE3 implementation of
-            // av1_resize_and_extend_frame do not differ from scalar version
-            if (sf_down == 4 && sf_up == 3) {
-              continue;
-            }
-
             if (sf_up == sf_down && sf_up != 1) {
               continue;
             }
@@ -272,7 +304,43 @@ TEST_P(ResizeAndExtendTest, ResizeFrame_EightTapSmooth) {
   RunTest(EIGHTTAP_SMOOTH);
 }
 TEST_P(ResizeAndExtendTest, ResizeFrame_Bilinear) { RunTest(BILINEAR); }
+TEST_P(ResizeAndExtendTest, ResizeFrame4To3) { RunTest4To3(); }
 TEST_P(ResizeAndExtendTest, DISABLED_Speed) { SpeedTest(); }
+
+TEST(ResizeAndExtendTestC, Scale4To3Sampling) {
+  YV12_BUFFER_CONFIG src = {};
+  YV12_BUFFER_CONFIG dst = {};
+  const int width = 96;
+  const int height = 64;
+  ASSERT_EQ(0, aom_alloc_frame_buffer(&src, width, height, 1, 1, 0,
+                                      AOM_BORDER_IN_PIXELS, 16, false, 0));
+  ASSERT_EQ(0, aom_alloc_frame_buffer(&dst, 3 * width / 4, 3 * height / 4, 1, 1,
+                                      0, AOM_BORDER_IN_PIXELS, 16, false, 0));
+  for (int y = 0; y < height; ++y) {
+    for (int x = 0; x < width; ++x) {
+      src.y_buffer[y * src.y_stride + x] = x + y;
+    }
+  }
+  aom_extend_frame_borders(&src, 1);
+  for (int phase = 0; phase < SUBPEL_SHIFTS; ++phase) {
+    av1_resize_and_extend_frame_c(&src, &dst, BILINEAR, phase, 1);
+    for (int y = 0; y < dst.y_crop_height; ++y) {
+      for (int x = 0; x < dst.y_crop_width; ++x) {
+        // Bilinear interpolation of the ramp rounds each source coordinate
+        // independently. Use the exact 4:3 ratio to compute those coordinates.
+        const int x_q4 = x * 4 * SUBPEL_SHIFTS / 3 + phase;
+        const int y_q4 = y * 4 * SUBPEL_SHIFTS / 3 + phase;
+        const int expected =
+            AOMMIN(ROUND_POWER_OF_TWO(x_q4, SUBPEL_BITS), width - 1) +
+            AOMMIN(ROUND_POWER_OF_TWO(y_q4, SUBPEL_BITS), height - 1);
+        EXPECT_EQ(expected, dst.y_buffer[y * dst.y_stride + x])
+            << "x=" << x << ", y=" << y << ", phase=" << phase;
+      }
+    }
+  }
+  aom_free_frame_buffer(&src);
+  aom_free_frame_buffer(&dst);
+}
 
 #if HAVE_SSSE3
 INSTANTIATE_TEST_SUITE_P(SSSE3, ResizeAndExtendTest,
