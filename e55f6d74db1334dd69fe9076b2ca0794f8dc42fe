@@ -35,6 +35,25 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "f825edf1_95429a34",
+        "filename": "examples/av1_enc_fuzzer.cc",
+        "patchSetId": 1
+      },
+      "lineNbr": 166,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-10-27T19:01:15Z",
+      "side": 1,
+      "message": "Yes, it stood for background. Renamed to background for clarity.",
+      "parentUuid": "f802e3ee_e53e710e",
+      "isAi": true,
+      "revId": "e55f6d74db1334dd69fe9076b2ca0794f8dc42fe",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "d9ab103f_e60bbbb6",
@@ -48,6 +67,25 @@
       "writtenOn": "2026-10-27T18:37:18Z",
       "side": 1,
       "message": "Nit: I think `p` stands for `pass`? Since `pass` is also short, we can use `pass` as the loop index variable name.",
+      "revId": "e55f6d74db1334dd69fe9076b2ca0794f8dc42fe",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "42ed66af_290f4f0a",
+        "filename": "examples/av1_enc_fuzzer.cc",
+        "patchSetId": 1
+      },
+      "lineNbr": 178,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-10-27T19:01:15Z",
+      "side": 1,
+      "message": "Done. Renamed p to pass.",
+      "parentUuid": "d9ab103f_e60bbbb6",
+      "isAi": true,
       "revId": "e55f6d74db1334dd69fe9076b2ca0794f8dc42fe",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
@@ -69,6 +107,25 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "f936921d_0a6e5ff4",
+        "filename": "examples/av1_enc_fuzzer.cc",
+        "patchSetId": 1
+      },
+      "lineNbr": 184,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-10-27T19:01:15Z",
+      "side": 1,
+      "message": "Done. Renamed pw/ph to patch_width/patch_height, x0/y0 to patch_x/patch_y, and dst to dst_row.",
+      "parentUuid": "d9d63f1c_5515efbc",
+      "isAi": true,
+      "revId": "e55f6d74db1334dd69fe9076b2ca0794f8dc42fe",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "c4bb0dfe_aaf92c5a",
@@ -82,6 +139,25 @@
       "writtenOn": "2026-10-27T18:37:18Z",
       "side": 1,
       "message": "[This is a question, not a request for change.] `sbs` stands for superblocks, right? \"sbs\" is a common abbreviation in libaom, so this is fine. I just wanted to confirm I understand it correctly.",
+      "revId": "e55f6d74db1334dd69fe9076b2ca0794f8dc42fe",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "f9f18fb6_084266a1",
+        "filename": "examples/av1_enc_fuzzer.cc",
+        "patchSetId": 1
+      },
+      "lineNbr": 313,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-10-27T19:01:15Z",
+      "side": 1,
+      "message": "Yes, sbs stood for superblocks. Renamed to superblocks0, superblocks1, max_frame_superblocks, and max_frames_by_superblocks for clarity.",
+      "parentUuid": "c4bb0dfe_aaf92c5a",
+      "isAi": true,
       "revId": "e55f6d74db1334dd69fe9076b2ca0794f8dc42fe",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
