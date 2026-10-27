@@ -681,11 +681,18 @@ static inline void scale_plane_4_to_3_8tap(const uint8_t *src,
 static inline bool has_normative_scaler_neon(const int src_width,
                                              const int src_height,
                                              const int dst_width,
-                                             const int dst_height) {
+                                             const int dst_height,
+                                             const int dst_buffer_width,
+                                             const int dst_buffer_height) {
+  if (4 * dst_width == 3 * src_width && 4 * dst_height == 3 * src_height) {
+    // The 4:3 scaler writes blocks of 8 columns and 6 rows. Make sure these
+    // writes fit within the destination plane and its borders.
+    return ((dst_width + 7) & ~7) <= dst_buffer_width &&
+           (dst_height + 5) / 6 * 6 <= dst_buffer_height;
+  }
   const bool has_normative_scaler =
       (2 * dst_width == src_width && 2 * dst_height == src_height) ||
-      (4 * dst_width == src_width && 4 * dst_height == src_height) ||
-      (4 * dst_width == 3 * src_width && 4 * dst_height == 3 * src_height);
+      (4 * dst_width == src_width && 4 * dst_height == src_height);
 
   return has_normative_scaler;
 }
@@ -697,15 +704,19 @@ void av1_resize_and_extend_frame_neon(const YV12_BUFFER_CONFIG *src,
   assert(filter == BILINEAR || filter == EIGHTTAP_SMOOTH ||
          filter == EIGHTTAP_REGULAR);
 
-  bool has_normative_scaler =
-      has_normative_scaler_neon(src->y_crop_width, src->y_crop_height,
-                                dst->y_crop_width, dst->y_crop_height);
+  bool has_normative_scaler = has_normative_scaler_neon(
+      src->y_crop_width, src->y_crop_height, dst->y_crop_width,
+      dst->y_crop_height, dst->y_width + dst->border,
+      dst->y_height + dst->border);
 
   if (num_planes > 1) {
     has_normative_scaler =
         has_normative_scaler &&
-        has_normative_scaler_neon(src->uv_crop_width, src->uv_crop_height,
-                                  dst->uv_crop_width, dst->uv_crop_height);
+        has_normative_scaler_neon(
+            src->uv_crop_width, src->uv_crop_height, dst->uv_crop_width,
+            dst->uv_crop_height,
+            dst->uv_width + (dst->border >> dst->subsampling_x),
+            dst->uv_height + (dst->border >> dst->subsampling_y));
   }
 
   if (!has_normative_scaler) {
