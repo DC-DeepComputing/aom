@@ -1051,10 +1051,15 @@ void av1_resize_and_extend_frame_c(const YV12_BUFFER_CONFIG *src,
     const int dst_h = dst->crop_heights[is_uv];
     uint8_t *dst_buffer = dst->buffers[i];
     const int dst_stride = dst->strides[is_uv];
-    for (int y = 0; y < dst_h; y += 16) {
+    // The 4:3 scaling step cannot be represented exactly in Q4. Reset the
+    // sampling position every three output pixels to match the specialized
+    // SIMD scalers, which advance by four input pixels at a time.
+    const int block_size =
+        4 * dst_w == 3 * src_w && 4 * dst_h == 3 * src_h ? 3 : 16;
+    for (int y = 0; y < dst_h; y += block_size) {
       const int y_q4 =
           src_h == dst_h ? 0 : y * 16 * src_h / dst_h + phase_scaler;
-      for (int x = 0; x < dst_w; x += 16) {
+      for (int x = 0; x < dst_w; x += block_size) {
         const int x_q4 =
             src_w == dst_w ? 0 : x * 16 * src_w / dst_w + phase_scaler;
         const uint8_t *src_ptr =
@@ -1062,8 +1067,8 @@ void av1_resize_and_extend_frame_c(const YV12_BUFFER_CONFIG *src,
         uint8_t *dst_ptr = dst_buffer + y * dst_stride + x;
 
         // Width and height of the actual working area.
-        const int work_w = AOMMIN(16, dst_w - x);
-        const int work_h = AOMMIN(16, dst_h - y);
+        const int work_w = AOMMIN(block_size, dst_w - x);
+        const int work_h = AOMMIN(block_size, dst_h - y);
         // SIMD versions of aom_scaled_2d() have some trouble handling
         // nonstandard sizes, so fall back on the C version to handle borders.
         if (work_w != 16 || work_h != 16) {
