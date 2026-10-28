@@ -425,7 +425,11 @@ static AOM_FORCE_INLINE void quantize_fp_qm_8_avx2(
   const __m256i v_abs = _mm256_abs_epi32(v_coeff);
   const __m256i v_wt =
       _mm256_cvtepu8_epi32(_mm_loadl_epi64((const __m128i *)qm_ptr));
-  const __m256i v_abs_wt = _mm256_mullo_epi32(v_abs, v_wt);
+  const __m256i v_abs_wt =
+      is_highbd
+          ? _mm256_mullo_epi32(v_abs, v_wt)
+          : _mm256_madd_epi16(
+                _mm256_min_epi32(v_abs, _mm256_set1_epi32(INT16_MAX)), v_wt);
   const __m256i v_cond = _mm256_cmpgt_epi32(v_abs_wt, v_thresh_m1);
 
   if (_mm256_testz_si256(v_cond, v_cond)) {
@@ -556,7 +560,11 @@ static AOM_FORCE_INLINE void quantize_b_qm_8_avx2(
   const __m256i v_abs = _mm256_abs_epi32(v_coeff);
   const __m256i v_wt =
       _mm256_cvtepu8_epi32(_mm_loadl_epi64((const __m128i *)qm_ptr));
-  const __m256i v_abs_wt = _mm256_mullo_epi32(v_abs, v_wt);
+  const __m256i v_abs_wt =
+      is_highbd
+          ? _mm256_mullo_epi32(v_abs, v_wt)
+          : _mm256_madd_epi16(
+                _mm256_min_epi32(v_abs, _mm256_set1_epi32(INT16_MAX)), v_wt);
   const __m256i v_cond = _mm256_cmpgt_epi32(v_abs_wt, v_zbin_m1);
 
   if (_mm256_testz_si256(v_cond, v_cond)) {

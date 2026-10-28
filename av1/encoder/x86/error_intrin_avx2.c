@@ -225,7 +225,7 @@ static inline __m256i load_qm_weights_avx2(const qm_val_t *qmatrix,
   const uint32_t hi = w45 | w67;
 
   return _mm256_cvtepu8_epi32(
-      _mm_cvtsi64_si128((int64_t)((uint64_t)lo | ((uint64_t)hi << 32))));
+      _mm_insert_epi32(_mm_cvtsi32_si128((int)lo), (int)hi, 1));
 }
 
 int64_t av1_block_error_qm_avx2(const tran_low_t *coeff,
@@ -244,9 +244,7 @@ int64_t av1_block_error_qm_avx2(const tran_low_t *coeff,
 
   for (; scan < scan_end; coeff += 8, dqcoeff += 8, scan += 8) {
     const __m256i v_coeff = _mm256_loadu_si256((const __m256i *)coeff);
-    const __m256i v_dqcoeff = _mm256_loadu_si256((const __m256i *)dqcoeff);
-    if (_mm256_testz_si256(v_dqcoeff, v_dqcoeff) &&
-        _mm256_testz_si256(v_coeff, v_coeff)) {
+    if (_mm256_testz_si256(v_coeff, v_coeff)) {
       continue;
     }
 
@@ -262,6 +260,7 @@ int64_t av1_block_error_qm_avx2(const tran_low_t *coeff,
     const __m256i v_sq = _mm256_add_epi64(v_sq_even, v_sq_odd);
     v_sqcoeff = _mm256_add_epi64(v_sqcoeff, v_sq);
 
+    const __m256i v_dqcoeff = _mm256_loadu_si256((const __m256i *)dqcoeff);
     if (_mm256_testz_si256(v_dqcoeff, v_dqcoeff)) {
       v_error = _mm256_add_epi64(v_error, v_sq);
     } else {
@@ -279,16 +278,14 @@ int64_t av1_block_error_qm_avx2(const tran_low_t *coeff,
     }
   }
 
-  const __m256i v_error_hi = _mm256_srli_si256(v_error, 8);
-  const __m256i v_sqcoeff_hi = _mm256_srli_si256(v_sqcoeff, 8);
-  v_error = _mm256_add_epi64(v_error, v_error_hi);
-  v_sqcoeff = _mm256_add_epi64(v_sqcoeff, v_sqcoeff_hi);
+  __m128i v_error_128 = _mm_add_epi64(_mm256_castsi256_si128(v_error),
+                                      _mm256_extracti128_si256(v_error, 1));
+  __m128i v_sqcoeff_128 = _mm_add_epi64(_mm256_castsi256_si128(v_sqcoeff),
+                                        _mm256_extracti128_si256(v_sqcoeff, 1));
 
-  const __m128i v_error_128 = _mm_add_epi64(
-      _mm256_castsi256_si128(v_error), _mm256_extracti128_si256(v_error, 1));
-  const __m128i v_sqcoeff_128 =
-      _mm_add_epi64(_mm256_castsi256_si128(v_sqcoeff),
-                    _mm256_extracti128_si256(v_sqcoeff, 1));
+  v_error_128 = _mm_add_epi64(v_error_128, _mm_srli_si128(v_error_128, 8));
+  v_sqcoeff_128 =
+      _mm_add_epi64(v_sqcoeff_128, _mm_srli_si128(v_sqcoeff_128, 8));
 
   *ssz = _mm_cvtsi128_si64(v_sqcoeff_128);
   return _mm_cvtsi128_si64(v_error_128);
