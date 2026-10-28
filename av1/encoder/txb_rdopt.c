@@ -151,7 +151,11 @@ static AOM_FORCE_INLINE void update_coeff_simple(
 
       const int allow_lower_qc = sharpness ? (abs_qc > 1) : 1;
       if (allow_lower_qc) {
-        const int dqv = get_dqv(dequant, scan[si], iqmatrix);
+        int dqv = dequant[1];
+        if (iqmatrix != NULL) {
+          dqv =
+              ((iqmatrix[ci] * dqv) + (1 << (AOM_QM_BITS - 1))) >> AOM_QM_BITS;
+        }
         const tran_low_t abs_qc_low = abs_qc - 1;
         const tran_low_t abs_dqc_low = (abs_qc_low * dqv) >> shift;
         int64_t dist_diff_0, dist_diff_low_0;
