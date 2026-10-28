@@ -228,13 +228,8 @@ static inline void lowbd_compute_gradient_info_sb(MACROBLOCK *const x,
       d0 = d1;
       d1 = d2;
       row_info[c].abs_dx_abs_dy_sum = (uint16_t)(abs(dx) + abs(dy));
-      if (dx == 0) {
-        row_info[c].is_dx_zero = 1;
-        row_info[c].hist_bin_idx = -1;
-      } else {
-        row_info[c].is_dx_zero = 0;
-        row_info[c].hist_bin_idx = (int8_t)get_hist_bin_idx(dx, dy);
-      }
+      row_info[c].hist_bin_idx =
+          (dx == 0) ? BINS : (int8_t)get_hist_bin_idx(dx, dy);
     }
     src += stride;
   }
@@ -320,13 +315,8 @@ static inline void highbd_compute_gradient_info_sb(MACROBLOCK *const x,
       d0 = d1;
       d1 = d2;
       row_info[c].abs_dx_abs_dy_sum = (uint16_t)(abs(dx) + abs(dy));
-      if (dx == 0) {
-        row_info[c].is_dx_zero = 1;
-        row_info[c].hist_bin_idx = -1;
-      } else {
-        row_info[c].is_dx_zero = 0;
-        row_info[c].hist_bin_idx = (int8_t)get_hist_bin_idx(dx, dy);
-      }
+      row_info[c].hist_bin_idx =
+          (dx == 0) ? BINS : (int8_t)get_hist_bin_idx(dx, dy);
     }
     src += stride;
   }
@@ -428,7 +418,7 @@ static inline void generate_hog_using_gradient_cache(const MACROBLOCK *x,
                                                 plane * MAX_SB_SQUARE +
                                                 block_offset_in_grad_cache;
 
-  uint32_t int_hist[BINS] = { 0 };
+  uint32_t int_hist[BINS + 1] = { 0 };
   // Retrieve the cached gradient information and generate the histogram.
   for (int r = 1; r < rows - 1; ++r) {
     const PixelLevelGradientInfo *const row_info = grad_info_blk + r * sb_width;
@@ -436,17 +426,14 @@ static inline void generate_hog_using_gradient_cache(const MACROBLOCK *x,
       const uint16_t abs_dx_abs_dy_sum = row_info[c].abs_dx_abs_dy_sum;
       if (!abs_dx_abs_dy_sum) continue;
       total += abs_dx_abs_dy_sum;
-      if (row_info[c].is_dx_zero) {
-        const uint32_t half = abs_dx_abs_dy_sum >> 1;
-        int_hist[0] += half;
-        int_hist[BINS - 1] += half;
-      } else {
-        const int8_t idx = row_info[c].hist_bin_idx;
-        assert(idx >= 0 && idx < BINS);
-        int_hist[idx] += abs_dx_abs_dy_sum;
-      }
+      const uint8_t idx = (uint8_t)row_info[c].hist_bin_idx;
+      assert(idx <= BINS);
+      int_hist[idx] += abs_dx_abs_dy_sum;
     }
   }
+  const uint32_t dx_zero_half = int_hist[BINS] >> 1;
+  int_hist[0] += dx_zero_half;
+  int_hist[BINS - 1] += dx_zero_half;
   for (int b = 0; b < BINS; ++b) {
     hist[b] = (float)int_hist[b];
   }

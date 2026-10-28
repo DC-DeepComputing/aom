@@ -16,7 +16,7 @@
 #include "aom_ports/mem.h"
 #include "av1/common/idct.h"
 
-static inline void update_coeff_general(
+static AOM_FORCE_INLINE void update_coeff_general(
     int *accu_rate, int64_t *accu_dist, int si, int eob, TX_SIZE tx_size,
     TX_CLASS tx_class, int bhl, int width, int64_t rdmult, int shift,
     int dc_sign_ctx, const int16_t *dequant, const int16_t *scan,
@@ -45,7 +45,7 @@ static inline void update_coeff_general(
     if (abs_qc == 1) {
       rate_low = txb_costs->base_cost[coeff_ctx][0];
     } else {
-      const int dqv = get_dqv(dequant, scan[si], iqmatrix);
+      const int dqv = get_dqv(dequant, ci, iqmatrix);
       get_qc_dqc_low(abs_qc, sign, dqv, shift, &qc_low, &dqc_low);
       abs_qc_low = abs_qc - 1;
       rate_low =
@@ -62,12 +62,13 @@ static inline void update_coeff_general(
               ? 0
               : (((int64_t)dqc_low * (dqc_low - tqc2)) * (1LL << (2 * shift)));
     } else {
-      const int64_t dist0 = get_coeff_dist(tqc, 0, shift, qmatrix, ci);
-      dist_diff_0 = get_coeff_dist(tqc, dqc, shift, qmatrix, ci) - dist0;
+      const int64_t qm_val = qmatrix[ci];
+      const int64_t dist0 = get_coeff_dist_qm(tqc, 0, shift, qm_val);
+      dist_diff_0 = get_coeff_dist_qm(tqc, dqc, shift, qm_val) - dist0;
       dist_diff_low_0 =
           (abs_qc == 1)
               ? 0
-              : (get_coeff_dist(tqc, dqc_low, shift, qmatrix, ci) - dist0);
+              : (get_coeff_dist_qm(tqc, dqc_low, shift, qm_val) - dist0);
     }
 
     const int64_t rd = RDCOST(rdmult, rate, dist_diff_0);
@@ -124,9 +125,10 @@ static AOM_FORCE_INLINE void update_coeff_simple(
               ((int64_t)abs_dqc * (abs_dqc - ((int64_t)abs_tqc * 2))) *
               (1LL << (2 * shift));
         } else {
-          const int64_t dist0 = get_coeff_dist(abs_tqc, 0, shift, qmatrix, ci);
+          const int64_t qm_val = qmatrix[ci];
+          const int64_t dist0 = get_coeff_dist_qm(abs_tqc, 0, shift, qm_val);
           dist_diff_0 =
-              get_coeff_dist(abs_tqc, abs_dqc, shift, qmatrix, ci) - dist0;
+              get_coeff_dist_qm(abs_tqc, abs_dqc, shift, qm_val) - dist0;
         }
         const int rate_low = rate - base_cost[5];
         const int64_t rd = RDCOST(rdmult, rate, dist_diff_0);
@@ -141,13 +143,20 @@ static AOM_FORCE_INLINE void update_coeff_simple(
       }
       *accu_rate += rate;
     } else {
-      int rate_low = 0;
-      const int rate = get_two_coeff_cost_simple(
-          ci, abs_qc, coeff_ctx, txb_costs, bhl, tx_class, levels, &rate_low);
       if (abs_dqc < abs_tqc) {
+        int rate = txb_costs->base_cost[coeff_ctx][AOMMIN(abs_qc, 3)] +
+                   av1_cost_literal(1);
+        if (abs_qc > NUM_BASE_LEVELS) {
+          const int br_ctx = get_br_ctx_simple(levels, ci, bhl, tx_class);
+          rate += get_br_cost(abs_qc, txb_costs->lps_cost[br_ctx]);
+        }
         *accu_rate += rate;
         return;
       }
+
+      int rate_low = 0;
+      const int rate = get_two_coeff_cost_simple(
+          ci, abs_qc, coeff_ctx, txb_costs, bhl, tx_class, levels, &rate_low);
 
       const int allow_lower_qc = sharpness ? (abs_qc > 1) : 1;
       if (allow_lower_qc) {
@@ -166,11 +175,12 @@ static AOM_FORCE_INLINE void update_coeff_simple(
           dist_diff_low_0 = ((int64_t)abs_dqc_low * (abs_dqc_low - abs_tqc2)) *
                             (1LL << (2 * shift));
         } else {
-          const int64_t dist0 = get_coeff_dist(abs_tqc, 0, shift, qmatrix, ci);
+          const int64_t qm_val = qmatrix[ci];
+          const int64_t dist0 = get_coeff_dist_qm(abs_tqc, 0, shift, qm_val);
           dist_diff_0 =
-              get_coeff_dist(abs_tqc, abs_dqc, shift, qmatrix, ci) - dist0;
+              get_coeff_dist_qm(abs_tqc, abs_dqc, shift, qm_val) - dist0;
           dist_diff_low_0 =
-              get_coeff_dist(abs_tqc, abs_dqc_low, shift, qmatrix, ci) - dist0;
+              get_coeff_dist_qm(abs_tqc, abs_dqc_low, shift, qm_val) - dist0;
         }
         const int64_t rd = RDCOST(rdmult, rate, dist_diff_0);
         const int64_t rd_low = RDCOST(rdmult, rate_low, dist_diff_low_0);
@@ -204,7 +214,6 @@ static AOM_FORCE_INLINE void update_coeff_eob(
   if (qc == 0) {
     *accu_rate += txb_costs->base_cost[coeff_ctx][0];
   } else {
-    const int dqv = get_dqv(dequant, scan[si], iqmatrix);
     int lower_level = 0;
     const tran_low_t abs_qc = abs(qc);
     const tran_low_t tqc = tcoeff[ci];
@@ -218,6 +227,7 @@ static AOM_FORCE_INLINE void update_coeff_eob(
     if (abs_qc == 1) {
       rate_low = txb_costs->base_cost[coeff_ctx][0];
     } else {
+      const int dqv = get_dqv(dequant, ci, iqmatrix);
       get_qc_dqc_low(abs_qc, sign, dqv, shift, &qc_low, &dqc_low);
       abs_qc_low = abs_qc - 1;
       rate_low =
@@ -234,12 +244,12 @@ static AOM_FORCE_INLINE void update_coeff_eob(
               ? 0
               : (((int64_t)dqc_low * (dqc_low - tqc2)) * (1LL << (2 * shift)));
     } else {
-      const int64_t dist0 = get_coeff_dist(tqc, 0, shift, qmatrix, ci);
-      dist = get_coeff_dist(tqc, dqc, shift, qmatrix, ci) - dist0;
-      dist_low =
-          (abs_qc == 1)
-              ? 0
-              : (get_coeff_dist(tqc, dqc_low, shift, qmatrix, ci) - dist0);
+      const int64_t qm_val = qmatrix[ci];
+      const int64_t dist0 = get_coeff_dist_qm(tqc, 0, shift, qm_val);
+      dist = get_coeff_dist_qm(tqc, dqc, shift, qm_val) - dist0;
+      dist_low = (abs_qc == 1)
+                     ? 0
+                     : (get_coeff_dist_qm(tqc, dqc_low, shift, qm_val) - dist0);
     }
 
     int rate =
@@ -397,11 +407,15 @@ static AOM_FORCE_INLINE void update_coeff_simple_facade(
     const tran_low_t *tcoeff, tran_low_t *qcoeff, tran_low_t *dqcoeff,
     uint8_t *levels, int sharpness, const qm_val_t *iqmatrix,
     const qm_val_t *qmatrix) {
-  for (; *si >= 1; --*si) {
-    update_coeff_simple(accu_rate, *si, eob, tx_size, tx_class, bhl, rdmult,
+  int local_rate = *accu_rate;
+  int s = *si;
+  for (; s >= 1; --s) {
+    update_coeff_simple(&local_rate, s, eob, tx_size, tx_class, bhl, rdmult,
                         shift, dequant, scan, txb_costs, tcoeff, qcoeff,
                         dqcoeff, levels, sharpness, iqmatrix, qmatrix);
   }
+  *accu_rate = local_rate;
+  *si = s;
 }
 
 int av1_optimize_txb(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
@@ -594,6 +608,28 @@ static AOM_FORCE_INLINE int warehouse_efficients_txb(
     int reduced_tx_set_used) {
   const tran_low_t *const qcoeff = p->qcoeff + BLOCK_OFFSET(block);
   const int txb_skip_ctx = txb_ctx->txb_skip_ctx;
+  const int eob_multi_size = txsize_log2_minus4[tx_size];
+  const LV_MAP_EOB_COST *const eob_costs =
+      &x->coeff_costs.eob_costs[eob_multi_size][plane_type];
+  int cost = coeff_costs->txb_skip_cost[txb_skip_ctx][0];
+  cost += get_tx_type_cost(x, xd, plane, tx_size, tx_type, reduced_tx_set_used);
+  cost += get_eob_cost(eob, eob_costs, coeff_costs, tx_class);
+
+  const int (*lps_cost)[COEFF_BASE_RANGE + 1 + COEFF_BASE_RANGE + 1] =
+      coeff_costs->lps_cost;
+  if (eob == 1) {
+    const tran_low_t v = qcoeff[0];
+    const int sign = AOMSIGN(v);
+    const int level = (v ^ sign) - sign;
+    cost += coeff_costs->base_eob_cost[0][AOMMIN(level, 3) - 1];
+    if (level > NUM_BASE_LEVELS) {
+      cost += get_br_cost(level, lps_cost[0]);
+    }
+    const int sign01 = -sign;
+    cost += coeff_costs->dc_sign_cost[txb_ctx->dc_sign_ctx][sign01];
+    return cost;
+  }
+
   const int bhl = get_txb_bhl(tx_size);
   const int width = get_txb_wide(tx_size);
   const int height = get_txb_high(tx_size);
@@ -602,21 +638,10 @@ static AOM_FORCE_INLINE int warehouse_efficients_txb(
   uint8_t levels_buf[TX_PAD_2D];
   uint8_t *const levels = set_levels(levels_buf, height);
   DECLARE_ALIGNED(16, int8_t, coeff_contexts[MAX_TX_SQUARE]);
-  const int eob_multi_size = txsize_log2_minus4[tx_size];
-  const LV_MAP_EOB_COST *const eob_costs =
-      &x->coeff_costs.eob_costs[eob_multi_size][plane_type];
-  int cost = coeff_costs->txb_skip_cost[txb_skip_ctx][0];
 
-  if (eob > 1) av1_txb_init_levels(qcoeff, width, height, levels);
-
-  cost += get_tx_type_cost(x, xd, plane, tx_size, tx_type, reduced_tx_set_used);
-
-  cost += get_eob_cost(eob, eob_costs, coeff_costs, tx_class);
-
+  av1_txb_init_levels(qcoeff, width, height, levels);
   av1_get_nz_map_contexts(levels, scan, eob, tx_size, tx_class, coeff_contexts);
 
-  const int (*lps_cost)[COEFF_BASE_RANGE + 1 + COEFF_BASE_RANGE + 1] =
-      coeff_costs->lps_cost;
   int c = eob - 1;
   {
     const int pos = scan[c];
@@ -632,29 +657,16 @@ static AOM_FORCE_INLINE int warehouse_efficients_txb(
         const int ctx = get_br_ctx_eob(pos, bhl, tx_class);
         cost += get_br_cost(level, lps_cost[ctx]);
       }
-      if (c) {
-        cost += av1_cost_literal(1);
-      } else {
-        const int sign01 = (sign ^ sign) - sign;
-        const int dc_sign_ctx = txb_ctx->dc_sign_ctx;
-        cost += coeff_costs->dc_sign_cost[dc_sign_ctx][sign01];
-        return cost;
-      }
+      cost += av1_cost_literal(1);
     }
   }
   const int (*base_cost)[8] = coeff_costs->base_cost;
   for (c = eob - 2; c >= 1; --c) {
     const int pos = scan[c];
     const int coeff_ctx = coeff_contexts[pos];
-    const tran_low_t v = qcoeff[pos];
-    if (!v) {
-      cost += base_cost[coeff_ctx][0];
-      continue;
-    }
-    const int level = abs(v);
-    cost += base_cost[coeff_ctx][AOMMIN(level, 3)];
-    // sign bit cost
-    cost += av1_cost_literal(1);
+    const int level = abs(qcoeff[pos]);
+    cost += base_cost[coeff_ctx][AOMMIN(level, 3)] +
+            ((level != 0) << AV1_PROB_COST_SHIFT);
     if (level > NUM_BASE_LEVELS) {
       const int ctx = get_br_ctx(levels, pos, bhl, tx_class);
       cost += get_br_cost(level, lps_cost[ctx]);
