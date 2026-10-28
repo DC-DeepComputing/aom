@@ -69,6 +69,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "0a15d435_9b5e1dd7",
+        "filename": "av1/encoder/nonrd_pickmode.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 238,
+      "author": {
+        "id": 26549
+      },
+      "writtenOn": "2026-10-28T15:46:49Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "ad76cd25_1c1cad7d",
+      "revId": "cfcebd126fac64292896731471879bc788fc06e8",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "525799fd_fe14b168",
@@ -82,6 +100,24 @@
       "writtenOn": "2026-10-28T01:03:03Z",
       "side": 1,
       "message": "Cast to `int64_t`. For consistency, cast all three occurrences of `full_var_rd` to `int64_t`.\n\nNote: I think we can equivalently say:\n\n```\nfull_var_rd \u003c\u003d 62267 * 7 / 40\n```\n\nor\n\n```\nfull_var_rd \u003c (62267 * 7 + 39) / 40\n```\n\nBut we need to either change `\u003c` to `\u003c\u003d` (because of the floor operation of integer division) or add 39 before dividing by 40. So the change may raise questions.",
+      "revId": "cfcebd126fac64292896731471879bc788fc06e8",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "53694aaf_260421f8",
+        "filename": "av1/encoder/nonrd_pickmode.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 256,
+      "author": {
+        "id": 26549
+      },
+      "writtenOn": "2026-10-28T15:46:49Z",
+      "side": 1,
+      "message": "Done. Using `int64_t` is clearer, and this shouldn\u0027t make the function visibly slower.",
+      "parentUuid": "525799fd_fe14b168",
       "revId": "cfcebd126fac64292896731471879bc788fc06e8",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
