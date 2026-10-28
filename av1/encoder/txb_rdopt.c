@@ -977,9 +977,10 @@ static AOM_FORCE_INLINE int warehouse_efficients_txb_loop(
     const tran_low_t v = qcoeff[pos];
 
     if (v) {
-      const int level = abs(v);
+      const unsigned int level = (unsigned int)abs(v);
       const int coeff_ctx = coeff_contexts[pos];
-      cost += coeff_costs->base_eob_cost[coeff_ctx][AOMMIN(level, 3) - 1] +
+      const uintptr_t min_lvl = level < 3 ? level : 3;
+      cost += coeff_costs->base_eob_cost[coeff_ctx][min_lvl - 1] +
               av1_cost_literal(1);
       if (UNLIKELY(level > NUM_BASE_LEVELS)) {
         const int ctx = get_br_ctx_eob(pos, bhl, tx_class);
@@ -991,8 +992,9 @@ static AOM_FORCE_INLINE int warehouse_efficients_txb_loop(
   for (c = eob - 2; c >= 1; --c) {
     const int pos = scan[c];
     const int coeff_ctx = coeff_contexts[pos];
-    const int level = abs(qcoeff[pos]);
-    cost += base_cost[coeff_ctx][4 + AOMMIN(level, 3)];
+    const unsigned int level = (unsigned int)abs(qcoeff[pos]);
+    const uintptr_t min_lvl = level < 3 ? level : 3;
+    cost += base_cost[coeff_ctx][4 + min_lvl];
     if (UNLIKELY(level > NUM_BASE_LEVELS)) {
       const int ctx =
           get_br_ctx_simple_stride(levels, pos, bhl, stride, tx_class);
@@ -1006,10 +1008,11 @@ static AOM_FORCE_INLINE int warehouse_efficients_txb_loop(
     if (!v) {
       cost += base_cost[coeff_ctx][0];
     } else {
-      const int level = abs(v);
+      const unsigned int level = (unsigned int)abs(v);
       const int sign01 = (v < 0) ? 1 : 0;
       const int dc_sign_ctx = txb_ctx->dc_sign_ctx;
-      cost += base_cost[coeff_ctx][AOMMIN(level, 3)] +
+      const uintptr_t min_lvl = level < 3 ? level : 3;
+      cost += base_cost[coeff_ctx][min_lvl] +
               coeff_costs->dc_sign_cost[dc_sign_ctx][sign01];
       if (UNLIKELY(level > NUM_BASE_LEVELS)) {
         const int ctx = get_br_ctx_stride(levels, 0, bhl, stride, tx_class);
@@ -1028,10 +1031,8 @@ static int warehouse_efficients_txb_multi(
     const TXB_CTX *const txb_ctx, const int eob,
     const LV_MAP_COEFF_COST *const coeff_costs, const TX_TYPE tx_type,
     const TX_CLASS tx_class, int cost) {
-  const int bhl = get_txb_bhl(tx_size);
   const int width = get_txb_wide(tx_size);
   const int height = get_txb_high(tx_size);
-  const intptr_t stride = height + TX_PAD_HOR;
   const SCAN_ORDER *const scan_order = get_scan(tx_size, tx_type);
   const int16_t *const scan = scan_order->scan;
   uint8_t levels_buf[TX_PAD_2D];
@@ -1041,6 +1042,8 @@ static int warehouse_efficients_txb_multi(
   av1_txb_init_levels(qcoeff, width, height, levels);
   av1_get_nz_map_contexts(levels, scan, eob, tx_size, tx_class, coeff_contexts);
 
+  const int bhl = get_txb_bhl(tx_size);
+  const intptr_t stride = height + TX_PAD_HOR;
   switch (tx_class) {
     case TX_CLASS_2D:
       return warehouse_efficients_txb_loop(qcoeff, scan, eob, levels,
@@ -1179,6 +1182,36 @@ int av1_cost_coeffs_txb(const MACROBLOCK *x, const int plane, const int block,
     }
     const int sign01 = -sign;
     cost += coeff_costs->dc_sign_cost[txb_ctx->dc_sign_ctx][sign01];
+    return cost;
+  }
+
+  if (eob == 2 && tx_class == TX_CLASS_2D) {
+    const int16_t *const scan = get_scan(tx_size, tx_type)->scan;
+    const int pos1 = scan[1];
+    const tran_low_t v1 = qcoeff[pos1];
+    unsigned int level1 = 0;
+    if (v1) {
+      level1 = (unsigned int)abs(v1);
+      const uintptr_t min_lvl1 = level1 < 3 ? level1 : 3;
+      cost += coeff_costs->base_eob_cost[1][min_lvl1 - 1] + av1_cost_literal(1);
+      if (UNLIKELY(level1 > NUM_BASE_LEVELS)) {
+        cost += get_br_cost(level1, coeff_costs->lps_cost[7]);
+      }
+    }
+    const tran_low_t v0 = qcoeff[0];
+    if (!v0) {
+      cost += coeff_costs->base_cost[0][0];
+    } else {
+      const unsigned int level0 = (unsigned int)abs(v0);
+      const int sign01 = (v0 < 0) ? 1 : 0;
+      const uintptr_t min_lvl0 = level0 < 3 ? level0 : 3;
+      cost += coeff_costs->base_cost[0][min_lvl0] +
+              coeff_costs->dc_sign_cost[txb_ctx->dc_sign_ctx][sign01];
+      if (UNLIKELY(level0 > NUM_BASE_LEVELS)) {
+        const unsigned int ctx0 = AOMMIN((level1 + 1) >> 1, 6);
+        cost += get_br_cost(level0, coeff_costs->lps_cost[ctx0]);
+      }
+    }
     return cost;
   }
 

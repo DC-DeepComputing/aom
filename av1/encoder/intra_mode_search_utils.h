@@ -35,6 +35,10 @@
 extern "C" {
 #endif
 
+#if defined(__GNUC__) && __GNUC__ >= 4
+#pragma GCC visibility push(hidden)
+#endif
+
 /*!\cond */
 // Macro for computing the speed-preset dependent threshold which is used for
 // deciding whether to enable/disable variance calculations in
@@ -724,6 +728,10 @@ static inline int model_intra_yrd_and_prune(const AV1_COMP *const cpi,
   }
   return 0;
 }
+
+#if defined(__GNUC__) && __GNUC__ >= 4
+#pragma GCC visibility pop
+#endif
 
 #ifdef __cplusplus
 }  // extern "C"

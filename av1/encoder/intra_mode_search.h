@@ -23,6 +23,10 @@
 extern "C" {
 #endif
 
+#if defined(__GNUC__) && __GNUC__ >= 4
+#pragma GCC visibility push(hidden)
+#endif
+
 /*! \brief Variables related to intra-mode search during inter frame coding.
  *
  * \ingroup intra_mode_search
@@ -321,8 +325,45 @@ static inline void init_intra_mode_search_state(
  * \param[in]    reorder_delta_angle_eval  Indicates whether to reorder the
  *                                         evaluation of delta angle modes.
  */
-void set_y_mode_and_delta_angle(const int mode_idx, MB_MODE_INFO *const mbmi,
-                                int reorder_delta_angle_eval);
+static inline void set_y_mode_and_delta_angle(const int mode_idx,
+                                              MB_MODE_INFO *const mbmi,
+                                              int reorder_delta_angle_eval) {
+  static const uint8_t kLumaModeOrder[LUMA_MODE_COUNT] = {
+    DC_PRED,       H_PRED,    V_PRED,    SMOOTH_PRED, PAETH_PRED, SMOOTH_V_PRED,
+    SMOOTH_H_PRED, D135_PRED, D203_PRED, D157_PRED,   D67_PRED,   D113_PRED,
+    D45_PRED,      V_PRED,    V_PRED,    V_PRED,      V_PRED,     V_PRED,
+    V_PRED,        H_PRED,    H_PRED,    H_PRED,      H_PRED,     H_PRED,
+    H_PRED,        D45_PRED,  D45_PRED,  D45_PRED,    D45_PRED,   D45_PRED,
+    D45_PRED,      D135_PRED, D135_PRED, D135_PRED,   D135_PRED,  D135_PRED,
+    D135_PRED,     D113_PRED, D113_PRED, D113_PRED,   D113_PRED,  D113_PRED,
+    D113_PRED,     D157_PRED, D157_PRED, D157_PRED,   D157_PRED,  D157_PRED,
+    D157_PRED,     D203_PRED, D203_PRED, D203_PRED,   D203_PRED,  D203_PRED,
+    D203_PRED,     D67_PRED,  D67_PRED,  D67_PRED,    D67_PRED,   D67_PRED,
+    D67_PRED,
+  };
+  static const int8_t kLumaAngleDeltaOrder[2][LUMA_MODE_COUNT] = {
+    {
+        0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  -3, -2, -1,
+        1,  2,  3,  -3, -2, -1, 1,  2,  3,  -3, -2, -1, 1,  2,  3,  -3,
+        -2, -1, 1,  2,  3,  -3, -2, -1, 1,  2,  3,  -3, -2, -1, 1,  2,
+        3,  -3, -2, -1, 1,  2,  3,  -3, -2, -1, 1,  2,  3,
+    },
+    {
+        0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  -2, 2,  -3,
+        -1, 1,  3,  -2, 2,  -3, -1, 1,  3,  -2, 2,  -3, -1, 1,  3,  -2,
+        2,  -3, -1, 1,  3,  -2, 2,  -3, -1, 1,  3,  -2, 2,  -3, -1, 1,
+        3,  -2, 2,  -3, -1, 1,  3,  -2, 2,  -3, -1, 1,  3,
+    },
+  };
+  mbmi->mode = (PREDICTION_MODE)kLumaModeOrder[mode_idx];
+  mbmi->angle_delta[PLANE_TYPE_Y] =
+      kLumaAngleDeltaOrder[reorder_delta_angle_eval != 0][mode_idx];
+}
+
+#if defined(__GNUC__) && __GNUC__ >= 4
+#pragma GCC visibility pop
+#endif
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif
