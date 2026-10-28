@@ -288,6 +288,7 @@ static AOM_FORCE_INLINE int get_lower_levels_ctx(const uint8_t *levels,
                                                  int coeff_idx, int bhl,
                                                  TX_SIZE tx_size,
                                                  TX_CLASS tx_class) {
+  if ((tx_class | coeff_idx) == 0) return 0;
   const int stats =
       get_nz_mag(levels + get_padded_idx(coeff_idx, bhl), bhl, tx_class);
   return get_nz_map_ctx_from_stats(stats, coeff_idx, bhl, tx_size, tx_class);
@@ -344,6 +345,28 @@ static inline int get_lower_levels_ctx_general(int is_last, int scan_idx,
 
 static inline void set_dc_sign(int *cul_level, int dc_val) {
   *cul_level += ((dc_val < 0) + ((dc_val > 0) << 1)) << COEFF_CONTEXT_BITS;
+}
+
+static inline uint8_t av1_get_txb_entropy_context(const tran_low_t *qcoeff,
+                                                  const SCAN_ORDER *scan_order,
+                                                  int eob) {
+  if (eob == 0) return 0;
+  if (eob == 1) {
+    int cul_level = AOMMIN(COEFF_CONTEXT_MASK, abs(qcoeff[0]));
+    set_dc_sign(&cul_level, qcoeff[0]);
+    return (uint8_t)cul_level;
+  }
+  const int16_t *const scan = scan_order->scan;
+  int cul_level = 0;
+  for (int c = 0; c < eob; ++c) {
+    cul_level += abs(qcoeff[scan[c]]);
+    if (cul_level > COEFF_CONTEXT_MASK) break;
+  }
+
+  cul_level = AOMMIN(COEFF_CONTEXT_MASK, cul_level);
+  set_dc_sign(&cul_level, qcoeff[0]);
+
+  return (uint8_t)cul_level;
 }
 
 #define MAX_TX_SIZE_UNIT 16
