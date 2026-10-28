@@ -1075,6 +1075,7 @@ typedef struct AV1Common {
   int64_t txcoeff_cost_timer;
   int64_t txcoeff_cost_count;
 #endif  // TXCOEFF_COST_TIMER
+  double chroma_deviation;
 } AV1_COMMON;
 
 /*!\cond */
@@ -1562,33 +1563,6 @@ static inline int partition_cdf_length(BLOCK_SIZE bsize) {
     return EXT_PARTITION_TYPES - 2;
   else
     return EXT_PARTITION_TYPES;
-}
-
-static inline int max_block_wide(const MACROBLOCKD *xd, BLOCK_SIZE bsize,
-                                 int plane) {
-  assert(bsize < BLOCK_SIZES_ALL);
-  int max_blocks_wide = block_size_wide[bsize];
-
-  if (xd->mb_to_right_edge < 0) {
-    const struct macroblockd_plane *const pd = &xd->plane[plane];
-    max_blocks_wide += xd->mb_to_right_edge >> (3 + pd->subsampling_x);
-  }
-
-  // Scale the width in the transform block unit.
-  return max_blocks_wide >> MI_SIZE_LOG2;
-}
-
-static inline int max_block_high(const MACROBLOCKD *xd, BLOCK_SIZE bsize,
-                                 int plane) {
-  int max_blocks_high = block_size_high[bsize];
-
-  if (xd->mb_to_bottom_edge < 0) {
-    const struct macroblockd_plane *const pd = &xd->plane[plane];
-    max_blocks_high += xd->mb_to_bottom_edge >> (3 + pd->subsampling_y);
-  }
-
-  // Scale the height in the transform block unit.
-  return max_blocks_high >> MI_SIZE_LOG2;
 }
 
 static inline void av1_zero_above_context(AV1_COMMON *const cm,
