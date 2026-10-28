@@ -210,49 +210,63 @@ int64_t av1_block_error_avx2(const tran_low_t *coeff, const tran_low_t *dqcoeff,
   return sse;
 }
 
-int64_t av1_block_error_qm_avx2(const tran_low_t *coeff,
-                                const tran_low_t *dqcoeff, intptr_t block_size,
-                                const qm_val_t *qmatrix, const int16_t *scan,
-                                int64_t *ssz, int bd);
+static inline __m256i load_qm_weights_avx2(const qm_val_t *qmatrix,
+                                           const int16_t *scan_ptr) {
+  const uint32_t w01 =
+      (uint32_t)qmatrix[scan_ptr[0]] | ((uint32_t)qmatrix[scan_ptr[1]] << 8);
+  const uint32_t w23 = ((uint32_t)qmatrix[scan_ptr[2]] << 16) |
+                       ((uint32_t)qmatrix[scan_ptr[3]] << 24);
+  const uint32_t lo = w01 | w23;
+
+  const uint32_t w45 =
+      (uint32_t)qmatrix[scan_ptr[4]] | ((uint32_t)qmatrix[scan_ptr[5]] << 8);
+  const uint32_t w67 = ((uint32_t)qmatrix[scan_ptr[6]] << 16) |
+                       ((uint32_t)qmatrix[scan_ptr[7]] << 24);
+  const uint32_t hi = w45 | w67;
+
+  return _mm256_cvtepu8_epi32(
+      _mm_cvtsi64_si128((int64_t)((uint64_t)lo | ((uint64_t)hi << 32))));
+}
 
 int64_t av1_block_error_qm_avx2(const tran_low_t *coeff,
                                 const tran_low_t *dqcoeff, intptr_t block_size,
                                 const qm_val_t *qmatrix, const int16_t *scan,
-                                int64_t *ssz, int bd) {
+                                int64_t *ssz);
+
+int64_t av1_block_error_qm_avx2(const tran_low_t *coeff,
+                                const tran_low_t *dqcoeff, intptr_t block_size,
+                                const qm_val_t *qmatrix, const int16_t *scan,
+                                int64_t *ssz) {
   __m256i v_error = _mm256_setzero_si256();
   __m256i v_sqcoeff = _mm256_setzero_si256();
   const __m256i v_round_qm = _mm256_set1_epi64x(1 << (2 * AOM_QM_BITS - 1));
+  const int16_t *const scan_end = scan + block_size;
 
-  for (intptr_t i = 0; i < block_size; i += 8) {
-    const __m256i v_coeff = _mm256_loadu_si256((const __m256i *)(coeff + i));
-    const __m256i v_dqcoeff =
-        _mm256_loadu_si256((const __m256i *)(dqcoeff + i));
+  for (; scan < scan_end; coeff += 8, dqcoeff += 8, scan += 8) {
+    const __m256i v_coeff = _mm256_loadu_si256((const __m256i *)coeff);
+    const __m256i v_dqcoeff = _mm256_loadu_si256((const __m256i *)dqcoeff);
+    if (_mm256_testz_si256(v_dqcoeff, v_dqcoeff) &&
+        _mm256_testz_si256(v_coeff, v_coeff)) {
+      continue;
+    }
+
+    const __m256i v_wt = load_qm_weights_avx2(qmatrix, scan);
+    const __m256i v_cc = _mm256_mullo_epi32(v_coeff, v_wt);
+    const __m256i v_cc_hi = _mm256_srli_epi64(v_cc, 32);
+    const __m256i v_cc_even = _mm256_mul_epi32(v_cc, v_cc);
+    const __m256i v_cc_odd = _mm256_mul_epi32(v_cc_hi, v_cc_hi);
+    const __m256i v_sq_even = _mm256_srli_epi64(
+        _mm256_add_epi64(v_cc_even, v_round_qm), 2 * AOM_QM_BITS);
+    const __m256i v_sq_odd = _mm256_srli_epi64(
+        _mm256_add_epi64(v_cc_odd, v_round_qm), 2 * AOM_QM_BITS);
+    const __m256i v_sq = _mm256_add_epi64(v_sq_even, v_sq_odd);
+    v_sqcoeff = _mm256_add_epi64(v_sqcoeff, v_sq);
+
     if (_mm256_testz_si256(v_dqcoeff, v_dqcoeff)) {
-      if (_mm256_testz_si256(v_coeff, v_coeff)) continue;
-      const __m256i v_wt = _mm256_setr_epi32(
-          qmatrix[scan[i + 0]], qmatrix[scan[i + 1]], qmatrix[scan[i + 2]],
-          qmatrix[scan[i + 3]], qmatrix[scan[i + 4]], qmatrix[scan[i + 5]],
-          qmatrix[scan[i + 6]], qmatrix[scan[i + 7]]);
-      const __m256i v_cc = _mm256_mullo_epi32(v_coeff, v_wt);
-      const __m256i v_cc_hi = _mm256_srli_epi64(v_cc, 32);
-      const __m256i v_cc_even = _mm256_mul_epi32(v_cc, v_cc);
-      const __m256i v_cc_odd = _mm256_mul_epi32(v_cc_hi, v_cc_hi);
-      const __m256i v_sq_even = _mm256_srli_epi64(
-          _mm256_add_epi64(v_cc_even, v_round_qm), 2 * AOM_QM_BITS);
-      const __m256i v_sq_odd = _mm256_srli_epi64(
-          _mm256_add_epi64(v_cc_odd, v_round_qm), 2 * AOM_QM_BITS);
-      const __m256i v_sq = _mm256_add_epi64(v_sq_even, v_sq_odd);
       v_error = _mm256_add_epi64(v_error, v_sq);
-      v_sqcoeff = _mm256_add_epi64(v_sqcoeff, v_sq);
     } else {
-      const __m256i v_wt = _mm256_setr_epi32(
-          qmatrix[scan[i + 0]], qmatrix[scan[i + 1]], qmatrix[scan[i + 2]],
-          qmatrix[scan[i + 3]], qmatrix[scan[i + 4]], qmatrix[scan[i + 5]],
-          qmatrix[scan[i + 6]], qmatrix[scan[i + 7]]);
       const __m256i v_diff = _mm256_sub_epi32(v_coeff, v_dqcoeff);
       const __m256i v_dd = _mm256_mullo_epi32(v_diff, v_wt);
-      const __m256i v_cc = _mm256_mullo_epi32(v_coeff, v_wt);
-
       const __m256i v_dd_hi = _mm256_srli_epi64(v_dd, 32);
       const __m256i v_dd_even = _mm256_mul_epi32(v_dd, v_dd);
       const __m256i v_dd_odd = _mm256_mul_epi32(v_dd_hi, v_dd_hi);
@@ -262,16 +276,6 @@ int64_t av1_block_error_qm_avx2(const tran_low_t *coeff,
           _mm256_add_epi64(v_dd_odd, v_round_qm), 2 * AOM_QM_BITS);
       v_error =
           _mm256_add_epi64(v_error, _mm256_add_epi64(v_err_even, v_err_odd));
-
-      const __m256i v_cc_hi = _mm256_srli_epi64(v_cc, 32);
-      const __m256i v_cc_even = _mm256_mul_epi32(v_cc, v_cc);
-      const __m256i v_cc_odd = _mm256_mul_epi32(v_cc_hi, v_cc_hi);
-      const __m256i v_sq_even = _mm256_srli_epi64(
-          _mm256_add_epi64(v_cc_even, v_round_qm), 2 * AOM_QM_BITS);
-      const __m256i v_sq_odd = _mm256_srli_epi64(
-          _mm256_add_epi64(v_cc_odd, v_round_qm), 2 * AOM_QM_BITS);
-      v_sqcoeff =
-          _mm256_add_epi64(v_sqcoeff, _mm256_add_epi64(v_sq_even, v_sq_odd));
     }
   }
 
@@ -286,14 +290,6 @@ int64_t av1_block_error_qm_avx2(const tran_low_t *coeff,
       _mm_add_epi64(_mm256_castsi256_si128(v_sqcoeff),
                     _mm256_extracti128_si256(v_sqcoeff, 1));
 
-  int64_t error = _mm_cvtsi128_si64(v_error_128);
-  int64_t sqcoeff = _mm_cvtsi128_si64(v_sqcoeff_128);
-
-  const int shift = 2 * (bd - 8);
-  const int rounding = (1 << shift) >> 1;
-  error = (error + rounding) >> shift;
-  sqcoeff = (sqcoeff + rounding) >> shift;
-
-  *ssz = sqcoeff;
-  return error;
+  *ssz = _mm_cvtsi128_si64(v_sqcoeff_128);
+  return _mm_cvtsi128_si64(v_error_128);
 }
