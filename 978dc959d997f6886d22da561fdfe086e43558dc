@@ -16,6 +16,24 @@
       "message": "Some background on why the fill walks by columns, since it surprised me.\n\nThe loop comes from HM\u0027s first hash search, where blocks were hashed straight from the pixels. Walking down a column let each block reuse the row hashes it shared with the block above. HM later switched to hashes computed for the whole picture first (JCTVC-W0078), but kept the loop, and libaom ported that version. So the column order no longer saves any work. Since the 256-entry bucket cap in e91b7aa26d, though, the order does decide which blocks a full bucket keeps. The coarse-to-fine column walk spreads them evenly over the frame.\n\nThat\u0027s why this CL keeps the order and only pads the rows. Reading down a column steps 2 to 8 rows at a time. When the width is a multiple of 128, every step is a multiple of 1 KB, so all reads of a column land in a small part of the cache sets and get evicted before the next column reuses them. The padding spreads them over all the sets. The order stays the same, so the output is bit exact.\n\nThe other option is to change the order to rows. First the rows at multiples of the block size, then the rows halfway between them, and so on, each row left to right. The buffer is then read in memory order, so the padding isn\u0027t needed and the fill is simpler.\n\nA full bucket keeps the first 256 blocks it gets. With the column walk, the first pass samples the whole frame sparsely. With the row walk, the first pass covers every 8th row across the full width, so a busy bucket fills up sooner and keeps more blocks from the top of the frame. Blocks lower down can then end up with longer, more expensive vectors. This only matters for content with very many repeats of the same block, like slides with large flat areas, and on screen recordings it mostly cancels out. A plain raster walk has the same problem much worse, since a full bucket keeps only the top rows.\n\nIf you prefer the row order, I can replace this CL with it.",
       "revId": "978dc959d997f6886d22da561fdfe086e43558dc",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "64ea15da_161a1ef0",
+        "filename": "av1/encoder/hash_motion.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 371,
+      "author": {
+        "id": 5216012
+      },
+      "writtenOn": "2026-10-28T13:32:30Z",
+      "side": 1,
+      "message": "Here are the numbers. I compared three fills: the current column walk, column + padding (this CL), and the row walk.\n\nSetup: RT speed 11, IntraBC on, 20 key frames per clip, 16 of my screen recordings (1080p to 5K) and the 11 AOM CTC b2_scc clips, 4:2:0 and 4:4:4, 1 and 4 threads. Each number is the mean over clips of the per-clip median of 5 interleaved rounds (3 so far on x86). I timed the 2x2 pass, the CRC passes, the count and the fill separately.\n\nFill time in ms per key frame, 1 thread, 4:2:0:\n\nColumn\tColumn + pad\tRow\nApple M3 Pro, recordings\t8.33\t7.46\t5.06\nApple M3 Pro, CTC\t3.60\t3.34\t2.37\nRyzen 9 5900X (MSVC), recordings\t22.48\t17.54\t14.51\nRyzen 9 5900X (MSVC), CTC\t8.08\t7.93\t6.69\nRow walk against this CL, 1 thread (4 threads for the key frame in brackets), 4:2:0 / 4:4:4:\n\nFill\tHash build\tKey frame\nM3 Pro, recordings\t-31% / -31%\t-13% / -13%\t-2.7% / -2.6% (-2.4% / -2.1%)\nM3 Pro, CTC\t-30% / -30%\t-12% / -12%\t-1.9% / -1.7% (-1.6% / -1.0%)\n5900X, recordings\t-17% / -17%\t-7% / -7%\t-2.0% / -1.4% (-1.7% / -1.5%)\n5900X, CTC\t-18% / -17%\t-7% / -6%\t-1.6% / -1.4% (-1.5% / -0.9%)\n\nThe fill is faster with rows on every clip on both machines. The 2x2, CRC and count stages don\u0027t change, except for a 4% CRC difference on the 5900X.\n\nSize, BD rate over q 6 to 24, row walk against this CL. These runs used plain 218282, and both machines gave the same streams:\n\nRecordings: -0.001% / -0.011% at 1 thread, -0.005% / -0.006% at 4 threads (4:2:0 / 4:4:4).\nCTC: +0.013% / +0.021% at 1 thread, +0.008% / +0.020% at 4 threads.\n\nThe worst clip is Slides2r: +0.12% in 4:2:0 and +0.18% in 4:4:4.\n\nSo the row walk is faster than the padding on both Arm and x86, at a size cost of about 0.02% on average on CTC. I\u0027d like to replace this CL with the row walk if you\u0027re OK with the output change. Or we can leave the column walk as is",
+      "parentUuid": "13fdb1c3_e0d800dc",
+      "revId": "978dc959d997f6886d22da561fdfe086e43558dc",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
