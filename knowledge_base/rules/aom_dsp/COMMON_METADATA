@@ -9,6 +9,13 @@
 
 agentic_review {
   capability_groups {
+    path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp|mm)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp|mm)"
+    path_expression: "common/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp|mm)"
+    path_expression_exclusion: "third_party/.*"
+    rules: "knowledge_base/rules/aom_dsp/document-simd-sublane-partitioning.md"
+  }
+  capability_groups {
     path_expression: "aom_dsp/.*"
     path_expression: "av1/.*"
     path_expression: "common/.*"
