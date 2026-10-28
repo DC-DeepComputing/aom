@@ -9,8 +9,20 @@
 
 agentic_review {
   capability_groups {
+    path_expression: "aom/(?:.*/)?[^/]*\\.(?:c|cc|h|hpp)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|cc|h|hpp)"
+    rules: "knowledge_base/rules/aom/align-cicp-enums-with-itu-t-h273.md"
+  }
+  capability_groups {
     path_expression: "aom/(?:.*/)?[^/]*\\.(?:h|hpp)"
     rules: "knowledge_base/rules/aom/append-new-public-enum-values-at-end.md"
+    rules: "knowledge_base/rules/aom/avoid-overloading-tuning-enums-with-detection-modes.md"
+    rules: "knowledge_base/rules/aom/avoid-placeholder-enumerators-for-reserved-ranges.md"
+    rules: "knowledge_base/rules/aom/define-explicit-enum-constants-for-flag-combinations.md"
+    rules: "knowledge_base/rules/aom/deprecate-public-enum-constants-before-removal.md"
+    rules: "knowledge_base/rules/aom/describe-option-tradeoffs-neutrally-in-headers.md"
+    rules: "knowledge_base/rules/aom/use-aom-prefix-for-public-header-includes.md"
+    rules: "knowledge_base/rules/aom/use-doxygen-comment-format-in-public-headers.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
@@ -19,12 +31,57 @@ agentic_review {
     rules: "knowledge_base/rules/aom/document-mechanism-and-purpose-for-codec-controls.md"
   }
   capability_groups {
+    path_expression: "aom/(?:.*/)?[^/]*\\.(?:h|hpp)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|cc|h|hpp)"
+    rules: "knowledge_base/rules/aom/document-unsupported-control-options-as-no-effect.md"
+  }
+  capability_groups {
+    path_expression: "aom/[^/]*\\.h"
+    rules: "knowledge_base/rules/aom/document-valid-ranges-in-public-structs.md"
+    rules: "knowledge_base/rules/aom/no-bool-in-public-headers.md"
+  }
+  capability_groups {
+    path_expression: "aom/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "apps/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "common/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "examples/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "test/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "knowledge_base/rules/aom/nv12-chroma-shift-and-interleaved-plane-width.md"
+  }
+  capability_groups {
+    path_expression: "aom/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp|mm)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp|mm)"
+    path_expression_exclusion: "examples/.*"
+    path_expression_exclusion: "test/.*"
+    rules: "knowledge_base/rules/aom/omit-redundant-descriptors-in-codec-controls.md"
+  }
+  capability_groups {
     path_expression: "aom/.*"
     path_expression: "apps/.*"
     path_expression: "av1/.*"
     path_expression_exclusion: "examples/.*"
     path_expression_exclusion: "test/.*"
     rules: "knowledge_base/rules/aom/omit-tuning-overrides-from-codec-control-defaults.md"
+  }
+  capability_groups {
+    path_expression: "aom/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "knowledge_base/rules/aom/preserve-released-codec-control-semantics.md"
+    rules: "knowledge_base/rules/aom/use-t-suffix-for-public-c-typedefs.md"
+  }
+  capability_groups {
+    path_expression: "aom/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "knowledge_base/rules/aom/public-codec-control-enums-in-public-headers.md"
+  }
+  capability_groups {
+    path_expression: "aom/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "common/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "examples/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "test/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "tools/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "knowledge_base/rules/aom/specify-temporal-and-spatial-layer-ids-in-docs.md"
   }
   capability_groups {
     path_expression: "aom/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
