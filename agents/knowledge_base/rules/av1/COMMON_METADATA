@@ -32,6 +32,10 @@ agentic_review {
     rules: "agents/knowledge_base/rules/av1/dispatch-8bit-simd-by-runtime-bit-depth.md"
   }
   capability_groups {
+    path_expression: "av1/encoder/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp|mm)"
+    rules: "agents/knowledge_base/rules/av1/document-search-pruning-rationale.md"
+  }
+  capability_groups {
     path_expression: "av1/encoder/.*"
     rules: "agents/knowledge_base/rules/av1/document-shared-codec-structs-for-encoder-and-decoder.md"
     rules: "agents/knowledge_base/rules/av1/preserve-default-rate-control-tuning.md"
@@ -61,6 +65,11 @@ agentic_review {
     rules: "agents/knowledge_base/rules/av1/maintain-highbd-and-lowbd-counterpart-parity.md"
   }
   capability_groups {
+    path_expression: "av1/.*"
+    rules: "agents/knowledge_base/rules/av1/order-pointer-arguments-before-block-coordinates-and-flags.md"
+    rules: "agents/knowledge_base/rules/av1/use-exact-resolution-bounds-for-speed-features.md"
+  }
+  capability_groups {
     path_expression: "aom_util/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
     path_expression: "av1/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
     rules: "agents/knowledge_base/rules/av1/terminate-workers-before-freeing-worker-arrays.md"
@@ -70,10 +79,6 @@ agentic_review {
     path_expression: "aom_scale/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
     path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
     rules: "agents/knowledge_base/rules/av1/use-capability-helper-or-flag-for-optimized-scaler-dispatch.md"
-  }
-  capability_groups {
-    path_expression: "av1/.*"
-    rules: "agents/knowledge_base/rules/av1/use-exact-resolution-bounds-for-speed-features.md"
   }
   capability_groups {
     path_expression: "aom/(?:.*/)?[^/]*\\.(?:c|h)"
