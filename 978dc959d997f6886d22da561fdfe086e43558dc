@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "13fdb1c3_e0d800dc",
+        "filename": "av1/encoder/hash_motion.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 371,
+      "author": {
+        "id": 5216012
+      },
+      "writtenOn": "2026-10-28T12:57:56Z",
+      "side": 1,
+      "message": "Some background on why the fill walks by columns, since it surprised me.\n\nThe loop comes from HM\u0027s first hash search, where blocks were hashed straight from the pixels. Walking down a column let each block reuse the row hashes it shared with the block above. HM later switched to hashes computed for the whole picture first (JCTVC-W0078), but kept the loop, and libaom ported that version. So the column order no longer saves any work. Since the 256-entry bucket cap in e91b7aa26d, though, the order does decide which blocks a full bucket keeps. The coarse-to-fine column walk spreads them evenly over the frame.\n\nThat\u0027s why this CL keeps the order and only pads the rows. Reading down a column steps 2 to 8 rows at a time. When the width is a multiple of 128, every step is a multiple of 1 KB, so all reads of a column land in a small part of the cache sets and get evicted before the next column reuses them. The padding spreads them over all the sets. The order stays the same, so the output is bit exact.\n\nThe other option is to change the order to rows. First the rows at multiples of the block size, then the rows halfway between them, and so on, each row left to right. The buffer is then read in memory order, so the padding isn\u0027t needed and the fill is simpler.\n\nA full bucket keeps the first 256 blocks it gets. With the column walk, the first pass samples the whole frame sparsely. With the row walk, the first pass covers every 8th row across the full width, so a busy bucket fills up sooner and keeps more blocks from the top of the frame. Blocks lower down can then end up with longer, more expensive vectors. This only matters for content with very many repeats of the same block, like slides with large flat areas, and on screen recordings it mostly cancels out. A plain raster walk has the same problem much worse, since a full bucket keeps only the top rows.\n\nIf you prefer the row order, I can replace this CL with it.",
+      "revId": "978dc959d997f6886d22da561fdfe086e43558dc",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
