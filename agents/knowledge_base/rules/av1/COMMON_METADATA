@@ -9,6 +9,121 @@
 
 agentic_review {
   capability_groups {
+    path_expression: "av1/encoder/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "agents/knowledge_base/rules/av1/account-for-encoder-mode-in-rdmult-tuning.md"
+    rules: "agents/knowledge_base/rules/av1/assign-mode-and-ref-in-caller-loops.md"
+    rules: "agents/knowledge_base/rules/av1/avoid-freeing-aliased-thread-context-pointers.md"
+    rules: "agents/knowledge_base/rules/av1/avoid-guarding-cheap-counter-increments.md"
+    rules: "agents/knowledge_base/rules/av1/avoid-redundant-quantizer-conversions.md"
+    rules: "agents/knowledge_base/rules/av1/do-not-clear-context-root-during-subtree-deallocation.md"
+    rules: "agents/knowledge_base/rules/av1/document-speed-feature-levels-and-validation-checks.md"
+    rules: "agents/knowledge_base/rules/av1/encapsulate-reference-frame-predicate-checks.md"
+    rules: "agents/knowledge_base/rules/av1/explain-speed-feature-preset-applicability.md"
+    rules: "agents/knowledge_base/rules/av1/gate-highbitdepth-features-at-runtime.md"
+    rules: "agents/knowledge_base/rules/av1/guard-expensive-block-metric-computations.md"
+    rules: "agents/knowledge_base/rules/av1/init-motion-search-params-in-setup-helpers.md"
+    rules: "agents/knowledge_base/rules/av1/invalidate-cached-frame-metadata-when-copy-bypassed.md"
+    rules: "agents/knowledge_base/rules/av1/keep-speed-features-orthogonal.md"
+    rules: "agents/knowledge_base/rules/av1/no-const-cast-cpi-store-stats-in-macroblock.md"
+    rules: "agents/knowledge_base/rules/av1/refresh-search-sites-before-set-mv-search-method.md"
+    rules: "agents/knowledge_base/rules/av1/separate-stage-multithreading-state.md"
+    rules: "agents/knowledge_base/rules/av1/suffix-search-pruning-speed-features-with-search.md"
+    rules: "agents/knowledge_base/rules/av1/trim-lookahead-frames-from-tpl-gop-stats.md"
+    rules: "agents/knowledge_base/rules/av1/use-loop-for-reference-frame-bitmasks.md"
+    rules: "agents/knowledge_base/rules/av1/verify-rate-control-mode-for-mode-specific-parameters.md"
+  }
+  capability_groups {
+    path_expression: "av1/encoder/.*"
+    rules: "agents/knowledge_base/rules/av1/accumulate-syntax-tree-costs-in-ref-cost-estimation.md"
+    rules: "agents/knowledge_base/rules/av1/accurately-name-resolution-range-check-variables.md"
+    rules: "agents/knowledge_base/rules/av1/avoid-mutating-shared-primary-compressor-state.md"
+    rules: "agents/knowledge_base/rules/av1/bypass-deltaq-per-block-for-lossless-aq.md"
+    rules: "agents/knowledge_base/rules/av1/centralize-speed-tuning-in-speed-features.md"
+    rules: "agents/knowledge_base/rules/av1/check-lookahead-peek-non-null.md"
+    rules: "agents/knowledge_base/rules/av1/direct-simple-motion-search-for-single-reference.md"
+    rules: "agents/knowledge_base/rules/av1/distinguish-mode-signaling-from-header-rate-in-comments.md"
+    rules: "agents/knowledge_base/rules/av1/do-not-gate-mt-sync-realloc-on-per-frame-flags.md"
+    rules: "agents/knowledge_base/rules/av1/document-shared-codec-structs-for-encoder-and-decoder.md"
+    rules: "agents/knowledge_base/rules/av1/drop-overlay-frame-when-altref-dropped.md"
+    rules: "agents/knowledge_base/rules/av1/encapsulate-format-constraints-in-setup-helpers.md"
+    rules: "agents/knowledge_base/rules/av1/gate-orientation-dependent-speed-features.md"
+    rules: "agents/knowledge_base/rules/av1/gate-speed-feature-threshold-on-specific-level.md"
+    rules: "agents/knowledge_base/rules/av1/guard-mt-sync-allocation-with-feature-check.md"
+    rules: "agents/knowledge_base/rules/av1/guard-rd-cost-arithmetic-against-sentinel-overflow.md"
+    rules: "agents/knowledge_base/rules/av1/include-block-dimensions-when-clamping-search-bounds.md"
+    rules: "agents/knowledge_base/rules/av1/initialize-superblock-state-before-partition-search.md"
+    rules: "agents/knowledge_base/rules/av1/place-tuning-speed-features-before-mode-early-returns.md"
+    rules: "agents/knowledge_base/rules/av1/preserve-default-rate-control-tuning.md"
+    rules: "agents/knowledge_base/rules/av1/separate-speed-features-by-video-orientation.md"
+    rules: "agents/knowledge_base/rules/av1/set-rate-and-distortion-when-invalidating-rd-stats.md"
+    rules: "agents/knowledge_base/rules/av1/split-independent-speed-features.md"
+    rules: "agents/knowledge_base/rules/av1/sync-frame-resize-realloc-paths.md"
+    rules: "agents/knowledge_base/rules/av1/synchronize-auxiliary-frame-buffer-guards.md"
+    rules: "agents/knowledge_base/rules/av1/threads-ge-tiles-in-multithreading-heuristics.md"
+    rules: "agents/knowledge_base/rules/av1/update-row-mt-progress-counters-monotonically.md"
+    rules: "agents/knowledge_base/rules/av1/use-av1-is-scaled-ternary-for-reference-buffers.md"
+    rules: "agents/knowledge_base/rules/av1/use-frames-since-key-for-distance-from-key-frame.md"
+    rules: "agents/knowledge_base/rules/av1/use-lookup-table-for-speed-feature-levels.md"
+    rules: "agents/knowledge_base/rules/av1/validate-frame-duration-and-update-timestamp-history.md"
+    rules: "agents/knowledge_base/rules/av1/verify-encoder-optimizations-with-lookahead-and-unit-tests.md"
+    rules: "agents/knowledge_base/rules/av1/verify-inter-mode-evaluated-before-pruning.md"
+    rules: "agents/knowledge_base/rules/av1/verify-ref-frame-when-checking-reference-specific-mvs.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    rules: "agents/knowledge_base/rules/av1/accurate-fixed-point-precision-suffixes.md"
+    rules: "agents/knowledge_base/rules/av1/complete-filter-and-convolution-function-families.md"
+    rules: "agents/knowledge_base/rules/av1/document-hierarchical-boundary-exclusions.md"
+    rules: "agents/knowledge_base/rules/av1/use-dual-loop-filter-for-adjacent-edges.md"
+  }
+  capability_groups {
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    rules: "agents/knowledge_base/rules/av1/align-experimental-tool-constants-with-specification.md"
+    rules: "agents/knowledge_base/rules/av1/clamp-delta-q-quantizer-index-to-valid-range.md"
+    rules: "agents/knowledge_base/rules/av1/document-shared-control-flags-and-caller-invariants.md"
+    rules: "agents/knowledge_base/rules/av1/name-predicates-consistently-with-enum-constants.md"
+    rules: "agents/knowledge_base/rules/av1/negate-allow-palette-in-early-exit-guards.md"
+    rules: "agents/knowledge_base/rules/av1/pass-channel-buffer-pointers-over-frame-structs.md"
+    rules: "agents/knowledge_base/rules/av1/reuse-standard-block-dimension-tables.md"
+    rules: "agents/knowledge_base/rules/av1/update-paired-dc-and-ac-quantization-functions.md"
+    rules: "agents/knowledge_base/rules/av1/use-bit-shifts-over-get-mv-rawpel-for-aligned-mv-bounds.md"
+    rules: "agents/knowledge_base/rules/av1/use-interp-filter-params-table-for-kernels.md"
+    rules: "agents/knowledge_base/rules/av1/use-mi-params-for-mode-info-dimensions.md"
+    rules: "agents/knowledge_base/rules/av1/use-subpel-mv-limits-for-subpel-search-params.md"
+  }
+  capability_groups {
+    path_expression: "av1/encoder/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    rules: "agents/knowledge_base/rules/av1/align-motion-search-limits-to-step-increments.md"
+  }
+  capability_groups {
+    path_expression: "aom_scale/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "test/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    rules: "agents/knowledge_base/rules/av1/alloc-pyramid-only-for-source-or-ref-buffers.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/.*"
+    path_expression: "av1/common/.*"
+    rules: "agents/knowledge_base/rules/av1/allow-padded-filter-taps-in-8tap-simd-convolve.md"
+  }
+  capability_groups {
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "test/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "agents/knowledge_base/rules/av1/assert-positive-tensor-channels-on-branch-combine.md"
+    rules: "agents/knowledge_base/rules/av1/start-valid-padding-strided-convolution-at-zero.md"
+  }
+  capability_groups {
+    path_expression: "av1/common/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "test/(?:.*/)?cdef[^/]*"
+    rules: "agents/knowledge_base/rules/av1/assume-minimum-block-width-4-in-cdef-simd.md"
+  }
+  capability_groups {
+    path_expression: "aom/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    rules: "agents/knowledge_base/rules/av1/av1-support-signed-values-for-delta-parameters.md"
+  }
+  capability_groups {
     path_expression: "aom_dsp/.*"
     path_expression: "aom_scale/.*"
     path_expression: "av1/.*"
@@ -18,12 +133,144 @@ agentic_review {
   capability_groups {
     path_expression: "aom_dsp/.*"
     path_expression: "av1/.*"
+    rules: "agents/knowledge_base/rules/av1/avoid-highbd-header-includes-in-standard-sources.md"
+    rules: "agents/knowledge_base/rules/av1/avoid-redundant-buffer-conversion-in-dsp-wrappers.md"
+    rules: "agents/knowledge_base/rules/av1/avoid-redundant-dimension-reconstruction-shifts.md"
+    rules: "agents/knowledge_base/rules/av1/avoid-redundant-transform-buffer-zeroing-beyond-eob.md"
+    rules: "agents/knowledge_base/rules/av1/consolidate-bitdepth-buffer-pointers-in-branches.md"
     rules: "agents/knowledge_base/rules/av1/delegate-composite-dsp-to-standalone-primitives.md"
+    rules: "agents/knowledge_base/rules/av1/document-intentional-simd-overstore-or-overread.md"
     rules: "agents/knowledge_base/rules/av1/hoist-scratch-buffer-allocations.md"
+    rules: "agents/knowledge_base/rules/av1/omit-redundant-shift-rounding-ternary-in-high-bitdepth.md"
+    rules: "agents/knowledge_base/rules/av1/parameterize-frame-buffer-helpers-by-plane.md"
+    rules: "agents/knowledge_base/rules/av1/pass-filter-pointers-directly-in-simd-convolve.md"
+    rules: "agents/knowledge_base/rules/av1/peel-loop-boundary-iterations-for-padding.md"
+    rules: "agents/knowledge_base/rules/av1/recompute-sliding-window-accumulations.md"
+    rules: "agents/knowledge_base/rules/av1/unified-2d-convolution-dispatch-over-1d-branching.md"
+    rules: "agents/knowledge_base/rules/av1/update-all-simd-passes-when-relaxing-dimension-constraints.md"
+    rules: "agents/knowledge_base/rules/av1/use-standard-simd-transform-primitive-names.md"
+    rules: "agents/knowledge_base/rules/av1/validate-plane-iteration-upper-bound-against-max-mb-plane.md"
+  }
+  capability_groups {
+    path_expression: "av1/encoder/tpl_model\\.[^/]*"
+    rules: "agents/knowledge_base/rules/av1/avoid-redundant-frame-0-tpl-dispenser.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/.*"
+    path_expression: "aom_scale/.*"
+    path_expression: "av1/.*"
+    rules: "agents/knowledge_base/rules/av1/avoid-redundant-highbd-pointer-conversions.md"
+    rules: "agents/knowledge_base/rules/av1/compare-yv12-buffer-dimensions-consistently.md"
+    rules: "agents/knowledge_base/rules/av1/group-yv12-buffer-and-crop-dimensions.md"
+    rules: "agents/knowledge_base/rules/av1/validate-dimensions-individually-for-coordinate-offsets.md"
+  }
+  capability_groups {
+    path_expression: "aom/.*"
+    path_expression: "av1/.*"
+    rules: "agents/knowledge_base/rules/av1/avoid-redundant-mode-checks-for-unsupported-features.md"
+    rules: "agents/knowledge_base/rules/av1/check-encoder-config-for-monochrome-not-input-image.md"
+    rules: "agents/knowledge_base/rules/av1/default-encoder-quantizer-bounds-at-extremes.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:c|h)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|h)"
+    rules: "agents/knowledge_base/rules/av1/avoid-simd-dimension-assertions-in-dispatch-facades.md"
+    rules: "agents/knowledge_base/rules/av1/distinguish-filter-taps-from-subpel-shifts.md"
+    rules: "agents/knowledge_base/rules/av1/document-lowbd-reuse-in-highbd-paths.md"
+    rules: "agents/knowledge_base/rules/av1/name-projection-functions-source-to-target-space.md"
+    rules: "agents/knowledge_base/rules/av1/parameterize-motion-search-ranges-and-limits.md"
+    rules: "agents/knowledge_base/rules/av1/reflect-spherical-latitude-across-poles.md"
+    rules: "agents/knowledge_base/rules/av1/return-best-distortion-from-motion-search.md"
+    rules: "agents/knowledge_base/rules/av1/simplify-block-dimension-expressions-in-specialized-simd-ker.md"
+    rules: "agents/knowledge_base/rules/av1/specify-search-algorithm-in-function-names.md"
+    rules: "agents/knowledge_base/rules/av1/use-floating-point-for-projection-coordinates.md"
+    rules: "agents/knowledge_base/rules/av1/use-sad-and-helpers-for-motion-search-distortion.md"
+  }
+  capability_groups {
+    path_expression: "av1/.*"
+    rules: "agents/knowledge_base/rules/av1/avoid-state-dependent-early-exit-in-shared-helpers.md"
+    rules: "agents/knowledge_base/rules/av1/canonical-encoder-config-defaults.md"
+    rules: "agents/knowledge_base/rules/av1/clamp-projected-continuous-coordinates-to-dimensions.md"
+    rules: "agents/knowledge_base/rules/av1/consolidate-buffer-initialization-and-padding.md"
+    rules: "agents/knowledge_base/rules/av1/document-mode-specific-config-rationale.md"
+    rules: "agents/knowledge_base/rules/av1/guard-chroma-plane-processing-with-is-chroma-ref.md"
+    rules: "agents/knowledge_base/rules/av1/no-zero-based-plane-index-for-chroma.md"
+    rules: "agents/knowledge_base/rules/av1/order-pointer-arguments-before-block-coordinates-and-flags.md"
+    rules: "agents/knowledge_base/rules/av1/process-unconditional-luma-prior-to-chroma-plane-guards.md"
+    rules: "agents/knowledge_base/rules/av1/reject-unsupported-per-frame-flags-when-lagged.md"
+    rules: "agents/knowledge_base/rules/av1/save-and-restore-coding-context-for-speculative-encodes.md"
+    rules: "agents/knowledge_base/rules/av1/use-av1-prefix-not-speculative-prefixes.md"
+    rules: "agents/knowledge_base/rules/av1/use-consistent-quantizer-index-range-bounds.md"
+    rules: "agents/knowledge_base/rules/av1/use-exact-resolution-bounds-for-speed-features.md"
+    rules: "agents/knowledge_base/rules/av1/use-seq-params-for-subsampling-and-format-properties.md"
+    rules: "agents/knowledge_base/rules/av1/use-standard-superblock-dimension-constants.md"
+    rules: "agents/knowledge_base/rules/av1/validate-both-spatial-and-temporal-layers-for-svc.md"
+    rules: "agents/knowledge_base/rules/av1/validate-mode-info-coordinates-against-grid-dimensions.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "aom_scale/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    rules: "agents/knowledge_base/rules/av1/break-multiplane-loop-on-failure-for-fallback.md"
+    rules: "agents/knowledge_base/rules/av1/sync-8bit-fast-paths-across-highbitdepth-branches.md"
+    rules: "agents/knowledge_base/rules/av1/use-capability-helper-or-flag-for-optimized-scaler-dispatch.md"
   }
   capability_groups {
     path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|h)"
+    rules: "agents/knowledge_base/rules/av1/check-av1-is-valid-scale-after-setup.md"
+    rules: "agents/knowledge_base/rules/av1/consolidate-identity-translation-into-warping-helpers.md"
     rules: "agents/knowledge_base/rules/av1/derive-and-validate-shear-params-on-warped-motion.md"
+    rules: "agents/knowledge_base/rules/av1/derive-stream-config-in-set-encoder-config.md"
+    rules: "agents/knowledge_base/rules/av1/do-not-gate-auto-config-on-thread-count.md"
+    rules: "agents/knowledge_base/rules/av1/document-quantization-delta-qindex-offsets.md"
+    rules: "agents/knowledge_base/rules/av1/early-exit-when-worker-count-unchanged.md"
+    rules: "agents/knowledge_base/rules/av1/group-related-bitstream-syntax-elements.md"
+    rules: "agents/knowledge_base/rules/av1/initialize-motion-search-baseline-error.md"
+    rules: "agents/knowledge_base/rules/av1/reset-worker-exit-flags-before-dispatch.md"
+    rules: "agents/knowledge_base/rules/av1/unify-intra-inter-bitstream-syntax-functions.md"
+  }
+  capability_groups {
+    path_expression: "aom_util/(?:.*/)?[^/]*\\.(?:c|h)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|h)"
+    rules: "agents/knowledge_base/rules/av1/check-exit-flag-in-condition-variable-wait-loops.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/.*"
+    path_expression: "av1/common/.*"
+    path_expression: "av1/encoder/.*"
+    path_expression: "test/.*"
+    rules: "agents/knowledge_base/rules/av1/check-related-transform-sizes-and-types-on-simd-fixes.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "aom_scale/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "common/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    rules: "agents/knowledge_base/rules/av1/clamp-block-dimensions-at-plane-boundaries.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:c|h)"
+    path_expression: "aom_scale/(?:.*/)?[^/]*\\.(?:c|h)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|h)"
+    rules: "agents/knowledge_base/rules/av1/compute-pixels-on-the-fly-avoid-coordinate-buffers.md"
+    rules: "agents/knowledge_base/rules/av1/perform-clamping-after-multiplication-in-simd.md"
+    rules: "agents/knowledge_base/rules/av1/prevent-simd-load-over-reads-at-buffer-boundaries.md"
+    rules: "agents/knowledge_base/rules/av1/use-fixed-point-tables-instead-of-floating-point-math.md"
+  }
+  capability_groups {
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|cc|h)"
+    rules: "agents/knowledge_base/rules/av1/counterpart-struct-member-ordering.md"
+    rules: "agents/knowledge_base/rules/av1/name-syntax-presence-flags-explicitly.md"
+  }
+  capability_groups {
+    path_expression: "av1/common/reconintra\\.c"
+    rules: "agents/knowledge_base/rules/av1/declare-local-variables-for-intra-mode-neighbor-flags.md"
+  }
+  capability_groups {
+    path_expression: "aom/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "av1/encoder/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "av1/ratectrl_rtc\\.[^/]*"
+    rules: "agents/knowledge_base/rules/av1/differentiate-external-qp-overrides-from-fixed-q-mode.md"
   }
   capability_groups {
     path_expression: "aom_dsp/.*"
@@ -32,20 +279,51 @@ agentic_review {
     rules: "agents/knowledge_base/rules/av1/dispatch-8bit-simd-by-runtime-bit-depth.md"
   }
   capability_groups {
+    path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "tools/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "agents/knowledge_base/rules/av1/distinguish-icdf-from-cdf-in-entropy-coding-names.md"
+  }
+  capability_groups {
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp|mm)"
+    rules: "agents/knowledge_base/rules/av1/distinguish-intrabc-from-intra-in-documentation.md"
+    rules: "agents/knowledge_base/rules/av1/keep-encoder-only-code-in-encoder-directory.md"
+  }
+  capability_groups {
+    path_expression: "av1/common/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "common/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "test/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    rules: "agents/knowledge_base/rules/av1/do-not-modify-spec-tables-for-test-inputs.md"
+  }
+  capability_groups {
+    path_expression: "aom/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "agents/knowledge_base/rules/av1/document-deferred-codec-control-conversion.md"
+    rules: "agents/knowledge_base/rules/av1/preserve-build-config-overrides-in-encoder-flags.md"
+  }
+  capability_groups {
+    path_expression: "av1/encoder/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    rules: "agents/knowledge_base/rules/av1/document-joint-effects-of-coupled-tuning-adjustments.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "av1/common/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "av1/encoder/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "agents/knowledge_base/rules/av1/document-or-adjust-thresholds-for-high-bit-depth.md"
+  }
+  capability_groups {
     path_expression: "av1/encoder/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp|mm)"
     rules: "agents/knowledge_base/rules/av1/document-search-pruning-rationale.md"
   }
   capability_groups {
     path_expression: "av1/encoder/.*"
-    rules: "agents/knowledge_base/rules/av1/document-shared-codec-structs-for-encoder-and-decoder.md"
-    rules: "agents/knowledge_base/rules/av1/preserve-default-rate-control-tuning.md"
-    rules: "agents/knowledge_base/rules/av1/split-independent-speed-features.md"
-    rules: "agents/knowledge_base/rules/av1/sync-frame-resize-realloc-paths.md"
+    path_expression: "av1/ratectrl_rtc\\.[^/]*"
+    rules: "agents/knowledge_base/rules/av1/document-svc-layer-context-and-metric-provenance.md"
   }
   capability_groups {
-    path_expression: "av1/encoder/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
-    rules: "agents/knowledge_base/rules/av1/document-speed-feature-levels-and-validation-checks.md"
-    rules: "agents/knowledge_base/rules/av1/separate-stage-multithreading-state.md"
+    path_expression: "aom[^/]*/(?:.*/)?[^/]*\\.(?:c|cc|h|hpp)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|cc|h|hpp)"
+    rules: "agents/knowledge_base/rules/av1/document-threading-and-mode-context-pointers.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
@@ -55,8 +333,37 @@ agentic_review {
     rules: "agents/knowledge_base/rules/av1/size-scratch-buffers-tightly.md"
   }
   capability_groups {
-    path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp|mm)"
-    rules: "agents/knowledge_base/rules/av1/keep-encoder-only-code-in-encoder-directory.md"
+    path_expression: "aom_scale/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    rules: "agents/knowledge_base/rules/av1/extend-frame-borders-after-resizing.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/.*"
+    path_expression: "av1/.*"
+    path_expression_exclusion: "third_party/.*"
+    rules: "agents/knowledge_base/rules/av1/flatten-row-invariant-intermediate-buffers.md"
+    rules: "agents/knowledge_base/rules/av1/promote-high-bitdepth-intermediate-arithmetic-to-64-bit.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    path_expression: "aom/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "apps/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "agents/knowledge_base/rules/av1/group-related-encoder-config-options.md"
+  }
+  capability_groups {
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "agents/knowledge_base/rules/av1/invalidate-ref-frame-maps-on-buffer-reset.md"
+    rules: "agents/knowledge_base/rules/av1/name-mode-specific-predicates-precisely.md"
+    rules: "agents/knowledge_base/rules/av1/null-check-reference-frame-buffers.md"
+    rules: "agents/knowledge_base/rules/av1/prefer-direct-context-member-access-over-alias.md"
+    rules: "agents/knowledge_base/rules/av1/ratectrl-ceil-duration-to-frame-count.md"
+    rules: "agents/knowledge_base/rules/av1/reject-compiled-out-features-and-guard-blocks.md"
+    rules: "agents/knowledge_base/rules/av1/reserve-mi-prefix-for-mode-info-units.md"
+    rules: "agents/knowledge_base/rules/av1/use-int-mv-union-for-motion-vectors.md"
+    rules: "agents/knowledge_base/rules/av1/use-predefined-zero-mv-constants.md"
+    rules: "agents/knowledge_base/rules/av1/use-standard-kf-prefix-for-key-frames.md"
+    rules: "agents/knowledge_base/rules/av1/validate-directional-tile-dimensions-independently.md"
   }
   capability_groups {
     path_expression: "aom_dsp/.*"
@@ -65,9 +372,50 @@ agentic_review {
     rules: "agents/knowledge_base/rules/av1/maintain-highbd-and-lowbd-counterpart-parity.md"
   }
   capability_groups {
+    path_expression: "aom/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "common/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "agents/knowledge_base/rules/av1/match-arg-parse-helper-to-codec-control-type.md"
+    rules: "agents/knowledge_base/rules/av1/match-bitstream-syntax-order-in-header-structs.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "agents/knowledge_base/rules/av1/omit-2d-dimensions-in-1d-transform-types-and-tables.md"
+    rules: "agents/knowledge_base/rules/av1/scale-high-bitdepth-buffer-size-by-shift.md"
+    rules: "agents/knowledge_base/rules/av1/use-maxlanes-for-highway-simd-lane-counts.md"
+    rules: "agents/knowledge_base/rules/av1/use-plane-index-not-plane-type-for-individual-planes.md"
+    rules: "agents/knowledge_base/rules/av1/use-unsigned-int-for-block-variance.md"
+  }
+  capability_groups {
+    path_expression: "aom/.*"
     path_expression: "av1/.*"
-    rules: "agents/knowledge_base/rules/av1/order-pointer-arguments-before-block-coordinates-and-flags.md"
-    rules: "agents/knowledge_base/rules/av1/use-exact-resolution-bounds-for-speed-features.md"
+    path_expression: "common/.*"
+    rules: "agents/knowledge_base/rules/av1/omit-deprecated-image-formats-from-validation.md"
+  }
+  capability_groups {
+    path_expression: "av1/encoder/(?:.*/)?[^/]*\\.(?:c|h)"
+    rules: "agents/knowledge_base/rules/av1/omit-redundant-dropped-frame-check-when-frame-size-checked.md"
+    rules: "agents/knowledge_base/rules/av1/reuse-working-buffers-across-frames.md"
+    rules: "agents/knowledge_base/rules/av1/update-lr-mt-buffers-after-alloc-restoration-buffers.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "test/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "agents/knowledge_base/rules/av1/size-static-filter-arrays-to-exact-simd-load-offset.md"
+  }
+  capability_groups {
+    path_expression: "av1/.*"
+    path_expression: "test/.*"
+    rules: "agents/knowledge_base/rules/av1/size-txfm-stage-range-using-max-txfm-stage-num.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "test/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    rules: "agents/knowledge_base/rules/av1/strictly-monotonic-aom-cdf-probabilities.md"
   }
   capability_groups {
     path_expression: "aom_util/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
@@ -75,14 +423,87 @@ agentic_review {
     rules: "agents/knowledge_base/rules/av1/terminate-workers-before-freeing-worker-arrays.md"
   }
   capability_groups {
-    path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
-    path_expression: "aom_scale/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "test/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "agents/knowledge_base/rules/av1/test-simd-frame-routines-with-non-aligned-dimensions.md"
+  }
+  capability_groups {
+    path_expression: "av1/decoder/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "agents/knowledge_base/rules/av1/update-data-end-on-show-existing-frame.md"
+  }
+  capability_groups {
+    path_expression: "av1/av1_cx_iface\\.c"
+    path_expression: "av1/encoder/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "agents/knowledge_base/rules/av1/update-stage-predicates-instead-of-toggling-pipeline-state.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/.*"
+    path_expression: "av1/common/.*"
+    path_expression: "av1/encoder/.*"
+    rules: "agents/knowledge_base/rules/av1/use-aligned-buffers-for-simd-dsp-routines.md"
+  }
+  capability_groups {
     path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
-    rules: "agents/knowledge_base/rules/av1/use-capability-helper-or-flag-for-optimized-scaler-dispatch.md"
+    path_expression: "test/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    rules: "agents/knowledge_base/rules/av1/use-consistent-as-int-access-for-paired-int-mv.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "aom_scale/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "test/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "agents/knowledge_base/rules/av1/use-plane-indexed-buffers-in-multiplane-loops.md"
   }
   capability_groups {
     path_expression: "aom/(?:.*/)?[^/]*\\.(?:c|h)"
     path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
     rules: "agents/knowledge_base/rules/av1/use-ppi-number-spatial-layers-for-sequence-config.md"
+  }
+  capability_groups {
+    path_expression: "av1/encoder/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "av1/ratectrl_rtc\\.[^/]*"
+    rules: "agents/knowledge_base/rules/av1/use-standard-q-value-and-qindex-terminology.md"
+  }
+  capability_groups {
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression_exclusion: "third_party/.*"
+    rules: "agents/knowledge_base/rules/av1/use-unsigned-int-for-frame-numbers.md"
+  }
+  capability_groups {
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|h)"
+    path_expression: "common/(?:.*/)?[^/]*\\.(?:c|h)"
+    path_expression: "examples/(?:.*/)?[^/]*\\.(?:c|cc)"
+    path_expression: "tools/(?:.*/)?[^/]*\\.(?:c|cc)"
+    rules: "agents/knowledge_base/rules/av1/validate-encoded-uleb-size-matches-expected.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:c|h)"
+    path_expression: "aom_scale/(?:.*/)?[^/]*\\.(?:c|h)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    rules: "agents/knowledge_base/rules/av1/validate-multiplane-compatibility-upfront.md"
+  }
+  capability_groups {
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "common/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "examples/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "agents/knowledge_base/rules/av1/validate-tflite-interpreter-builder-status-and-tensor-counts.md"
+  }
+  capability_groups {
+    path_expression: "aom/.*"
+    path_expression: "aom_dsp/.*"
+    path_expression: "aom_mem/.*"
+    path_expression: "apps/.*"
+    path_expression: "av1/.*"
+    path_expression: "common/.*"
+    path_expression: "examples/.*"
+    path_expression: "stats/.*"
+    path_expression: "tools/.*"
+    rules: "agents/knowledge_base/rules/av1/verify-capacity-when-reusing-cached-buffers.md"
+  }
+  capability_groups {
+    path_expression: "av1/common/.*"
+    path_expression: "av1/encoder/.*"
+    rules: "agents/knowledge_base/rules/av1/when-computing-chroma-plane-subsampling-shifts-relative-to-l.md"
   }
 }

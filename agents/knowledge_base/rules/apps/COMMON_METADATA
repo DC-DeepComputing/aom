@@ -9,6 +9,39 @@
 
 agentic_review {
   capability_groups {
+    path_expression: "apps/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "common/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "examples/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "test/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "tools/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "agents/knowledge_base/rules/apps/apps-validate-planar-format-before-planar-scaling.md"
+  }
+  capability_groups {
+    path_expression: "apps/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    path_expression: "common/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    path_expression: "tools/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    rules: "agents/knowledge_base/rules/apps/format-av1-sequence-levels-with-dot-notation.md"
+  }
+  capability_groups {
+    path_expression: "apps/.*"
+    path_expression: "examples/.*"
+    rules: "agents/knowledge_base/rules/apps/group-unconditional-cli-args-before-conditional-blocks.md"
+  }
+  capability_groups {
+    path_expression: "apps/.*"
+    path_expression: "examples/.*"
+    path_expression: "test/.*"
+    path_expression: "tools/.*"
+    rules: "agents/knowledge_base/rules/apps/omit-aom-ctrl-macro-guards-in-tree.md"
+  }
+  capability_groups {
+    path_expression: "apps/.*"
+    path_expression: "examples/.*"
+    path_expression: "tools/.*"
+    rules: "agents/knowledge_base/rules/apps/omit-redundant-codec-qualifiers-in-cli-errors.md"
+  }
+  capability_groups {
     path_expression: "apps/aomenc\\.c"
     rules: "agents/knowledge_base/rules/apps/place-key-val-args-in-av1-key-val-args.md"
   }

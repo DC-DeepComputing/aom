@@ -1,0 +1,31 @@
+# Copyright (c) 2026, Alliance for Open Media. All rights reserved.
+#
+# This source code is subject to the terms of the BSD 2 Clause License and
+# the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
+# was not distributed with this source code in the LICENSE file, you can
+# obtain it at www.aomedia.org/license/software. If the Alliance for Open
+# Media Patent License 1.0 was not distributed with this source code in the
+# PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+
+agentic_review {
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.cmake"
+    path_expression: "CMakeLists\\.txt"
+    rules: "agents/knowledge_base/rules/cmakelists-txt/append-common-cmake-list-items-unconditionally.md"
+    rules: "agents/knowledge_base/rules/cmakelists-txt/avoid-cmake-matches-for-path-substrings.md"
+    rules: "agents/knowledge_base/rules/cmakelists-txt/cmake-nested-expansion-for-indirect-variables.md"
+    rules: "agents/knowledge_base/rules/cmakelists-txt/consistent-cmake-scratch-variable-names.md"
+    rules: "agents/knowledge_base/rules/cmakelists-txt/document-compiler-warning-suppressions-in-build-files.md"
+    rules: "agents/knowledge_base/rules/cmakelists-txt/omit-redundant-dot-slash-in-cmake-install-interface.md"
+  }
+  capability_groups {
+    path_expression: "CMakeLists\\.txt"
+    path_expression: "cmake/.*"
+    rules: "agents/knowledge_base/rules/cmakelists-txt/cmake-project-version-matches-release.md"
+  }
+  capability_groups {
+    path_expression: "CMakeLists\\.txt"
+    path_expression: "test/test\\.cmake"
+    rules: "agents/knowledge_base/rules/cmakelists-txt/sync-source-list-generation-with-test-cmake.md"
+  }
+}

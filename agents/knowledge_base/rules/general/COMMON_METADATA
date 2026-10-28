@@ -9,13 +9,106 @@
 
 agentic_review {
   capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\buint\\b"
+    rules: "agents/knowledge_base/rules/general/abbreviate-fraction-numerator-as-num-not-nom.md"
+    rules: "agents/knowledge_base/rules/general/accumulate-directly-into-total-in-nested-loops.md"
+    rules: "agents/knowledge_base/rules/general/accurately-name-functions-handling-multiple-modes.md"
+    rules: "agents/knowledge_base/rules/general/assert-invariants-before-unsigned-subtraction.md"
+    rules: "agents/knowledge_base/rules/general/assign-output-arrays-directly-avoid-memcpy.md"
+    rules: "agents/knowledge_base/rules/general/avoid-commenting-code-to-silence-warnings.md"
+    rules: "agents/knowledge_base/rules/general/avoid-misleading-arch-suffixes-on-semantically-distinct-help.md"
+    rules: "agents/knowledge_base/rules/general/avoid-overly-verbose-function-names.md"
+    rules: "agents/knowledge_base/rules/general/avoid-premature-parameters-and-flag-parsing.md"
+    rules: "agents/knowledge_base/rules/general/avoid-redundant-parameters-available-in-struct-arguments.md"
+    rules: "agents/knowledge_base/rules/general/avoid-redundant-parameters-in-deallocation-functions.md"
+    rules: "agents/knowledge_base/rules/general/avoid-side-effects-in-const-getters.md"
+    rules: "agents/knowledge_base/rules/general/cache-redundant-function-calls-across-branches.md"
+    rules: "agents/knowledge_base/rules/general/compute-derived-bounds-before-mutating-in-out-params.md"
+    rules: "agents/knowledge_base/rules/general/consolidate-duplicate-local-variables.md"
+    rules: "agents/knowledge_base/rules/general/consolidate-variable-computation-at-declaration.md"
+    rules: "agents/knowledge_base/rules/general/constant-names-k-prefix-no-leading-underscores.md"
+    rules: "agents/knowledge_base/rules/general/declare-buffer-pointers-before-strides.md"
+    rules: "agents/knowledge_base/rules/general/document-helper-functions-and-callbacks.md"
+    rules: "agents/knowledge_base/rules/general/document-non-obvious-logic-and-name-magic-values.md"
+    rules: "agents/knowledge_base/rules/general/document-struct-field-semantic-meaning-over-allocation-prove.md"
+    rules: "agents/knowledge_base/rules/general/document-trusted-input-preconditions.md"
+    rules: "agents/knowledge_base/rules/general/encapsulate-count-increments-in-insertion-helpers.md"
+    rules: "agents/knowledge_base/rules/general/fold-constant-scale-factors-into-matrix-tables.md"
+    rules: "agents/knowledge_base/rules/general/group-numbered-fields-into-multidimensional-arrays.md"
+    rules: "agents/knowledge_base/rules/general/keep-temporary-scratch-buffers-local.md"
+    rules: "agents/knowledge_base/rules/general/maintain-consistent-modifier-word-order-in-identifiers.md"
+    rules: "agents/knowledge_base/rules/general/match-dimensions-in-paired-doc-comments.md"
+    rules: "agents/knowledge_base/rules/general/match-return-type-in-range-checking-and-clamping-helpers.md"
+    rules: "agents/knowledge_base/rules/general/name-desired-dimensions-target-not-scaled-before-scaling.md"
+    rules: "agents/knowledge_base/rules/general/name-dimension-variables-after-associated-buffer.md"
+    rules: "agents/knowledge_base/rules/general/name-parameters-by-function-semantics-not-caller-context.md"
+    rules: "agents/knowledge_base/rules/general/name-shift-amounts-as-shift-not-ratio.md"
+    rules: "agents/knowledge_base/rules/general/omit-redundant-out-parameter-initialization.md"
+    rules: "agents/knowledge_base/rules/general/order-entity-before-attribute-in-dimension-names.md"
+    rules: "agents/knowledge_base/rules/general/order-multi-component-parameters-by-canonical-name.md"
+    rules: "agents/knowledge_base/rules/general/pass-explicit-buffer-sizes-for-pointer-arguments.md"
+    rules: "agents/knowledge_base/rules/general/pass-primitive-scalars-to-internal-helpers-by-value.md"
+    rules: "agents/knowledge_base/rules/general/prefer-count-over-num-for-count-constants.md"
+    rules: "agents/knowledge_base/rules/general/prefer-natural-noun-verb-names-for-action-counts.md"
+    rules: "agents/knowledge_base/rules/general/prefer-zero-based-loop-indexing.md"
+    rules: "agents/knowledge_base/rules/general/qualify-subregion-dimension-names.md"
+    rules: "agents/knowledge_base/rules/general/use-enum-types-for-parameters.md"
+    rules: "agents/knowledge_base/rules/general/use-explicit-dimension-names.md"
+    rules: "agents/knowledge_base/rules/general/use-offset-or-idx-not-ptr-for-integer-offsets.md"
+    rules: "agents/knowledge_base/rules/general/use-reference-not-pointer-for-refcounts-and-handles.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\btable\\b"
+    rules: "agents/knowledge_base/rules/general/account-for-trigonometric-parity-on-negative-angles.md"
+    rules: "agents/knowledge_base/rules/general/consolidate-identical-dispatch-tables.md"
+    rules: "agents/knowledge_base/rules/general/distinguish-hashing-from-hash-table-insertion-in-comments.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bshift\\b"
+    rules: "agents/knowledge_base/rules/general/accurately-explain-arithmetic-in-comments.md"
+    rules: "agents/knowledge_base/rules/general/use-round-power-of-two-helper-macros.md"
+  }
+  capability_groups {
     path_expression: "test/.*"
     rules: "agents/knowledge_base/rules/general/add-regression-tests-for-bug-fixes-and-edge-cases.md"
+    rules: "agents/knowledge_base/rules/general/unit-test-new-formulas-and-mode-behaviors.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bindex\\b"
+    rules: "agents/knowledge_base/rules/general/align-comment-and-expression-term-ordering.md"
+    rules: "agents/knowledge_base/rules/general/distinguish-array-elements-from-indices-in-comments.md"
+    rules: "agents/knowledge_base/rules/general/use-negative-one-as-error-sentinel-for-index-returns.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
     content_patterns: "\\bparams\\b"
     rules: "agents/knowledge_base/rules/general/align-comment-terminology-with-identifiers.md"
+    rules: "agents/knowledge_base/rules/general/group-correlated-lookup-properties-into-struct-arrays.md"
+    rules: "agents/knowledge_base/rules/general/omit-redundant-comments-and-use-imperative-phrasing.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\belse\\s+if\\s*\\("
+    rules: "agents/knowledge_base/rules/general/align-comments-with-positive-branch-conditions.md"
+    rules: "agents/knowledge_base/rules/general/avoid-redundant-return-in-if-else-chains.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bhigh\\b"
+    rules: "agents/knowledge_base/rules/general/align-local-variable-names-with-callee-parameters.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bAOM_INLINE\\b"
+    rules: "agents/knowledge_base/rules/general/align-predicate-conditions-with-dispatch-branch-order.md"
+    rules: "agents/knowledge_base/rules/general/avoid-redundant-specialized-helpers.md"
+    rules: "agents/knowledge_base/rules/general/document-mathematical-index-transformations.md"
+    rules: "agents/knowledge_base/rules/general/prefer-active-verb-function-names.md"
+    rules: "agents/knowledge_base/rules/general/preserve-explanatory-comments-when-extracting-helpers.md"
   }
   capability_groups {
     path_expression: "aom_dsp/.*"
@@ -24,6 +117,26 @@ agentic_review {
     path_expression: "av1/encoder/arm/.*"
     path_expression: "av1/encoder/x86/.*"
     rules: "agents/knowledge_base/rules/general/align-simd-tables-with-declare-aligned.md"
+    rules: "agents/knowledge_base/rules/general/avoid-static-lookup-tables-for-formulaic-simd-masks.md"
+    rules: "agents/knowledge_base/rules/general/avoid-unnecessary-simd-padding-on-scalar-arrays.md"
+    rules: "agents/knowledge_base/rules/general/chain-sequential-simd-lane-insertions.md"
+    rules: "agents/knowledge_base/rules/general/general-offset-residual-loop-indexing-after-simd.md"
+    rules: "agents/knowledge_base/rules/general/target-lowest-required-simd-isa-extension.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.h"
+    rules: "agents/knowledge_base/rules/general/append-new-fields-to-serialized-and-api-structs.md"
+    rules: "agents/knowledge_base/rules/general/avoid-declare-aligned-on-extern-declarations.md"
+    rules: "agents/knowledge_base/rules/general/extern-c-guards-in-c-headers.md"
+    rules: "agents/knowledge_base/rules/general/portability-macros-in-low-level-headers-not-codec-headers.md"
+    rules: "agents/knowledge_base/rules/general/single-c-enum-in-dual-c-cpp-headers.md"
+    rules: "agents/knowledge_base/rules/general/use-opaque-struct-pointers-for-c-handles.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*_neon\\.[^/]*"
+    path_expression: "(?:.*/)?arm/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression_exclusion: "third_party/.*"
+    rules: "agents/knowledge_base/rules/general/arm-neon-32bit-fallback-unpack-both-halves.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*_neon\\.[^/]*"
@@ -36,6 +149,17 @@ agentic_review {
     path_expression: "common/arm/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp|mm)"
     path_expression_exclusion: "third_party/.*"
     rules: "agents/knowledge_base/rules/general/arm-neon-aarch64-horizontal-reduction-intrinsics.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*_neon\\.[^/]*"
+    path_expression: "(?:.*/)?arm/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp|mm)"
+    path_expression_exclusion: "third_party/.*"
+    rules: "agents/knowledge_base/rules/general/arm-neon-accumulate-vmax-vcle-threshold-mask.md"
+    rules: "agents/knowledge_base/rules/general/arm-neon-avoid-unnecessary-saturating-intrinsics.md"
+    rules: "agents/knowledge_base/rules/general/arm-neon-initialize-lane0-with-vdup-n.md"
+    rules: "agents/knowledge_base/rules/general/arm-neon-unaligned-stores-vget-lane-memcpy.md"
+    rules: "agents/knowledge_base/rules/general/arm-neon-vtrn-self-for-dual-lane-broadcast.md"
+    rules: "agents/knowledge_base/rules/general/matching-typed-vdup-not-vreinterpret.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*_neon\\.[^/]*"
@@ -61,8 +185,89 @@ agentic_review {
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
-    content_patterns: "\\bhas_size_field\\b"
+    content_patterns: "\\bstride\\b"
+    rules: "agents/knowledge_base/rules/general/assert-buffer-capacity-before-grid-indexing.md"
+    rules: "agents/knowledge_base/rules/general/document-in-place-buffer-aliasing-safety-and-order.md"
+    rules: "agents/knowledge_base/rules/general/match-buffer-pointer-bit-depth-suffixes.md"
+    rules: "agents/knowledge_base/rules/general/match-nested-loop-indices-to-spatial-bounds.md"
+    rules: "agents/knowledge_base/rules/general/match-sample-variable-types-to-buffer-elements.md"
+    rules: "agents/knowledge_base/rules/general/omit-unused-parameters-from-internal-helpers.md"
+    rules: "agents/knowledge_base/rules/general/parenthesize-arithmetic-before-bitwise-shift.md"
+    rules: "agents/knowledge_base/rules/general/parenthesize-compound-column-offsets-in-2d-indexing.md"
+    rules: "agents/knowledge_base/rules/general/prefer-loop-index-offsets-over-mutating-base-pointers.md"
+    rules: "agents/knowledge_base/rules/general/prefer-memcpy-for-non-overlapping-buffers.md"
+    rules: "agents/knowledge_base/rules/general/prefer-pointer-param-for-buffer-offsets.md"
+    rules: "agents/knowledge_base/rules/general/prevent-stride-multiplication-integer-overflow.md"
+    rules: "agents/knowledge_base/rules/general/reuse-local-pointer-aliases-for-nested-members.md"
+    rules: "agents/knowledge_base/rules/general/single-memset-memcpy-for-contiguous-rows.md"
+    rules: "agents/knowledge_base/rules/general/traverse-buffer-rows-in-forward-memory-order.md"
+    rules: "agents/knowledge_base/rules/general/use-signed-int-for-stride-and-dimensions.md"
+    rules: "agents/knowledge_base/rules/general/use-size-t-arithmetic-for-buffer-allocations.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bIMPLIES\\b"
+    rules: "agents/knowledge_base/rules/general/assert-conditional-preconditions-at-entry.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bmode\\b"
+    rules: "agents/knowledge_base/rules/general/assert-disallowed-configurations-over-silent-fallbacks.md"
+    rules: "agents/knowledge_base/rules/general/check-non-zero-for-multi-mode-flags.md"
+    rules: "agents/knowledge_base/rules/general/do-not-combine-enum-cases-with-mode-specific-logic.md"
+    rules: "agents/knowledge_base/rules/general/prefer-enum-parameter-over-boolean-flag.md"
+    rules: "agents/knowledge_base/rules/general/use-logical-or-for-disjunctive-conditions-in-comments.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bcount\\b"
+    rules: "agents/knowledge_base/rules/general/assert-non-empty-count-before-indexing-array.md"
+    rules: "agents/knowledge_base/rules/general/avoid-redundant-loop-counter-variables.md"
+    rules: "agents/knowledge_base/rules/general/group-related-output-param-assignments.md"
+    rules: "agents/knowledge_base/rules/general/guard-memcpy-memmove-against-null.md"
+    rules: "agents/knowledge_base/rules/general/increment-retry-counter-in-loop-body-not-condition.md"
+    rules: "agents/knowledge_base/rules/general/omit-redundant-guards-after-unconditional-initialization.md"
+    rules: "agents/knowledge_base/rules/general/place-conditional-assertions-inside-guarding-branch.md"
+    rules: "agents/knowledge_base/rules/general/prefer-while-over-do-while-for-buffer-io.md"
+    rules: "agents/knowledge_base/rules/general/reset-capacity-on-allocation-failure.md"
+    rules: "agents/knowledge_base/rules/general/reset-freed-pointers-to-null-before-fallible-allocations.md"
+    rules: "agents/knowledge_base/rules/general/simplify-boolean-flag-computations.md"
+    rules: "agents/knowledge_base/rules/general/validate-bounds-before-mutating-state.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression_exclusion: "third_party/.*"
+    content_patterns: "\\barr\\b"
+    rules: "agents/knowledge_base/rules/general/assert-non-null-dispatch-table-lookup.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\baom_assert\\b"
+    rules: "agents/knowledge_base/rules/general/assert-null-before-allocating-buffer.md"
+    rules: "agents/knowledge_base/rules/general/assert-null-buffer-implies-zero-allocation-count.md"
+    rules: "agents/knowledge_base/rules/general/assert-preconditions-over-redundant-checks.md"
+    rules: "agents/knowledge_base/rules/general/consolidate-redundant-assertions.md"
+    rules: "agents/knowledge_base/rules/general/document-mathematical-invariants-and-regularization.md"
+    rules: "agents/knowledge_base/rules/general/document-unsupported-features-with-todo.md"
+    rules: "agents/knowledge_base/rules/general/guard-vector-normalization-with-epsilon.md"
+    rules: "agents/knowledge_base/rules/general/use-strict-upper-bounds-for-zero-indexed-coordinates.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\balso\\b"
     rules: "agents/knowledge_base/rules/general/assert-or-document-spec-invariants.md"
+    rules: "agents/knowledge_base/rules/general/use-concise-verb-object-function-names.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bstride\\b"
+    rules: "agents/knowledge_base/rules/general/assert-positive-divisors-before-division.md"
+    rules: "agents/knowledge_base/rules/general/assign-variables-close-to-use.md"
+    rules: "agents/knowledge_base/rules/general/derive-image-stride-from-width-not-height.md"
+    rules: "agents/knowledge_base/rules/general/document-encoded-numbering-and-spatial-layouts.md"
+    rules: "agents/knowledge_base/rules/general/round-up-subsampled-plane-dimensions.md"
+    rules: "agents/knowledge_base/rules/general/scale-vertical-row-offsets-by-stride.md"
+    rules: "agents/knowledge_base/rules/general/zero-v-plane-for-nv12-image-format.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp|inc)"
@@ -72,73 +277,52 @@ agentic_review {
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
-    content_patterns: "\\baom_assert\\b"
-    rules: "agents/knowledge_base/rules/general/assert-preconditions-over-redundant-checks.md"
-    rules: "agents/knowledge_base/rules/general/consolidate-redundant-assertions.md"
+    content_patterns: "\\bsqrtf\\b"
+    rules: "agents/knowledge_base/rules/general/assert-preconditions-before-domain-restricted-math.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\btotal\\b"
+    rules: "agents/knowledge_base/rules/general/avoid-aggregation-names-for-intermediate-temporaries.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\baom_internal_error\\b"
     rules: "agents/knowledge_base/rules/general/avoid-ambiguous-abbreviations-in-error-messages.md"
-    rules: "agents/knowledge_base/rules/general/avoid-implicit-narrowing-integer-conversions.md"
-    rules: "agents/knowledge_base/rules/general/avoid-inaccurate-assumption-comments.md"
-    rules: "agents/knowledge_base/rules/general/avoid-redundant-assertions-after-early-returns.md"
-    rules: "agents/knowledge_base/rules/general/avoid-redundant-boolean-ternary.md"
-    rules: "agents/knowledge_base/rules/general/avoid-redundant-else-after-return-2.md"
-    rules: "agents/knowledge_base/rules/general/avoid-unnecessary-bare-block-scopes.md"
-    rules: "agents/knowledge_base/rules/general/avoid-unnecessary-single-use-intermediate-variables.md"
-    rules: "agents/knowledge_base/rules/general/cast-operands-before-arithmetic-to-prevent-overflow.md"
-    rules: "agents/knowledge_base/rules/general/chain-mutually-exclusive-checks-with-else-if.md"
-    rules: "agents/knowledge_base/rules/general/consolidate-consecutive-if-guards.md"
-    rules: "agents/knowledge_base/rules/general/declare-single-file-helpers-static.md"
-    rules: "agents/knowledge_base/rules/general/disambiguate-macro-and-constant-names-with-domain-prefix.md"
-    rules: "agents/knowledge_base/rules/general/document-encoded-numbering-and-spatial-layouts.md"
-    rules: "agents/knowledge_base/rules/general/document-non-obvious-conditions-and-edge-case-guards.md"
-    rules: "agents/knowledge_base/rules/general/document-return-value-semantics.md"
-    rules: "agents/knowledge_base/rules/general/document-struct-fields-in-headers.md"
-    rules: "agents/knowledge_base/rules/general/document-threshold-and-scaling-constants.md"
-    rules: "agents/knowledge_base/rules/general/factor-identical-function-calls-out-of-conditional-branches.md"
-    rules: "agents/knowledge_base/rules/general/format-multiline-comments-with-leading-asterisks-or-line-com.md"
-    rules: "agents/knowledge_base/rules/general/general-no-empty-preprocessor-blocks.md"
-    rules: "agents/knowledge_base/rules/general/generalize-identifier-after-removing-variants.md"
-    rules: "agents/knowledge_base/rules/general/match-buffer-count-and-size-names-to-buffer-identifier.md"
-    rules: "agents/knowledge_base/rules/general/omit-enclosing-name-in-struct-and-union-members.md"
-    rules: "agents/knowledge_base/rules/general/omit-redundant-repeated-words-in-compound-names.md"
-    rules: "agents/knowledge_base/rules/general/place-explanatory-comments-adjacent-to-statement.md"
-    rules: "agents/knowledge_base/rules/general/prefer-break-over-mutating-loop-counter.md"
-    rules: "agents/knowledge_base/rules/general/prefer-direct-assert-over-assert-zero.md"
-    rules: "agents/knowledge_base/rules/general/prefer-direct-pointer-arithmetic-over-address-of-subscript.md"
-    rules: "agents/knowledge_base/rules/general/prefer-positive-condition-in-if-else.md"
-    rules: "agents/knowledge_base/rules/general/remove-obsolete-todo-comments.md"
-    rules: "agents/knowledge_base/rules/general/retain-invariant-assertions-without-removal-todos.md"
-    rules: "agents/knowledge_base/rules/general/round-up-subsampled-plane-dimensions.md"
-    rules: "agents/knowledge_base/rules/general/simplify-negated-compound-boolean-expressions.md"
-    rules: "agents/knowledge_base/rules/general/trailing-comment-on-endif-directives.md"
-    rules: "agents/knowledge_base/rules/general/update-doxygen-parameter-documentation.md"
-    rules: "agents/knowledge_base/rules/general/use-bool-for-boolean-flags-and-arrays.md"
-    rules: "agents/knowledge_base/rules/general/use-curly-braces-for-multi-line-conditionals.md"
-    rules: "agents/knowledge_base/rules/general/use-named-constants-for-array-bounds.md"
-    rules: "agents/knowledge_base/rules/general/use-sizeof-pointer-dereference-in-allocations.md"
-    rules: "agents/knowledge_base/rules/general/when-defining-helper-predicate-or-condition-checking-functio.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression_exclusion: "third_party/.*"
+    rules: "agents/knowledge_base/rules/general/avoid-bounded-search-loop-index-overshoot.md"
   }
   capability_groups {
     rules: "agents/knowledge_base/rules/general/avoid-bundling-unrelated-changes.md"
     rules: "agents/knowledge_base/rules/general/avoid-drive-by-refactoring-in-bug-fixes.md"
     rules: "agents/knowledge_base/rules/general/avoid-incidental-diff-churn-in-unrelated-code.md"
+    rules: "agents/knowledge_base/rules/general/document-all-behavior-changes-in-commit-message.md"
+    rules: "agents/knowledge_base/rules/general/document-removed-workarounds-in-commit-message.md"
     rules: "agents/knowledge_base/rules/general/isolate-fixes-from-unrelated-drive-by-changes.md"
+    rules: "agents/knowledge_base/rules/general/keep-cls-focused-on-single-logical-change.md"
+    rules: "agents/knowledge_base/rules/general/match-commit-descriptions-to-code-identifiers.md"
+    rules: "agents/knowledge_base/rules/general/revert-files-without-substantive-changes.md"
     rules: "agents/knowledge_base/rules/general/separate-renaming-and-refactoring-from-bug-fixes.md"
     rules: "agents/knowledge_base/rules/general/separate-unrelated-bug-fixes.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
-    content_patterns: "\\buint\\b"
-    rules: "agents/knowledge_base/rules/general/avoid-commenting-code-to-silence-warnings.md"
-    rules: "agents/knowledge_base/rules/general/avoid-redundant-parameters-available-in-struct-arguments.md"
-    rules: "agents/knowledge_base/rules/general/consolidate-duplicate-local-variables.md"
-    rules: "agents/knowledge_base/rules/general/consolidate-variable-computation-at-declaration.md"
-    rules: "agents/knowledge_base/rules/general/constant-names-k-prefix-no-leading-underscores.md"
-    rules: "agents/knowledge_base/rules/general/encapsulate-count-increments-in-insertion-helpers.md"
-    rules: "agents/knowledge_base/rules/general/maintain-consistent-modifier-word-order-in-identifiers.md"
-    rules: "agents/knowledge_base/rules/general/use-enum-types-for-parameters.md"
+    content_patterns: "\\bistorically\\b"
+    rules: "agents/knowledge_base/rules/general/avoid-changelog-or-historical-notes-in-comments.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "(?://|/\\*).*\\b(?:optimal|optimally|optimum)\\b"
+    rules: "agents/knowledge_base/rules/general/avoid-claiming-optimal-tuning-in-comments.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bscratch\\b"
+    rules: "agents/knowledge_base/rules/general/avoid-cryptic-or-leftover-scratchpad-comments.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
@@ -149,11 +333,44 @@ agentic_review {
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "(?:->|\\.)[a-zA-Z0-9_]+\\s*=\\s*[^;=]+="
+    rules: "agents/knowledge_base/rules/general/avoid-deeply-chained-assignments.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bparam\\b"
+    rules: "agents/knowledge_base/rules/general/avoid-doxygen-tags-in-non-doxygen-comments.md"
+    rules: "agents/knowledge_base/rules/general/use-established-terminology-in-doxygen-param-comments.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
     content_patterns: "\\bCONFIG\\b"
+    rules: "agents/knowledge_base/rules/general/avoid-duplicate-macros-in-preprocessor-conditionals.md"
+    rules: "agents/knowledge_base/rules/general/avoid-duplicate-parameters-in-conditional-blocks.md"
     rules: "agents/knowledge_base/rules/general/avoid-duplicating-declarations-across-preprocessor-branches.md"
+    rules: "agents/knowledge_base/rules/general/conditionally-size-struct-bitfields-for-experiments.md"
+    rules: "agents/knowledge_base/rules/general/factor-complex-branch-logic-into-helpers.md"
     rules: "agents/knowledge_base/rules/general/group-adjacent-preprocessor-conditional-blocks.md"
+    rules: "agents/knowledge_base/rules/general/group-related-parameters-into-substructures.md"
+    rules: "agents/knowledge_base/rules/general/keep-lookup-table-dimensions-uniform-across-build-configs.md"
+    rules: "agents/knowledge_base/rules/general/place-comments-inside-preprocessor-guards.md"
     rules: "agents/knowledge_base/rules/general/prefer-positive-preprocessor-conditions.md"
+    rules: "agents/knowledge_base/rules/general/preserve-baseline-definitions-outside-config-guards.md"
+    rules: "agents/knowledge_base/rules/general/remove-obsolete-config-guards-when-feature-standardized.md"
+    rules: "agents/knowledge_base/rules/general/scope-helper-macros-inside-preprocessor-branches.md"
+    rules: "agents/knowledge_base/rules/general/update-callers-in-conditionally-compiled-sources.md"
+    rules: "agents/knowledge_base/rules/general/use-logical-not-over-equals-zero-in-preprocessor-if.md"
     rules: "agents/knowledge_base/rules/general/use-symbolic-constants-for-derived-values.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "//\\s*\\[[A-Za-z]"
+    rules: "agents/knowledge_base/rules/general/avoid-enclosing-comments-in-square-brackets.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bndef\\b"
+    rules: "agents/knowledge_base/rules/general/avoid-experimental-compile-time-macro-toggles.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
@@ -166,30 +383,85 @@ agentic_review {
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression_exclusion: "third_party/.*"
+    content_patterns: "\\[\\s*\\w+\\s*\\*\\s*\\w*(?:stride|pitch|step)\\w*\\s*\\]"
+    rules: "agents/knowledge_base/rules/general/avoid-forward-indexing-with-countdown-loop-variable.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bstack\\b"
+    rules: "agents/knowledge_base/rules/general/avoid-generic-container-names-for-identifiers.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|h)"
+    rules: "agents/knowledge_base/rules/general/avoid-goto-for-error-cleanup.md"
+    rules: "agents/knowledge_base/rules/general/avoid-positional-struct-initializers.md"
+    rules: "agents/knowledge_base/rules/general/c-function-names-lowercase-snake-case.md"
+    rules: "agents/knowledge_base/rules/general/document-syntax-order-under-compound-config-conditions.md"
+    rules: "agents/knowledge_base/rules/general/guard-64bit-msvc-intrinsics-with-32bit-fallback.md"
+    rules: "agents/knowledge_base/rules/general/match-parameter-const-between-declaration-and-definition.md"
+    rules: "agents/knowledge_base/rules/general/pass-error-info-to-initialization-functions.md"
+    rules: "agents/knowledge_base/rules/general/prefer-loop-bounds-over-diagnostic-pragmas.md"
+    rules: "agents/knowledge_base/rules/general/prefer-while-1-over-while-true.md"
+    rules: "agents/knowledge_base/rules/general/prefix-functions-with-action-verbs.md"
+    rules: "agents/knowledge_base/rules/general/preserve-subsystem-prefix-hierarchy-in-identifiers.md"
+    rules: "agents/knowledge_base/rules/general/use-alloc-suffix-for-allocation-owner-pointers.md"
+    rules: "agents/knowledge_base/rules/general/use-int-for-c-enum-variables-and-masks.md"
+    rules: "agents/knowledge_base/rules/general/use-typedef-struct-for-c-definitions.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
     content_patterns: "\\bclamp\\b"
     rules: "agents/knowledge_base/rules/general/avoid-hardcoded-line-numbers-in-comments.md"
-    rules: "agents/knowledge_base/rules/general/round-and-clamp-floating-point-pixel-results.md"
+    rules: "agents/knowledge_base/rules/general/normalize-angles-modulo-two-pi.md"
     rules: "agents/knowledge_base/rules/general/synchronize-comments-across-counterpart-functions.md"
+    rules: "agents/knowledge_base/rules/general/use-exact-equality-when-testing-clamped-bounds.md"
+    rules: "agents/knowledge_base/rules/general/use-inequality-when-asserting-bounds.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp|py|sh)"
+    rules: "agents/knowledge_base/rules/general/avoid-hardcoded-local-filesystem-paths.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
     path_expression_exclusion: "third_party/.*"
+    content_patterns: "\\brange\\b"
     rules: "agents/knowledge_base/rules/general/avoid-implicit-boolean-checks-on-multi-valued-options.md"
-    rules: "agents/knowledge_base/rules/general/avoid-redundant-local-parameter-aliases.md"
-    rules: "agents/knowledge_base/rules/general/declare-and-initialize-local-variables-at-first-use.md"
-    rules: "agents/knowledge_base/rules/general/document-non-obvious-arithmetic-offsets-and-biases.md"
-    rules: "agents/knowledge_base/rules/general/merge-consecutive-loops-over-same-range.md"
-    rules: "agents/knowledge_base/rules/general/narrow-ifdef-scope-to-diverging-logic.md"
-    rules: "agents/knowledge_base/rules/general/no-top-level-const-on-function-params.md"
-    rules: "agents/knowledge_base/rules/general/omit-redundant-narrowing-casts-on-wider-integers.md"
-    rules: "agents/knowledge_base/rules/general/populate-caller-output-struct-over-heap-allocation.md"
-    rules: "agents/knowledge_base/rules/general/prefer-aommin-aommax-and-standard-type-limits.md"
-    rules: "agents/knowledge_base/rules/general/prefer-plain-int-over-fixed-width-integers.md"
-    rules: "agents/knowledge_base/rules/general/prefer-static-inline-functions-over-function-macros.md"
-    rules: "agents/knowledge_base/rules/general/prefer-west-const-pointer-declarations-2.md"
-    rules: "agents/knowledge_base/rules/general/return-single-values-and-remove-unused-out-params.md"
-    rules: "agents/knowledge_base/rules/general/use-consistent-inlining-macros.md"
-    rules: "agents/knowledge_base/rules/general/zero-initialize-c-structs.md"
+    rules: "agents/knowledge_base/rules/general/document-dynamic-ranges-and-sanitizer-workarounds.md"
+    rules: "agents/knowledge_base/rules/general/document-theoretical-rationale-in-commit-messages-over-inlin.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\buint\\b"
+    rules: "agents/knowledge_base/rules/general/avoid-implicit-narrowing-integer-conversions.md"
+    rules: "agents/knowledge_base/rules/general/avoid-speculative-unused-helpers.md"
+    rules: "agents/knowledge_base/rules/general/avoid-unnecessary-function-relocation.md"
+    rules: "agents/knowledge_base/rules/general/cite-external-specifications-and-papers-for-algorithms.md"
+    rules: "agents/knowledge_base/rules/general/define-single-use-constants-and-macros-in-function-scope.md"
+    rules: "agents/knowledge_base/rules/general/document-classification-function-output-classes.md"
+    rules: "agents/knowledge_base/rules/general/document-multi-level-index-mappings-with-diagrams.md"
+    rules: "agents/knowledge_base/rules/general/omit-redundant-prefixes-in-local-variables.md"
+    rules: "agents/knowledge_base/rules/general/omit-redundant-repeated-words-in-compound-names.md"
+    rules: "agents/knowledge_base/rules/general/use-canonical-api-typedefs-over-primitive-casts.md"
+    rules: "agents/knowledge_base/rules/general/use-index-variable-when-documenting-array-elements.md"
+    rules: "agents/knowledge_base/rules/general/when-defining-helper-predicate-or-condition-checking-functio.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\s*#\\s*(?:if|elif|ifdef|ifndef)\\s+[A-Za-z0-9_]+"
+    rules: "agents/knowledge_base/rules/general/avoid-inaccurate-assumption-comments.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:h|hpp)"
+    rules: "agents/knowledge_base/rules/general/avoid-include-only-headers.md"
+    rules: "agents/knowledge_base/rules/general/avoid-referencing-foreign-types-in-header-docs.md"
+    rules: "agents/knowledge_base/rules/general/document-bitfield-layout-and-combinations-in-enum-flags.md"
+    rules: "agents/knowledge_base/rules/general/document-color-space-and-range-assumptions-in-headers.md"
+    rules: "agents/knowledge_base/rules/general/document-enum-definitions-not-in-function-doxygen-comments.md"
+    rules: "agents/knowledge_base/rules/general/group-paired-function-declarations-in-headers.md"
+    rules: "agents/knowledge_base/rules/general/retain-constexpr-in-dual-c-cpp-headers.md"
+    rules: "agents/knowledge_base/rules/general/use-doxygen-grouping-for-related-struct-fields.md"
+    rules: "agents/knowledge_base/rules/general/use-recursive-template-reduction-for-power-of-two-blocks.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
@@ -199,17 +471,45 @@ agentic_review {
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bM_PI\\b"
+    rules: "agents/knowledge_base/rules/general/avoid-integer-division-in-floating-point-calculations.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
     content_patterns: "\\boffset\\b"
     rules: "agents/knowledge_base/rules/general/avoid-integer-overflow-in-bounds-checks.md"
     rules: "agents/knowledge_base/rules/general/avoid-redundant-zero-offset-arithmetic.md"
-    rules: "agents/knowledge_base/rules/general/prevent-stride-multiplication-integer-overflow.md"
+    rules: "agents/knowledge_base/rules/general/avoid-right-shift-for-signed-downscaling.md"
+    rules: "agents/knowledge_base/rules/general/document-signed-bitwise-rounding-invariants.md"
+    rules: "agents/knowledge_base/rules/general/guard-pointer-arithmetic-with-null-check.md"
+    rules: "agents/knowledge_base/rules/general/match-comment-diagrams-to-loop-traversal-order.md"
+    rules: "agents/knowledge_base/rules/general/order-addition-operands-as-base-plus-delta.md"
     rules: "agents/knowledge_base/rules/general/round-floating-point-before-integer-cast.md"
+    rules: "agents/knowledge_base/rules/general/round-integer-division-to-nearest-integer.md"
     rules: "agents/knowledge_base/rules/general/standardize-terminology-for-related-identifiers.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\blimit\\b"
+    rules: "agents/knowledge_base/rules/general/avoid-integer-overflow-in-scaled-sentinel-constants.md"
+    rules: "agents/knowledge_base/rules/general/distinguish-exclusive-thresholds-from-inclusive-bounds.md"
+    rules: "agents/knowledge_base/rules/general/document-spatial-boundary-checks.md"
+    rules: "agents/knowledge_base/rules/general/use-descriptive-threshold-and-limit-names.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp)"
+    rules: "agents/knowledge_base/rules/general/avoid-intermediate-unique-ptr-when-releasing.md"
+    rules: "agents/knowledge_base/rules/general/avoid-redundant-or-unused-using-declarations.md"
+    rules: "agents/knowledge_base/rules/general/avoid-redundant-type-aliases-for-canonical-types.md"
+    rules: "agents/knowledge_base/rules/general/omit-redundant-public-specifier-in-struct.md"
+    rules: "agents/knowledge_base/rules/general/omit-redundant-struct-keyword-in-cpp-type-aliases.md"
+    rules: "agents/knowledge_base/rules/general/prefer-function-local-static-for-thread-safe-lazy-init.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp|mm)"
     rules: "agents/knowledge_base/rules/general/avoid-large-stack-buffer-allocations.md"
     rules: "agents/knowledge_base/rules/general/avoid-redundant-null-check-before-free.md"
+    rules: "agents/knowledge_base/rules/general/document-error-path-cleanup-in-teardown.md"
     rules: "agents/knowledge_base/rules/general/document-lookup-table-input-output-mapping.md"
     rules: "agents/knowledge_base/rules/general/unambiguous-cli-help-strings.md"
   }
@@ -222,24 +522,127 @@ agentic_review {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp|inc)"
     rules: "agents/knowledge_base/rules/general/avoid-mixing-cleanups-into-functional-changes.md"
     rules: "agents/knowledge_base/rules/general/delete-obsolete-macros-and-simplify-expressions.md"
+    rules: "agents/knowledge_base/rules/general/document-explicit-data-alignment-rationale.md"
     rules: "agents/knowledge_base/rules/general/mark-unmodified-local-pointers-const.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\binit\\b"
+    rules: "agents/knowledge_base/rules/general/avoid-narrow-or-misleading-inline-comments.md"
+    rules: "agents/knowledge_base/rules/general/avoid-speculative-generic-helper-names.md"
+    rules: "agents/knowledge_base/rules/general/consistent-compounding-in-related-identifiers.md"
+    rules: "agents/knowledge_base/rules/general/defer-variable-init-past-early-exit.md"
+    rules: "agents/knowledge_base/rules/general/do-not-reset-caller-error-info-in-component-helpers.md"
+    rules: "agents/knowledge_base/rules/general/group-paired-c-api-lifecycle-functions.md"
+    rules: "agents/knowledge_base/rules/general/group-struct-initialization-contiguously.md"
+    rules: "agents/knowledge_base/rules/general/init-target-struct-first-parameter.md"
+    rules: "agents/knowledge_base/rules/general/initialize-sentinel-fields-at-setup.md"
+    rules: "agents/knowledge_base/rules/general/name-boolean-state-flags-for-specific-phase.md"
+    rules: "agents/knowledge_base/rules/general/separate-lazy-allocation-from-element-insertion.md"
+    rules: "agents/knowledge_base/rules/general/split-orthogonal-side-effects-from-helpers.md"
+    rules: "agents/knowledge_base/rules/general/split-state-initialization-from-validation.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*_avx2\\.[^/]*"
+    path_expression: "(?:.*/)?[^/]*_avx512\\.[^/]*"
+    path_expression: "(?:.*/)?[^/]*_neon\\.[^/]*"
+    path_expression: "(?:.*/)?[^/]*_sse2\\.[^/]*"
+    path_expression: "(?:.*/)?[^/]*_sse4\\.[^/]*"
+    path_expression: "(?:.*/)?[^/]*_ssse3\\.[^/]*"
+    path_expression: "(?:.*/)?arm/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "(?:.*/)?x86/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression_exclusion: "third_party/.*"
+    rules: "agents/knowledge_base/rules/general/avoid-premature-widening-in-simd-accumulation-loops.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|inc)"
     path_expression_exclusion: "third_party/.*"
     rules: "agents/knowledge_base/rules/general/avoid-raw-compiler-attributes.md"
+    rules: "agents/knowledge_base/rules/general/eliminate-redundant-rounding-with-zero-shift.md"
     rules: "agents/knowledge_base/rules/general/match-undef-to-defined-macro-name.md"
   }
   capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\baom_assert\\b"
+    rules: "agents/knowledge_base/rules/general/avoid-redundant-assertions-after-early-returns.md"
+    rules: "agents/knowledge_base/rules/general/general-update-counterpart-paths-with-shared-assertions.md"
+    rules: "agents/knowledge_base/rules/general/prefer-direct-assert-over-assert-zero.md"
+  }
+  capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
-    content_patterns: "\\bsetzero\\b"
+    content_patterns: "\\b\\w+(?:->|\\.)\\w+\\s*=\\s*(?:true|false|[01])\\s*;"
+    rules: "agents/knowledge_base/rules/general/avoid-redundant-assignment-before-conditional-blocks.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: ":\\s*(?:true|false|[01])\\b"
+    rules: "agents/knowledge_base/rules/general/avoid-redundant-boolean-ternary.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\belse\\s*\\{"
+    rules: "agents/knowledge_base/rules/general/avoid-redundant-else-after-return-2.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bAOM_INLINE\\b"
+    rules: "agents/knowledge_base/rules/general/avoid-redundant-forward-declarations.md"
+    rules: "agents/knowledge_base/rules/general/declare-single-file-helpers-static.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\ballow\\b"
+    rules: "agents/knowledge_base/rules/general/avoid-redundant-guards-for-idempotent-assignments.md"
+    rules: "agents/knowledge_base/rules/general/factor-complex-boolean-logic-into-helpers.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bvdup\\b"
     rules: "agents/knowledge_base/rules/general/avoid-redundant-initialization-with-exhaustive-conditionals.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
-    content_patterns: "\\bAOM_INLINE\\b"
-    rules: "agents/knowledge_base/rules/general/avoid-redundant-specialized-helpers.md"
-    rules: "agents/knowledge_base/rules/general/preserve-explanatory-comments-when-extracting-helpers.md"
+    content_patterns: "\\bmemcpy\\b"
+    rules: "agents/knowledge_base/rules/general/avoid-redundant-input-buffer-copies.md"
+    rules: "agents/knowledge_base/rules/general/prefer-malloc-over-calloc-for-fully-written-buffers.md"
+    rules: "agents/knowledge_base/rules/general/prefer-memcpy-over-manual-loops.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression_exclusion: "third_party/.*"
+    content_patterns: "\\bstride\\b"
+    rules: "agents/knowledge_base/rules/general/avoid-redundant-local-parameter-aliases.md"
+    rules: "agents/knowledge_base/rules/general/document-non-obvious-arithmetic-offsets-and-biases.md"
+    rules: "agents/knowledge_base/rules/general/update-bounds-assertions-on-buffer-resize.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|h)"
+    path_expression: "(?:.*/)?[^/]*arm[^/]*/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "(?:.*/)?[^/]*neon[^/]*/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression_exclusion: "third_party/.*"
+    rules: "agents/knowledge_base/rules/general/avoid-redundant-neon-multiply-accumulate.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bdo\\s*\\{"
+    rules: "agents/knowledge_base/rules/general/avoid-redundant-outer-loop-wrappers.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bLIMIT\\b"
+    rules: "agents/knowledge_base/rules/general/avoid-redundant-plus-one-in-array-sizing.md"
+    rules: "agents/knowledge_base/rules/general/guard-memory-allocation-limits-for-32-bit.md"
+    rules: "agents/knowledge_base/rules/general/suffix-mode-qualifiers-on-constant-and-macro-names.md"
+    rules: "agents/knowledge_base/rules/general/validate-macro-capacity-bounds-at-compile-time.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bvalid\\b"
+    rules: "agents/knowledge_base/rules/general/avoid-redundant-state-updates-when-callee-handles-error.md"
+    rules: "agents/knowledge_base/rules/general/avoid-separate-helpers-for-inverse-conditions.md"
+    rules: "agents/knowledge_base/rules/general/name-status-helpers-action-target-as-state.md"
+    rules: "agents/knowledge_base/rules/general/qualify-partial-state-reset-helper-names.md"
+    rules: "agents/knowledge_base/rules/general/return-early-from-loops-on-termination-conditions.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*_neon\\.[^/]*"
@@ -248,6 +651,72 @@ agentic_review {
     path_expression: "(?:.*/)?arm/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp|mm)"
     path_expression_exclusion: "third_party/.*"
     rules: "agents/knowledge_base/rules/general/avoid-redundant-vector-widening-neon.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bDECLARE_ALIGNED\\b"
+    rules: "agents/knowledge_base/rules/general/avoid-redundant-zero-init-of-stack-buffers.md"
+    rules: "agents/knowledge_base/rules/general/pass-byte-alignment-to-declare-aligned.md"
+    rules: "agents/knowledge_base/rules/general/use-union-for-mutually-exclusive-stack-buffers.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bmalloc\\b"
+    rules: "agents/knowledge_base/rules/general/avoid-sequential-check-mem-error-leaks.md"
+    rules: "agents/knowledge_base/rules/general/reuse-temporary-buffers-across-loop-iterations.md"
+    rules: "agents/knowledge_base/rules/general/scale-allocation-by-element-sizeof.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*arm[^/]*/.*"
+    path_expression: "(?:.*/)?[^/]*neon[^/]*/.*"
+    path_expression_exclusion: "third_party/.*"
+    rules: "agents/knowledge_base/rules/general/avoid-serial-dependencies-in-neon-vector-extracts.md"
+    rules: "agents/knowledge_base/rules/general/batch-neon-horizontal-reductions-with-horizontal-add-4d.md"
+    rules: "agents/knowledge_base/rules/general/combine-neon-vmul-and-vadd-into-vmla.md"
+    rules: "agents/knowledge_base/rules/general/use-neon-bitselect-for-conditional-vector-selection.md"
+    rules: "agents/knowledge_base/rules/general/use-neon-multiply-accumulate-over-bitmask-add.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression_exclusion: "third_party/.*"
+    content_patterns: "\\buint\\b"
+    rules: "agents/knowledge_base/rules/general/avoid-shadowing-standard-c-library-functions.md"
+    rules: "agents/knowledge_base/rules/general/combine-matrix-transpose-into-buffer-copy.md"
+    rules: "agents/knowledge_base/rules/general/match-stride-parameter-names-to-buffers.md"
+    rules: "agents/knowledge_base/rules/general/merge-consecutive-loops-over-same-range.md"
+    rules: "agents/knowledge_base/rules/general/name-calculation-functions-after-returned-property.md"
+    rules: "agents/knowledge_base/rules/general/provide-symmetric-elementary-conversion-helpers.md"
+    rules: "agents/knowledge_base/rules/general/return-single-values-and-remove-unused-out-params.md"
+    rules: "agents/knowledge_base/rules/general/standard-buffer-parameter-naming-dst-src.md"
+    rules: "agents/knowledge_base/rules/general/use-consistent-literal-formatting-for-constants.md"
+    rules: "agents/knowledge_base/rules/general/use-descriptive-names-for-selected-indices-and-state-variabl.md"
+    rules: "agents/knowledge_base/rules/general/use-descriptive-names-over-nonstandard-abbreviations.md"
+    rules: "agents/knowledge_base/rules/general/use-semantic-names-for-bitwise-masks-and-constants.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bbuiltin_prefetch\\b"
+    rules: "agents/knowledge_base/rules/general/avoid-software-prefetch-hints.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bbuffer\\b"
+    rules: "agents/knowledge_base/rules/general/avoid-stack-array-buffers-for-loop-temporaries.md"
+    rules: "agents/knowledge_base/rules/general/check-realloc-return-before-assignment.md"
+    rules: "agents/knowledge_base/rules/general/descriptive-names-for-entities-and-pointer-parameters.md"
+    rules: "agents/knowledge_base/rules/general/document-ping-pong-buffer-usage.md"
+    rules: "agents/knowledge_base/rules/general/explicit-identifiers-in-caching-comments.md"
+    rules: "agents/knowledge_base/rules/general/name-buffer-addition-helpers-with-add.md"
+    rules: "agents/knowledge_base/rules/general/name-data-transfer-helpers-with-action-and-direction.md"
+    rules: "agents/knowledge_base/rules/general/separate-allocation-checks-for-independent-buffers.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression_exclusion: "test/.*"
+    path_expression_exclusion: "third_party/.*"
+    rules: "agents/knowledge_base/rules/general/avoid-static-scratch-buffers.md"
+    rules: "agents/knowledge_base/rules/general/null-safe-cleanup-and-free-functions.md"
+    rules: "agents/knowledge_base/rules/general/validate-c-api-pointer-parameters-against-null.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
@@ -268,9 +737,46 @@ agentic_review {
     rules: "agents/knowledge_base/rules/general/avoid-stdout-or-stderr-in-library-code.md"
   }
   capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|h)"
+    rules: "agents/knowledge_base/rules/general/avoid-transitive-windows-header-pollution.md"
+    rules: "agents/knowledge_base/rules/general/cleanup-partially-allocated-arrays-forward.md"
+    rules: "agents/knowledge_base/rules/general/convert-msvc-bitscan-index-to-clz.md"
+    rules: "agents/knowledge_base/rules/general/derive-buffer-allocation-size-from-stride.md"
+    rules: "agents/knowledge_base/rules/general/document-api-configuration-alongside-cli-flags.md"
+    rules: "agents/knowledge_base/rules/general/name-bitdepth-dispatchers-base-and-qualify-variants.md"
+    rules: "agents/knowledge_base/rules/general/name-enum-constants-and-sentinels-to-match-type.md"
+    rules: "agents/knowledge_base/rules/general/plural-suffix-for-multi-bit-masks.md"
+    rules: "agents/knowledge_base/rules/general/preserve-container-count-on-allocation-failure.md"
+    rules: "agents/knowledge_base/rules/general/provide-sentinel-initializers-for-conditionally-compiled-arr.md"
+    rules: "agents/knowledge_base/rules/general/return-codec-ok-after-successful-setjmp.md"
+    rules: "agents/knowledge_base/rules/general/use-column-index-not-buffer-offset-for-subsampling-parity.md"
+    rules: "agents/knowledge_base/rules/general/use-local-enums-for-function-scoped-constants.md"
+    rules: "agents/knowledge_base/rules/general/use-standard-msvc-architecture-macros.md"
+    rules: "agents/knowledge_base/rules/general/zero-initialize-nested-allocations-for-cleanup.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression_exclusion: "third_party/.*"
+    content_patterns: "\\bindex\\b"
+    rules: "agents/knowledge_base/rules/general/avoid-unconditional-result-assignment-in-search-loops.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\s*\\{\\s*(?:$|//|/\\*)"
+    rules: "agents/knowledge_base/rules/general/avoid-unnecessary-bare-block-scopes.md"
+  }
+  capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|inc)"
     rules: "agents/knowledge_base/rules/general/avoid-unnecessary-parameters-for-fixed-constants.md"
+    rules: "agents/knowledge_base/rules/general/check-compiler-macros-with-defined-for-wundef.md"
     rules: "agents/knowledge_base/rules/general/undef-local-helper-macros-after-use.md"
+    rules: "agents/knowledge_base/rules/general/update-associated-macros-and-constants-when-renaming-identif.md"
+    rules: "agents/knowledge_base/rules/general/use-config-big-endian-macro-not-runtime-checks.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bretval\\b"
+    rules: "agents/knowledge_base/rules/general/avoid-unnecessary-single-use-intermediate-variables.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*_avx2\\.[^/]*"
@@ -285,14 +791,110 @@ agentic_review {
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
-    content_patterns: "\\bmm_set1_epi\\b"
+    content_patterns: "\\(\\s*\\d+(?:\\.\\d+)?[fF]?\\s*[+\\-*/]\\s*\\d+(?:\\.\\d+)?[fF]?\\s*\\)"
+    rules: "agents/knowledge_base/rules/general/avoid-unsimplified-constant-expressions.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\baom_free\\b"
+    rules: "agents/knowledge_base/rules/general/avoid-variable-length-arrays-and-alloca.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression_exclusion: "third_party/.*"
+    content_patterns: "\\bAOM_INLINE\\b"
+    rules: "agents/knowledge_base/rules/general/avoid-void-pointer-parameters-in-concrete-helpers.md"
+    rules: "agents/knowledge_base/rules/general/narrow-ifdef-scope-to-diverging-logic.md"
+    rules: "agents/knowledge_base/rules/general/prefer-static-inline-functions-over-function-macros.md"
+    rules: "agents/knowledge_base/rules/general/use-consistent-inlining-macros.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp)"
+    rules: "agents/knowledge_base/rules/general/avoid-wclobbered-by-declaring-after-setjmp.md"
+    rules: "agents/knowledge_base/rules/general/guard-arch-sources-with-error-directive.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|h|hpp)"
+    rules: "agents/knowledge_base/rules/general/avoid-whether-in-doc-comments-for-non-boolean-settings.md"
+    rules: "agents/knowledge_base/rules/general/group-related-struct-members.md"
+    rules: "agents/knowledge_base/rules/general/use-symbolic-enum-constants-for-array-indices.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bheight\\b"
+    rules: "agents/knowledge_base/rules/general/bundle-coupled-parameters-into-struct.md"
+    rules: "agents/knowledge_base/rules/general/match-dimension-and-coordinate-argument-order.md"
+    rules: "agents/knowledge_base/rules/general/reset-state-flags-when-replacing-sentinel-values.md"
+    rules: "agents/knowledge_base/rules/general/transpose-operands-in-complementary-orientation-branches.md"
+    rules: "agents/knowledge_base/rules/general/update-buffer-alloc-size-only-on-realloc.md"
+    rules: "agents/knowledge_base/rules/general/use-continuous-dimensions-for-floating-point-coordinates.md"
+    rules: "agents/knowledge_base/rules/general/use-dimension-suffixes-not-coordinate-suffixes-for-sizes.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\btyped_output_tensor\\b"
+    rules: "agents/knowledge_base/rules/general/cache-tensor-buffer-pointers-before-loops.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bstatic_cast\\b"
+    rules: "agents/knowledge_base/rules/general/cast-operands-before-arithmetic-to-prevent-overflow.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bextract_epi\\b"
     rules: "agents/knowledge_base/rules/general/cast-subwords-to-unsigned-before-bitwise-packing.md"
+    rules: "agents/knowledge_base/rules/general/save-repeated-vector-lane-extractions-in-local-variable.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\babort\\b"
+    rules: "agents/knowledge_base/rules/general/chain-mutually-exclusive-checks-with-else-if.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bCONFIG\\b"
+    rules: "agents/knowledge_base/rules/general/check-config-macros-with-if-not-ifdef.md"
+    rules: "agents/knowledge_base/rules/general/derive-feature-macros-directly-from-config-flags.md"
+    rules: "agents/knowledge_base/rules/general/populate-enum-indexed-lookup-tables-on-enum-expansion.md"
+    rules: "agents/knowledge_base/rules/general/trailing-comment-on-endif-directives.md"
+    rules: "agents/knowledge_base/rules/general/use-if-false-ladder-for-conditional-if-else-chains.md"
+    rules: "agents/knowledge_base/rules/general/use-wildcard-suffix-for-constant-families-in-comments.md"
+  }
+  capability_groups {
+    content_patterns: "\\bdeterminant\\b"
+    rules: "agents/knowledge_base/rules/general/check-floating-point-magnitude-near-zero.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bwritten_bytes\\b"
+    rules: "agents/knowledge_base/rules/general/check-fread-fwrite-return-against-item-count.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bstatus\\b"
+    rules: "agents/knowledge_base/rules/general/check-non-zero-for-status-return-codes.md"
+    rules: "agents/knowledge_base/rules/general/explicit-comparison-for-integer-error-codes.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bsscanf_s\\b"
+    rules: "agents/knowledge_base/rules/general/check-scanf-return-value.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression_exclusion: "third_party/.*"
+    content_patterns: "\\bbuffer\\b"
+    rules: "agents/knowledge_base/rules/general/clamp-buffer-pointer-advancement-to-end-boundary.md"
+    rules: "agents/knowledge_base/rules/general/validate-buffer-bounds-before-reading-into-fixed-size-buffer.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
     path_expression_exclusion: "third_party/.*"
     rules: "agents/knowledge_base/rules/general/clamp-floating-point-conversions-to-integer-limits.md"
+    rules: "agents/knowledge_base/rules/general/label-composite-conditions-on-nested-branches.md"
     rules: "agents/knowledge_base/rules/general/omit-redundant-type-casts.md"
+    rules: "agents/knowledge_base/rules/general/prefer-logging-total-tries-over-computed-retries.md"
     rules: "agents/knowledge_base/rules/general/prefer-single-sided-bounds-over-two-sided-clamp.md"
     rules: "agents/knowledge_base/rules/general/use-float-literal-suffix-in-float-expressions.md"
     rules: "agents/knowledge_base/rules/general/use-inttypes-format-macros-for-fixed-width-integers.md"
@@ -300,8 +902,20 @@ agentic_review {
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\baom_internal_error\\b"
+    rules: "agents/knowledge_base/rules/general/combine-failure-checks-with-logical-or.md"
+    rules: "agents/knowledge_base/rules/general/include-filename-in-io-error-messages.md"
+    rules: "agents/knowledge_base/rules/general/keep-error-messages-generic-in-shared-helpers.md"
+    rules: "agents/knowledge_base/rules/general/reuse-identical-error-strings-to-reduce-binary-size.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
     content_patterns: "\\belse\\s*\\{"
     rules: "agents/knowledge_base/rules/general/combine-identical-branches-with-logical-or.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.sh"
+    rules: "agents/knowledge_base/rules/general/combine-pattern-matching-and-extraction-in-awk.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
@@ -315,20 +929,87 @@ agentic_review {
     rules: "agents/knowledge_base/rules/general/comment-out-unused-parameters-in-cpp.md"
   }
   capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bINT_MAX\\b"
+    rules: "agents/knowledge_base/rules/general/comments-document-control-flow-sentinels.md"
+  }
+  capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
     content_patterns: "\\bbit_depth\\b"
     rules: "agents/knowledge_base/rules/general/compute-bit-depth-max-value-with-shift.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
-    content_patterns: "\\bmode\\b"
-    rules: "agents/knowledge_base/rules/general/consistent-compounding-in-related-identifiers.md"
-    rules: "agents/knowledge_base/rules/general/split-distinct-modes-into-dedicated-functions.md"
+    content_patterns: "\\baom_internal_error_info\\b"
+    rules: "agents/knowledge_base/rules/general/configure-setjmp-on-existing-error-info-pointer.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\s*default:"
+    rules: "agents/knowledge_base/rules/general/consistent-bracing-across-switch-cases.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*arm[^/]*/.*"
+    path_expression: "(?:.*/)?[^/]*avx[^/]*/.*"
+    path_expression: "(?:.*/)?[^/]*mips[^/]*/.*"
+    path_expression: "(?:.*/)?[^/]*neon[^/]*/.*"
+    path_expression: "(?:.*/)?[^/]*ppc[^/]*/.*"
+    path_expression: "(?:.*/)?[^/]*riscv[^/]*/.*"
+    path_expression: "(?:.*/)?[^/]*sse[^/]*/.*"
+    path_expression: "(?:.*/)?[^/]*sve[^/]*/.*"
+    path_expression: "(?:.*/)?[^/]*x86[^/]*/.*"
+    path_expression_exclusion: "third_party/.*"
+    rules: "agents/knowledge_base/rules/general/consistent-simd-accumulator-half-suffixes.md"
+    rules: "agents/knowledge_base/rules/general/maintain-simd-parity-with-c-reference.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\binit\\b"
+    rules: "agents/knowledge_base/rules/general/consistent-struct-and-class-member-initialization.md"
+    rules: "agents/knowledge_base/rules/general/hold-mutex-when-checking-guarded-state-in-assertions.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/.*"
+    path_expression: "av1/common/arm/.*"
+    path_expression: "av1/common/x86/.*"
+    path_expression: "av1/encoder/arm/.*"
+    path_expression: "av1/encoder/x86/.*"
+    path_expression_exclusion: "third_party/.*"
+    rules: "agents/knowledge_base/rules/general/consistent-variable-naming-across-simd-and-c.md"
+    rules: "agents/knowledge_base/rules/general/define-or-enum-for-c-simd-immediate-constants.md"
+    rules: "agents/knowledge_base/rules/general/do-not-mix-generic-simd-wrappers-with-native-intrinsics.md"
+    rules: "agents/knowledge_base/rules/general/document-non-obvious-simd-trade-offs.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bplane\\b"
+    rules: "agents/knowledge_base/rules/general/consistent-variable-naming-across-symmetric-branches.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.cmake"
+    path_expression: "CMakeLists\\.txt"
+    rules: "agents/knowledge_base/rules/general/consolidate-cmake-conditional-source-lists.md"
+    rules: "agents/knowledge_base/rules/general/name-cmake-targets-after-specific-functionality.md"
+    rules: "agents/knowledge_base/rules/general/nest-component-source-exclusions-under-feature-guards.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bif\\s*\\([^;{}]*(?:&&|\\|\\|)"
+    rules: "agents/knowledge_base/rules/general/consolidate-consecutive-if-guards.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
     content_patterns: "\\bconst_cast\\b"
     rules: "agents/knowledge_base/rules/general/const-qualify-read-only-pointer-params.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bbuffer\\b"
+    rules: "agents/knowledge_base/rules/general/contrast-allocation-and-reallocation-semantics.md"
+    rules: "agents/knowledge_base/rules/general/document-in-place-buffer-mutation-and-ordering.md"
+    rules: "agents/knowledge_base/rules/general/document-ordering-constraints-in-detection-sequences.md"
+    rules: "agents/knowledge_base/rules/general/express-memory-sizes-with-multipliers-or-shifts.md"
+    rules: "agents/knowledge_base/rules/general/use-specific-names-for-error-fallback-flags.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?CMakeLists\\.txt"
@@ -337,18 +1018,109 @@ agentic_review {
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
-    content_patterns: "\\bCHECK_MEM_ERROR\\b"
-    rules: "agents/knowledge_base/rules/general/defer-variable-init-past-early-exit.md"
-    rules: "agents/knowledge_base/rules/general/prefer-malloc-over-calloc-for-fully-written-buffers.md"
-    rules: "agents/knowledge_base/rules/general/remove-unreachable-dead-code-after-returns.md"
-    rules: "agents/knowledge_base/rules/general/reset-freed-pointers-to-null-before-fallible-allocations.md"
-    rules: "agents/knowledge_base/rules/general/scale-allocation-by-element-sizeof.md"
-    rules: "agents/knowledge_base/rules/general/update-buffer-alloc-size-only-on-realloc.md"
+    path_expression_exclusion: "third_party/.*"
+    content_patterns: "\\bvdup\\b"
+    rules: "agents/knowledge_base/rules/general/declare-and-initialize-local-variables-at-first-use.md"
   }
   capability_groups {
-    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|h)"
-    rules: "agents/knowledge_base/rules/general/document-api-configuration-alongside-cli-flags.md"
-    rules: "agents/knowledge_base/rules/general/zero-initialize-nested-allocations-for-cleanup.md"
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "[ \\t]+#[ \\t]*define\\b"
+    rules: "agents/knowledge_base/rules/general/define-macros-outside-function-bodies.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bFLAG\\b"
+    rules: "agents/knowledge_base/rules/general/descriptive-parameter-names-in-macros.md"
+    rules: "agents/knowledge_base/rules/general/use-hex-or-shifts-for-bitmask-and-flag-constants.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*arm[^/]*/.*"
+    path_expression: "(?:.*/)?[^/]*neon[^/]*/.*"
+    rules: "agents/knowledge_base/rules/general/direct-scalar-assignment-for-neon-reductions.md"
+    rules: "agents/knowledge_base/rules/general/neon-lane-wise-addition-before-horizontal-reduction.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bLIMIT\\b"
+    rules: "agents/knowledge_base/rules/general/disambiguate-macro-and-constant-names-with-domain-prefix.md"
+    rules: "agents/knowledge_base/rules/general/document-non-obvious-conditions-and-edge-case-guards.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bfree\\b"
+    rules: "agents/knowledge_base/rules/general/do-not-free-unallocated-or-uninitialized-pointers.md"
+    rules: "agents/knowledge_base/rules/general/group-resource-destruction-and-deallocation.md"
+    rules: "agents/knowledge_base/rules/general/initialize-out-parameters-in-declaration-order.md"
+    rules: "agents/knowledge_base/rules/general/nullify-freed-in-out-pointer-on-allocation-failure.md"
+    rules: "agents/knowledge_base/rules/general/set-feature-flags-after-resource-allocation.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\breturn\\s+(?:false|true)\\b"
+    rules: "agents/knowledge_base/rules/general/do-not-return-boolean-literals-from-non-boolean-functions.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/arm/.*"
+    path_expression: "av1/common/arm/.*"
+    path_expression: "av1/encoder/arm/.*"
+    rules: "agents/knowledge_base/rules/general/do-not-use-64bit-neon-store-for-32bit-data.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bAOM_ARCH\\b"
+    rules: "agents/knowledge_base/rules/general/document-architecture-conditional-typedefs.md"
+    rules: "agents/knowledge_base/rules/general/include-arm-alongside-aarch64-guards.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bTODO\\b"
+    rules: "agents/knowledge_base/rules/general/document-assumptions-when-indexing-first-array-element.md"
+    rules: "agents/knowledge_base/rules/general/resolve-todos-before-duplicating-code.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bheight\\b"
+    rules: "agents/knowledge_base/rules/general/document-asymmetric-spatial-loop-bounds.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bstream\\b"
+    rules: "agents/knowledge_base/rules/general/document-hardcoded-config-overrides-and-limitations.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bcheck\\b"
+    rules: "agents/knowledge_base/rules/general/document-invariant-when-ignoring-return-values.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression_exclusion: "third_party/.*"
+    content_patterns: "\\bmathematical\\b"
+    rules: "agents/knowledge_base/rules/general/document-mathematical-derivation-of-spec-formulas.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\blevel\\b"
+    rules: "agents/knowledge_base/rules/general/document-minimum-platform-sdk-version-for-feature-guards.md"
+    rules: "agents/knowledge_base/rules/general/document-threshold-and-scaling-constants.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bAOM_ASSERT\\b"
+    rules: "agents/knowledge_base/rules/general/document-parameter-assumptions-in-assertions.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bMSC_VER\\b"
+    rules: "agents/knowledge_base/rules/general/document-platform-and-build-workarounds-with-bug-reference.md"
+    rules: "agents/knowledge_base/rules/general/place-explanatory-comments-adjacent-to-statement.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bTODO\\b"
+    rules: "agents/knowledge_base/rules/general/document-potential-library-substitutions-with-todo.md"
+    rules: "agents/knowledge_base/rules/general/remove-obsolete-todo-comments.md"
+    rules: "agents/knowledge_base/rules/general/retain-invariant-assertions-without-removal-todos.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
@@ -358,6 +1130,68 @@ agentic_review {
     rules: "agents/knowledge_base/rules/general/document-reference-c-implementation-fallbacks.md"
   }
   capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bstatus\\b"
+    rules: "agents/knowledge_base/rules/general/document-return-value-semantics.md"
+    rules: "agents/knowledge_base/rules/general/prefer-break-over-mutating-loop-counter.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bstate\\b"
+    rules: "agents/knowledge_base/rules/general/document-state-machine-and-exploration-order.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\brief\\b"
+    rules: "agents/knowledge_base/rules/general/document-struct-fields-in-headers.md"
+    rules: "agents/knowledge_base/rules/general/update-doxygen-parameter-documentation.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bmemset\\b"
+    rules: "agents/knowledge_base/rules/general/document-temporary-struct-setup-for-callees.md"
+    rules: "agents/knowledge_base/rules/general/omit-redundant-memset-before-setjmp.md"
+    rules: "agents/knowledge_base/rules/general/zero-initialize-local-arrays.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\btype\\b"
+    rules: "agents/knowledge_base/rules/general/eliminate-noop-helpers-and-identity-loops.md"
+    rules: "agents/knowledge_base/rules/general/match-tensor-accessor-template-type-to-model-data-type.md"
+    rules: "agents/knowledge_base/rules/general/reference-internal-interfaces-in-signature-todos.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bcompute\\b"
+    rules: "agents/knowledge_base/rules/general/encapsulate-dispatcher-preconditions-in-helpers.md"
+    rules: "agents/knowledge_base/rules/general/use-standard-distortion-metric-naming-sad-sse.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bfilter\\b"
+    rules: "agents/knowledge_base/rules/general/encapsulate-index-and-coordinate-calculation-in-helpers.md"
+    rules: "agents/knowledge_base/rules/general/name-filter-helpers-specifically.md"
+    rules: "agents/knowledge_base/rules/general/round-and-clamp-floating-point-pixel-results.md"
+    rules: "agents/knowledge_base/rules/general/split-distinct-modes-into-dedicated-functions.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bbytes\\b"
+    rules: "agents/knowledge_base/rules/general/encode-units-in-identifier-names.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\s*(?:-?\\d+,\\s*){3,}"
+    rules: "agents/knowledge_base/rules/general/ensure-integer-array-type-fits-constant-values.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bdefined\\b"
+    rules: "agents/knowledge_base/rules/general/exclude-clang-when-guarding-msvc-workarounds.md"
+    rules: "agents/knowledge_base/rules/general/guard-assertion-loops-with-ndebug.md"
+    rules: "agents/knowledge_base/rules/general/unconditionally-initialize-to-silence-compiler-warnings.md"
+  }
+  capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|pl)"
     path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
     path_expression: "aom_scale/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
@@ -365,9 +1199,9 @@ agentic_review {
     rules: "agents/knowledge_base/rules/general/explicit-dimensions-for-fixed-size-array-parameters.md"
   }
   capability_groups {
-    path_expression: "(?:.*/)?[^/]*\\.h"
-    rules: "agents/knowledge_base/rules/general/extern-c-guards-in-c-headers.md"
-    rules: "agents/knowledge_base/rules/general/single-c-enum-in-dual-c-cpp-headers.md"
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bNULL\\s*(?:!=|==)"
+    rules: "agents/knowledge_base/rules/general/explicit-null-comparisons-for-pointers.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc)"
@@ -376,13 +1210,63 @@ agentic_review {
     rules: "agents/knowledge_base/rules/general/extract-shared-helpers-for-duplicate-option-handling.md"
   }
   capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc)"
+    rules: "agents/knowledge_base/rules/general/factor-duplicated-error-resets-into-helpers.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\b\\(\\*\\w+\\)\\s*\\("
+    rules: "agents/knowledge_base/rules/general/factor-identical-function-calls-out-of-conditional-branches.md"
+  }
+  capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
     path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp|mm)"
     rules: "agents/knowledge_base/rules/general/factor-repeated-conditions-into-inline-helpers.md"
   }
   capability_groups {
-    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|h|hpp)"
-    rules: "agents/knowledge_base/rules/general/group-related-struct-members.md"
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bscale\\b"
+    rules: "agents/knowledge_base/rules/general/fold-scale-factors-into-integer-divisors.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bROUND_POWER_OF_TWO\\b"
+    rules: "agents/knowledge_base/rules/general/fold-subterm-division-into-rounding-shift.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\s*/\\*+"
+    rules: "agents/knowledge_base/rules/general/format-multiline-comments-with-leading-asterisks-or-line-com.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bCHECK_MEM_ERROR\\b"
+    rules: "agents/knowledge_base/rules/general/free-previous-buffer-before-reallocation.md"
+    rules: "agents/knowledge_base/rules/general/use-sizeof-pointer-dereference-in-allocations.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\s*#\\s*else\\b"
+    rules: "agents/knowledge_base/rules/general/general-no-empty-preprocessor-blocks.md"
+  }
+  capability_groups {
+    path_expression: "aom/.*"
+    rules: "agents/knowledge_base/rules/general/general-return-aom-codec-err-for-fallible-functions.md"
+    rules: "agents/knowledge_base/rules/general/name-aom-tune-metric-tuning.md"
+    rules: "agents/knowledge_base/rules/general/no-uninitialized-error-info-in-aom-check-mem-error.md"
+    rules: "agents/knowledge_base/rules/general/scale-element-limits-when-checking-aom-vector-byte-size.md"
+    rules: "agents/knowledge_base/rules/general/use-aom-calloc-for-zero-initialized-allocations.md"
+    rules: "agents/knowledge_base/rules/general/use-aom-rb-read-unsigned-literal-for-32-bit-fields.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bsecondary\\b"
+    rules: "agents/knowledge_base/rules/general/generalize-identifier-after-removing-variants.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\}\\s*while\\s*\\([^;)]*--"
+    rules: "agents/knowledge_base/rules/general/guard-do-while-decrement-against-zero-count.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
@@ -392,34 +1276,140 @@ agentic_review {
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression_exclusion: "third_party/.*"
+    content_patterns: "\\btypedef\\s+[^;]*\\(\\s*\\*\\w+\\s*\\)\\s*\\("
+    rules: "agents/knowledge_base/rules/general/include-parameter-names-in-function-declarations.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.c"
+    path_expression_exclusion: "third_party/.*"
+    rules: "agents/knowledge_base/rules/general/include-rtcd-headers-for-prototype-verification.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression_exclusion: "third_party/.*"
+    content_patterns: "\\baom_tools_warn\\b"
+    rules: "agents/knowledge_base/rules/general/include-trailing-newline-in-printf-and-fprintf.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bWIDTH\\b"
+    rules: "agents/knowledge_base/rules/general/increment-chunk-loop-index-by-step-size.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bheader\\b"
+    rules: "agents/knowledge_base/rules/general/init-non-null-terminated-char-arrays-with-char-list.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
     content_patterns: "\\(void\\)\\s*[a-zA-Z0-9_]+;"
     rules: "agents/knowledge_base/rules/general/initialize-all-output-parameters-in-stubs.md"
   }
   capability_groups {
-    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
-    content_patterns: "\\baom_free\\b"
-    rules: "agents/knowledge_base/rules/general/initialize-out-parameters-in-declaration-order.md"
+    path_expression: "(?:.*/)?[^/]*arm[^/]*/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "(?:.*/)?[^/]*neon[^/]*/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "agents/knowledge_base/rules/general/initialize-neon-vectors-before-lane-loads.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
-    content_patterns: "\\baom_internal_error\\b"
-    rules: "agents/knowledge_base/rules/general/keep-error-messages-generic-in-shared-helpers.md"
+    content_patterns: "\\bprintf\\b"
+    rules: "agents/knowledge_base/rules/general/inline-constant-literals-in-format-strings.md"
+    rules: "agents/knowledge_base/rules/general/route-diagnostics-to-stderr-not-stdout.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*_neon\\.c"
+    path_expression: "(?:.*/)?[^/]*_neon\\.h"
+    path_expression: "(?:.*/)?[^/]*_sve\\.c"
+    path_expression: "(?:.*/)?[^/]*_sve\\.h"
+    path_expression: "aom_dsp/arm/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "av1/common/arm/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "av1/encoder/arm/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "agents/knowledge_base/rules/general/inline-single-use-simd-loads.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.h"
+    path_expression_exclusion: "third_party/.*"
+    rules: "agents/knowledge_base/rules/general/keep-component-types-in-component-headers.md"
+  }
+  capability_groups {
+    content_patterns: "\\baom_cdf_prob\\b"
+    rules: "agents/knowledge_base/rules/general/keep-ported-code-faithful-to-source.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
-    content_patterns: "\\bheight\\b"
-    rules: "agents/knowledge_base/rules/general/match-dimension-and-coordinate-argument-order.md"
-    rules: "agents/knowledge_base/rules/general/omit-unused-parameters-from-internal-helpers.md"
-    rules: "agents/knowledge_base/rules/general/reuse-local-pointer-aliases-for-nested-members.md"
+    content_patterns: "\\bmutex\\b"
+    rules: "agents/knowledge_base/rules/general/keep-state-mutations-outside-multithread-guards.md"
+    rules: "agents/knowledge_base/rules/general/keep-unshared-updates-outside-critical-sections.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\s*\\*.*[^\\x00-\\x7f]"
+    rules: "agents/knowledge_base/rules/general/limit-comments-to-ascii-characters.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\s*#\\s*undef\\s+[A-Z0-9_]{3,}\\b"
+    rules: "agents/knowledge_base/rules/general/macro-names-separate-components-with-underscores.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\s*#\\s*define\\s+[A-Z][A-Z0-9_]*\\s*\\("
+    rules: "agents/knowledge_base/rules/general/macro-parameters-lowercase-snake-case.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\binfo\\b"
+    rules: "agents/knowledge_base/rules/general/match-backup-variables-to-saved-members.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bplanes\\b"
+    rules: "agents/knowledge_base/rules/general/match-buffer-count-and-size-names-to-buffer-identifier.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bARG_DEF\\b"
+    rules: "agents/knowledge_base/rules/general/match-enum-domain-in-mapping-tables.md"
+    rules: "agents/knowledge_base/rules/general/name-cli-options-for-data-scope-with-natural-order.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression_exclusion: "third_party/.*"
+    content_patterns: "\\bidentifier\\b"
+    rules: "agents/knowledge_base/rules/general/match-local-comment-parameter-quoting.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|pl)"
     rules: "agents/knowledge_base/rules/general/match-rtcd-prototype-parameter-order-2.md"
   }
   capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression_exclusion: "third_party/.*"
+    content_patterns: "\\baom_calloc\\b"
+    rules: "agents/knowledge_base/rules/general/merge-buffer-reallocation-blocks.md"
+    rules: "agents/knowledge_base/rules/general/zero-initialize-c-structs.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\boxcf\\b"
+    rules: "agents/knowledge_base/rules/general/mirror-prerequisite-guards-in-bypass-conditions.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bUENUM\\b"
+    rules: "agents/knowledge_base/rules/general/name-enums-after-selected-attribute-or-variant.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bif\\s*\\([^)]*&&[^)]*\\)"
+    rules: "agents/knowledge_base/rules/general/nest-dependent-conditionals-to-simplify-checks.md"
+  }
+  capability_groups {
     path_expression: "av1/decoder/.*"
     path_expression: "av1/encoder/.*"
     rules: "agents/knowledge_base/rules/general/no-assert-for-untrusted-bitstream.md"
+    rules: "agents/knowledge_base/rules/general/order-bitstream-offset-terms-by-bitstream-sequence.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:asm|c|cc|cpp|h|hpp|inc)"
@@ -430,19 +1420,112 @@ agentic_review {
     rules: "agents/knowledge_base/rules/general/no-commented-out-debug-code.md"
   }
   capability_groups {
-    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
-    content_patterns: "\\bfeatures\\b"
-    rules: "agents/knowledge_base/rules/general/omit-redundant-comments-and-use-imperative-phrasing.md"
+    path_expression: "(?:.*/)?[^/]*\\.inc"
+    rules: "agents/knowledge_base/rules/general/no-includes-in-inc-files.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.c"
+    rules: "agents/knowledge_base/rules/general/no-inline-on-non-static-c-functions.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
-    content_patterns: "\\bcount\\b"
-    rules: "agents/knowledge_base/rules/general/omit-redundant-guards-after-unconditional-initialization.md"
+    path_expression_exclusion: "third_party/.*"
+    content_patterns: "\\btran_low_t\\b"
+    rules: "agents/knowledge_base/rules/general/no-top-level-const-on-function-params.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bDECLARE_ALIGNED\\b"
+    rules: "agents/knowledge_base/rules/general/omit-enclosing-name-in-struct-and-union-members.md"
+  }
+  capability_groups {
+    path_expression: "av1/.*"
+    rules: "agents/knowledge_base/rules/general/omit-legacy-config-av1-guards.md"
+    rules: "agents/knowledge_base/rules/general/use-av1-specification-terminology.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
-    content_patterns: "\\bmodes\\b"
+    path_expression_exclusion: "third_party/.*"
+    content_patterns: "\\brate\\b"
+    rules: "agents/knowledge_base/rules/general/omit-redundant-intermediate-clamping.md"
+    rules: "agents/knowledge_base/rules/general/reserve-abs-prefix-for-mathematical-absolute-values.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression_exclusion: "third_party/.*"
+    content_patterns: "[-+*&|^]?=\\s*\\((?:int64_t|uint64_t)\\)"
+    rules: "agents/knowledge_base/rules/general/omit-redundant-narrowing-casts-on-wider-integers.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression_exclusion: "third_party/.*"
+    content_patterns: "\\bbuf_size\\b"
+    rules: "agents/knowledge_base/rules/general/omit-redundant-null-check-with-tracked-allocation-size.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bimage\\b"
+    rules: "agents/knowledge_base/rules/general/omit-redundant-nv12-check-for-444-subsampling.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bparam\\b"
+    rules: "agents/knowledge_base/rules/general/omit-redundant-pointer-to-in-doxygen-param-descriptions.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\s*default\\s*:"
+    rules: "agents/knowledge_base/rules/general/omit-redundant-switch-cases-matching-default.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.inc"
+    path_expression: "(?:.*/)?[^/]*template[^/]*\\.h"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|h|inc)"
+    rules: "agents/knowledge_base/rules/general/omit-renaming-macros-on-static-template-functions.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\[[^\\]]+\\]\\s*(?:<|<=|>|>=|==|!=)[^&\\n]*&&"
+    rules: "agents/knowledge_base/rules/general/order-bounds-checks-before-predicates-in-conditions.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bflags\\b"
     rules: "agents/knowledge_base/rules/general/order-enumerators-by-declaration-sequence.md"
+    rules: "agents/knowledge_base/rules/general/use-local-parameter-copy-consistently.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\s*else\\s+if\\b"
+    rules: "agents/knowledge_base/rules/general/order-specialized-before-general-branches.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bstd::optional\\b"
+    rules: "agents/knowledge_base/rules/general/order-struct-members-to-minimize-padding.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "(?://|/\\*).*\\brespectively\\b"
+    rules: "agents/knowledge_base/rules/general/pair-option-names-with-values-in-comments.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*arm[^/]*/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "(?:.*/)?[^/]*neon[^/]*/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    rules: "agents/knowledge_base/rules/general/parameterize-neon-lane-helpers-via-macros.md"
+    rules: "agents/knowledge_base/rules/general/store-directly-from-neon-vectors-using-lane-indices.md"
+    rules: "agents/knowledge_base/rules/general/use-neon-halving-add-intrinsics.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression_exclusion: "third_party/.*"
+    content_patterns: "\\bset1_epi\\b"
+    rules: "agents/knowledge_base/rules/general/parenthesize-binary-expressions-when-casting.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\*[ \\t]*\\([^)]+\\)\\s*/"
+    rules: "agents/knowledge_base/rules/general/parenthesize-compound-denominators-in-division.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
@@ -451,13 +1534,64 @@ agentic_review {
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
-    content_patterns: "\\bDECLARE_ALIGNED\\b"
-    rules: "agents/knowledge_base/rules/general/pass-byte-alignment-to-declare-aligned.md"
+    path_expression_exclusion: "third_party/.*"
+    content_patterns: "=\\s*[^;={}]+\\?\\s*[^;={:]+:"
+    rules: "agents/knowledge_base/rules/general/parenthesize-ternary-conditions.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
     content_patterns: "(?:[(,])\\s*&\\s*\\w+\\s*[,)]"
     rules: "agents/knowledge_base/rules/general/pass-destination-address-to-out-parameters.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\b\\w+\\[\\s*0\\s*\\]\\.\\w+"
+    rules: "agents/knowledge_base/rules/general/pass-struct-descriptors-by-pointer.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression_exclusion: "third_party/.*"
+    content_patterns: "\\boxcf\\b"
+    rules: "agents/knowledge_base/rules/general/place-call-site-assertions-immediately-before-guarded-operat.md"
+  }
+  capability_groups {
+    path_expression: "common/.*"
+    rules: "agents/knowledge_base/rules/general/place-common-post-processing-outside-conditional-compilation.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "[*\\/]\\s*-\\s*[A-Za-z0-9_(]"
+    rules: "agents/knowledge_base/rules/general/place-unary-negation-at-front-of-arithmetic-expressions.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bswitch\\s*\\("
+    rules: "agents/knowledge_base/rules/general/place-unreachable-assertions-in-switch-default.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression_exclusion: "third_party/.*"
+    content_patterns: "\\bconfig\\b"
+    rules: "agents/knowledge_base/rules/general/populate-caller-output-struct-over-heap-allocation.md"
+  }
+  capability_groups {
+    path_expression: "aom/.*"
+    path_expression_exclusion: "aom/aom_integer\\.h"
+    path_expression_exclusion: "third_party/.*"
+    rules: "agents/knowledge_base/rules/general/prefer-aom-integer-over-stdint.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression_exclusion: "third_party/.*"
+    content_patterns: "\\bAOMMIN\\b"
+    rules: "agents/knowledge_base/rules/general/prefer-aommin-aommax-and-standard-type-limits.md"
+    rules: "agents/knowledge_base/rules/general/update-bit-width-guards-when-widening-signed-shifts-to-64-bi.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression_exclusion: "third_party/.*"
+    content_patterns: "\\bround\\b"
+    rules: "agents/knowledge_base/rules/general/prefer-ceil-and-floor-for-rounding.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
@@ -471,9 +1605,29 @@ agentic_review {
     rules: "agents/knowledge_base/rules/general/prefer-compound-assignment-operators.md"
   }
   capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bmemmove\\b"
+    rules: "agents/knowledge_base/rules/general/prefer-direct-pointer-arithmetic-over-address-of-subscript.md"
+  }
+  capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
-    content_patterns: "\\bmemset\\b"
-    rules: "agents/knowledge_base/rules/general/prefer-memcpy-over-manual-loops.md"
+    content_patterns: "\\b(?:return|=)\\s*[A-Z][A-Z0-9_]*\\s*\\+\\s*\\(?"
+    rules: "agents/knowledge_base/rules/general/prefer-explicit-branching-over-enum-arithmetic.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bfor\\s*\\(\\s*(?:float|double)\\s+\\w+\\s*="
+    rules: "agents/knowledge_base/rules/general/prefer-integer-loop-counters-over-floating-point.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:cc|cpp)"
+    rules: "agents/knowledge_base/rules/general/prefer-namespaced-types-in-cpp.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression_exclusion: "third_party/.*"
+    content_patterns: "\\bmode\\b"
+    rules: "agents/knowledge_base/rules/general/prefer-plain-int-over-fixed-width-integers.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
@@ -481,9 +1635,38 @@ agentic_review {
     rules: "agents/knowledge_base/rules/general/prefer-positive-boolean-variable-names.md"
   }
   capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bif\\s*\\(\\s*![^)]+\\)"
+    rules: "agents/knowledge_base/rules/general/prefer-positive-condition-in-if-else.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\s*continue\\s*;"
+    rules: "agents/knowledge_base/rules/general/prefer-positive-condition-over-loop-tail-continue.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "aom/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "agents/knowledge_base/rules/general/prefer-screen-over-sct-in-identifiers.md"
+    rules: "agents/knowledge_base/rules/general/record-error-details-with-aom-set-error.md"
+  }
+  capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
     content_patterns: "\\?\\s*[^:;\\n]+\\s*:\\s*[^;\\n]+;"
     rules: "agents/knowledge_base/rules/general/prefer-ternary-over-if-else-for-simple-assignments.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression_exclusion: "third_party/.*"
+    content_patterns: "\\b[A-Za-z0-9_]+\\s+const\\s*[*&]"
+    rules: "agents/knowledge_base/rules/general/prefer-west-const-pointer-declarations-2.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bdone\\b"
+    rules: "agents/knowledge_base/rules/general/prefer-while-true-and-scoped-variables-when-breaking-interna.md"
+    rules: "agents/knowledge_base/rules/general/use-break-for-post-loop-cleanup.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:cc|cpp|hpp)"
@@ -491,7 +1674,7 @@ agentic_review {
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
-    content_patterns: "\\bCreate\\b"
+    content_patterns: "\\bConfig\\b"
     rules: "agents/knowledge_base/rules/general/prefix-c-api-types-and-enum-constants.md"
   }
   capability_groups {
@@ -501,24 +1684,63 @@ agentic_review {
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
-    path_expression: "aom/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
-    path_expression: "av1/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
-    rules: "agents/knowledge_base/rules/general/record-error-details-with-aom-set-error.md"
+    content_patterns: "\\bload\\b"
+    rules: "agents/knowledge_base/rules/general/preserve-const-in-pointer-casts.md"
+  }
+  capability_groups {
+    content_patterns: "\\bmake_optional\\b"
+    rules: "agents/knowledge_base/rules/general/preserve-cxx14-baseline-avoid-cxx17.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cmake|h)"
+    path_expression: "(?:.*/)?exports_[^/]*"
+    path_expression: "CMakeLists\\.txt"
+    rules: "agents/knowledge_base/rules/general/preserve-shared-library-abi-for-exported-symbols.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
-    content_patterns: "\\bmalloc\\b"
-    rules: "agents/knowledge_base/rules/general/reset-capacity-on-allocation-failure.md"
-    rules: "agents/knowledge_base/rules/general/use-size-t-arithmetic-for-buffer-allocations.md"
-  }
-  capability_groups {
-    path_expression: "(?:.*/)?[^/]*\\.(?:h|hpp)"
-    rules: "agents/knowledge_base/rules/general/retain-constexpr-in-dual-c-cpp-headers.md"
+    content_patterns: "\\baom_memalign\\b"
+    rules: "agents/knowledge_base/rules/general/preserve-valid-input-pointers-on-error.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
-    content_patterns: "\\bputchar\\b"
-    rules: "agents/knowledge_base/rules/general/route-diagnostics-to-stderr-not-stdout.md"
+    content_patterns: "\\battribute\\b"
+    rules: "agents/knowledge_base/rules/general/provide-fallbacks-for-feature-testing-macros.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    path_expression: "av1/decoder/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "examples/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "agents/knowledge_base/rules/general/qualify-metric-identifiers-with-scope-granularity.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "agents/knowledge_base/rules/general/remove-git-merge-conflict-markers.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bCHECK_MEM_ERROR\\b"
+    rules: "agents/knowledge_base/rules/general/remove-unreachable-dead-code-after-returns.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bAV1RateControl\\b"
+    rules: "agents/knowledge_base/rules/general/return-c-enum-constants-in-c-wrappers.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    path_expression: "av1/encoder/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "agents/knowledge_base/rules/general/reuse-existing-structs-and-helpers-instead-of-duplicates.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "(?://|/\\*).*\\b(?:overflow|underflow)\\b"
+    rules: "agents/knowledge_base/rules/general/round-up-numerical-upper-bounds-in-comments.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bround\\b"
+    rules: "agents/knowledge_base/rules/general/scale-fixed-point-values-by-precision-shift.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|mm)"
@@ -526,14 +1748,96 @@ agentic_review {
     rules: "agents/knowledge_base/rules/general/scope-temporary-allocations-to-usage-block.md"
   }
   capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bbrief\\b"
+    rules: "agents/knowledge_base/rules/general/separate-non-matching-members-from-doxygen-groups.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bget_crc32c_value\\b"
+    rules: "agents/knowledge_base/rules/general/serialize-multibyte-integers-before-hashing.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "(?:&&|\\|\\|)\\s*!\\s*\\("
+    rules: "agents/knowledge_base/rules/general/simplify-negated-compound-boolean-expressions.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\brealloc\\b"
+    rules: "agents/knowledge_base/rules/general/size-dynamic-buffer-realloc-with-max-growth.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bFailed\\b"
+    rules: "agents/knowledge_base/rules/general/specify-omitted-feature-in-warning-messages.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "(?://|/\\*|\\*)\\s*.*\\b(?:bit|frame)[-_ ]?(?:depth|rate)s?\\b"
+    rules: "agents/knowledge_base/rules/general/standardize-domain-term-spelling-in-comments.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\b\\w+\\s*\\^=\\s*1\\b"
+    rules: "agents/knowledge_base/rules/general/standardize-double-buffering-index-toggling.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*_rvv\\.\\[ch\\]"
+    path_expression: "(?:.*/)?riscv/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "agents/knowledge_base/rules/general/standardize-on-modern-rvv-intrinsics.md"
+  }
+  capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|h|hpp)"
     path_expression_exclusion: "third_party/.*"
     rules: "agents/knowledge_base/rules/general/static-inline-utility-functions-in-headers.md"
   }
   capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bpred\\b"
+    rules: "agents/knowledge_base/rules/general/step-loop-indices-by-block-dimensions.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bINT64_C\\b"
+    rules: "agents/knowledge_base/rules/general/suffix-64-bit-integer-literals-with-ull.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "aom/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "aom_mem/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "common/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression_exclusion: "third_party/.*"
+    rules: "agents/knowledge_base/rules/general/track-allocated-buffer-sizes-for-realloc.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bull\\b"
+    rules: "agents/knowledge_base/rules/general/use-64-bit-literals-for-64-bit-shifts.md"
+  }
+  capability_groups {
     path_expression: "aom/.*"
     path_expression_exclusion: "third_party/.*"
+    rules: "agents/knowledge_base/rules/general/use-aom-arch-macros-for-architecture-guards.md"
     rules: "agents/knowledge_base/rules/general/use-aom-malloc-and-free.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bflags\\b"
+    rules: "agents/knowledge_base/rules/general/use-bool-for-boolean-flags-and-arrays.md"
+    rules: "agents/knowledge_base/rules/general/use-descriptive-names-for-counters-not-flags.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bchar\\s*\\*\\s*[a-z0-9_]+;"
+    rules: "agents/knowledge_base/rules/general/use-const-char-and-omit-const-on-struct-member-pointers.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\s*(?:(?:\\}\\s*)?else|do)\\s*$"
+    rules: "agents/knowledge_base/rules/general/use-curly-braces-for-multi-line-conditionals.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
@@ -542,13 +1846,10 @@ agentic_review {
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
-    content_patterns: "\\bbound\\b"
-    rules: "agents/knowledge_base/rules/general/use-descriptive-threshold-and-limit-names.md"
-  }
-  capability_groups {
-    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
-    content_patterns: "\\bparam\\b"
-    rules: "agents/knowledge_base/rules/general/use-established-terminology-in-doxygen-param-comments.md"
+    path_expression: "av1/decoder/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "av1/encoder/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "av1/ratectrl_rtc\\.[^/]*"
+    rules: "agents/knowledge_base/rules/general/use-directional-qualifiers-in-hierarchical-flag-names.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|h)"
@@ -557,13 +1858,31 @@ agentic_review {
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
-    content_patterns: "\\bindex\\b"
-    rules: "agents/knowledge_base/rules/general/use-negative-one-as-error-sentinel-for-index-returns.md"
+    path_expression_exclusion: "third_party/.*"
+    content_patterns: "\\bUINT\\b"
+    rules: "agents/knowledge_base/rules/general/use-float-limits-for-floating-min-max.md"
   }
   capability_groups {
-    path_expression: "(?:.*/)?[^/]*arm[^/]*/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
-    path_expression: "(?:.*/)?[^/]*neon[^/]*/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
-    rules: "agents/knowledge_base/rules/general/use-neon-halving-add-intrinsics.md"
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\bDO_[A-Z0-9_]+\\("
+    rules: "agents/knowledge_base/rules/general/use-macro-parameters-not-enclosing-locals.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*x86[^/]*/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "aom_dsp/simd/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression_exclusion: "third_party/.*"
+    rules: "agents/knowledge_base/rules/general/use-mm-loadl-epi64-not-loadu-si64-in-sse2.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*x86[^/]*/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|mm)"
+    path_expression: "aom_dsp/simd/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|mm)"
+    path_expression_exclusion: "third_party/.*"
+    rules: "agents/knowledge_base/rules/general/use-mm-shuffle-macro-for-shuffle-masks.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bqsort\\b"
+    rules: "agents/knowledge_base/rules/general/use-named-constants-for-array-bounds.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
@@ -585,21 +1904,43 @@ agentic_review {
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
-    content_patterns: "\\bshift\\b"
-    rules: "agents/knowledge_base/rules/general/use-round-power-of-two-helper-macros.md"
+    content_patterns: "\\bcompar\\b"
+    rules: "agents/knowledge_base/rules/general/use-relational-comparisons-in-qsort-comparators.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
-    content_patterns: "\\boffs\\b"
+    content_patterns: "\\bentries\\b"
     rules: "agents/knowledge_base/rules/general/use-specific-domain-terms-in-comments.md"
   }
   capability_groups {
-    path_expression: "(?:.*/)?[^/]*\\.(?:c|h)"
-    rules: "agents/knowledge_base/rules/general/use-typedef-struct-for-c-definitions.md"
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression_exclusion: "third_party/.*"
+    content_patterns: "\\bisnan\\b"
+    rules: "agents/knowledge_base/rules/general/use-standard-isnan-for-nan-checks.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*x86[^/]*/(?:.*/)?[^/]*\\.(?:c|h)"
     path_expression: "(?:.*/)?[^/]*x86[^/]*\\.\\[ch\\]"
     rules: "agents/knowledge_base/rules/general/use-x86-simd-synonyms-helpers.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*arm[^/]*/.*"
+    path_expression: "(?:.*/)?[^/]*avx[^/]*/.*"
+    path_expression: "(?:.*/)?[^/]*neon[^/]*/.*"
+    path_expression: "(?:.*/)?[^/]*sse[^/]*/.*"
+    path_expression: "(?:.*/)?[^/]*sve[^/]*/.*"
+    path_expression: "(?:.*/)?[^/]*x86[^/]*/.*"
+    path_expression_exclusion: "third_party/.*"
+    rules: "agents/knowledge_base/rules/general/vectorize-simd-block-copies-not-memcpy.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp)"
+    content_patterns: "\\bovershoot_detection_cbr\\b"
+    rules: "agents/knowledge_base/rules/general/when-formatting-multi-clause-compound-boolean-conditions-enc.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    content_patterns: "\\s*/\\*\\*?\\s+[A-Z]"
+    rules: "agents/knowledge_base/rules/general/when-performing-structural-or-mechanical-refactoring-cls-kee.md"
   }
 }

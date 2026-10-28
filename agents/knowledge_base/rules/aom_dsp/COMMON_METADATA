@@ -9,6 +9,114 @@
 
 agentic_review {
   capability_groups {
+    path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "test/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "agents/knowledge_base/rules/aom_dsp/access-vector-union-members-directly-not-pointer-casts.md"
+    rules: "agents/knowledge_base/rules/aom_dsp/guard-extended-partition-dsp-with-realtime-only.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/.*"
+    path_expression: "av1/.*"
+    rules: "agents/knowledge_base/rules/aom_dsp/advance-destination-pointer-by-total-packed-elements-in-simd.md"
+    rules: "agents/knowledge_base/rules/aom_dsp/allocate-uint16-scratch-buffers-for-highbd.md"
+    rules: "agents/knowledge_base/rules/aom_dsp/avoid-integer-division-in-dsp-kernels.md"
+    rules: "agents/knowledge_base/rules/aom_dsp/check-sibling-variants-for-uninitialized-buffers.md"
+    rules: "agents/knowledge_base/rules/aom_dsp/factor-simd-height-loops-into-inline-helpers.md"
+    rules: "agents/knowledge_base/rules/aom_dsp/keep-parameter-qualifiers-consistent-across-dsp-kernels.md"
+    rules: "agents/knowledge_base/rules/aom_dsp/name-dsp-functions-by-metrics-and-block-layout.md"
+    rules: "agents/knowledge_base/rules/aom_dsp/omit-inner-horizontal-loop-for-width-four-simd.md"
+    rules: "agents/knowledge_base/rules/aom_dsp/preserve-supported-block-size-variants-in-dsp-kernels.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*arm[^/]*\\.(?:c|h)"
+    path_expression: "(?:.*/)?[^/]*neon[^/]*\\.(?:c|h)"
+    path_expression: "aom_dsp/arm/(?:.*/)?[^/]*\\.(?:c|h)"
+    path_expression: "aom_dsp/simd/(?:.*/)?[^/]*\\.(?:c|h)"
+    path_expression: "av1/(?:.*/)?arm/(?:.*/)?[^/]*\\.(?:c|h)"
+    path_expression: "test/arm/(?:.*/)?[^/]*\\.(?:c|h)"
+    path_expression_exclusion: "third_party/.*"
+    rules: "agents/knowledge_base/rules/aom_dsp/avoid-redundant-neon-vcreate-casts.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/x86/.*"
+    path_expression: "av1/(?:.*/)?x86/.*"
+    rules: "agents/knowledge_base/rules/aom_dsp/avoid-redundant-zeroupper-intrinsics.md"
+    rules: "agents/knowledge_base/rules/aom_dsp/use-lane-store-intrinsics-for-scalar-outputs.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/.*"
+    path_expression: "aom_scale/.*"
+    path_expression: "av1/.*"
+    rules: "agents/knowledge_base/rules/aom_dsp/avoid-rtcd-specializations-for-composite-wrappers.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression_exclusion: "third_party/.*"
+    rules: "agents/knowledge_base/rules/aom_dsp/avoid-trivial-wrappers-around-single-simd-intrinsics.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/simd/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "aom_dsp/x86/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "av1/(?:.*/)?x86/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "test/x86/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression_exclusion: "third_party/.*"
+    rules: "agents/knowledge_base/rules/aom_dsp/cast-simd-set1-epi8-to-char.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/.*"
+    rules: "agents/knowledge_base/rules/aom_dsp/cast-subtracted-variance-term-to-unsigned.md"
+    rules: "agents/knowledge_base/rules/aom_dsp/place-shared-dsp-headers-in-aom-dsp.md"
+    rules: "agents/knowledge_base/rules/aom_dsp/place-variable-identifier-before-dynamic-range-in-comments.md"
+    rules: "agents/knowledge_base/rules/aom_dsp/use-largest-matching-sub-block-kernel-for-variance.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "agents/knowledge_base/rules/aom_dsp/cast-vector-intrinsic-return-to-scalar-type.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/.*"
+    path_expression: "av1/.*"
+    path_expression: "common/.*"
+    path_expression_exclusion: "third_party/.*"
+    rules: "agents/knowledge_base/rules/aom_dsp/compute-stride-offsets-inline-in-simd.md"
+    rules: "agents/knowledge_base/rules/aom_dsp/do-not-guard-tran-low-t-on-highbitdepth.md"
+    rules: "agents/knowledge_base/rules/aom_dsp/factor-repetitive-simd-arithmetic-into-inline-helpers.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression_exclusion: "third_party/.*"
+    rules: "agents/knowledge_base/rules/aom_dsp/consolidate-block-dimension-functions-using-macros.md"
+    rules: "agents/knowledge_base/rules/aom_dsp/process-2d-blocks-row-major-for-cache-locality.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*_hwy\\.cc"
+    path_expression: "(?:.*/)?[^/]*_hwy\\.h"
+    path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp)"
+    path_expression: "common/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp)"
+    path_expression_exclusion: "third_party/.*"
+    rules: "agents/knowledge_base/rules/aom_dsp/decorate-highway-vector-helpers-with-hwy-attr-hwy-inline.md"
+    rules: "agents/knowledge_base/rules/aom_dsp/migrate-neutral-performance-kernels-to-highway.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "common/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression_exclusion: "third_party/.*"
+    rules: "agents/knowledge_base/rules/aom_dsp/derive-sub-block-pointers-from-offset-start-pointer.md"
+    rules: "agents/knowledge_base/rules/aom_dsp/omit-simd-chunking-loops-when-accumulators-cannot-overflow.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp|mm)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp|mm)"
+    path_expression_exclusion: "third_party/.*"
+    rules: "agents/knowledge_base/rules/aom_dsp/document-buffer-layouts-and-stride-semantics.md"
+  }
+  capability_groups {
     path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp|mm)"
     path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp|mm)"
     path_expression: "common/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h|hpp|mm)"
@@ -16,11 +124,16 @@ agentic_review {
     rules: "agents/knowledge_base/rules/aom_dsp/document-simd-sublane-partitioning.md"
   }
   capability_groups {
-    path_expression: "aom_dsp/.*"
-    path_expression: "av1/.*"
-    path_expression: "common/.*"
+    path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:c|h)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|h)"
+    rules: "agents/knowledge_base/rules/aom_dsp/encapsulate-simd-lane-stores-in-helpers.md"
+  }
+  capability_groups {
+    path_expression: "(?:.*/)?[^/]*_(?:avx2|neon|rvv|sse2|sse4|ssse3|sve)[^/]*\\.(?:c|h)"
+    path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
     path_expression_exclusion: "third_party/.*"
-    rules: "agents/knowledge_base/rules/aom_dsp/factor-repetitive-simd-arithmetic-into-inline-helpers.md"
+    rules: "agents/knowledge_base/rules/aom_dsp/hoist-independent-simd-loads-to-reduce-latency.md"
   }
   capability_groups {
     path_expression: "aom_dsp/simd/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
@@ -32,16 +145,23 @@ agentic_review {
     rules: "agents/knowledge_base/rules/aom_dsp/load-only-four-bytes-for-four-wide-simd-blocks.md"
   }
   capability_groups {
-    path_expression: "aom_dsp/.*"
-    path_expression: "av1/.*"
-    rules: "agents/knowledge_base/rules/aom_dsp/name-dsp-functions-by-metrics-and-block-layout.md"
+    path_expression: "(?:.*/)?[^/]*\\.cmake"
+    path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression_exclusion: "third_party/.*"
+    rules: "agents/knowledge_base/rules/aom_dsp/match-architecture-specific-dsp-filename-conventions.md"
   }
   capability_groups {
     path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
     path_expression: "av1/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
     path_expression: "common/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "test/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
     path_expression_exclusion: "third_party/.*"
-    rules: "agents/knowledge_base/rules/aom_dsp/omit-simd-chunking-loops-when-accumulators-cannot-overflow.md"
+    rules: "agents/knowledge_base/rules/aom_dsp/match-arm-neon-intrinsic-types-or-cast-scalars.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "agents/knowledge_base/rules/aom_dsp/omit-redundant-entropy-encoder-carry-bounds-checks.md"
   }
   capability_groups {
     path_expression: "(?:.*/)?[^/]*_hwy[^/]*\\.cc"
@@ -68,6 +188,32 @@ agentic_review {
     rules: "agents/knowledge_base/rules/aom_dsp/pass-all-x86-vectors-as-pointers-over-three-args.md"
   }
   capability_groups {
+    path_expression: "aom_dsp/aom_simd[^/]*"
+    path_expression: "aom_dsp/simd/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "agents/knowledge_base/rules/aom_dsp/place-shared-simd-macros-in-simd-inline-header.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/simd/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "aom_dsp/x86/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "av1/(?:.*/)?x86/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression: "test/x86/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
+    path_expression_exclusion: "third_party/.*"
+    rules: "agents/knowledge_base/rules/aom_dsp/prefer-loadu-over-lddqu-simd-intrinsics.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "test/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "agents/knowledge_base/rules/aom_dsp/split-dsp-primitives-from-downstream-callers.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "common/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression_exclusion: "third_party/.*"
+    rules: "agents/knowledge_base/rules/aom_dsp/unify-simd-kernel-variants-with-nullable-pointer.md"
+  }
+  capability_groups {
     path_expression: "(?:.*/)?[^/]*arm[^/]*/.*"
     path_expression: "(?:.*/)?[^/]*avx[^/]*/.*"
     path_expression: "(?:.*/)?[^/]*neon[^/]*/.*"
@@ -88,5 +234,24 @@ agentic_review {
     path_expression: "test/(?:.*/)?[^/]*\\.(?:c|cc|cpp|h)"
     path_expression_exclusion: "third_party/.*"
     rules: "agents/knowledge_base/rules/aom_dsp/use-aligned-simd-loads-for-aligned-buffers.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp)"
+    path_expression: "av1/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp)"
+    path_expression: "common/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp)"
+    path_expression_exclusion: "third_party/.*"
+    rules: "agents/knowledge_base/rules/aom_dsp/use-fixedtag-for-exact-highway-simd-lane-count.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/.*"
+    path_expression: "av1/.*"
+    path_expression: "common/.*"
+    rules: "agents/knowledge_base/rules/aom_dsp/use-matching-element-simd-broadcast-with-constants.md"
+  }
+  capability_groups {
+    path_expression: "aom_dsp/simd/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "aom_dsp/x86/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    path_expression: "av1/(?:.*/)?x86/(?:.*/)?[^/]*\\.(?:cc|cpp|h|hpp|mm)"
+    rules: "agents/knowledge_base/rules/aom_dsp/use-sign-mask-arithmetic-for-sse2-abs-s8.md"
   }
 }
