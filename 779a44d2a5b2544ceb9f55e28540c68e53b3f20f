@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "efc1c5e1_26f00aa8",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-28T23:07:59Z",
+      "side": 1,
+      "message": "Yuan: If this CL doesn\u0027t depend on any other CL, please move it out of the CL chain, and I will ask a suitable libaom team member to review it. Thanks!",
+      "revId": "779a44d2a5b2544ceb9f55e28540c68e53b3f20f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
