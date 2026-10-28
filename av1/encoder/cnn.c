@@ -1081,14 +1081,30 @@ bool av1_cnn_predict_img_multi_out(uint8_t **dgd, int width, int height,
                                    int stride, const CNN_CONFIG *cnn_config,
                                    const CNN_THREAD_DATA *thread_data,
                                    CNN_MULTI_OUT *output) {
-  const float max_val = 255.0;
+#define INV255_ROW(b)                                                \
+  ((b) + 0) / 255.0f, ((b) + 1) / 255.0f, ((b) + 2) / 255.0f,        \
+      ((b) + 3) / 255.0f, ((b) + 4) / 255.0f, ((b) + 5) / 255.0f,    \
+      ((b) + 6) / 255.0f, ((b) + 7) / 255.0f, ((b) + 8) / 255.0f,    \
+      ((b) + 9) / 255.0f, ((b) + 10) / 255.0f, ((b) + 11) / 255.0f,  \
+      ((b) + 12) / 255.0f, ((b) + 13) / 255.0f, ((b) + 14) / 255.0f, \
+      ((b) + 15) / 255.0f
+  static const float kInv255Lut[256] = {
+    INV255_ROW(0),   INV255_ROW(16),  INV255_ROW(32),  INV255_ROW(48),
+    INV255_ROW(64),  INV255_ROW(80),  INV255_ROW(96),  INV255_ROW(112),
+    INV255_ROW(128), INV255_ROW(144), INV255_ROW(160), INV255_ROW(176),
+    INV255_ROW(192), INV255_ROW(208), INV255_ROW(224), INV255_ROW(240),
+  };
+#undef INV255_ROW
 
   const int in_width = width + 2 * cnn_config->ext_width;
   const int in_height = height + 2 * cnn_config->ext_height;
   const int in_channels = cnn_config->layer_config[0].in_channels;
+  const int total_elems = in_width * in_height * in_channels;
   float *inputs[CNN_MAX_CHANNELS];
-  float *input_ =
-      (float *)aom_malloc(in_width * in_height * in_channels * sizeof(*input_));
+  float stack_input[68 * 68];
+  float *input_ = (total_elems <= (int)(sizeof(stack_input) / sizeof(float)))
+                      ? stack_input
+                      : (float *)aom_malloc(total_elems * sizeof(*input_));
   if (!input_) return false;
   const int in_stride = in_width;
 
@@ -1100,7 +1116,7 @@ bool av1_cnn_predict_img_multi_out(uint8_t **dgd, int width, int height,
     if (cnn_config->strict_bounds) {
       for (int i = 0; i < height; ++i)
         for (int j = 0; j < width; ++j)
-          input[i * in_stride + j] = (float)dgd[c][i * stride + j] / max_val;
+          input[i * in_stride + j] = kInv255Lut[dgd[c][i * stride + j]];
       // extend left and right
       for (int i = 0; i < height; ++i) {
         for (int j = -cnn_config->ext_width; j < 0; ++j)
@@ -1121,13 +1137,13 @@ bool av1_cnn_predict_img_multi_out(uint8_t **dgd, int width, int height,
            ++i)
         for (int j = -cnn_config->ext_width; j < width + cnn_config->ext_width;
              ++j)
-          input[i * in_stride + j] = (float)dgd[c][i * stride + j] / max_val;
+          input[i * in_stride + j] = kInv255Lut[dgd[c][i * stride + j]];
     }
   }
   bool success = av1_cnn_predict((const float **)inputs, in_width, in_height,
                                  in_stride, cnn_config, thread_data, output);
 
-  aom_free(input_);
+  if (input_ != stack_input) aom_free(input_);
   return success;
 }
 
