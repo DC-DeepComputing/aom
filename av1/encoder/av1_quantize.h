@@ -172,12 +172,27 @@ void av1_quantize_fp_qm_avx2(const tran_low_t *coeff_ptr, intptr_t n_coeffs,
                              const int16_t *dequant_ptr, uint16_t *eob_ptr,
                              const int16_t *iscan, const qm_val_t *qm_ptr,
                              const qm_val_t *iqm_ptr, int log_scale);
+void av1_quantize_b_qm_avx2(const tran_low_t *coeff_ptr, intptr_t n_coeffs,
+                            const int16_t *zbin_ptr, const int16_t *round_ptr,
+                            const int16_t *quant_ptr,
+                            const int16_t *quant_shift_ptr,
+                            tran_low_t *qcoeff_ptr, tran_low_t *dqcoeff_ptr,
+                            const int16_t *dequant_ptr, uint16_t *eob_ptr,
+                            const int16_t *iscan, const qm_val_t *qm_ptr,
+                            const qm_val_t *iqm_ptr, int log_scale);
 #if CONFIG_AV1_HIGHBITDEPTH
 void av1_highbd_quantize_fp_qm_avx2(
     const tran_low_t *coeff_ptr, intptr_t n_coeffs, const int16_t *round_ptr,
     const int16_t *quant_ptr, tran_low_t *qcoeff_ptr, tran_low_t *dqcoeff_ptr,
     const int16_t *dequant_ptr, uint16_t *eob_ptr, const int16_t *iscan,
     const qm_val_t *qm_ptr, const qm_val_t *iqm_ptr, int log_scale);
+void av1_highbd_quantize_b_qm_avx2(
+    const tran_low_t *coeff_ptr, intptr_t n_coeffs, const int16_t *zbin_ptr,
+    const int16_t *round_ptr, const int16_t *quant_ptr,
+    const int16_t *quant_shift_ptr, tran_low_t *qcoeff_ptr,
+    tran_low_t *dqcoeff_ptr, const int16_t *dequant_ptr, uint16_t *eob_ptr,
+    const int16_t *iscan, const qm_val_t *qm_ptr, const qm_val_t *iqm_ptr,
+    int log_scale);
 #endif
 #endif
 
