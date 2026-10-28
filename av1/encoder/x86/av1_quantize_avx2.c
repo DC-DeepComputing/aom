@@ -436,7 +436,8 @@ static AOM_FORCE_INLINE void quantize_fp_qm_8_avx2(
     if (!is_highbd) {
       v_tmp = _mm256_min_epi32(v_tmp, _mm256_set1_epi32(INT16_MAX));
     }
-    const __m256i v_cw = _mm256_mullo_epi32(v_tmp, v_wt);
+    const __m256i v_cw = is_highbd ? _mm256_mullo_epi32(v_tmp, v_wt)
+                                   : _mm256_madd_epi16(v_tmp, v_wt);
 
     const __m256i prod_even = _mm256_mul_epu32(v_cw, v_quant_even);
     const __m256i res_even = _mm256_srl_epi64(prod_even, v_shift);
@@ -453,11 +454,13 @@ static AOM_FORCE_INLINE void quantize_fp_qm_8_avx2(
     const __m256i v_iwt =
         _mm256_cvtepu8_epi32(_mm_loadl_epi64((const __m128i *)iqm_ptr));
     const __m256i v_dequant = _mm256_srai_epi32(
-        _mm256_add_epi32(_mm256_mullo_epi32(v_dequant_base, v_iwt),
+        _mm256_add_epi32(_mm256_madd_epi16(v_dequant_base, v_iwt),
                          _mm256_set1_epi32(1 << (AOM_QM_BITS - 1))),
         AOM_QM_BITS);
     const __m256i v_abs_dq =
-        _mm256_sra_epi32(_mm256_mullo_epi32(v_tmp32, v_dequant), v_log_scale);
+        _mm256_sra_epi32(is_highbd ? _mm256_mullo_epi32(v_tmp32, v_dequant)
+                                   : _mm256_madd_epi16(v_tmp32, v_dequant),
+                         v_log_scale);
     const __m256i v_dqcoeff = _mm256_sign_epi32(v_abs_dq, v_coeff);
     _mm256_storeu_si256((__m256i *)dqcoeff_ptr, v_dqcoeff);
 
@@ -564,7 +567,8 @@ static AOM_FORCE_INLINE void quantize_b_qm_8_avx2(
     if (!is_highbd) {
       v_tmp = _mm256_min_epi32(v_tmp, _mm256_set1_epi32(INT16_MAX));
     }
-    const __m256i v_tmpw = _mm256_mullo_epi32(v_tmp, v_wt);
+    const __m256i v_tmpw = is_highbd ? _mm256_mullo_epi32(v_tmp, v_wt)
+                                     : _mm256_madd_epi16(v_tmp, v_wt);
 
     const __m256i q_even = _mm256_mul_epi32(v_tmpw, v_quant_even);
     const __m256i sh_even = _mm256_srli_epi64(q_even, 16);
@@ -589,11 +593,13 @@ static AOM_FORCE_INLINE void quantize_b_qm_8_avx2(
     const __m256i v_iwt =
         _mm256_cvtepu8_epi32(_mm_loadl_epi64((const __m128i *)iqm_ptr));
     const __m256i v_dequant = _mm256_srai_epi32(
-        _mm256_add_epi32(_mm256_mullo_epi32(v_dequant_base, v_iwt),
+        _mm256_add_epi32(_mm256_madd_epi16(v_dequant_base, v_iwt),
                          _mm256_set1_epi32(1 << (AOM_QM_BITS - 1))),
         AOM_QM_BITS);
     const __m256i v_abs_dq =
-        _mm256_sra_epi32(_mm256_mullo_epi32(v_tmp32, v_dequant), v_log_scale);
+        _mm256_sra_epi32(is_highbd ? _mm256_mullo_epi32(v_tmp32, v_dequant)
+                                   : _mm256_madd_epi16(v_tmp32, v_dequant),
+                         v_log_scale);
     const __m256i v_dqcoeff = _mm256_sign_epi32(v_abs_dq, v_coeff);
     _mm256_storeu_si256((__m256i *)dqcoeff_ptr, v_dqcoeff);
 
