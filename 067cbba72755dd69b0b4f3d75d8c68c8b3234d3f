@@ -18,6 +18,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "8d842230_99a4a386",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 8
+      },
+      "lineNbr": 16,
+      "author": {
+        "id": 5216012
+      },
+      "writtenOn": "2026-10-28T08:50:12Z",
+      "side": 1,
+      "message": "The share came from a temporary counter in av1_intrabc_hash_search(). For every lookup it counted how many entries of that bucket were in another tile. So it\u0027s weighted by lookups, not by entries.\n\nYou get 3/4 only when the copies of a hash are spread evenly over the four tiles.  For example, take 10 entries in tile A and 1 in tile B. Each of the 10 lookups from A sees 1 of 11 entries in another tile. The one lookup from B sees 10 of 11. That\u0027s 20/121, about 17%.\n\nI didn\u0027t measure how even the spread is. My guess is that screen content mostly repeats inside the same window (text, toolbars, backgrounds), so most copies of a block sit in its own tile.",
+      "parentUuid": "48544968_783b8e73",
+      "revId": "067cbba72755dd69b0b4f3d75d8c68c8b3234d3f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "643b6235_c20a46af",
@@ -35,6 +53,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "c47fb765_626e9813",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 8
+      },
+      "lineNbr": 25,
+      "author": {
+        "id": 5216012
+      },
+      "writtenOn": "2026-10-28T08:50:12Z",
+      "side": 1,
+      "message": "I think it\u0027s easy. Neighboring tiles could share one table that covers their bounding rectangle. For example, with 8x4 tiles, each table would take 2x1 tiles. The search still calls av1_is_dv_valid(), which rejects copies outside the current tile, so a shared table stays correct. It just has more entries to skip. Only get_intrabc_hash_region() and the table index in av1_intrabc_hash_search() would need to know about the grouping.\n\nI added a TODO in this CL and will do it in a follow-up.",
+      "parentUuid": "643b6235_c20a46af",
+      "revId": "067cbba72755dd69b0b4f3d75d8c68c8b3234d3f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "870a3092_069827d7",
@@ -48,6 +84,24 @@
       "writtenOn": "2026-10-28T00:40:59Z",
       "side": 1,
       "message": "Just curious: what does \"one is 2559 wide\" mean? Did you mean one of the five recordings has a width of 2559 rather than 2560?",
+      "revId": "067cbba72755dd69b0b4f3d75d8c68c8b3234d3f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "ae7f5d22_8ec20acb",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 8
+      },
+      "lineNbr": 32,
+      "author": {
+        "id": 5216012
+      },
+      "writtenOn": "2026-10-28T08:50:12Z",
+      "side": 1,
+      "message": "Yes. One of the five recordings is 2559x1372, so it differs in height too. I\u0027ll fix the commit message to say \"four 2560x1440 recordings and one 2559x1372\". It\u0027s useful to keep because its width isn\u0027t a multiple of 8, so it also tests the right edge of the frame.",
+      "parentUuid": "870a3092_069827d7",
       "revId": "067cbba72755dd69b0b4f3d75d8c68c8b3234d3f",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
@@ -82,6 +136,24 @@
       "writtenOn": "2026-10-28T00:40:59Z",
       "side": 1,
       "message": "IMPORTANT: Do we need to update this comment?\n\nThe commit message says:\n\n```\nGive each tile its own table with only the blocks that lie inside it.\nThe encoder threads build the tables before the tiles are encoded, one\ntile per job, ...\n```\n\nSo at least \"The encoder threads read shallow copies of the table in their own MACROBLOCK\" is no longer true, right?",
+      "revId": "067cbba72755dd69b0b4f3d75d8c68c8b3234d3f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "a134d966_8af8f349",
+        "filename": "av1/encoder/hash_motion.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 51,
+      "author": {
+        "id": 5216012
+      },
+      "writtenOn": "2026-10-28T08:50:12Z",
+      "side": 1,
+      "message": "Yes, it\u0027s out of date. The threads now also write the tables, one table at a time per thread, before the tiles are encoded. Their MACROBLOCK copy holds only the tile_tables pointer, not the table itself. Updated to:\n\n// A table keeps its buffers from frame to frame. cpi-\u003etd.mb owns it and frees\n// it with the encoder. The encoder threads build the tables before the tiles\n// are encoded, one table at a time per thread. After that they only read them\n// through the tile_tables pointer in their own MACROBLOCK, so a table must not\n// change while the tiles are encoded.",
+      "parentUuid": "94d390cc_c0327588",
       "revId": "067cbba72755dd69b0b4f3d75d8c68c8b3234d3f",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
