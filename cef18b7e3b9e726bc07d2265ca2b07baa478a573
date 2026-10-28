@@ -16,6 +16,23 @@
       "message": "Julio: FYI.",
       "revId": "cef18b7e3b9e726bc07d2265ca2b07baa478a573",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "4b45adeb_c8bf5558",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 10
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5216012
+      },
+      "writtenOn": "2026-10-28T16:02:30Z",
+      "side": 1,
+      "message": "Looks like the build was failed because of some infractructire broblems. The code itself is fine.",
+      "revId": "cef18b7e3b9e726bc07d2265ca2b07baa478a573",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
