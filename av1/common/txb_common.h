@@ -52,18 +52,24 @@ static const TX_CLASS tx_type_to_class[TX_TYPES] = {
 };
 
 static inline int get_txb_bhl(TX_SIZE tx_size) {
-  tx_size = av1_get_adjusted_tx_size(tx_size);
-  return tx_size_high_log2[tx_size];
+  static const uint8_t txb_bhl_tab[TX_SIZES_ALL] = { 2, 3, 4, 5, 5, 3, 2,
+                                                     4, 3, 5, 4, 5, 5, 4,
+                                                     2, 5, 3, 5, 4 };
+  return txb_bhl_tab[tx_size];
 }
 
 static inline int get_txb_wide(TX_SIZE tx_size) {
-  tx_size = av1_get_adjusted_tx_size(tx_size);
-  return tx_size_wide[tx_size];
+  static const uint8_t txb_wide_tab[TX_SIZES_ALL] = { 4,  8,  16, 32, 32, 4,  8,
+                                                      8,  16, 16, 32, 32, 32, 4,
+                                                      16, 8,  32, 16, 32 };
+  return txb_wide_tab[tx_size];
 }
 
 static inline int get_txb_high(TX_SIZE tx_size) {
-  tx_size = av1_get_adjusted_tx_size(tx_size);
-  return tx_size_high[tx_size];
+  static const uint8_t txb_high_tab[TX_SIZES_ALL] = {
+    4, 8, 16, 32, 32, 8, 4, 16, 8, 32, 16, 32, 32, 16, 4, 32, 8, 32, 16
+  };
+  return txb_high_tab[tx_size];
 }
 
 static inline uint8_t *set_levels(uint8_t *const levels_buf, const int height) {
