@@ -1,0 +1,89 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "48544968_783b8e73",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 8
+      },
+      "lineNbr": 16,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-28T00:40:59Z",
+      "side": 1,
+      "message": "Just curious: intuitively, when there are four tiles, I would expect about three fourths of the entries in a bucket point into another tile. Do you know why you observed a much lower ratio (half to two thirds)?",
+      "revId": "067cbba72755dd69b0b4f3d75d8c68c8b3234d3f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "643b6235_c20a46af",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 8
+      },
+      "lineNbr": 25,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-28T00:40:59Z",
+      "side": 1,
+      "message": "It is unfortunate that once a frame has more than 16 tiles, the number of hash tables abrubtly goes back to 1 rather than saturates at 16.\n\nIs it easy to let, for example, 32 tiles share 16 hash tables?\n\nNote: If you figure out how to do that, do NOT do that in this CL. Just add a TODO comment and do it later.",
+      "revId": "067cbba72755dd69b0b4f3d75d8c68c8b3234d3f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "870a3092_069827d7",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 8
+      },
+      "lineNbr": 32,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-28T00:40:59Z",
+      "side": 1,
+      "message": "Just curious: what does \"one is 2559 wide\" mean? Did you mean one of the five recordings has a width of 2559 rather than 2560?",
+      "revId": "067cbba72755dd69b0b4f3d75d8c68c8b3234d3f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "c608cbdd_f17aef35",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 8
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-28T00:40:59Z",
+      "side": 1,
+      "message": "Ihor: I haven\u0027t reviewed the code yet. I only read your description of the problem and your solution in the commit message. Your solution looks good to me.\n\nHere are the questions I have so far.",
+      "revId": "067cbba72755dd69b0b4f3d75d8c68c8b3234d3f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "94d390cc_c0327588",
+        "filename": "av1/encoder/hash_motion.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 51,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-28T00:40:59Z",
+      "side": 1,
+      "message": "IMPORTANT: Do we need to update this comment?\n\nThe commit message says:\n\n```\nGive each tile its own table with only the blocks that lie inside it.\nThe encoder threads build the tables before the tiles are encoded, one\ntile per job, ...\n```\n\nSo at least \"The encoder threads read shallow copies of the table in their own MACROBLOCK\" is no longer true, right?",
+      "revId": "067cbba72755dd69b0b4f3d75d8c68c8b3234d3f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
