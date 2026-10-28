@@ -165,6 +165,22 @@ void av1_quantize_fp_facade(const tran_low_t *coeff_ptr, intptr_t n_coeffs,
                             tran_low_t *dqcoeff_ptr, uint16_t *eob_ptr,
                             const SCAN_ORDER *sc, const QUANT_PARAM *qparam);
 
+#if HAVE_AVX2
+void av1_quantize_fp_qm_avx2(const tran_low_t *coeff_ptr, intptr_t n_coeffs,
+                             const int16_t *round_ptr, const int16_t *quant_ptr,
+                             tran_low_t *qcoeff_ptr, tran_low_t *dqcoeff_ptr,
+                             const int16_t *dequant_ptr, uint16_t *eob_ptr,
+                             const int16_t *iscan, const qm_val_t *qm_ptr,
+                             const qm_val_t *iqm_ptr, int log_scale);
+#if CONFIG_AV1_HIGHBITDEPTH
+void av1_highbd_quantize_fp_qm_avx2(
+    const tran_low_t *coeff_ptr, intptr_t n_coeffs, const int16_t *round_ptr,
+    const int16_t *quant_ptr, tran_low_t *qcoeff_ptr, tran_low_t *dqcoeff_ptr,
+    const int16_t *dequant_ptr, uint16_t *eob_ptr, const int16_t *iscan,
+    const qm_val_t *qm_ptr, const qm_val_t *iqm_ptr, int log_scale);
+#endif
+#endif
+
 void av1_quantize_b_facade(const tran_low_t *coeff_ptr, intptr_t n_coeffs,
                            const MACROBLOCK_PLANE *p, tran_low_t *qcoeff_ptr,
                            tran_low_t *dqcoeff_ptr, uint16_t *eob_ptr,
