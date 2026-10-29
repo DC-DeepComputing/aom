@@ -843,6 +843,11 @@ void av1_cdef_search(AV1_COMP *cpi) {
       (cpi->oxcf.rc_cfg.mode == AOM_Q || cpi->oxcf.rc_cfg.mode == AOM_CQ);
 
   assert(cdef_control != CDEF_NONE);
+  int cdef_opt = 0;
+  if (cpi->oxcf.tune_cfg.tuning == AOM_TUNE_SSIMULACRA2) {
+    const int cdef_px = cm->width * cm->height;
+    cdef_opt = (cdef_px >= 15000 && cdef_px < 1000000) ? 7 : 1;
+  }
   // For CDEF_ADAPTIVE, turning off CDEF around qindex 32 was best for still
   // pictures
   if ((cdef_control == CDEF_REFERENCE &&
@@ -920,7 +925,7 @@ void av1_cdef_search(AV1_COMP *cpi) {
       num_planes > 1 ? total_strengths * total_strengths : total_strengths;
   const int max_signaling_bits =
       joint_strengths == 1 ? 0 : get_msb(joint_strengths - 1) + 1;
-  int rdmult = cpi->td.mb.rdmult;
+  const int rdmult = cpi->td.mb.rdmult;
 
   // For adaptive CDEF, reduce primary and secondary CDEF strengths for
   // qindexes up to 220.
@@ -938,6 +943,43 @@ void av1_cdef_search(AV1_COMP *cpi) {
   // overall decode time.
   const int min_signaling_bits =
       (should_zero_cdef_strengths && max_signaling_bits > 0) ? 1 : 0;
+
+  if (0 && should_reduce_cdef_strengths) {
+    int seen_reduced[TOTAL_STRENGTHS] = { 0 };
+    seen_reduced[0] = 1;
+    // Scan in preferred order (odd pri first) so the preferred representative
+    // is kept per reduced strength.
+    for (int pass = 0; pass < 2; pass++) {
+      for (int s = 1; s < total_strengths; s++) {
+        int pri_s, sec_s;
+        if (fast) {
+          get_cdef_filter_strengths(pick_method, &pri_s, &sec_s, s);
+        } else {
+          pri_s = s / CDEF_SEC_STRENGTHS;
+          sec_s = s % CDEF_SEC_STRENGTHS;
+        }
+        const int is_odd_pri = (pri_s & 1);
+        if (pass == 0 && !is_odd_pri) continue;
+        if (pass == 1 && is_odd_pri) continue;
+
+        int new_pri = pri_s >> 1;
+        int new_sec = sec_s >> 1;
+        if (should_zero_cdef_strengths && new_pri <= 4 && new_sec <= 1) {
+          new_pri = 0;
+          new_sec = 0;
+        }
+        const int reduced_idx = new_pri * CDEF_SEC_STRENGTHS + new_sec;
+        if (seen_reduced[reduced_idx]) {
+          for (int sb = 0; sb < sb_count; sb++) {
+            mse[0][sb][s] = mse[0][sb][0];
+            if (num_planes > 1) mse[1][sb][s] = mse[1][sb][0];
+          }
+        } else {
+          seen_reduced[reduced_idx] = 1;
+        }
+      }
+    }
+  }
 
   for (int i = min_signaling_bits; i <= 3; i++) {
     if (i > max_signaling_bits) break;
@@ -1091,6 +1133,79 @@ void av1_cdef_search(AV1_COMP *cpi) {
           }
         }
       }
+    }
+  }
+
+  if (0 && cdef_info->nb_cdef_strengths > 1) {
+    int unique_y[CDEF_MAX_STRENGTHS];
+    int unique_uv[CDEF_MAX_STRENGTHS];
+    int remap[CDEF_MAX_STRENGTHS];
+    int used[CDEF_MAX_STRENGTHS] = { 0 };
+    for (int i = 0; i < sb_count; i++) {
+      int gi =
+          mi_params->mi_grid_base[cdef_search_ctx->sb_index[i]]->cdef_strength;
+      if (gi >= 0 && gi < cdef_info->nb_cdef_strengths) used[gi] = 1;
+    }
+    int num_unique = 0;
+    for (int j = 0; j < cdef_info->nb_cdef_strengths; j++) {
+      if (!used[j]) {
+        remap[j] = 0;
+        continue;
+      }
+      int y_val = cdef_info->cdef_strengths[j];
+      int uv_val = (num_planes > 1) ? cdef_info->cdef_uv_strengths[j] : 0;
+      int found = -1;
+      for (int k = 0; k < num_unique; k++) {
+        if (unique_y[k] == y_val && unique_uv[k] == uv_val) {
+          found = k;
+          break;
+        }
+      }
+      if (found >= 0) {
+        remap[j] = found;
+      } else {
+        unique_y[num_unique] = y_val;
+        unique_uv[num_unique] = uv_val;
+        remap[j] = num_unique;
+        num_unique++;
+      }
+    }
+    if (num_unique == 0) {
+      unique_y[0] = cdef_info->cdef_strengths[0];
+      unique_uv[0] = (num_planes > 1) ? cdef_info->cdef_uv_strengths[0] : 0;
+      num_unique = 1;
+    }
+    int new_bits = 0;
+    if (num_unique > 4)
+      new_bits = 3;
+    else if (num_unique > 2)
+      new_bits = 2;
+    else if (num_unique > 1)
+      new_bits = 1;
+    else
+      new_bits = 0;
+    if (new_bits < cdef_info->cdef_bits) {
+      int new_nb = 1 << new_bits;
+      for (int k = 0; k < new_nb; k++) {
+        int src_k = (k < num_unique) ? k : 0;
+        cdef_info->cdef_strengths[k] = unique_y[src_k];
+        if (num_planes > 1) {
+          cdef_info->cdef_uv_strengths[k] = unique_uv[src_k];
+        }
+      }
+      for (int i = 0; i < sb_count; i++) {
+        int old_gi =
+            mi_params->mi_grid_base[cdef_search_ctx->sb_index[i]]->cdef_strength;
+        if (old_gi >= 0 && old_gi < cdef_info->nb_cdef_strengths) {
+          mi_params->mi_grid_base[cdef_search_ctx->sb_index[i]]->cdef_strength =
+              remap[old_gi];
+        } else {
+          mi_params->mi_grid_base[cdef_search_ctx->sb_index[i]]->cdef_strength =
+              0;
+        }
+      }
+      cdef_info->cdef_bits = new_bits;
+      cdef_info->nb_cdef_strengths = new_nb;
     }
   }
 
