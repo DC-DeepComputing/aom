@@ -110,57 +110,6 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
 void av1_write_intra_coeffs_mb(const AV1_COMMON *const cm, MACROBLOCK *x,
                                aom_writer *w, BLOCK_SIZE bsize);
 
-/*!\brief Pack the context info of the current transform block into an uint8_t.
- * \ingroup coefficient_coding
- *
- * This context info will be collected and consolidated by its neighbor
- * transform blocks for coding transform block skip flag (tx_skip) and
- * the sign of DC coefficient (dc_sign).
- *
- * \param[in]    qcoeff         Buffer of quantized coefficients
- * \param[in]    scan_order     Coding order of coefficients in the transform
- * block
- * \param[in]    eob            The scan index of last non-zero coefficient plus
- * one
- */
-static inline uint8_t av1_get_txb_entropy_context(const tran_low_t *qcoeff,
-                                                  const SCAN_ORDER *scan_order,
-                                                  int eob) {
-  if (eob == 0) return 0;
-  if (eob == 1) {
-    int cul_level = AOMMIN(COEFF_CONTEXT_MASK, abs(qcoeff[0]));
-    set_dc_sign(&cul_level, qcoeff[0]);
-    return (uint8_t)cul_level;
-  }
-  const int16_t *const scan = scan_order->scan;
-  int cul_level = 0;
-  for (int c = 0; c < eob; ++c) {
-    cul_level += abs(qcoeff[scan[c]]);
-    if (cul_level > COEFF_CONTEXT_MASK) break;
-  }
-
-  cul_level = AOMMIN(COEFF_CONTEXT_MASK, cul_level);
-  set_dc_sign(&cul_level, qcoeff[0]);
-
-  return (uint8_t)cul_level;
-}
-
-/*!\brief Update the probability model (cdf) and the entropy context related to
- * coefficient coding for all transform blocks in the intra macroblock.
- *
- * \ingroup coefficient_coding
- *
- * This function will go through each transform block in the intra macorblock
- * and call \ref av1_update_and_record_txb_context to update the probability
- * model and entropy context properly.
- *
- * \param[in]    cpi               Top-level encoder structure
- * \param[in]    td                Top-level multithreading structure
- * \param[in]    dry_run           Whether this is a dry run.
- * \param[in]    bsize             Block size of the current macroblock
- * \param[in]    allow_update_cdf  Allowed to update probability model (cdf) or
- * not.
- */
 void av1_update_intra_mb_txb_context(const AV1_COMP *cpi, ThreadData *td,
                                      RUN_TYPE dry_run, BLOCK_SIZE bsize,
                                      uint8_t allow_update_cdf);
