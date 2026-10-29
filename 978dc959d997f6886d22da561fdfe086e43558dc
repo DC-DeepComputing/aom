@@ -20,6 +20,24 @@
     {
       "unresolved": false,
       "key": {
+        "uuid": "e8ba4b71_0bcf0b17",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 7
+      },
+      "lineNbr": 13,
+      "author": {
+        "id": 5220824
+      },
+      "writtenOn": "2026-10-29T22:52:28Z",
+      "side": 1,
+      "message": "It assumes 64 byte cache lines. When the width is a multiple of 128 values, a 2 row step is a multiple of 2 * 128 * 4 \u003d 1024 bytes. Each read of a column then lands 16 lines after the previous one, so only every 16th set gets used. A bigger power of 2 in the width makes it worse. At 2560 the step is 5 x 4 KB, and a column uses 1 of every 64 sets.",
+      "parentUuid": "a215f2ce_ad381078",
+      "revId": "978dc959d997f6886d22da561fdfe086e43558dc",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
         "uuid": "7585d116_b37cd348",
         "filename": "/PATCHSET_LEVEL",
         "patchSetId": 7
@@ -52,6 +70,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "66f15ad6_7eedbafd",
+        "filename": "av1/encoder/encodeframe.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 2061,
+      "author": {
+        "id": 5220824
+      },
+      "writtenOn": "2026-10-29T22:52:28Z",
+      "side": 1,
+      "message": "128 counts hash values, not bytes. The buffers hold uint32_t, so 128 values are 512 bytes, and the smallest step of the walk (2 rows) is 1 KB.\n\nA width that\u0027s an odd multiple of 64 gives a 512 byte step, so a column uses 1/8 of the sets. Whether that hurts depends on the column length and the L2. On Zen 3 (my cpu) it is 512 KB, 8 way, 1024 sets, 1/8 of the sets hold 1024 lines. A 1440 row frame (720 reads per column) still fits, but a 2160 row frame (1080 reads) doesn\u0027t. So 128 isn\u0027t a hard limit. It\u0027s just where common sizes start to hurt. The padding fixes every width.",
+      "parentUuid": "69bdd5d0_be603714",
+      "revId": "978dc959d997f6886d22da561fdfe086e43558dc",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "4880013a_cb063bf6",
@@ -65,6 +101,24 @@
       "writtenOn": "2026-10-29T21:16:45Z",
       "side": 1,
       "message": "Nit: in \"a column doesn\u0027t stay in the cache until the next column reads it\", what does \"it\" refer to?",
+      "revId": "978dc959d997f6886d22da561fdfe086e43558dc",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "92a1c1de_3c34fc62",
+        "filename": "av1/encoder/encodeframe.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 2062,
+      "author": {
+        "id": 5220824
+      },
+      "writtenOn": "2026-10-29T22:52:28Z",
+      "side": 1,
+      "message": "The column. I meant that the lines a column loads get evicted before the next column reads them again. At step 2, 8 columns share each 64 byte line.",
+      "parentUuid": "4880013a_cb063bf6",
       "revId": "978dc959d997f6886d22da561fdfe086e43558dc",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
@@ -99,6 +153,42 @@
       "writtenOn": "2026-10-29T21:16:45Z",
       "side": 1,
       "message": "Nit: add \"cache\" before \"sets\"?",
+      "revId": "978dc959d997f6886d22da561fdfe086e43558dc",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "d2b28050_901255d8",
+        "filename": "av1/encoder/encodeframe.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 2063,
+      "author": {
+        "id": 5220824
+      },
+      "writtenOn": "2026-10-29T22:52:28Z",
+      "side": 1,
+      "message": "Marked as resolved.",
+      "parentUuid": "3ba06066_83999eb6",
+      "revId": "978dc959d997f6886d22da561fdfe086e43558dc",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "52987722_a5752a39",
+        "filename": "av1/encoder/encodeframe.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 2063,
+      "author": {
+        "id": 5220824
+      },
+      "writtenOn": "2026-10-29T22:52:28Z",
+      "side": 1,
+      "message": "2 rows of 8 values are exactly one 64 byte line. With an odd multiple of 8, a 2 row step is an odd number of whole lines, so a column goes through every set before it reuses one. An odd multiple of 4 also spreads the column. Just making the width odd isn\u0027t always enough, though. At 2559 wide, a 2 row step is 8 bytes short of 5 x 4 KB, so the column only moves to a new set every 8 reads.\n\nI timed the fill alone at 2560x1440 with different pads and 8 was the fastest on both machines, so I picked it. I don\u0027t have counter data that explains why 4 is a bit slower.\n\nAnother option is to switch the walk to row-major order, so we would access memory sequentially and wouldn\u0027t need any padding. But, this would slightly change the output.",
+      "parentUuid": "60024914_8d07983e",
       "revId": "978dc959d997f6886d22da561fdfe086e43558dc",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
@@ -151,6 +241,24 @@
       "writtenOn": "2026-10-29T21:16:45Z",
       "side": 1,
       "message": "Nit: I suggest renaming the `stride` parameters `pic_block_hash_stride` and `pic_hash_stride` to indicate their relation to the corresponding hash buffer.",
+      "revId": "978dc959d997f6886d22da561fdfe086e43558dc",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "d3d6cc9c_17b13ed1",
+        "filename": "av1/encoder/hash_motion.h",
+        "patchSetId": 7
+      },
+      "lineNbr": 107,
+      "author": {
+        "id": 5220824
+      },
+      "writtenOn": "2026-10-29T22:52:28Z",
+      "side": 1,
+      "message": "Marked as resolved.",
+      "parentUuid": "c30792cd_9c90117f",
       "revId": "978dc959d997f6886d22da561fdfe086e43558dc",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
