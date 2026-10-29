@@ -26,6 +26,8 @@ print <<EOF
 #include "av1/common/restoration.h"
 
 struct macroblockd;
+struct MV_REF;
+struct TPL_MV_REF;
 
 /* Encoder forward decls */
 struct macroblock;
@@ -109,6 +111,10 @@ if (aom_config("HAVE_X86_ASM") eq "yes") {
 
 add_proto qw/void av1_convolve_horiz_rs/, "const uint8_t *src, int src_stride, uint8_t *dst, int dst_stride, int w, int h, const int16_t *x_filters, int x0_qn, int x_step_qn";
 specialize qw/av1_convolve_horiz_rs sse4_1 neon/;
+
+# One row of motion-field projection.
+add_proto qw/void av1_mfp_project_row/, "const struct MV_REF *src_row, struct TPL_MV_REF *tpl_mvs, int tpl_stride, int blk_row, int mvs_cols, int mi_rows_half, int mi_cols_half, const int *ref_offset, int cur_offset, int dir";
+specialize qw/av1_mfp_project_row sse4_1 avx2/;
 
 if(aom_config("CONFIG_AV1_HIGHBITDEPTH") eq "yes") {
   add_proto qw/void av1_highbd_convolve_horiz_rs/, "const uint16_t *src, int src_stride, uint16_t *dst, int dst_stride, int w, int h, const int16_t *x_filters, int x0_qn, int x_step_qn, int bd";
