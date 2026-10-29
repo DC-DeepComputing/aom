@@ -3909,7 +3909,8 @@ static int encode_with_and_without_superres(AV1_COMP *cpi, size_t *size,
     // Note: Both use common rdmult based on base qindex of fullres.
     const int64_t rdmult = av1_compute_rd_mult_based_on_qindex(
         bit_depth, update_type, cm->quant_params.base_qindex,
-        cpi->oxcf.tune_cfg.tuning, cpi->oxcf.mode);
+        cpi->oxcf.tune_cfg.tuning, cpi->oxcf.mode, cm->width * cm->height,
+        cm->height > cm->width);
 
     // Find the best rdcost among all superres denoms.
     int best_denom = -1;
@@ -3974,7 +3975,8 @@ static int encode_with_and_without_superres(AV1_COMP *cpi, size_t *size,
     // Note: Both use common rdmult based on base qindex of fullres.
     const int64_t rdmult = av1_compute_rd_mult_based_on_qindex(
         bit_depth, update_type, cm->quant_params.base_qindex,
-        cpi->oxcf.tune_cfg.tuning, cpi->oxcf.mode);
+        cpi->oxcf.tune_cfg.tuning, cpi->oxcf.mode, cm->width * cm->height,
+        cm->height > cm->width);
     proj_rdcost1 =
         RDCOST_DBL_WITH_NATIVE_BD_DIST(rdmult, rate1, sse1, bit_depth);
     const double proj_rdcost2 =
