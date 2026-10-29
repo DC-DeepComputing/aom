@@ -75,10 +75,18 @@ static void quantize_fp_helper_c(
     const int16_t *quant_shift_ptr, tran_low_t *qcoeff_ptr,
     tran_low_t *dqcoeff_ptr, const int16_t *dequant_ptr, uint16_t *eob_ptr,
     const int16_t *scan, const int16_t *iscan, const qm_val_t *qm_ptr,
-    const qm_val_t *iqm_ptr, int log_scale) {
+    const qm_val_t *iqm_ptr, int log_scale, int ssim2_scale_thresh) {
   int i, eob = -1;
   const int rounding[2] = { ROUND_POWER_OF_TWO(round_ptr[0], log_scale),
                             ROUND_POWER_OF_TWO(round_ptr[1], log_scale) };
+  const int64_t qm_thresh[2] = {
+    (int64_t)dequant_ptr[0] << (AOM_QM_BITS - (1 + log_scale)),
+    ssim2_scale_thresh
+        ? (((int64_t)dequant_ptr[1] << (AOM_QM_BITS - (1 + log_scale))) * 31 +
+           16) >>
+              5
+        : (int64_t)dequant_ptr[1] << (AOM_QM_BITS - (1 + log_scale))
+  };
   // TODO(jingning) Decide the need of these arguments after the
   // quantization process is completed.
   (void)zbin_ptr;
@@ -106,8 +114,7 @@ static void quantize_fp_helper_c(
       const int coeff_sign = AOMSIGN(coeff);
       int64_t abs_coeff = (coeff ^ coeff_sign) - coeff_sign;
       int tmp32 = 0;
-      if (abs_coeff * wt >=
-          (dequant_ptr[rc != 0] << (AOM_QM_BITS - (1 + log_scale)))) {
+      if (abs_coeff * wt >= qm_thresh[rc != 0]) {
         abs_coeff += rounding[rc != 0];
         abs_coeff = clamp64(abs_coeff, INT16_MIN, INT16_MAX);
         tmp32 = (int)((abs_coeff * wt * quant_ptr[rc != 0]) >>
@@ -116,7 +123,6 @@ static void quantize_fp_helper_c(
         const tran_low_t abs_dqcoeff = (tmp32 * dequant) >> log_scale;
         dqcoeff_ptr[rc] = (abs_dqcoeff ^ coeff_sign) - coeff_sign;
       }
-
       if (tmp32) eob = i;
     }
     *eob_ptr = eob + 1;
