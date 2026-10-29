@@ -944,7 +944,7 @@ void av1_cdef_search(AV1_COMP *cpi) {
   const int min_signaling_bits =
       (should_zero_cdef_strengths && max_signaling_bits > 0) ? 1 : 0;
 
-  if (0 && should_reduce_cdef_strengths) {
+  if (cdef_opt == 7 && should_reduce_cdef_strengths) {
     int seen_reduced[TOTAL_STRENGTHS] = { 0 };
     seen_reduced[0] = 1;
     // Scan in preferred order (odd pri first) so the preferred representative
@@ -1136,7 +1136,7 @@ void av1_cdef_search(AV1_COMP *cpi) {
     }
   }
 
-  if (0 && cdef_info->nb_cdef_strengths > 1) {
+  if (cdef_opt >= 1 && cdef_info->nb_cdef_strengths > 1) {
     int unique_y[CDEF_MAX_STRENGTHS];
     int unique_uv[CDEF_MAX_STRENGTHS];
     int remap[CDEF_MAX_STRENGTHS];
