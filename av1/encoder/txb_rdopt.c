@@ -101,7 +101,7 @@ static AOM_FORCE_INLINE void update_coeff_simple(
   const int ci = scan[si];
   const tran_low_t qc = qcoeff[ci];
   const int coeff_ctx =
-      get_lower_levels_ctx(levels, ci, bhl, tx_size, tx_class);
+      get_lower_levels_ctx_simple(levels, ci, bhl, tx_size, tx_class);
   if (qc == 0) {
     *accu_rate += txb_costs->base_cost[coeff_ctx][0];
   } else {
