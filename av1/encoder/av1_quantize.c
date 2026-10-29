@@ -964,11 +964,14 @@ void av1_set_quantizer(AV1_COMMON *const cm, int min_qmlevel, int max_qmlevel,
         const int v_ac_max = is_xyb ? 28 : 30;
         const int u_div = is_xyb ? 3 : 2;
         const int v_div = 2;
+        quant_params->u_dc_delta_q = 0;
+        quant_params->v_dc_delta_q = 0;
         quant_params->u_ac_delta_q =
             clamp((quant_params->base_qindex / u_div), 0, u_ac_max);
         quant_params->v_ac_delta_q =
             clamp((quant_params->base_qindex / v_div), 0, v_ac_max);
-        if (quant_params->u_ac_delta_q != quant_params->v_ac_delta_q) {
+        if (quant_params->u_dc_delta_q != quant_params->v_dc_delta_q ||
+            quant_params->u_ac_delta_q != quant_params->v_ac_delta_q) {
           cm->seq_params->separate_uv_delta_q = 1;
         }
       }
