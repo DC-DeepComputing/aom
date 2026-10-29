@@ -20,6 +20,24 @@
     {
       "unresolved": false,
       "key": {
+        "uuid": "6575538e_8f2a57fe",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 11
+      },
+      "lineNbr": 29,
+      "author": {
+        "id": 5220824
+      },
+      "writtenOn": "2026-10-29T20:58:53Z",
+      "side": 1,
+      "message": "Done, thanks a lot for looking into it",
+      "parentUuid": "fa56b1ef_2f44aeb3",
+      "revId": "28400443440ae9fdc578323a93bd951f629fa5de",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
         "uuid": "f6a8d052_79993f61",
         "filename": "/PATCHSET_LEVEL",
         "patchSetId": 11
@@ -52,6 +70,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "c06db566_bcf260cb",
+        "filename": "av1/encoder/encodeframe.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 2071,
+      "author": {
+        "id": 5220824
+      },
+      "writtenOn": "2026-10-29T20:58:53Z",
+      "side": 1,
+      "message": "Marked as resolved.",
+      "parentUuid": "07b77f35_a5e2ccb3",
+      "revId": "28400443440ae9fdc578323a93bd951f629fa5de",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "241d60e6_c276b5a8",
@@ -65,6 +101,24 @@
       "writtenOn": "2026-10-29T20:29:25Z",
       "side": 1,
       "message": "Nit: I suggest changing the first parameter `cpi` to two parameters `cpi-\u003esource` and `cpi-\u003ecommon`. This makes it clear that the caller passes `cpi-\u003esource` to this function. It is helpful to the analysis of the code.",
+      "revId": "28400443440ae9fdc578323a93bd951f629fa5de",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "f6030c71_a9d1306c",
+        "filename": "av1/encoder/encodeframe.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 2076,
+      "author": {
+        "id": 5220824
+      },
+      "writtenOn": "2026-10-29T20:58:53Z",
+      "side": 1,
+      "message": "Done, thanks",
+      "parentUuid": "241d60e6_c276b5a8",
       "revId": "28400443440ae9fdc578323a93bd951f629fa5de",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
@@ -86,6 +140,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "e5a174b0_0d3a864a",
+        "filename": "av1/encoder/encodeframe.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 2097,
+      "author": {
+        "id": 5220824
+      },
+      "writtenOn": "2026-10-29T20:58:53Z",
+      "side": 1,
+      "message": "Marked as resolved.",
+      "parentUuid": "38318398_65b87129",
+      "revId": "28400443440ae9fdc578323a93bd951f629fa5de",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "b88b523b_5a2bf5d9",
@@ -99,6 +171,24 @@
       "writtenOn": "2026-10-29T20:29:25Z",
       "side": 1,
       "message": "Nit: Omit the outer parentheses:\n\n```\n  int max_sb_size \u003d 1 \u003c\u003c (cm-\u003eseq_params-\u003emib_size_log2 + MI_SIZE_LOG2);\n```",
+      "revId": "28400443440ae9fdc578323a93bd951f629fa5de",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "4ad12e1f_526f1d39",
+        "filename": "av1/encoder/encodeframe.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 2105,
+      "author": {
+        "id": 5220824
+      },
+      "writtenOn": "2026-10-29T20:58:53Z",
+      "side": 1,
+      "message": "Marked as resolved.",
+      "parentUuid": "b88b523b_5a2bf5d9",
       "revId": "28400443440ae9fdc578323a93bd951f629fa5de",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
