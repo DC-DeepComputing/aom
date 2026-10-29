@@ -917,6 +917,34 @@ static void pick_sb_modes(AV1_COMP *const cpi, TileDataEnc *tile_data,
   // Initialize default mode evaluation params
   set_mode_eval_params(cpi, x, DEFAULT_EVAL);
 
+  if (cpi->oxcf.mode == ALLINTRA) {
+    if (bsize == cm->seq_params->sb_size) {
+      double var_min, var_max;
+      log_sub_block_var(cpi, x, bsize, &var_min, &var_max);
+      x->intra_sb_rdmult_modifier = 128;
+      int max_ded = 48;
+      int slope = 6;
+      if (cpi->oxcf.tune_cfg.tuning == AOM_TUNE_SSIMULACRA2) {
+        const int sb_px = cm->width * cm->height;
+        const int sb_bq = cm->quant_params.base_qindex;
+        const bool boost_sb_mod =
+            ((sb_px >= 5000 && sb_px < 15000 && sb_bq >= 140) ||
+             (sb_px >= 30000 && sb_px < 50000 && sb_bq < 140));
+        const bool gentle_sb_mod =
+            ((sb_px >= 500000 && sb_px < 1000000 && sb_bq < 140) ||
+             (sb_px >= 100000 && sb_px < 200000 && sb_bq >= 140 && sb_bq < 165));
+        max_ded = gentle_sb_mod ? 32 : (boost_sb_mod ? 60 : 48);
+        slope = gentle_sb_mod ? 4 : (boost_sb_mod ? 7 : 6);
+      }
+      if ((var_min < 2.0) && (var_max > 4.0)) {
+        int ded = ((var_max - var_min) > 8.0)
+                      ? max_ded
+                      : (int)((var_max - var_min) * slope);
+        x->intra_sb_rdmult_modifier -= ded;
+      }
+    }
+  }
+
   // Save rdmult before it might be changed, so it can be restored later.
   const int orig_rdmult = x->rdmult;
   setup_block_rdmult(cpi, x, mi_row, mi_col, bsize, aq_mode, mbmi);
@@ -1819,6 +1847,34 @@ void av1_rd_use_partition(AV1_COMP *cpi, ThreadData *td, TileDataEnc *tile_data,
     x->mb_energy = av1_log_block_var(cpi, x, bsize);
   }
 
+  if (cpi->oxcf.mode == ALLINTRA) {
+    if (bsize == cm->seq_params->sb_size) {
+      double var_min, var_max;
+      log_sub_block_var(cpi, x, bsize, &var_min, &var_max);
+      x->intra_sb_rdmult_modifier = 128;
+      int max_ded = 48;
+      int slope = 6;
+      if (cpi->oxcf.tune_cfg.tuning == AOM_TUNE_SSIMULACRA2) {
+        const int sb_px = cm->width * cm->height;
+        const int sb_bq = cm->quant_params.base_qindex;
+        const bool boost_sb_mod =
+            ((sb_px >= 5000 && sb_px < 15000 && sb_bq >= 140) ||
+             (sb_px >= 30000 && sb_px < 50000 && sb_bq < 140));
+        const bool gentle_sb_mod =
+            ((sb_px >= 500000 && sb_px < 1000000 && sb_bq < 140) ||
+             (sb_px >= 100000 && sb_px < 200000 && sb_bq >= 140 && sb_bq < 165));
+        max_ded = gentle_sb_mod ? 32 : (boost_sb_mod ? 60 : 48);
+        slope = gentle_sb_mod ? 4 : (boost_sb_mod ? 7 : 6);
+      }
+      if ((var_min < 2.0) && (var_max > 4.0)) {
+        int ded = ((var_max - var_min) > 8.0)
+                      ? max_ded
+                      : (int)((var_max - var_min) * slope);
+        x->intra_sb_rdmult_modifier -= ded;
+      }
+    }
+  }
+
   // Save rdmult before it might be changed, so it can be restored later.
   const int orig_rdmult = x->rdmult;
   setup_block_rdmult(cpi, x, mi_row, mi_col, bsize, NO_AQ, NULL);
@@ -2307,6 +2363,34 @@ static void pick_sb_modes_nonrd(AV1_COMP *const cpi, TileDataEnc *tile_data,
         (x->source_variance == UINT_MAX || bsize < cm->seq_params->sb_size))
       x->source_variance = av1_get_perpixel_variance_facade(
           cpi, xd, &x->plane[0].src, bsize, AOM_PLANE_Y);
+  }
+
+  if (cpi->oxcf.mode == ALLINTRA) {
+    if (bsize == cm->seq_params->sb_size) {
+      double var_min, var_max;
+      log_sub_block_var(cpi, x, bsize, &var_min, &var_max);
+      x->intra_sb_rdmult_modifier = 128;
+      int max_ded = 48;
+      int slope = 6;
+      if (cpi->oxcf.tune_cfg.tuning == AOM_TUNE_SSIMULACRA2) {
+        const int sb_px = cm->width * cm->height;
+        const int sb_bq = cm->quant_params.base_qindex;
+        const bool boost_sb_mod =
+            ((sb_px >= 5000 && sb_px < 15000 && sb_bq >= 140) ||
+             (sb_px >= 30000 && sb_px < 50000 && sb_bq < 140));
+        const bool gentle_sb_mod =
+            ((sb_px >= 500000 && sb_px < 1000000 && sb_bq < 140) ||
+             (sb_px >= 100000 && sb_px < 200000 && sb_bq >= 140 && sb_bq < 165));
+        max_ded = gentle_sb_mod ? 32 : (boost_sb_mod ? 60 : 48);
+        slope = gentle_sb_mod ? 4 : (boost_sb_mod ? 7 : 6);
+      }
+      if ((var_min < 2.0) && (var_max > 4.0)) {
+        int ded = ((var_max - var_min) > 8.0)
+                      ? max_ded
+                      : (int)((var_max - var_min) * slope);
+        x->intra_sb_rdmult_modifier -= ded;
+      }
+    }
   }
 
   // Save rdmult before it might be changed, so it can be restored later.
@@ -4859,6 +4943,34 @@ static RD_STATS rd_search_for_fixed_partition(
 
   av1_set_offsets(cpi, tile_info, x, mi_row, mi_col, bsize);
 
+  if (cpi->oxcf.mode == ALLINTRA) {
+    if (bsize == cm->seq_params->sb_size) {
+      double var_min, var_max;
+      log_sub_block_var(cpi, x, bsize, &var_min, &var_max);
+      x->intra_sb_rdmult_modifier = 128;
+      int max_ded = 48;
+      int slope = 6;
+      if (cpi->oxcf.tune_cfg.tuning == AOM_TUNE_SSIMULACRA2) {
+        const int sb_px = cm->width * cm->height;
+        const int sb_bq = cm->quant_params.base_qindex;
+        const bool boost_sb_mod =
+            ((sb_px >= 5000 && sb_px < 15000 && sb_bq >= 140) ||
+             (sb_px >= 30000 && sb_px < 50000 && sb_bq < 140));
+        const bool gentle_sb_mod =
+            ((sb_px >= 500000 && sb_px < 1000000 && sb_bq < 140) ||
+             (sb_px >= 100000 && sb_px < 200000 && sb_bq >= 140 && sb_bq < 165));
+        max_ded = gentle_sb_mod ? 32 : (boost_sb_mod ? 60 : 48);
+        slope = gentle_sb_mod ? 4 : (boost_sb_mod ? 7 : 6);
+      }
+      if ((var_min < 2.0) && (var_max > 4.0)) {
+        int ded = ((var_max - var_min) > 8.0)
+                      ? max_ded
+                      : (int)((var_max - var_min) * slope);
+        x->intra_sb_rdmult_modifier -= ded;
+      }
+    }
+  }
+
   // Save rdmult before it might be changed, so it can be restored later.
   const int orig_rdmult = x->rdmult;
   setup_block_rdmult(cpi, x, mi_row, mi_col, bsize, NO_AQ, NULL);
@@ -5719,6 +5831,34 @@ bool av1_rd_pick_partition(AV1_COMP *const cpi, ThreadData *td,
         } else {
           x->intra_sb_rdmult_modifier -= (int)((var_max - var_min) * 6);
         }
+      }
+    }
+  }
+
+  if (cpi->oxcf.mode == ALLINTRA) {
+    if (bsize == cm->seq_params->sb_size) {
+      double var_min, var_max;
+      log_sub_block_var(cpi, x, bsize, &var_min, &var_max);
+      x->intra_sb_rdmult_modifier = 128;
+      int max_ded = 48;
+      int slope = 6;
+      if (cpi->oxcf.tune_cfg.tuning == AOM_TUNE_SSIMULACRA2) {
+        const int sb_px = cm->width * cm->height;
+        const int sb_bq = cm->quant_params.base_qindex;
+        const bool boost_sb_mod =
+            ((sb_px >= 5000 && sb_px < 15000 && sb_bq >= 140) ||
+             (sb_px >= 30000 && sb_px < 50000 && sb_bq < 140));
+        const bool gentle_sb_mod =
+            ((sb_px >= 500000 && sb_px < 1000000 && sb_bq < 140) ||
+             (sb_px >= 100000 && sb_px < 200000 && sb_bq >= 140 && sb_bq < 165));
+        max_ded = gentle_sb_mod ? 32 : (boost_sb_mod ? 60 : 48);
+        slope = gentle_sb_mod ? 4 : (boost_sb_mod ? 7 : 6);
+      }
+      if ((var_min < 2.0) && (var_max > 4.0)) {
+        int ded = ((var_max - var_min) > 8.0)
+                      ? max_ded
+                      : (int)((var_max - var_min) * slope);
+        x->intra_sb_rdmult_modifier -= ded;
       }
     }
   }
