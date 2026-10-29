@@ -83,6 +83,39 @@ void av1_set_ssim_rdmult(const AV1_COMP *const cpi, int *errorperbit,
         geom_mean_of_scale = 0.92 * geom_mean_of_scale + 0.08 * max_scale;
       }
     }
+    const int a_px = cm->width * cm->height;
+    const int a_bq = cm->quant_params.base_qindex;
+    const int a_portrait = (cm->height > cm->width);
+    if (a_px >= 15000 && a_px < 30000 && a_bq >= 140 && a_bq < 165) {
+      if (geom_mean_of_scale < 1.0)
+        geom_mean_of_scale = pow(geom_mean_of_scale, 0.85);
+    } else if (((a_px >= 2700000 && a_px < 2793000) ||
+                (a_px >= 30000 && a_px < 50000)) &&
+               a_bq >= 75 && a_bq < 110) {
+      if (geom_mean_of_scale < 1.0)
+        geom_mean_of_scale = pow(geom_mean_of_scale, 1.15);
+    } else if (a_px >= 2793000 && a_px < 3000000 && !a_portrait &&
+               a_bq >= 140 && a_bq < 165) {
+      if (geom_mean_of_scale > 1.0)
+        geom_mean_of_scale = pow(geom_mean_of_scale, 1.15);
+    } else if (a_px >= 2793000 && a_px < 3000000 && a_portrait &&
+               a_bq >= 140 && a_bq < 165) {
+      if (geom_mean_of_scale < 1.0)
+        geom_mean_of_scale = pow(geom_mean_of_scale, 1.07);
+    } else if (a_px >= 15000 && a_px < 30000 && a_bq >= 75 && a_bq < 110) {
+      if (geom_mean_of_scale < 1.0)
+        geom_mean_of_scale = pow(geom_mean_of_scale, 1.07);
+    } else if (a_px >= 15000 && a_px < 30000 && a_bq >= 28 && a_bq < 50) {
+      if (geom_mean_of_scale > 1.0)
+        geom_mean_of_scale = pow(geom_mean_of_scale, 0.93);
+    } else if (a_px >= 2700000 && a_px < 2793000 && a_bq >= 140 &&
+               a_bq < 165) {
+      if (geom_mean_of_scale > 1.0)
+        geom_mean_of_scale = pow(geom_mean_of_scale, 1.07);
+    } else if (a_px >= 500000 && a_px < 2793000 && a_bq <= 16) {
+      if (geom_mean_of_scale > 1.0)
+        geom_mean_of_scale = pow(geom_mean_of_scale, 1.07);
+    }
   }
 
   *rdmult = (int)((double)(*rdmult) * geom_mean_of_scale + 0.5);
