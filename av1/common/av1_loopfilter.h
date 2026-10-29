@@ -117,11 +117,13 @@ void av1_filter_block_plane_horz(const struct AV1Common *const cm,
                                  const MACROBLOCKD_PLANE *const plane_ptr,
                                  const uint32_t mi_row, const uint32_t mi_col);
 
+// If check_params is true, dual/quad filtering is used only where the batched
+// luma lines have the same filter parameters.
 void av1_filter_block_plane_vert_opt(
     const struct AV1Common *const cm, const MACROBLOCKD *const xd,
     const MACROBLOCKD_PLANE *const plane_ptr, const uint32_t mi_row,
     const uint32_t mi_col, AV1_DEBLOCKING_PARAMETERS *params_buf,
-    TX_SIZE *tx_buf, int num_mis_in_lpf_unit_height_log2);
+    TX_SIZE *tx_buf, bool check_params, int num_mis_in_lpf_unit_height_log2);
 
 void av1_filter_block_plane_vert_opt_chroma(
     const struct AV1Common *const cm, const MACROBLOCKD *const xd,
@@ -134,7 +136,7 @@ void av1_filter_block_plane_horz_opt(
     const struct AV1Common *const cm, const MACROBLOCKD *const xd,
     const MACROBLOCKD_PLANE *const plane_ptr, const uint32_t mi_row,
     const uint32_t mi_col, AV1_DEBLOCKING_PARAMETERS *params_buf,
-    TX_SIZE *tx_buf, int num_mis_in_lpf_unit_height_log2);
+    TX_SIZE *tx_buf, bool check_params, int num_mis_in_lpf_unit_height_log2);
 
 void av1_filter_block_plane_horz_opt_chroma(
     const struct AV1Common *const cm, const MACROBLOCKD *const xd,

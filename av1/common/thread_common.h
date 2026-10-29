@@ -25,6 +25,15 @@ extern "C" {
 
 struct AV1Common;
 
+// Values of lpf_opt_level:
+// 0: Filter each edge on its own.
+// 1: Dual/quad loop filtering. The caller guarantees that the batched edges
+//    have the same filter parameters.
+// 2: As 1, and filter both chroma planes together.
+// 3: Dual/quad loop filtering only where the batched luma edges have the same
+//    filter parameters. Used by the decoder, which has no such guarantee.
+#define LPF_OPT_LEVEL_CHECK_PARAMS 3
+
 typedef struct AV1LfMTInfo {
   int mi_row;
   int plane;

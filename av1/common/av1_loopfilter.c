@@ -698,12 +698,6 @@ static AOM_FORCE_INLINE void set_one_param_for_line_luma(
 
     const int32_t pu_edge = mi_prev != mbmi;
 
-    // The quad loop filter assumes that all the transform blocks within a
-    // 8x16/16x8/16x16 prediction block are of the same size.
-    assert(IMPLIES(
-        !pu_edge && (mbmi->bsize >= BLOCK_8X16 && mbmi->bsize <= BLOCK_16X16),
-        pv_ts == ts));
-
     if (!pu_edge) {
       curr_skipped = mbmi->skip_txfm && is_inter_block(mbmi);
     }
@@ -764,6 +758,39 @@ static AOM_FORCE_INLINE void set_lpf_parameters_for_line_luma(
     params += advance_units;
     tx_size += advance_units;
   }
+}
+
+// Returns true if the next num_lines - 1 lines have the same filter parameters
+// as the line in params_buf/tx_buf, so one dual/quad filter can cover them.
+static bool lpf_lines_match_luma(
+    const AV1_DEBLOCKING_PARAMETERS *params_buf, const TX_SIZE *tx_buf,
+    const AV1_COMMON *const cm, const MACROBLOCKD *const xd,
+    const EDGE_DIR edge_dir, uint32_t mi_col, uint32_t mi_row,
+    const struct macroblockd_plane *plane_ptr, const uint32_t mi_range,
+    const ptrdiff_t mode_step, int num_lines) {
+  const int is_vert = edge_dir == VERT_EDGE;
+  const int range = (int)mi_range - (int)(is_vert ? mi_col : mi_row);
+  AV1_DEBLOCKING_PARAMETERS line_params[MAX_MIB_SIZE];
+  TX_SIZE line_tx[MAX_MIB_SIZE];
+
+  for (int line = 1; line < num_lines; ++line) {
+    int min_dim = block_size_high[BLOCK_128X128];
+    set_lpf_parameters_for_line_luma(line_params, line_tx, cm, xd, edge_dir,
+                                     mi_col + (is_vert ? 0 : line),
+                                     mi_row + (is_vert ? line : 0), plane_ptr,
+                                     mi_range, mode_step, &min_dim);
+    for (int i = 0; i < range;) {
+      if (line_tx[i] != tx_buf[i] ||
+          line_params[i].filter_length != params_buf[i].filter_length ||
+          (params_buf[i].filter_length &&
+           line_params[i].lfthr != params_buf[i].lfthr)) {
+        return false;
+      }
+      const TX_SIZE ts = tx_buf[i] == TX_INVALID ? TX_4X4 : tx_buf[i];
+      i += is_vert ? tx_size_wide_unit[ts] : tx_size_high_unit[ts];
+    }
+  }
+  return true;
 }
 
 static AOM_FORCE_INLINE void set_one_param_for_line_chroma(
@@ -1355,7 +1382,7 @@ void av1_filter_block_plane_vert_opt(
     const AV1_COMMON *const cm, const MACROBLOCKD *const xd,
     const MACROBLOCKD_PLANE *const plane_ptr, const uint32_t mi_row,
     const uint32_t mi_col, AV1_DEBLOCKING_PARAMETERS *params_buf,
-    TX_SIZE *tx_buf, int num_mis_in_lpf_unit_height_log2) {
+    TX_SIZE *tx_buf, bool check_params, int num_mis_in_lpf_unit_height_log2) {
   uint8_t *const dst_ptr = plane_ptr->dst.buf;
   const int dst_stride = plane_ptr->dst.stride;
   // Ensure that mi_cols/mi_rows are calculated based on frame dimension aligned
@@ -1389,14 +1416,21 @@ void av1_filter_block_plane_vert_opt(
 
     uint8_t *p = dst_ptr + y * MI_SIZE * dst_stride;
 
-    if ((y & 3) == 0 && (y + 3) < y_range && min_block_height >= 16) {
+    if ((y & 3) == 0 && (y + 3) < y_range && min_block_height >= 16 &&
+        (!check_params ||
+         lpf_lines_match_luma(params_buf, tx_buf, cm, xd, VERT_EDGE, x_start,
+                              curr_y, plane_ptr, x_end, mode_step, 4))) {
       // If we are on a row which is a multiple of 4, and the minimum height is
       // 16 pixels, then the current and right 3 cols must contain the same
       // prediction block. This is because dim 16 can only happen every unit of
       // 4 mi's.
       use_filter_type = USE_QUAD;
       y += 3;
-    } else if ((y + 1) < y_range && min_block_height >= 8) {
+    } else if ((y + 1) < y_range && min_block_height >= 8 &&
+               (!check_params ||
+                lpf_lines_match_luma(params_buf, tx_buf, cm, xd, VERT_EDGE,
+                                     x_start, curr_y, plane_ptr, x_end,
+                                     mode_step, 2))) {
       use_filter_type = USE_DUAL;
       y += 1;
     }
@@ -1956,7 +1990,7 @@ void av1_filter_block_plane_horz_opt(
     const AV1_COMMON *const cm, const MACROBLOCKD *const xd,
     const MACROBLOCKD_PLANE *const plane_ptr, const uint32_t mi_row,
     const uint32_t mi_col, AV1_DEBLOCKING_PARAMETERS *params_buf,
-    TX_SIZE *tx_buf, int num_mis_in_lpf_unit_height_log2) {
+    TX_SIZE *tx_buf, bool check_params, int num_mis_in_lpf_unit_height_log2) {
   uint8_t *const dst_ptr = plane_ptr->dst.buf;
   const int dst_stride = plane_ptr->dst.stride;
   // Ensure that mi_cols/mi_rows are calculated based on frame dimension aligned
@@ -1985,14 +2019,21 @@ void av1_filter_block_plane_horz_opt(
 
     uint8_t *p = dst_ptr + x * MI_SIZE;
 
-    if ((x & 3) == 0 && (x + 3) < x_range && min_block_width >= 16) {
+    if ((x & 3) == 0 && (x + 3) < x_range && min_block_width >= 16 &&
+        (!check_params ||
+         lpf_lines_match_luma(params_buf, tx_buf, cm, xd, HORZ_EDGE, curr_x,
+                              y_start, plane_ptr, y_end, mode_step, 4))) {
       // If we are on a col which is a multiple of 4, and the minimum width is
       // 16 pixels, then the current and right 3 cols must contain the same
       // prediction block. This is because dim 16 can only happen every unit of
       // 4 mi's.
       filter_type = USE_QUAD;
       x += 3;
-    } else if ((x + 1) < x_range && min_block_width >= 8) {
+    } else if ((x + 1) < x_range && min_block_width >= 8 &&
+               (!check_params ||
+                lpf_lines_match_luma(params_buf, tx_buf, cm, xd, HORZ_EDGE,
+                                     curr_x, y_start, plane_ptr, y_end,
+                                     mode_step, 2))) {
       filter_type = USE_DUAL;
       x += 1;
     }
