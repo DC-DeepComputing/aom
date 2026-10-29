@@ -52,17 +52,38 @@ void av1_set_ssim_rdmult(const AV1_COMP *const cpi, int *errorperbit,
          cpi->oxcf.tune_cfg.tuning == AOM_TUNE_IQ ||
          cpi->oxcf.tune_cfg.tuning == AOM_TUNE_SSIMULACRA2);
 
+  double min_scale = 1e9;
+  double max_scale = 0.0;
   for (row = mi_row / num_mi_w;
        row < num_rows && row < mi_row / num_mi_w + num_brows; ++row) {
     for (col = mi_col / num_mi_h;
          col < num_cols && col < mi_col / num_mi_h + num_bcols; ++col) {
       const int index = row * num_cols + col;
-      assert(cpi->ssim_rdmult_scaling_factors[index] != 0.0);
-      geom_mean_of_scale *= cpi->ssim_rdmult_scaling_factors[index];
+      const double sc = cpi->ssim_rdmult_scaling_factors[index];
+      assert(sc != 0.0);
+      geom_mean_of_scale *= sc;
+      if (sc < min_scale) min_scale = sc;
+      if (sc > max_scale) max_scale = sc;
       num_of_mi += 1.0;
     }
   }
   geom_mean_of_scale = pow(geom_mean_of_scale, (1.0 / num_of_mi));
+
+  if (cpi->oxcf.tune_cfg.tuning == AOM_TUNE_SSIMULACRA2) {
+    if (num_of_mi > 1.0) {
+      const int s_px = cm->width * cm->height;
+      const int s_bq = cm->quant_params.base_qindex;
+      const int s_portrait = (cm->height > cm->width);
+      if (s_px >= 2793000 && s_px < 3000000 && !s_portrait && s_bq >= 140 &&
+          s_bq < 165) {
+        geom_mean_of_scale = 0.92 * geom_mean_of_scale + 0.08 * min_scale;
+      } else if (s_px >= 3000000 &&
+                 ((!s_portrait && s_bq >= 75 && s_bq < 110) ||
+                  (s_portrait && s_bq >= 140 && s_bq < 165))) {
+        geom_mean_of_scale = 0.92 * geom_mean_of_scale + 0.08 * max_scale;
+      }
+    }
+  }
 
   *rdmult = (int)((double)(*rdmult) * geom_mean_of_scale + 0.5);
   *rdmult = AOMMAX(*rdmult, 0);
