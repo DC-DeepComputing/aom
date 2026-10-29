@@ -195,6 +195,9 @@ typedef struct {
   int dc_sign_cost[DC_SIGN_CONTEXTS][2];
   //! Cost for encoding an increment to the coefficient
   int lps_cost[LEVEL_CONTEXTS][COEFF_BASE_RANGE + 1 + COEFF_BASE_RANGE + 1];
+  int ssim2_px;
+  int ssim2_is_portrait;
+  int ssim2_base_q;
 } LV_MAP_COEFF_COST;
 
 /*! \brief Costs for encoding the eob.
