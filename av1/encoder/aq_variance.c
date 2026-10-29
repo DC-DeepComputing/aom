@@ -209,34 +209,52 @@ unsigned int av1_get_variance_boost_block_variance(const AV1_COMP *cpi,
                                  ? CONVERT_TO_BYTEPTR(av1_highbd_all_zeros)
                                  : av1_all_zeros;
   unsigned int variances[SUBBLOCKS_IN_SB];
+  int num_subblocks = 0;
+  const int sb_row = xd->mi_row * MI_SIZE;
+  const int sb_col = xd->mi_col * MI_SIZE;
+  const bool filter_oob =
+      is_ssim2 && (AOMMIN(cpi->common.width, cpi->common.height) < 128 ||
+                   pixels >= 1000000);
 
   // Calculate subblock variances.
   aom_variance_fn_t vf = cpi->ppi->fn_ptr[BLOCK_8X8].vf;
   for (int subb_i = 0; subb_i < SUBBLOCKS_IN_SB_DIM; subb_i++) {
     int i = subb_i * SUBBLOCK_SIZE;
+    if (filter_oob && sb_row + i >= cpi->common.height && num_subblocks > 0)
+      continue;
     for (int subb_j = 0; subb_j < SUBBLOCKS_IN_SB_DIM; subb_j++) {
       int j = subb_j * SUBBLOCK_SIZE;
+      if (filter_oob && sb_col + j >= cpi->common.width && num_subblocks > 0)
+        continue;
       // Truncating values to integers (i.e. the 64 term) was found to perform
       // better than rounding, or returning them as doubles.
-      variances[subb_i * SUBBLOCKS_IN_SB_DIM + subb_j] =
+      const unsigned int raw_var =
           vf(x->plane[0].src.buf + i * x->plane[0].src.stride + j,
-             x->plane[0].src.stride, all_zeros, 0, &sse) /
-          64;
+             x->plane[0].src.stride, all_zeros, 0, &sse);
+      variances[num_subblocks++] = is_ssim2 ? raw_var : (raw_var / 64);
     }
   }
 
   // Order the 8x8 SB values from smallest to largest variance.
-  qsort(variances, SUBBLOCKS_IN_SB, sizeof(unsigned int), comp_unsigned_int);
+  qsort(variances, num_subblocks, sizeof(unsigned int), comp_unsigned_int);
 
   // Sample three 8x8 variance values: at the specified octile, previous octile,
   // and next octile. Make sure we use the last subblock in each octile as the
   // representative of the octile.
   assert(octile >= 1 && octile <= 8);
-  const int middle_index = octile * SUBBLOCKS_IN_OCTILE - 1;
-  const int lower_index =
-      AOMMAX(SUBBLOCKS_IN_OCTILE - 1, middle_index - SUBBLOCKS_IN_OCTILE);
-  const int upper_index =
-      AOMMIN(SUBBLOCKS_IN_SB - 1, middle_index + SUBBLOCKS_IN_OCTILE);
+  int middle_index, lower_index, upper_index;
+  if (filter_oob && num_subblocks < SUBBLOCKS_IN_SB) {
+    const int step = AOMMAX(1, num_subblocks / 8);
+    middle_index = clamp((octile * num_subblocks) / 8 - 1, 0, num_subblocks - 1);
+    lower_index = clamp(middle_index - step, 0, num_subblocks - 1);
+    upper_index = clamp(middle_index + step, 0, num_subblocks - 1);
+  } else {
+    middle_index = octile * SUBBLOCKS_IN_OCTILE - 1;
+    lower_index =
+        AOMMAX(SUBBLOCKS_IN_OCTILE - 1, middle_index - SUBBLOCKS_IN_OCTILE);
+    upper_index =
+        AOMMIN(SUBBLOCKS_IN_SB - 1, middle_index + SUBBLOCKS_IN_OCTILE);
+  }
 
   // Weigh the three variances in a 1:2:1 ratio, with rounding (the +2 term).
   // This allows for smoother delta-q transitions among superblocks with
@@ -246,7 +264,7 @@ unsigned int av1_get_variance_boost_block_variance(const AV1_COMP *cpi,
        variances[upper_index] + 2) /
       4;
 
-  return variance;
+  return is_ssim2 ? (variance / 64) : variance;
 }
 #endif  // !CONFIG_REALTIME_ONLY
 
