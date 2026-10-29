@@ -108,6 +108,10 @@ typedef struct {
 struct AV1_COMP;
 struct AV1Common;
 
+#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
+#pragma GCC visibility push(hidden)
+#endif
+
 void av1_frame_init_quantizer(struct AV1_COMP *cpi);
 
 void av1_init_plane_quantizers(const struct AV1_COMP *cpi, MACROBLOCK *x,
@@ -235,6 +239,10 @@ void av1_highbd_quantize_dc_facade(const tran_low_t *coeff_ptr,
                                    const SCAN_ORDER *sc,
                                    const QUANT_PARAM *qparam);
 
+#endif
+
+#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
+#pragma GCC visibility pop
 #endif
 
 #ifdef __cplusplus

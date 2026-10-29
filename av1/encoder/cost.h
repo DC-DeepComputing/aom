@@ -19,6 +19,10 @@
 extern "C" {
 #endif
 
+#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
+#pragma GCC visibility push(hidden)
+#endif
+
 extern const uint16_t av1_prob_cost[129];
 
 // The factor to scale from cost in bits to cost in av1_prob_cost units.
@@ -49,6 +53,10 @@ static inline int av1_cost_symbol(aom_cdf_prob p15) {
 
 void av1_cost_tokens_from_cdf(int *costs, const aom_cdf_prob *cdf,
                               const int *inv_map);
+
+#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
+#pragma GCC visibility pop
+#endif
 
 #ifdef __cplusplus
 }  // extern "C"
