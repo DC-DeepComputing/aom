@@ -202,7 +202,9 @@ unsigned int av1_get_variance_boost_block_variance(const AV1_COMP *cpi,
   // between quality and consistency. Lower octiles tend to score lower in
   // SSIMU2, while higher octiles tend to harm subjective quality consistency,
   // especially in <1 MP images.
-  const int octile = 5;
+  const bool is_ssim2 = (cpi->oxcf.tune_cfg.tuning == AOM_TUNE_SSIMULACRA2);
+  const int pixels = cpi->common.width * cpi->common.height;
+  const int octile = is_ssim2 ? ((pixels >= 2000000) ? 7 : ((pixels >= 1000000) ? 6 : 5)) : 5;
   const uint8_t *all_zeros = is_cur_buf_hbd(xd)
                                  ? CONVERT_TO_BYTEPTR(av1_highbd_all_zeros)
                                  : av1_all_zeros;
