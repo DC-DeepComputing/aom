@@ -33,6 +33,24 @@
       "message": "Nit: add \"frame\" before \"size\"",
       "revId": "ef6b940bfabb59928a75d847170b8ec48f2cbc04",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "bd24d503_1615ae52",
+        "filename": "av1/encoder/encodeframe.c",
+        "patchSetId": 13
+      },
+      "lineNbr": 2100,
+      "author": {
+        "id": 5220824
+      },
+      "writtenOn": "2026-10-29T22:34:41Z",
+      "side": 1,
+      "message": "Marked as resolved.",
+      "parentUuid": "dae4af47_328bd34d",
+      "revId": "ef6b940bfabb59928a75d847170b8ec48f2cbc04",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
