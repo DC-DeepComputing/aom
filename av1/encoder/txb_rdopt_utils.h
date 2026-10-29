@@ -12,6 +12,7 @@
 #ifndef AOM_AV1_ENCODER_TXB_RDOPT_UTILS_H_
 #define AOM_AV1_ENCODER_TXB_RDOPT_UTILS_H_
 
+#include <stdlib.h>
 #include "av1/encoder/encodetxb.h"
 
 static const int golomb_bits_cost[32] = {
@@ -79,7 +80,124 @@ static int get_eob_cost(int eob, const LV_MAP_EOB_COST *txb_eob_costs,
     const int offset_bits = av1_eob_offset_bits[eob_pt];
     if (offset_bits > 1) eob_cost += av1_cost_literal(offset_bits - 1);
   }
+  if (txb_costs->ssim2_px > 0) {
+    const int px = txb_costs->ssim2_px;
+    const int bq = txb_costs->ssim2_base_q;
+    const int is_portrait = txb_costs->ssim2_is_portrait;
+    int ec_opt = 0;
+    if ((px >= 30000 && px < 50000 && bq <= 16) ||
+        (px >= 1500 && px < 15000 && bq >= 75 && bq < 110) ||
+        (px < 1000 && bq >= 75 && bq < 110)) {
+      ec_opt = 2;
+    } else if ((px >= 2000000 && px < 2700000 && bq >= 28 && bq < 50) ||
+               (px >= 500000 && px < 1000000 && bq >= 140 && bq < 165) ||
+               (px >= 30000 && px < 50000 && bq >= 75 && bq < 110)) {
+      ec_opt = 3;
+    } else if (px >= 2793000 && px < 3000000 && !is_portrait && bq <= 16) {
+      ec_opt = 6;
+    } else if ((px >= 2000000 && px < 2700000 && bq >= 140 && bq < 165) ||
+               (px >= 50000 && px < 100000 && bq <= 16) ||
+               (px >= 200000 && px < 400000 &&
+                ((bq >= 75 && bq < 110) || bq <= 16))) {
+      ec_opt = 8;
+    } else if (px >= 3000000 && !is_portrait && bq >= 140 && bq < 165) {
+      ec_opt = 9;
+    }
+    if (ec_opt == 2) {
+      eob_cost = (eob_cost * 9) >> 3;
+    } else if (ec_opt == 3) {
+      eob_cost = (eob_cost * 15) >> 4;
+    } else if (ec_opt == 6) {
+      eob_cost = (eob_cost * 31) >> 5;
+    } else if (ec_opt == 8) {
+      eob_cost = (eob_cost * 63) >> 6;
+    } else if (ec_opt == 9) {
+      eob_cost = (eob_cost * 65) >> 6;
+    }
+  }
   return eob_cost;
+}
+
+static inline int get_txb_skip_cost(const LV_MAP_COEFF_COST *txb_costs,
+                                    int txb_skip_ctx) {
+  int skip_cost = txb_costs->txb_skip_cost[txb_skip_ctx][1];
+  if (txb_costs->ssim2_px > 0) {
+    const int px = txb_costs->ssim2_px;
+    const int bq = txb_costs->ssim2_base_q;
+    const int is_portrait = txb_costs->ssim2_is_portrait;
+    int sc_opt = 0;
+    if (px >= 200000 && px < 400000 && bq >= 140 && bq < 165) {
+      sc_opt = 1;
+    } else if (px >= 50000 && px < 100000 && bq >= 28 && bq < 50) {
+      sc_opt = 2;
+    } else if (px >= 500000 && px < 1000000 && bq <= 16) {
+      sc_opt = 3;
+    } else if (px >= 2793000 && px < 3000000 && !is_portrait && bq <= 16) {
+      sc_opt = 6;
+    }
+    if (sc_opt == 1) {
+      skip_cost = (skip_cost * 7) >> 3;
+    } else if (sc_opt == 2) {
+      skip_cost = (skip_cost * 9) >> 3;
+    } else if (sc_opt == 3) {
+      skip_cost = (skip_cost * 15) >> 4;
+    } else if (sc_opt == 6) {
+      skip_cost = (skip_cost * 31) >> 5;
+    }
+  }
+  return skip_cost;
+}
+
+static inline int get_txb_non_skip_cost(const LV_MAP_COEFF_COST *txb_costs,
+                                        int txb_skip_ctx) {
+  int non_skip_cost = txb_costs->txb_skip_cost[txb_skip_ctx][0];
+  if (txb_costs->ssim2_px > 0) {
+    const int px = txb_costs->ssim2_px;
+    const int bq = txb_costs->ssim2_base_q;
+    const int is_portrait = txb_costs->ssim2_is_portrait;
+    int nsc_opt = 0;
+    if (px >= 15000 && px < 30000 && bq >= 75 && bq < 110) {
+      nsc_opt = 1;
+    } else if (((px >= 2000000 && px < 2700000) ||
+                (px >= 100000 && px < 200000)) &&
+               bq <= 16) {
+      nsc_opt = 7;
+    } else if ((px >= 3000000 && !is_portrait && bq >= 140 && bq < 165) ||
+               (px >= 2793000 && px < 3000000 && !is_portrait && bq <= 16) ||
+               (px >= 50000 && px < 100000 && bq >= 75 && bq < 110) ||
+               (px >= 500000 && px < 1000000 && bq >= 140 && bq < 165) ||
+               (px >= 30000 && px < 50000 && bq <= 16)) {
+      nsc_opt = 9;
+    }
+    if (nsc_opt == 1) {
+      non_skip_cost = (non_skip_cost * 7) >> 3;
+    } else if (nsc_opt == 7) {
+      non_skip_cost = (non_skip_cost * 33) >> 5;
+    } else if (nsc_opt == 9) {
+      non_skip_cost = (non_skip_cost * 65) >> 6;
+    }
+  }
+  return non_skip_cost;
+}
+
+static inline int resolve_br_cost_opt(const LV_MAP_COEFF_COST *txb_costs) {
+  int brc_opt = 0;
+  if (txb_costs->ssim2_px > 0) {
+    const int px = txb_costs->ssim2_px;
+    const int bq = txb_costs->ssim2_base_q;
+    const int is_portrait = txb_costs->ssim2_is_portrait;
+    if ((px < 1000 &&
+         ((bq >= 75 && bq < 110) || (bq >= 28 && bq < 50))) ||
+        (px >= 1500 && px < 15000 && bq >= 28 && bq < 50)) {
+      brc_opt = 2;
+    } else if (px >= 30000 && px < 50000 && bq >= 75 && bq < 110) {
+      brc_opt = 3;
+    } else if (px >= 2793000 && px < 3000000 && is_portrait &&
+               bq >= 140 && bq < 165) {
+      brc_opt = 8;
+    }
+  }
+  return brc_opt;
 }
 
 static inline int get_golomb_cost(int abs_qc) {
@@ -91,53 +209,283 @@ static inline int get_golomb_cost(int abs_qc) {
   return 0;
 }
 
-static inline int get_br_cost(tran_low_t level, const int *coeff_lps) {
+static inline int get_br_cost(tran_low_t level, const int *coeff_lps,
+                              const LV_MAP_COEFF_COST *txb_costs) {
   const int base_range = AOMMIN(level - 1 - NUM_BASE_LEVELS, COEFF_BASE_RANGE);
-  return coeff_lps[base_range] + get_golomb_cost(level);
+  int cost = coeff_lps[base_range] + get_golomb_cost(level);
+  if (txb_costs->ssim2_px > 0) {
+    const int brc_opt = resolve_br_cost_opt(txb_costs);
+    if (brc_opt == 2) {
+      cost = (cost * 9) >> 3;
+    } else if (brc_opt == 3) {
+      cost = (cost * 15) >> 4;
+    } else if (brc_opt == 8) {
+      cost = (cost * 63) >> 6;
+    }
+  }
+  return cost;
 }
 
 static inline int get_br_cost_with_diff(tran_low_t level, const int *coeff_lps,
+                                        const LV_MAP_COEFF_COST *txb_costs,
                                         int *diff) {
   const int base_range = AOMMIN(level - 1 - NUM_BASE_LEVELS, COEFF_BASE_RANGE);
   int golomb_bits = 0;
+  int local_diff = 0;
   if (level <= COEFF_BASE_RANGE + 1 + NUM_BASE_LEVELS)
-    *diff += coeff_lps[base_range + COEFF_BASE_RANGE + 1];
+    local_diff += coeff_lps[base_range + COEFF_BASE_RANGE + 1];
 
   if (level >= COEFF_BASE_RANGE + 1 + NUM_BASE_LEVELS) {
     int r = level - COEFF_BASE_RANGE - NUM_BASE_LEVELS;
     if (r < 32) {
       golomb_bits = golomb_bits_cost[r];
-      *diff += golomb_cost_diff[r];
+      local_diff += golomb_cost_diff[r];
     } else {
       golomb_bits = get_golomb_cost(level);
-      *diff += (r & (r - 1)) == 0 ? 1024 : 0;
+      local_diff += (r & (r - 1)) == 0 ? 1024 : 0;
     }
   }
 
-  return coeff_lps[base_range] + golomb_bits;
+  int cost = coeff_lps[base_range] + golomb_bits;
+  if (txb_costs->ssim2_px > 0) {
+    const int brc_opt = resolve_br_cost_opt(txb_costs);
+    if (brc_opt == 2) {
+      cost = (cost * 9) >> 3;
+      local_diff = (local_diff * 9) >> 3;
+    } else if (brc_opt == 3) {
+      cost = (cost * 15) >> 4;
+      local_diff = (local_diff * 15) >> 4;
+    } else if (brc_opt == 8) {
+      cost = (cost * 63) >> 6;
+      local_diff = (local_diff * 63) >> 6;
+    }
+  }
+  *diff += local_diff;
+  return cost;
+}
+
+static inline int get_base_eob_cost(int raw_cost,
+                                    const LV_MAP_COEFF_COST *txb_costs) {
+  int cost = raw_cost;
+  if (txb_costs->ssim2_px > 0) {
+    const int px = txb_costs->ssim2_px;
+    const int bq = txb_costs->ssim2_base_q;
+    const int is_portrait = txb_costs->ssim2_is_portrait;
+    int bec_opt = 0;
+    if ((px >= 50000 && px < 100000 && bq >= 140 && bq < 165) ||
+        (px >= 100000 && px < 200000 && bq >= 28 && bq < 50)) {
+      bec_opt = 4;
+    } else if (px >= 200000 && px < 400000 && bq >= 140 && bq < 165) {
+      bec_opt = 6;
+    } else if (px >= 3000000 && is_portrait && bq >= 28 && bq < 50) {
+      bec_opt = 7;
+    }
+    if (bec_opt == 4) {
+      cost = (cost * 33) >> 5;
+    } else if (bec_opt == 6) {
+      cost = (cost * 63) >> 6;
+    } else if (bec_opt == 7) {
+      cost = (cost * 65) >> 6;
+    }
+  }
+  return cost;
+}
+
+static inline int get_dc_sign_cost(int raw_cost,
+                                   const LV_MAP_COEFF_COST *txb_costs) {
+  int cost = raw_cost;
+  if (txb_costs->ssim2_px > 0) {
+    const int px = txb_costs->ssim2_px;
+    const int bq = txb_costs->ssim2_base_q;
+    int dsc_opt = 0;
+    if (px >= 15000 && px < 30000 && bq >= 75 && bq < 110) {
+      dsc_opt = 3;
+    } else if (px >= 200000 && px < 1000000 && bq >= 28 && bq < 50) {
+      dsc_opt = 4;
+    } else if (px >= 30000 && px < 50000 && bq <= 16) {
+      dsc_opt = 8;
+    }
+    if (dsc_opt == 3) {
+      cost = (cost * 15) >> 4;
+    } else if (dsc_opt == 4) {
+      cost = (cost * 17) >> 4;
+    } else if (dsc_opt == 8) {
+      cost = (cost * 63) >> 6;
+    }
+  }
+  return cost;
+}
+
+static inline int get_zero_coeff_cost(int raw_cost,
+                                      const LV_MAP_COEFF_COST *txb_costs) {
+  int cost = raw_cost;
+  if (txb_costs->ssim2_px > 0) {
+    const int px = txb_costs->ssim2_px;
+    const int bq = txb_costs->ssim2_base_q;
+    int zc_opt = 0;
+    if (((px >= 2000000 && px < 2700000) ||
+         (px >= 1500 && px < 15000) ||
+         (px < 1000)) &&
+        bq <= 16) {
+      zc_opt = 1;
+    } else if (px >= 50000 && px < 100000 && bq >= 75 && bq < 110) {
+      zc_opt = 7;
+    } else if (px >= 100000 && px < 200000 && bq <= 16) {
+      zc_opt = 8;
+    } else if (px >= 30000 && px < 50000 && bq >= 28 && bq < 50) {
+      zc_opt = 9;
+    }
+    if (zc_opt == 1) {
+      cost = (cost * 15) >> 4;
+    } else if (zc_opt == 7) {
+      cost = (cost * 65) >> 6;
+    } else if (zc_opt == 8) {
+      cost = (cost * 7) >> 3;
+    } else if (zc_opt == 9) {
+      cost = (cost * 9) >> 3;
+    }
+  }
+  return cost;
+}
+
+static inline int get_nz_base_cost(int raw_cost, int level,
+                                   const LV_MAP_COEFF_COST *txb_costs) {
+  (void)level;
+  int cost = raw_cost;
+  if (txb_costs->ssim2_px > 0) {
+    const int px = txb_costs->ssim2_px;
+    const int bq = txb_costs->ssim2_base_q;
+    const int is_portrait = txb_costs->ssim2_is_portrait;
+    int nzb_opt = 0;
+    if (((px >= 3000000 && is_portrait) ||
+         (px >= 1500 && px < 15000)) &&
+        bq <= 16) {
+      nzb_opt = 2;
+    } else if (px >= 30000 && px < 50000 && bq >= 75 && bq < 110) {
+      nzb_opt = 3;
+    } else if (px >= 3000000 && is_portrait && bq >= 140 && bq < 165) {
+      nzb_opt = 6;
+    } else if ((px >= 2793000 && px < 3000000 && !is_portrait && bq <= 16) ||
+               (px >= 2000000 && px < 2700000 && bq >= 28 && bq < 50)) {
+      nzb_opt = 7;
+    } else if ((px >= 500000 && px < 1000000 && bq >= 75 && bq < 110) ||
+               (px >= 30000 && px < 50000 && bq >= 140 && bq < 165) ||
+               (px < 1000 && bq >= 75 && bq < 110) ||
+               (px >= 1500 && px < 15000 && bq >= 140 && bq < 165)) {
+      nzb_opt = 8;
+    } else if ((px >= 2700000 && px < 2793000 && bq >= 140 && bq < 165) ||
+               (px >= 2793000 && px < 3000000 && !is_portrait && bq >= 28 &&
+                bq < 50) ||
+               (px < 1000 && bq >= 140 && bq < 165)) {
+      nzb_opt = 9;
+    }
+    if (nzb_opt == 2) {
+      cost = (cost * 17) >> 4;
+    } else if (nzb_opt == 3) {
+      cost = (cost * 31) >> 5;
+    } else if (nzb_opt == 6) {
+      cost = (cost * 63) >> 6;
+    } else if (nzb_opt == 7) {
+      cost = (cost * 65) >> 6;
+    } else if (nzb_opt == 8) {
+      cost = (cost * 7) >> 3;
+    } else if (nzb_opt == 9) {
+      cost = (cost * 9) >> 3;
+    }
+  }
+  return cost;
+}
+
+static inline int get_ac_sign_cost(const LV_MAP_COEFF_COST *txb_costs) {
+  int cost = av1_cost_literal(1);
+  if (txb_costs->ssim2_px > 0) {
+    const int px = txb_costs->ssim2_px;
+    const int bq = txb_costs->ssim2_base_q;
+    const int is_portrait = txb_costs->ssim2_is_portrait;
+    int acs_opt = 0;
+    if (px >= 15000 && px < 30000 && bq >= 140 && bq < 165) {
+      acs_opt = 1;
+    } else if (px >= 1500 && px < 15000 && bq <= 16) {
+      acs_opt = 2;
+    } else if (px >= 30000 && px < 50000 && bq <= 16) {
+      acs_opt = 3;
+    } else if (px >= 3000000 && is_portrait && bq >= 140 && bq < 165) {
+      acs_opt = 7;
+    } else if (px >= 500000 && px < 1000000 && bq >= 140 && bq < 165) {
+      acs_opt = 8;
+    }
+    if (acs_opt == 1) {
+      cost = (cost * 15) >> 4;
+    } else if (acs_opt == 2) {
+      cost = (cost * 17) >> 4;
+    } else if (acs_opt == 3) {
+      cost = (cost * 31) >> 5;
+    } else if (acs_opt == 7) {
+      cost = (cost * 65) >> 6;
+    } else if (acs_opt == 8) {
+      cost = (cost * 7) >> 3;
+    }
+  }
+  return cost;
+}
+
+static inline int get_eob_zero_cost(int raw_cost) {
+  return raw_cost;
 }
 
 static AOM_FORCE_INLINE int get_two_coeff_cost_simple(
     int ci, tran_low_t abs_qc, int coeff_ctx,
     const LV_MAP_COEFF_COST *txb_costs, int bhl, TX_CLASS tx_class,
     const uint8_t *levels, int *cost_low) {
-  // this simple version assumes the coeff's scan_idx is not DC (scan_idx != 0)
-  // and not the last (scan_idx != eob - 1)
   assert(ci > 0);
-  int cost = txb_costs->base_cost[coeff_ctx][AOMMIN(abs_qc, 3)];
+  int cost = (abs_qc > 0)
+                 ? get_nz_base_cost(
+                       txb_costs->base_cost[coeff_ctx][AOMMIN(abs_qc, 3)],
+                       AOMMIN(abs_qc, 3), txb_costs)
+                 : txb_costs->base_cost[coeff_ctx][0];
   int diff = 0;
-  if (abs_qc <= 3) diff = txb_costs->base_cost[coeff_ctx][abs_qc + 4];
-  if (abs_qc) {
+  if (abs_qc == 1) {
+    diff = cost + get_ac_sign_cost(txb_costs) -
+           get_zero_coeff_cost(txb_costs->base_cost[coeff_ctx][0], txb_costs);
+  } else if (abs_qc == 2 || abs_qc == 3) {
+    diff = cost -
+           get_nz_base_cost(txb_costs->base_cost[coeff_ctx][abs_qc - 1],
+                            abs_qc - 1, txb_costs);
+  }
+  if (abs_qc > 0) {
     cost += av1_cost_literal(1);
     if (abs_qc > NUM_BASE_LEVELS) {
       const int br_ctx = get_br_ctx(levels, ci, bhl, tx_class);
       int brcost_diff = 0;
       cost += get_br_cost_with_diff(abs_qc, txb_costs->lps_cost[br_ctx],
-                                    &brcost_diff);
+                                    txb_costs, &brcost_diff);
       diff += brcost_diff;
     }
+    if (abs_qc >= 2 && txb_costs->ssim2_px > 0) {
+      const int px = txb_costs->ssim2_px;
+      const int bq = txb_costs->ssim2_base_q;
+      const int is_portrait = txb_costs->ssim2_is_portrait;
+      int sdo_opt = 0;
+      if (px >= 15000 && px < 30000 && bq <= 16) {
+        sdo_opt = 1;
+      } else if ((px >= 15000 && px < 30000 && bq >= 140 && bq < 165) ||
+                 (px >= 2700000 && px < 2793000 && bq >= 75 && bq < 110)) {
+        sdo_opt = 2;
+      } else if (px >= 2793000 && px < 3000000 && !is_portrait && bq >= 75 &&
+                 bq < 110) {
+        sdo_opt = 4;
+      }
+      if (sdo_opt == 1) {
+        diff = (diff * 15) >> 4;
+      } else if (sdo_opt == 2) {
+        diff = (diff * 17) >> 4;
+      } else if (sdo_opt == 4) {
+        diff = (diff * 33) >> 5;
+      }
+    }
   }
-  *cost_low = cost - diff;
+  *cost_low = (abs_qc == 1) ? get_zero_coeff_cost(cost - diff, txb_costs)
+                            : (cost - diff);
 
   return cost;
 }
@@ -147,17 +495,18 @@ static inline int get_coeff_cost_eob(int ci, tran_low_t abs_qc, int sign,
                                      const LV_MAP_COEFF_COST *txb_costs,
                                      int bhl, TX_CLASS tx_class) {
   int cost = 0;
-  cost += txb_costs->base_eob_cost[coeff_ctx][AOMMIN(abs_qc, 3) - 1];
+  cost += get_base_eob_cost(
+      txb_costs->base_eob_cost[coeff_ctx][AOMMIN(abs_qc, 3) - 1], txb_costs);
   if (abs_qc != 0) {
     if (ci == 0) {
-      cost += txb_costs->dc_sign_cost[dc_sign_ctx][sign];
+      cost += get_dc_sign_cost(txb_costs->dc_sign_cost[dc_sign_ctx][sign],
+                               txb_costs);
     } else {
-      cost += av1_cost_literal(1);
+      cost += get_ac_sign_cost(txb_costs);
     }
     if (abs_qc > NUM_BASE_LEVELS) {
-      int br_ctx;
-      br_ctx = get_br_ctx_eob(ci, bhl, tx_class);
-      cost += get_br_cost(abs_qc, txb_costs->lps_cost[br_ctx]);
+      int br_ctx = get_br_ctx_eob(ci, bhl, tx_class);
+      cost += get_br_cost(abs_qc, txb_costs->lps_cost[br_ctx], txb_costs);
     }
   }
   return cost;
@@ -171,15 +520,20 @@ static inline int get_coeff_cost_general(int is_last, int ci, tran_low_t abs_qc,
                                          const uint8_t *levels) {
   int cost = 0;
   if (is_last) {
-    cost += txb_costs->base_eob_cost[coeff_ctx][AOMMIN(abs_qc, 3) - 1];
+    cost += get_base_eob_cost(
+        txb_costs->base_eob_cost[coeff_ctx][AOMMIN(abs_qc, 3) - 1], txb_costs);
+  } else if (abs_qc != 0) {
+    cost += get_nz_base_cost(txb_costs->base_cost[coeff_ctx][AOMMIN(abs_qc, 3)],
+                             AOMMIN(abs_qc, 3), txb_costs);
   } else {
-    cost += txb_costs->base_cost[coeff_ctx][AOMMIN(abs_qc, 3)];
+    cost += txb_costs->base_cost[coeff_ctx][0];
   }
   if (abs_qc != 0) {
     if (ci == 0) {
-      cost += txb_costs->dc_sign_cost[dc_sign_ctx][sign];
+      cost += get_dc_sign_cost(txb_costs->dc_sign_cost[dc_sign_ctx][sign],
+                               txb_costs);
     } else {
-      cost += av1_cost_literal(1);
+      cost += get_ac_sign_cost(txb_costs);
     }
     if (abs_qc > NUM_BASE_LEVELS) {
       int br_ctx;
@@ -187,7 +541,7 @@ static inline int get_coeff_cost_general(int is_last, int ci, tran_low_t abs_qc,
         br_ctx = get_br_ctx_eob(ci, bhl, tx_class);
       else
         br_ctx = get_br_ctx(levels, ci, bhl, tx_class);
-      cost += get_br_cost(abs_qc, txb_costs->lps_cost[br_ctx]);
+      cost += get_br_cost(abs_qc, txb_costs->lps_cost[br_ctx], txb_costs);
     }
   }
   return cost;

@@ -29,7 +29,7 @@ static inline void update_coeff_general(
   const int coeff_ctx = get_lower_levels_ctx_general(
       is_last, si, bhl, width, levels, ci, tx_size, tx_class);
   if (qc == 0) {
-    *accu_rate += txb_costs->base_cost[coeff_ctx][0];
+    *accu_rate += get_zero_coeff_cost(txb_costs->base_cost[coeff_ctx][0], txb_costs);
   } else {
     const int sign = (qc < 0) ? 1 : 0;
     const tran_low_t abs_qc = abs(qc);
@@ -49,7 +49,7 @@ static inline void update_coeff_general(
     if (abs_qc == 1) {
       abs_qc_low = qc_low = dqc_low = 0;
       dist_low = dist0;
-      rate_low = txb_costs->base_cost[coeff_ctx][0];
+      rate_low = get_zero_coeff_cost(txb_costs->base_cost[coeff_ctx][0], txb_costs);
     } else {
       get_qc_dqc_low(abs_qc, sign, dqv, shift, &qc_low, &dqc_low);
       abs_qc_low = abs_qc - 1;
@@ -90,7 +90,7 @@ static AOM_FORCE_INLINE void update_coeff_simple(
   const int coeff_ctx =
       get_lower_levels_ctx(levels, ci, bhl, tx_size, tx_class);
   if (qc == 0) {
-    *accu_rate += txb_costs->base_cost[coeff_ctx][0];
+    *accu_rate += get_zero_coeff_cost(txb_costs->base_cost[coeff_ctx][0], txb_costs);
   } else {
     const tran_low_t abs_qc = abs(qc);
     const tran_low_t abs_tqc = abs(tcoeff[ci]);
@@ -141,7 +141,7 @@ static AOM_FORCE_INLINE void update_coeff_eob(
   const int coeff_ctx =
       get_lower_levels_ctx(levels, ci, bhl, tx_size, tx_class);
   if (qc == 0) {
-    *accu_rate += txb_costs->base_cost[coeff_ctx][0];
+    *accu_rate += get_zero_coeff_cost(txb_costs->base_cost[coeff_ctx][0], txb_costs);
   } else {
     const int dqv = get_dqv(dequant, scan[si], iqmatrix);
     int lower_level = 0;
@@ -165,7 +165,7 @@ static AOM_FORCE_INLINE void update_coeff_eob(
       abs_qc_low = 0;
       dqc_low = qc_low = 0;
       dist_low = 0;
-      rate_low = txb_costs->base_cost[coeff_ctx][0];
+      rate_low = get_zero_coeff_cost(txb_costs->base_cost[coeff_ctx][0], txb_costs);
       rd_low = RDCOST(rdmult, *accu_rate + rate_low, *accu_dist);
     } else {
       get_qc_dqc_low(abs_qc, sign, dqv, shift, &qc_low, &dqc_low);
@@ -399,8 +399,8 @@ int av1_optimize_txb(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
 
   // TODO(angirbird): check iqmatrix
 
-  const int non_skip_cost = txb_costs->txb_skip_cost[txb_ctx->txb_skip_ctx][0];
-  const int skip_cost = txb_costs->txb_skip_cost[txb_ctx->txb_skip_ctx][1];
+  const int non_skip_cost = get_txb_non_skip_cost(txb_costs, txb_ctx->txb_skip_ctx);
+  const int skip_cost = get_txb_skip_cost(txb_costs, txb_ctx->txb_skip_ctx);
   const int eob_cost = get_eob_cost(eob, txb_eob_costs, txb_costs, tx_class);
   int accu_rate = eob_cost;
   int64_t accu_dist = 0;
