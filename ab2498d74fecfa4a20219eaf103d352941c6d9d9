@@ -16,6 +16,23 @@
       "message": "Increased the frame numbers but still needed to tighten the number of superblocks encoded based on benchmark of the fuzzer settings.",
       "revId": "ab2498d74fecfa4a20219eaf103d352941c6d9d9",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "7dbfd57d_2dafe417",
+        "filename": "examples/av1_enc_fuzzer.cc",
+        "patchSetId": 1
+      },
+      "lineNbr": 57,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-29T16:20:07Z",
+      "side": 1,
+      "message": "For reference, here are the original counts:\n\n```\nconstexpr unsigned int kNumFramesForCpuUsed[12] \u003d {\n  50,  // cpu_used 0\n  50,  // cpu_used 1\n  50,  // cpu_used 2\n  60,  // cpu_used 3\n  60,  // cpu_used 4\n  70,  // cpu_used 5\n  70,  // cpu_used 6\n  80,  // cpu_used 7\n  80,  // cpu_used 8\n  90,  // cpu_used 9\n  90,  // cpu_used 10\n  100  // cpu_used 11\n};\n```",
+      "revId": "ab2498d74fecfa4a20219eaf103d352941c6d9d9",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
