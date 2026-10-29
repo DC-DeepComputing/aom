@@ -268,6 +268,25 @@ static inline void setup_delta_q_nonrd(AV1_COMP *const cpi, ThreadData *td,
 
   x->delta_qindex = current_qindex - cm->quant_params.base_qindex;
   x->rdmult_delta_qindex = x->delta_qindex;
+  if (cpi->oxcf.tune_cfg.tuning == AOM_TUNE_SSIMULACRA2) {
+    const int px = cm->width * cm->height;
+    const int bq = cm->quant_params.base_qindex;
+    if (px >= 2700000) {
+      const bool use_90 =
+          (!(bq >= 30 && bq < 50) &&
+           !(px < 3000000 && bq < 25 && cm->width > cm->height) &&
+           !(px < 3000000 && bq < 16));
+      if (use_90) {
+        x->rdmult_delta_qindex = (x->delta_qindex * 90) / 100;
+      }
+    } else if (px >= 2000000 && px < 2700000 && bq >= 140) {
+      x->rdmult_delta_qindex = (x->delta_qindex * 90) / 100;
+    } else if (px >= 100000 && px < 200000 && (bq < 140 || bq >= 165)) {
+      x->rdmult_delta_qindex = (x->delta_qindex * 110) / 100;
+    } else if (px >= 50000 && px < 100000 && bq >= 16 && bq < 140) {
+      x->rdmult_delta_qindex = (x->delta_qindex * 90) / 100;
+    }
+  }
 
   av1_set_offsets(cpi, tile_info, x, mi_row, mi_col, sb_size);
   xd->mi[0]->current_qindex = current_qindex;
@@ -366,6 +385,25 @@ static inline void setup_delta_q(AV1_COMP *const cpi, ThreadData *td,
 
   x->delta_qindex = current_qindex - cm->quant_params.base_qindex;
   x->rdmult_delta_qindex = x->delta_qindex;
+  if (cpi->oxcf.tune_cfg.tuning == AOM_TUNE_SSIMULACRA2) {
+    const int px = cm->width * cm->height;
+    const int bq = cm->quant_params.base_qindex;
+    if (px >= 2700000) {
+      const bool use_90 =
+          (!(bq >= 30 && bq < 50) &&
+           !(px < 3000000 && bq < 25 && cm->width > cm->height) &&
+           !(px < 3000000 && bq < 16));
+      if (use_90) {
+        x->rdmult_delta_qindex = (x->delta_qindex * 90) / 100;
+      }
+    } else if (px >= 2000000 && px < 2700000 && bq >= 140) {
+      x->rdmult_delta_qindex = (x->delta_qindex * 90) / 100;
+    } else if (px >= 100000 && px < 200000 && (bq < 140 || bq >= 165)) {
+      x->rdmult_delta_qindex = (x->delta_qindex * 110) / 100;
+    } else if (px >= 50000 && px < 100000 && bq >= 16 && bq < 140) {
+      x->rdmult_delta_qindex = (x->delta_qindex * 90) / 100;
+    }
+  }
 
   av1_set_offsets(cpi, tile_info, x, mi_row, mi_col, sb_size);
   xd->mi[0]->current_qindex = current_qindex;
