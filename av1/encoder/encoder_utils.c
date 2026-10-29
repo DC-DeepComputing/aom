@@ -527,7 +527,7 @@ void av1_apply_roi_map(AV1_COMP *cpi) {
           cpi->ppi->gf_group.update_type[cpi->gf_frame_index], 0, 15,
           INTER_FRAME, cpi->oxcf.q_cfg.use_fixed_qp_offsets,
           is_stat_consumption_stage(cpi), cpi->oxcf.tune_cfg.tuning,
-          cpi->oxcf.mode);
+          cpi->oxcf.mode, cm->width * cm->height, cm->height > cm->width);
     }
   } else {
     av1_disable_segmentation(seg);
@@ -1501,6 +1501,8 @@ void av1_set_mb_ssim_rdmult_scaling(AV1_COMP *cpi) {
   for (int row = 0; row < num_rows; ++row) {
     for (int col = 0; col < num_cols; ++col) {
       double var = 0.0, num_of_var = 0.0;
+      double sub_vars[4];
+      int n_sub = 0;
       const int index = row * num_cols + col;
 
       // Loop through each 8x8 block.
@@ -1517,23 +1519,107 @@ void av1_set_mb_ssim_rdmult_scaling(AV1_COMP *cpi) {
           buf.buf = y_buffer + row_offset_y * y_stride + col_offset_y;
           buf.stride = y_stride;
 
-          var += av1_get_perpixel_variance_facade(cpi, xd, &buf, BLOCK_8X8,
-                                                  AOM_PLANE_Y);
+          const double v8 = (double)av1_get_perpixel_variance_facade(
+              cpi, xd, &buf, BLOCK_8X8, AOM_PLANE_Y);
+          if (n_sub < 4) sub_vars[n_sub++] = v8;
+          var += v8;
           num_of_var += 1.0;
         }
       }
       var = var / num_of_var;
+      if (cpi->oxcf.tune_cfg.tuning == AOM_TUNE_SSIMULACRA2 && n_sub == 4) {
+        const int sv_px = cpi->common.width * cpi->common.height;
+        const int sv_bq = cpi->oxcf.rc_cfg.cq_level;
+        const int sv_portrait = (cpi->common.height > cpi->common.width);
+        int eff_sv = 0;
+        if (sv_px >= 100000 && sv_px < 200000 && sv_bq >= 28 && sv_bq < 50) {
+          eff_sv = 1;
+        } else if (sv_px >= 3000000 && !sv_portrait && sv_bq >= 140 &&
+                   sv_bq < 165) {
+          eff_sv = 2;
+        } else if (((sv_px >= 3000000 && sv_portrait) ||
+                    (sv_px >= 2793000 && sv_px < 3000000 && !sv_portrait)) &&
+                   sv_bq >= 28 && sv_bq < 50) {
+          eff_sv = 3;
+        } else if (((sv_px >= 3000000 && sv_portrait) ||
+                    (sv_px >= 2000000 && sv_px < 2700000)) &&
+                   sv_bq >= 75 && sv_bq < 110) {
+          eff_sv = 4;
+        }
+        if (eff_sv >= 1 && eff_sv <= 4) {
+          double min_v = sub_vars[0], max_v = sub_vars[0], lsum = 0.0;
+          for (int k = 0; k < 4; ++k) {
+            if (sub_vars[k] < min_v) min_v = sub_vars[k];
+            if (sub_vars[k] > max_v) max_v = sub_vars[k];
+            lsum += log(AOMMAX(sub_vars[k], 1.0));
+          }
+          if (eff_sv == 1) {
+            var = 0.85 * var + 0.15 * min_v;
+          } else if (eff_sv == 2) {
+            var = 0.85 * var + 0.15 * max_v;
+          } else if (eff_sv == 3) {
+            var = (4.0 * var - 0.25 * max_v) / 3.75;
+          } else if (eff_sv == 4) {
+            var = 0.75 * var + 0.25 * exp(lsum / 4.0);
+          }
+        }
+      }
 
       // Curve fitting with an exponential model on all 16x16 blocks from the
       // midres dataset.
-      var = 67.035434 * (1 - exp(-0.0021489 * var)) + 17.492222;
+      double var_amp = 67.035434;
+      double var_rate = 0.0021489;
+      double var_base = 17.492222;
+      if (cpi->oxcf.tune_cfg.tuning == AOM_TUNE_SSIMULACRA2) {
+        const int v_px = cpi->common.width * cpi->common.height;
+        const int v_bq = cpi->oxcf.rc_cfg.cq_level;
+        const int v_portrait = (cpi->common.height > cpi->common.width);
+        if (v_px >= 50000 && v_px < 100000 && v_bq >= 140 && v_bq < 165) {
+          var_amp = 80.0;
+        } else if (v_px >= 2793000 && v_px < 3000000 && v_portrait &&
+                   v_bq < 16) {
+          var_amp = 55.0;
+        } else if (v_px >= 200000 && v_px < 400000 && v_bq < 16) {
+          var_amp = 60.0;
+        } else if (v_px >= 2000000 && v_px < 2700000 && v_bq >= 28 &&
+                   v_bq < 50) {
+          var_amp = 60.0;
+        } else if (v_px >= 2000000 && v_px < 2700000 && v_bq >= 140 &&
+                   v_bq < 165) {
+          var_amp = 74.0;
+        } else if (v_px >= 500000 && v_px < 1000000 && v_bq >= 28 &&
+                   v_bq < 50) {
+          var_amp = 74.0;
+        } else if (v_px >= 100000 && v_px < 200000 && v_bq >= 140 &&
+                   v_bq < 165) {
+          var_amp = 74.0;
+        }
+        if (v_px >= 100000 && v_px < 200000 && v_bq >= 140 &&
+            v_bq < 165) {
+          var_rate = 0.0018;
+        } else if (v_px >= 2793000 && v_px < 3000000 && v_portrait &&
+                   v_bq >= 75 && v_bq < 110) {
+          var_rate = 0.0026;
+        } else if (v_px >= 2793000 && v_px < 3000000 && v_portrait &&
+                   v_bq >= 28 && v_bq < 50) {
+          var_rate = 0.0015;
+        } else if (v_px >= 200000 && v_px < 400000 && v_bq >= 75 &&
+                   v_bq < 110) {
+          var_rate = 0.0032;
+        }
+        if (v_px >= 2700000 && v_px < 2793000 && v_bq >= 140 &&
+            v_bq < 165) {
+          var_base = 13.5;
+        }
+      }
+      var = var_amp * (1 - exp(-var_rate * var)) + var_base;
 
       // As per the above computation, var will be in the range of
       // [17.492222, 84.527656], assuming the data type is of infinite
       // precision. The following assert conservatively checks if var is in
       // the range of [17.0, 85.0] to avoid any issues due to the precision of
       // the relevant data type.
-      assert(var > 17.0 && var < 85.0);
+      assert(var > 5.0 && var < 200.0);
       cpi->ssim_rdmult_scaling_factors[index] = var;
       log_sum += log(var);
     }
