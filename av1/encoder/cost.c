@@ -27,27 +27,3 @@ const uint16_t av1_prob_cost[129] = {
   70,  66,  63,  60,  57,  54,  51,  48,  45,  42,  38,  35,  32,  29,  26,
   23,  20,  18,  15,  12,  9,   6,   3,   3,
 };
-
-void av1_cost_tokens_from_cdf(int *costs, const aom_cdf_prob *cdf,
-                              const int *inv_map) {
-  int prev_icdf = CDF_PROB_TOP;
-  if (inv_map) {
-    for (int i = 0;; ++i) {
-      const int cur_icdf = cdf[i];
-      const int p15 =
-          clamp(prev_icdf - cur_icdf, EC_MIN_PROB, CDF_PROB_TOP - 1);
-      prev_icdf = cur_icdf;
-      costs[inv_map[i]] = av1_cost_symbol_clamped(p15);
-      if (cur_icdf == 0) break;
-    }
-  } else {
-    for (int i = 0;; ++i) {
-      const int cur_icdf = cdf[i];
-      const int p15 =
-          clamp(prev_icdf - cur_icdf, EC_MIN_PROB, CDF_PROB_TOP - 1);
-      prev_icdf = cur_icdf;
-      costs[i] = av1_cost_symbol_clamped(p15);
-      if (cur_icdf == 0) break;
-    }
-  }
-}
