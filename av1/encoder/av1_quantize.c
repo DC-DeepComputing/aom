@@ -955,6 +955,23 @@ void av1_set_quantizer(AV1_COMMON *const cm, int min_qmlevel, int max_qmlevel,
       quant_params->u_ac_delta_q = chroma_ac_delta_q;
       quant_params->v_dc_delta_q = chroma_dc_delta_q;
       quant_params->v_ac_delta_q = chroma_ac_delta_q;
+      if (tuning == AOM_TUNE_SSIMULACRA2 &&
+          cm->seq_params->subsampling_x == 0 &&
+          cm->seq_params->subsampling_y == 0) {
+        const int is_xyb =
+            (cm->seq_params->matrix_coefficients == AOM_CICP_MC_IDENTITY);
+        const int u_ac_max = is_xyb ? 18 : 16;
+        const int v_ac_max = is_xyb ? 28 : 30;
+        const int u_div = is_xyb ? 3 : 2;
+        const int v_div = 2;
+        quant_params->u_ac_delta_q =
+            clamp((quant_params->base_qindex / u_div), 0, u_ac_max);
+        quant_params->v_ac_delta_q =
+            clamp((quant_params->base_qindex / v_div), 0, v_ac_max);
+        if (quant_params->u_ac_delta_q != quant_params->v_ac_delta_q) {
+          cm->seq_params->separate_uv_delta_q = 1;
+        }
+      }
     } else {
       // TODO(aomedia:2717): need to design better delta
       quant_params->u_dc_delta_q = 2;
