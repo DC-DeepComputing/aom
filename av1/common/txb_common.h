@@ -17,7 +17,7 @@
 extern const int16_t av1_eob_group_start[12];
 extern const int16_t av1_eob_offset_bits[12];
 
-extern const int8_t *av1_nz_map_ctx_offset[TX_SIZES_ALL];
+extern const int8_t *const av1_nz_map_ctx_offset[TX_SIZES_ALL];
 
 typedef struct txb_ctx {
   int txb_skip_ctx;
@@ -174,10 +174,10 @@ static const uint8_t clip_max3[256] = {
   3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3
 };
 
-static AOM_FORCE_INLINE int get_nz_mag(const uint8_t *const levels,
-                                       const int bhl, const TX_CLASS tx_class) {
+static AOM_FORCE_INLINE int get_nz_mag_stride(const uint8_t *const levels,
+                                              const intptr_t stride,
+                                              const TX_CLASS tx_class) {
   int mag;
-  const intptr_t stride = (1 << bhl) + TX_PAD_HOR;
   const uint8_t *const lvs = levels + stride;
 
   // Note: AOMMIN(level, 3) is useless for decoder since level < 3.
@@ -200,6 +200,12 @@ static AOM_FORCE_INLINE int get_nz_mag(const uint8_t *const levels,
   }
 
   return mag;
+}
+
+static AOM_FORCE_INLINE int get_nz_mag(const uint8_t *const levels,
+                                       const int bhl, const TX_CLASS tx_class) {
+  const intptr_t stride = (1 << bhl) + TX_PAD_HOR;
+  return get_nz_mag_stride(levels, stride, tx_class);
 }
 
 #define NZ_MAP_CTX_0 SIG_COEF_CONTEXTS_2D
@@ -287,21 +293,39 @@ static AOM_FORCE_INLINE int get_lower_levels_ctx(const uint8_t *levels,
   return get_nz_map_ctx_from_stats(stats, coeff_idx, bhl, tx_size, tx_class);
 }
 
-// Specialized variant for AC coefficients (coeff_idx > 0), skipping the
-// redundant (tx_class | coeff_idx) == 0 check.
-static AOM_FORCE_INLINE int get_lower_levels_ctx_simple(const uint8_t *levels,
-                                                        int coeff_idx, int bhl,
-                                                        TX_SIZE tx_size,
-                                                        TX_CLASS tx_class) {
-  const int stats =
-      get_nz_mag(levels + get_padded_idx(coeff_idx, bhl), bhl, tx_class);
+static AOM_FORCE_INLINE int get_lower_levels_ctx_fast(
+    const uint8_t *levels, int coeff_idx, int bhl, intptr_t stride,
+    const int8_t *nz_map_ctx_offset, TX_CLASS tx_class) {
+  if ((tx_class | coeff_idx) == 0) return 0;
+  const int col = coeff_idx >> bhl;
+  const int stats = get_nz_mag_stride(
+      levels + coeff_idx + (col << TX_PAD_HOR_LOG2), stride, tx_class);
   int ctx = (stats + 1) >> 1;
   ctx = AOMMIN(ctx, 4);
   switch (tx_class) {
-    case TX_CLASS_2D: return ctx + av1_nz_map_ctx_offset[tx_size][coeff_idx];
-    case TX_CLASS_HORIZ: return ctx + nz_map_ctx_offset_1d[coeff_idx >> bhl];
+    case TX_CLASS_2D: return ctx + nz_map_ctx_offset[coeff_idx];
+    case TX_CLASS_HORIZ: return ctx + nz_map_ctx_offset_1d[col];
     case TX_CLASS_VERT:
-      return ctx + nz_map_ctx_offset_1d[coeff_idx & ((1 << bhl) - 1)];
+      return ctx + nz_map_ctx_offset_1d[coeff_idx - (col << bhl)];
+    default: return 0;
+  }
+}
+
+// Specialized variant for AC coefficients (coeff_idx > 0), skipping the
+// redundant (tx_class | coeff_idx) == 0 check.
+static AOM_FORCE_INLINE int get_lower_levels_ctx_simple_fast(
+    const uint8_t *levels, int coeff_idx, int bhl, intptr_t stride,
+    const int8_t *nz_map_ctx_offset, TX_CLASS tx_class) {
+  const int col = coeff_idx >> bhl;
+  const int stats = get_nz_mag_stride(
+      levels + coeff_idx + (col << TX_PAD_HOR_LOG2), stride, tx_class);
+  int ctx = (stats + 1) >> 1;
+  ctx = AOMMIN(ctx, 4);
+  switch (tx_class) {
+    case TX_CLASS_2D: return ctx + nz_map_ctx_offset[coeff_idx];
+    case TX_CLASS_HORIZ: return ctx + nz_map_ctx_offset_1d[col];
+    case TX_CLASS_VERT:
+      return ctx + nz_map_ctx_offset_1d[coeff_idx & ((int)stride - 5)];
     default: return 0;
   }
 }
