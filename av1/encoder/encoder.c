@@ -1706,6 +1706,8 @@ AV1_COMP *av1_create_compressor(AV1_PRIMARY *ppi, const AV1EncoderConfig *oxcf,
   prev_deltaq_params->v_dc_delta_q = INT_MAX;
   prev_deltaq_params->u_ac_delta_q = INT_MAX;
   prev_deltaq_params->v_ac_delta_q = INT_MAX;
+  prev_deltaq_params->prev_px = INT_MAX;
+  prev_deltaq_params->prev_base_qindex = INT_MAX;
 
   av1_init_quantizer(&cpi->enc_quant_dequant_params, &cm->quant_params,
                      cm->seq_params->bit_depth, cpi->oxcf.algo_cfg.sharpness);
