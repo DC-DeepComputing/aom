@@ -734,7 +734,9 @@ static inline bool deltaq_params_have_changed(
           prev_deltaq_params->v_dc_delta_q != quant_params->v_dc_delta_q ||
           prev_deltaq_params->u_ac_delta_q != quant_params->u_ac_delta_q ||
           prev_deltaq_params->v_ac_delta_q != quant_params->v_ac_delta_q ||
-          prev_deltaq_params->sharpness != quant_params->sharpness);
+          prev_deltaq_params->sharpness != quant_params->sharpness ||
+          prev_deltaq_params->prev_px != quant_params->ssim2_px ||
+          prev_deltaq_params->prev_base_qindex != quant_params->base_qindex);
 }
 
 void av1_init_quantizer(EncQuantDequantParams *const enc_quant_dequant_params,
@@ -746,13 +748,14 @@ void av1_init_quantizer(EncQuantDequantParams *const enc_quant_dequant_params,
 
   // Re-initialize the quantizer only if any of the dc/ac deltaq parameters
   // change.
-  if (!deltaq_params_have_changed(prev_deltaq_params, quant_params)) return;
+  if (!deltaq_params_have_changed(prev_deltaq_params, quant_params))
+    return;
   QUANTS *const quants = &enc_quant_dequant_params->quants;
   Dequants *const dequants = &enc_quant_dequant_params->dequants;
   av1_build_quantizer(bit_depth, quant_params->y_dc_delta_q,
                       quant_params->u_dc_delta_q, quant_params->u_ac_delta_q,
                       quant_params->v_dc_delta_q, quant_params->v_ac_delta_q,
-                      quants, dequants, sharpness);
+                      quants, dequants, sharpness, quant_params);
 
   // Record the state of deltaq parameters.
   prev_deltaq_params->y_dc_delta_q = quant_params->y_dc_delta_q;
@@ -761,6 +764,8 @@ void av1_init_quantizer(EncQuantDequantParams *const enc_quant_dequant_params,
   prev_deltaq_params->u_ac_delta_q = quant_params->u_ac_delta_q;
   prev_deltaq_params->v_ac_delta_q = quant_params->v_ac_delta_q;
   prev_deltaq_params->sharpness = sharpness;
+  prev_deltaq_params->prev_px = quant_params->ssim2_px;
+  prev_deltaq_params->prev_base_qindex = quant_params->base_qindex;
 }
 
 /*!\brief Update quantize parameters in MACROBLOCK
@@ -871,7 +876,7 @@ void av1_init_plane_quantizers(const AV1_COMP *cpi, MACROBLOCK *x,
       cpi->ppi->gf_group.update_type[cpi->gf_frame_index], layer_depth,
       boost_index, frame_type, cpi->oxcf.q_cfg.use_fixed_qp_offsets,
       is_stat_consumption_stage(cpi), cpi->oxcf.tune_cfg.tuning,
-      cpi->oxcf.mode);
+      cpi->oxcf.mode, cm->width * cm->height, cm->height > cm->width);
 
   const int qindex_change = x->qindex != qindex;
   if (qindex_change || do_update) {
@@ -888,6 +893,25 @@ void av1_init_plane_quantizers(const AV1_COMP *cpi, MACROBLOCK *x,
 
   av1_set_error_per_bit(&x->errorperbit, rdmult);
   av1_set_sad_per_bit(cpi, &x->sadperbit, qindex_rd);
+
+  const int ssim2_px = (cpi->oxcf.tune_cfg.tuning == AOM_TUNE_SSIMULACRA2)
+                           ? (cm->width * cm->height)
+                           : 0;
+  const int ssim2_is_portrait =
+      (cpi->oxcf.tune_cfg.tuning == AOM_TUNE_SSIMULACRA2 &&
+       cm->height > cm->width)
+          ? 1
+          : 0;
+  const int ssim2_base_q = (cpi->oxcf.tune_cfg.tuning == AOM_TUNE_SSIMULACRA2)
+                               ? quant_params->base_qindex
+                               : 0;
+  for (int tx = 0; tx < TX_SIZES; ++tx) {
+    for (int pl = 0; pl < PLANE_TYPES; ++pl) {
+      x->coeff_costs.coeff_costs[tx][pl].ssim2_px = ssim2_px;
+      x->coeff_costs.coeff_costs[tx][pl].ssim2_is_portrait = ssim2_is_portrait;
+      x->coeff_costs.coeff_costs[tx][pl].ssim2_base_q = ssim2_base_q;
+    }
+  }
 
   x->prev_segment_id = segment_id;
 }
@@ -925,7 +949,16 @@ void av1_set_quantizer(AV1_COMMON *const cm, int min_qmlevel, int max_qmlevel,
   // quantizer has to be reinitialized with av1_init_quantizer() if any
   // delta_q changes.
   CommonQuantParams *quant_params = &cm->quant_params;
+  quant_params->ssim2_px =
+      (tuning == AOM_TUNE_SSIMULACRA2) ? (cm->width * cm->height) : 0;
+  quant_params->ssim2_is_portrait =
+      (tuning == AOM_TUNE_SSIMULACRA2 && cm->height > cm->width) ? 1 : 0;
   quant_params->base_qindex = AOMMAX(cm->delta_q_info.delta_q_present_flag, q);
+  quant_params->ssim2_scale_thresh =
+      (tuning == AOM_TUNE_SSIMULACRA2 && quant_params->base_qindex >= 140 &&
+       quant_params->ssim2_px >= 50000 && quant_params->ssim2_px < 100000)
+          ? 1
+          : 0;
   quant_params->y_dc_delta_q = 0;
 
   // Disable deltaq in lossless mode.
@@ -999,6 +1032,26 @@ void av1_set_quantizer(AV1_COMMON *const cm, int min_qmlevel, int max_qmlevel,
       quant_params->u_ac_delta_q = chroma_ac_delta_q;
       quant_params->v_dc_delta_q = chroma_dc_delta_q;
       quant_params->v_ac_delta_q = chroma_ac_delta_q;
+      if (tuning == AOM_TUNE_SSIMULACRA2 &&
+          cm->seq_params->subsampling_x == 0 &&
+          cm->seq_params->subsampling_y == 0) {
+        const int is_xyb =
+            (cm->seq_params->matrix_coefficients == AOM_CICP_MC_IDENTITY);
+        const int u_ac_max = is_xyb ? 18 : 16;
+        const int v_ac_max = is_xyb ? 28 : 30;
+        const int u_div = is_xyb ? 3 : 2;
+        const int v_div = 2;
+        quant_params->u_dc_delta_q = 0;
+        quant_params->v_dc_delta_q = 0;
+        quant_params->u_ac_delta_q =
+            clamp((quant_params->base_qindex / u_div), 0, u_ac_max);
+        quant_params->v_ac_delta_q =
+            clamp((quant_params->base_qindex / v_div), 0, v_ac_max);
+        if (quant_params->u_dc_delta_q != quant_params->v_dc_delta_q ||
+            quant_params->u_ac_delta_q != quant_params->v_ac_delta_q) {
+          cm->seq_params->separate_uv_delta_q = 1;
+        }
+      }
     } else {
       // TODO(aomedia:2717): need to design better delta
       quant_params->u_dc_delta_q = 2;
