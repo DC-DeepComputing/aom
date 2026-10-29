@@ -1,6 +1,108 @@
 {
   "comments": [
     {
+      "unresolved": true,
+      "key": {
+        "uuid": "a215f2ce_ad381078",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 7
+      },
+      "lineNbr": 13,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-29T21:16:45Z",
+      "side": 1,
+      "message": "Just curious: where does the 1/16 ratio come from?",
+      "revId": "978dc959d997f6886d22da561fdfe086e43558dc",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "7585d116_b37cd348",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 7
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-29T21:16:45Z",
+      "side": 1,
+      "message": "Ihor: This CL is more advanced. I have a little experience with performance issues related to the CPU cache line size, but I have to admit I don\u0027t fully understand your description of the performance problem, hence the many questions below.",
+      "revId": "978dc959d997f6886d22da561fdfe086e43558dc",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "69bdd5d0_be603714",
+        "filename": "av1/encoder/encodeframe.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 2061,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-29T21:16:45Z",
+      "side": 1,
+      "message": "Please explain 128. Is it a common CPU cache line size?\n\nIf the CPU cache line size is 64, do we run into this problem when the width is a multiple of 64?",
+      "revId": "978dc959d997f6886d22da561fdfe086e43558dc",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "4880013a_cb063bf6",
+        "filename": "av1/encoder/encodeframe.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 2062,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-29T21:16:45Z",
+      "side": 1,
+      "message": "Nit: in \"a column doesn\u0027t stay in the cache until the next column reads it\", what does \"it\" refer to?",
+      "revId": "978dc959d997f6886d22da561fdfe086e43558dc",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "60024914_8d07983e",
+        "filename": "av1/encoder/encodeframe.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 2063,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-29T21:16:45Z",
+      "side": 1,
+      "message": "Since many powers of 2 are a factor of 128, it is not clear why 8 is used here.\n\nFor example, would an odd multiple of 4 work?",
+      "revId": "978dc959d997f6886d22da561fdfe086e43558dc",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "3ba06066_83999eb6",
+        "filename": "av1/encoder/encodeframe.c",
+        "patchSetId": 7
+      },
+      "lineNbr": 2063,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-29T21:16:45Z",
+      "side": 1,
+      "message": "Nit: add \"cache\" before \"sets\"?",
+      "revId": "978dc959d997f6886d22da561fdfe086e43558dc",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": false,
       "key": {
         "uuid": "13fdb1c3_e0d800dc",
@@ -32,6 +134,23 @@
       "side": 1,
       "message": "Here are the numbers. I compared three fills: the current column walk, column + padding (this CL), and the row walk.\n\nSetup: RT speed 11, IntraBC on, 20 key frames per clip, 16 of my screen recordings (1080p to 5K) and the 11 AOM CTC b2_scc clips, 4:2:0 and 4:4:4, 1 and 4 threads. Each number is the mean over clips of the per-clip median of 5 interleaved rounds (3 so far on x86). I timed the 2x2 pass, the CRC passes, the count and the fill separately.\n\nFill time in ms per key frame, 1 thread, 4:2:0:\n\nColumn\tColumn + pad\tRow\nApple M3 Pro, recordings\t8.33\t7.46\t5.06\nApple M3 Pro, CTC\t3.60\t3.34\t2.37\nRyzen 9 5900X (MSVC), recordings\t22.48\t17.54\t14.51\nRyzen 9 5900X (MSVC), CTC\t8.08\t7.93\t6.69\nRow walk against this CL, 1 thread (4 threads for the key frame in brackets), 4:2:0 / 4:4:4:\n\nFill\tHash build\tKey frame\nM3 Pro, recordings\t-31% / -31%\t-13% / -13%\t-2.7% / -2.6% (-2.4% / -2.1%)\nM3 Pro, CTC\t-30% / -30%\t-12% / -12%\t-1.9% / -1.7% (-1.6% / -1.0%)\n5900X, recordings\t-17% / -17%\t-7% / -7%\t-2.0% / -1.4% (-1.7% / -1.5%)\n5900X, CTC\t-18% / -17%\t-7% / -6%\t-1.6% / -1.4% (-1.5% / -0.9%)\n\nThe fill is faster with rows on every clip on both machines. The 2x2, CRC and count stages don\u0027t change, except for a 4% CRC difference on the 5900X.\n\nSize, BD rate over q 6 to 24, row walk against this CL. These runs used plain 218282, and both machines gave the same streams:\n\nRecordings: -0.001% / -0.011% at 1 thread, -0.005% / -0.006% at 4 threads (4:2:0 / 4:4:4).\nCTC: +0.013% / +0.021% at 1 thread, +0.008% / +0.020% at 4 threads.\n\nThe worst clip is Slides2r: +0.12% in 4:2:0 and +0.18% in 4:4:4.\n\nSo the row walk is faster than the padding on both Arm and x86, at a size cost of about 0.02% on average on CTC. I\u0027d like to replace this CL with the row walk if you\u0027re OK with the output change. Or we can leave the column walk as is",
       "parentUuid": "13fdb1c3_e0d800dc",
+      "revId": "978dc959d997f6886d22da561fdfe086e43558dc",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "c30792cd_9c90117f",
+        "filename": "av1/encoder/hash_motion.h",
+        "patchSetId": 7
+      },
+      "lineNbr": 107,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-29T21:16:45Z",
+      "side": 1,
+      "message": "Nit: I suggest renaming the `stride` parameters `pic_block_hash_stride` and `pic_hash_stride` to indicate their relation to the corresponding hash buffer.",
       "revId": "978dc959d997f6886d22da561fdfe086e43558dc",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
