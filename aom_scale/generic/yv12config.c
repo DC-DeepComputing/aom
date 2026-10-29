@@ -134,10 +134,13 @@ static int realloc_frame_buffer_aligned(
 
       ybf->buffer_alloc_sz = (size_t)frame_size;
 
-      // This memset is needed for fixing valgrind error from C loop filter
-      // due to access uninitialized memory in frame border. It could be
-      // removed if border is totally removed.
+#if defined(__has_feature)
+#if __has_feature(memory_sanitizer)
+      // This memset is needed for fixing valgrind/msan error from C loop filter
+      // due to access uninitialized memory in frame border.
       memset(ybf->buffer_alloc, 0, ybf->buffer_alloc_sz);
+#endif
+#endif
     }
 
     ybf->y_crop_width = width;
