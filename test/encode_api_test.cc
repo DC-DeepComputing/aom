@@ -4691,6 +4691,127 @@ TEST(EncodeAPI, Avg16x16IntegerOverflow) {
 
   EXPECT_EQ(AOM_CODEC_OK, aom_codec_destroy(&enc));
 }
+
+// Verifies that validate_img() rejects high bit-depth images whose plane
+// pointers or byte strides are not 2-byte aligned.
+// Bug: 578678096
+TEST(EncodeAPI, HighbdMisalignedPlanesAndStrides) {
+  aom_codec_iface_t *const iface = aom_codec_av1_cx();
+  aom_codec_ctx_t enc;
+  aom_codec_enc_cfg_t cfg;
+
+  ASSERT_EQ(aom_codec_enc_config_default(iface, &cfg, AOM_USAGE_REALTIME),
+            AOM_CODEC_OK);
+
+  const unsigned int kWidth = 72;
+  const unsigned int kHeight = 72;
+  const int kStride = 256;
+  cfg.g_w = kWidth;
+  cfg.g_h = kHeight;
+  cfg.g_profile = 0;
+  cfg.g_bit_depth = AOM_BITS_10;
+  cfg.g_input_bit_depth = 10;
+  cfg.g_pass = AOM_RC_ONE_PASS;
+  cfg.g_lag_in_frames = 0;
+  cfg.rc_end_usage = AOM_Q;
+  cfg.rc_min_quantizer = 0;
+  cfg.rc_max_quantizer = 0;
+
+  ASSERT_EQ(aom_codec_enc_init(&enc, iface, &cfg, AOM_CODEC_USE_HIGHBITDEPTH),
+            AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&enc, AOME_SET_CPUUSED, 6), AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&enc, AOME_SET_CQ_LEVEL, 0), AOM_CODEC_OK);
+
+  std::vector<uint8_t> buf(kStride * kHeight * 3 + 16, 0);
+  // Ensure base is 2-byte aligned so base + 1 is guaranteed to be odd and
+  // base + 2 is guaranteed to be even.
+  uint8_t *base = buf.data();
+  if (reinterpret_cast<uintptr_t>(base) & 1) {
+    ++base;
+  }
+
+  // Populate a 4x4 checkerboard pattern of [0x00, 0x7F] / [0x00, 0x80] in the
+  // right-most 8x8 column. At base + 1 (odd), these 16-bit little-endian words
+  // are 0x007F / 0x0080 (< 1024); at base + 0 (even), they are 0x7F00 / 0x8000.
+  for (unsigned int y = 0; y < kHeight; ++y) {
+    for (unsigned int x = 64; x < kWidth; ++x) {
+      const size_t idx = y * kStride + x * 2;
+      const bool sx = (x & 3) < 2;
+      const bool sy = (y & 3) < 2;
+      base[idx] = 0x00;
+      base[idx + 1] = (sx ^ sy) ? 0x80 : 0x7F;
+    }
+  }
+
+  aom_image_t img;
+  memset(&img, 0, sizeof(img));
+  ASSERT_EQ(aom_img_wrap(&img, AOM_IMG_FMT_I42016, kWidth, kHeight, 1, base),
+            &img);
+  uint8_t *const aligned_y = base + 2;
+  uint8_t *const aligned_u = base + kStride * kHeight + 2;
+  uint8_t *const aligned_v = base + kStride * kHeight * 2 + 2;
+  auto reset_valid_img = [&]() {
+    img.planes[AOM_PLANE_Y] = aligned_y;
+    img.planes[AOM_PLANE_U] = aligned_u;
+    img.planes[AOM_PLANE_V] = aligned_v;
+    img.stride[AOM_PLANE_Y] = kStride;
+    img.stride[AOM_PLANE_U] = kStride;
+    img.stride[AOM_PLANE_V] = kStride;
+  };
+
+  // 1. Odd plane pointers on Y, U, or V must be rejected.
+  for (int plane = 0; plane < 3; ++plane) {
+    reset_valid_img();
+    img.planes[plane] -= 1;  // Odd byte address.
+    EXPECT_EQ(aom_codec_encode(&enc, &img, /*pts=*/0, /*duration=*/1,
+                               /*flags=*/AOM_EFLAG_FORCE_KF),
+              AOM_CODEC_INVALID_PARAM);
+  }
+
+  // 2. Odd byte strides on Y or U/V must be rejected.
+  reset_valid_img();
+  img.stride[AOM_PLANE_Y] = kStride + 1;
+  EXPECT_EQ(aom_codec_encode(&enc, &img, /*pts=*/0, /*duration=*/1,
+                             /*flags=*/AOM_EFLAG_FORCE_KF),
+            AOM_CODEC_INVALID_PARAM);
+
+  reset_valid_img();
+  img.stride[AOM_PLANE_U] = kStride + 1;
+  img.stride[AOM_PLANE_V] = kStride + 1;
+  EXPECT_EQ(aom_codec_encode(&enc, &img, /*pts=*/0, /*duration=*/1,
+                             /*flags=*/AOM_EFLAG_FORCE_KF),
+            AOM_CODEC_INVALID_PARAM);
+
+  // 3. Even with AOME_SET_VALIDATE_HBD_INPUT disabled, odd plane pointers and
+  // strides must still be rejected because CONVERT_TO_BYTEPTR and stride >>= 1
+  // require 2-byte alignment.
+  ASSERT_EQ(aom_codec_control(&enc, AOME_SET_VALIDATE_HBD_INPUT, 0),
+            AOM_CODEC_OK);
+  reset_valid_img();
+  img.planes[AOM_PLANE_Y] -= 1;
+  EXPECT_EQ(aom_codec_encode(&enc, &img, /*pts=*/0, /*duration=*/1,
+                             /*flags=*/AOM_EFLAG_FORCE_KF),
+            AOM_CODEC_INVALID_PARAM);
+  ASSERT_EQ(aom_codec_control(&enc, AOME_SET_VALIDATE_HBD_INPUT, 1),
+            AOM_CODEC_OK);
+
+  // 4. At the 2-byte aligned address (base + 2), the crafted bytes read as
+  // 0x7F00 / 0x8000 (>= 1024) and are rejected by validate_hbd_input.
+  // Moving the valid 10-bit samples (0x007F / 0x0080) to the 2-byte aligned
+  // plane address allows the frame to encode cleanly.
+  reset_valid_img();
+  EXPECT_EQ(aom_codec_encode(&enc, &img, /*pts=*/0, /*duration=*/1,
+                             /*flags=*/AOM_EFLAG_FORCE_KF),
+            AOM_CODEC_INVALID_PARAM);
+
+  memmove(base, base + 1, kStride * kHeight * 3);
+  reset_valid_img();
+  EXPECT_EQ(aom_codec_encode(&enc, &img, /*pts=*/0, /*duration=*/1,
+                             /*flags=*/AOM_EFLAG_FORCE_KF),
+            AOM_CODEC_OK);
+
+  ASSERT_EQ(aom_codec_destroy(&enc), AOM_CODEC_OK);
+}
 #endif  // CONFIG_AV1_HIGHBITDEPTH
 
 }  // namespace
