@@ -1089,9 +1089,20 @@ static inline void sort_rd(int64_t rds[], int txk[], int len) {
   }
 }
 
+#if HAVE_AVX2
+int64_t av1_block_error_qm_avx2(const tran_low_t *coeff,
+                                const tran_low_t *dqcoeff, intptr_t block_size,
+                                const qm_val_t *qmatrix, const int16_t *scan,
+                                int64_t *ssz, int bd);
+#endif
+
 static inline int64_t av1_block_error_qm(
     const tran_low_t *coeff, const tran_low_t *dqcoeff, intptr_t block_size,
     const qm_val_t *qmatrix, const int16_t *scan, int64_t *ssz, int bd) {
+#if HAVE_AVX2
+  return av1_block_error_qm_avx2(coeff, dqcoeff, block_size, qmatrix, scan, ssz,
+                                 bd);
+#endif
   int i;
   int64_t error = 0, sqcoeff = 0;
   int shift = 2 * (bd - 8);
