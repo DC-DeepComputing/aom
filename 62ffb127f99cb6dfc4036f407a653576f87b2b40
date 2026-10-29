@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "a9de0dba_ef073bf9",
+        "filename": "av1/av1_cx_iface.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 1031,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-29T21:37:53Z",
+      "side": 1,
+      "message": "Should we move the new if statement into the `#if CONFIG_AV1_HIGHBITDEPTH` block at line 1043 below?",
+      "revId": "62ffb127f99cb6dfc4036f407a653576f87b2b40",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
