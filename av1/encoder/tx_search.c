@@ -3002,6 +3002,35 @@ static inline void choose_tx_size_type_from_rd(const AV1_COMP *const cpi,
   int64_t best_rd = INT64_MAX;
   const int num_blks = bsize_to_num_blk(bs);
   x->rd_model = FULL_TXFM_RD;
+  int tx_depth_opt = 0;
+  if (cpi->oxcf.tune_cfg.tuning == AOM_TUNE_SSIMULACRA2) {
+    const int td_px = cpi->common.width * cpi->common.height;
+    const int td_bq = cpi->common.quant_params.base_qindex;
+    const int td_portrait = (cpi->common.height > cpi->common.width);
+    if ((td_px >= 2000000 && td_px < 2700000 && td_bq >= 75 && td_bq < 110) ||
+        (td_px >= 200000 && td_px < 400000 && td_bq <= 16)) {
+      tx_depth_opt = 1;
+    } else if (((td_px >= 2793000 && td_px < 3000000 && td_portrait) ||
+                (td_px >= 50000 && td_px < 100000) ||
+                (td_px >= 1500 && td_px < 15000)) &&
+               td_bq >= 75 && td_bq < 110) {
+      tx_depth_opt = 2;
+    } else if (td_px >= 200000 && td_px < 400000 && td_bq >= 28 &&
+               td_bq < 50) {
+      tx_depth_opt = 3;
+    } else if ((td_px >= 3000000 && !td_portrait && td_bq >= 28 &&
+                td_bq < 50) ||
+               (td_px >= 100000 && td_px < 200000 && td_bq >= 75 &&
+                td_bq < 110)) {
+      tx_depth_opt = 6;
+    } else if (td_px >= 2000000 && td_px < 2700000 && td_bq >= 28 &&
+               td_bq < 50) {
+      tx_depth_opt = 7;
+    } else if (td_px >= 100000 && td_px < 200000 && td_bq >= 140 &&
+               td_bq < 165) {
+      tx_depth_opt = 8;
+    }
+  }
   int64_t rd[MAX_TX_DEPTH + 1] = { INT64_MAX, INT64_MAX, INT64_MAX };
   for (int tx_size = start_tx, depth = init_depth; depth <= MAX_TX_DEPTH;
        depth++, tx_size = sub_tx_size_map[tx_size]) {
@@ -3032,6 +3061,21 @@ static inline void choose_tx_size_type_from_rd(const AV1_COMP *const cpi,
             : ref_best_rd;
     rd[depth] = uniform_txfm_yrd(cpi, x, &this_rd_stats, rd_thresh, bs, tx_size,
                                  FTXS_NONE);
+    if (rd[depth] != INT64_MAX && depth > init_depth) {
+      if (tx_depth_opt == 1) {
+        rd[depth] -= (rd[depth] >> 5);
+      } else if (tx_depth_opt == 2) {
+        rd[depth] += (rd[depth] >> 5);
+      } else if (tx_depth_opt == 3) {
+        rd[depth] -= (rd[depth] >> 6);
+      } else if (tx_depth_opt == 6) {
+        rd[depth] += (rd[depth] >> 6);
+      } else if (tx_depth_opt == 7) {
+        rd[depth] -= (rd[depth] >> 7);
+      } else if (tx_depth_opt == 8) {
+        rd[depth] += (rd[depth] >> 7);
+      }
+    }
     if (rd[depth] < best_rd) {
       av1_copy_array(best_txk_type_map, xd->tx_type_map, num_blks);
       best_tx_size = tx_size;
