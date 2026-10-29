@@ -289,6 +289,7 @@ void av1_thread_loop_filter_rows(
   int mi_col, c;
 
   const bool joint_filter_chroma = (lpf_opt_level == 2) && plane > AOM_PLANE_Y;
+  const bool check_params = lpf_opt_level == LPF_OPT_LEVEL_CHECK_PARAMS;
   const int num_planes = joint_filter_chroma ? 2 : 1;
   assert(IMPLIES(joint_filter_chroma, plane == AOM_PLANE_U));
 
@@ -300,9 +301,9 @@ void av1_thread_loop_filter_rows(
                            mi_row, mi_col, plane, plane + num_planes);
       if (lpf_opt_level) {
         if (plane == AOM_PLANE_Y) {
-          av1_filter_block_plane_vert_opt(cm, xd, &planes[plane], mi_row,
-                                          mi_col, params_buf, tx_buf,
-                                          num_mis_in_lpf_unit_height_log2);
+          av1_filter_block_plane_vert_opt(
+              cm, xd, &planes[plane], mi_row, mi_col, params_buf, tx_buf,
+              check_params, num_mis_in_lpf_unit_height_log2);
         } else {
           av1_filter_block_plane_vert_opt_chroma(
               cm, xd, &planes[plane], mi_row, mi_col, params_buf, tx_buf, plane,
@@ -333,9 +334,9 @@ void av1_thread_loop_filter_rows(
                            mi_row, mi_col, plane, plane + num_planes);
       if (lpf_opt_level) {
         if (plane == AOM_PLANE_Y) {
-          av1_filter_block_plane_horz_opt(cm, xd, &planes[plane], mi_row,
-                                          mi_col, params_buf, tx_buf,
-                                          num_mis_in_lpf_unit_height_log2);
+          av1_filter_block_plane_horz_opt(
+              cm, xd, &planes[plane], mi_row, mi_col, params_buf, tx_buf,
+              check_params, num_mis_in_lpf_unit_height_log2);
         } else {
           av1_filter_block_plane_horz_opt_chroma(
               cm, xd, &planes[plane], mi_row, mi_col, params_buf, tx_buf, plane,

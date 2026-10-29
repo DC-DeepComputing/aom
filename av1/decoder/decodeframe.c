@@ -5417,9 +5417,12 @@ void av1_decode_tg_tiles_and_wrapup(AV1Decoder *pbi, const uint8_t *data,
     start_timing(pbi, av1_loop_filter_frame_time);
 #endif
     if (cm->lf.filter_level[0] || cm->lf.filter_level[1]) {
+      // Dual/quad loop filtering, used only where the batched edges have the
+      // same filter parameters, so the output matches the single-edge path.
       av1_loop_filter_frame_mt(&cm->cur_frame->buf, cm, &pbi->dcb.xd, 0,
                                num_planes, 0, pbi->tile_workers,
-                               pbi->num_workers, &pbi->lf_row_sync, 0);
+                               pbi->num_workers, &pbi->lf_row_sync,
+                               LPF_OPT_LEVEL_CHECK_PARAMS);
     }
 #if CONFIG_COLLECT_COMPONENT_TIMING
     end_timing(pbi, av1_loop_filter_frame_time);
