@@ -351,10 +351,17 @@ void av1_quantize_b_facade(const tran_low_t *coeff_ptr, intptr_t n_coeffs,
 #endif  // !CONFIG_REALTIME_ONLY
 
   if (qm_ptr != NULL && iqm_ptr != NULL) {
+#if HAVE_AVX2
+    av1_quantize_b_qm_avx2(coeff_ptr, n_coeffs, p->zbin_QTX, p->round_QTX,
+                           p->quant_QTX, p->quant_shift_QTX, qcoeff_ptr,
+                           dqcoeff_ptr, p->dequant_QTX, eob_ptr, sc->iscan,
+                           qm_ptr, iqm_ptr, qparam->log_scale);
+#else
     aom_quantize_b_helper_c(coeff_ptr, n_coeffs, p->zbin_QTX, p->round_QTX,
                             p->quant_QTX, p->quant_shift_QTX, qcoeff_ptr,
                             dqcoeff_ptr, p->dequant_QTX, eob_ptr, sc->scan,
                             sc->iscan, qm_ptr, iqm_ptr, qparam->log_scale);
+#endif
   } else {
     switch (qparam->log_scale) {
       case 0:
@@ -500,10 +507,17 @@ void av1_highbd_quantize_b_facade(const tran_low_t *coeff_ptr,
 #endif  // !CONFIG_REALTIME_ONLY
 
   if (qm_ptr != NULL && iqm_ptr != NULL) {
+#if HAVE_AVX2
+    av1_highbd_quantize_b_qm_avx2(
+        coeff_ptr, n_coeffs, p->zbin_QTX, p->round_QTX, p->quant_QTX,
+        p->quant_shift_QTX, qcoeff_ptr, dqcoeff_ptr, p->dequant_QTX, eob_ptr,
+        sc->iscan, qm_ptr, iqm_ptr, qparam->log_scale);
+#else
     aom_highbd_quantize_b_helper_c(
         coeff_ptr, n_coeffs, p->zbin_QTX, p->round_QTX, p->quant_QTX,
         p->quant_shift_QTX, qcoeff_ptr, dqcoeff_ptr, p->dequant_QTX, eob_ptr,
         sc->scan, sc->iscan, qm_ptr, iqm_ptr, qparam->log_scale);
+#endif
   } else {
     switch (qparam->log_scale) {
       case 0:
