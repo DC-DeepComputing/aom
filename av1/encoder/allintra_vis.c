@@ -1097,7 +1097,38 @@ int av1_get_sbq_variance_boost(const AV1_COMP *cpi, const MACROBLOCK *x) {
   // High and medium variance SBs essentially get no boost, while lower variance
   // SBs get increasingly stronger boosts.
   // Still picture curve, with variance crossover point at 1024.
-  double qstep_ratio = 0.15 * strength * (-log2((double)variance) + 10.0) + 1.0;
+  double cur_coef = 0.15;
+  double cur_cross = 10.0;
+  double cur_qoff = 544.0;
+  int cur_ceil = (cpi->oxcf.tune_cfg.tuning == AOM_TUNE_SSIMULACRA2)
+                     ? 40
+                     : VAR_BOOST_MAX_DELTAQ_RANGE;
+  if (cpi->oxcf.tune_cfg.tuning == AOM_TUNE_SSIMULACRA2) {
+    const int px = cpi->common.width * cpi->common.height;
+    cur_ceil = 40;
+    cur_qoff = 590.0;
+    cur_cross = 10.0;
+    if (base_qindex >= 140) {
+      if (px >= 2600000) {
+        cur_qoff = 500.0;
+      } else if (px >= 50000 && px < 100000) {
+        cur_qoff = 340.0;
+      } else if ((px >= 1000000 && px < 2600000) ||
+                 (px >= 100000 && px < 200000)) {
+        cur_qoff = 340.0;
+      }
+    }
+    if (px >= 100000 && px < 200000 && base_qindex >= 23 &&
+        base_qindex < 140) {
+      cur_cross = 4.0;
+    } else if (px <= 1500) {
+      cur_cross = 4.0;
+    }
+  }
+  const double var_f = (double)variance;
+  double qstep_ratio =
+      cur_coef * strength * (-log2(var_f) + cur_cross) +
+      1.0;
   qstep_ratio = fclamp(qstep_ratio, 1.0, VAR_BOOST_MAX_BOOST);
 
   double base_q = av1_convert_qindex_to_q(base_qindex, bit_depth);
@@ -1110,11 +1141,8 @@ int av1_get_sbq_variance_boost(const AV1_COMP *cpi, const MACROBLOCK *x) {
   // The scaling coefficients were chosen empirically to maximize SSIMULACRA 2
   // scores, 10th percentile scores, and subjective quality. Boosts become
   // smaller (for a given variance) the lower the base qindex.
-  int cur_ceil = (cpi->oxcf.tune_cfg.tuning == AOM_TUNE_SSIMULACRA2)
-                     ? 40
-                     : VAR_BOOST_MAX_DELTAQ_RANGE;
-  int boost = (int)round((base_qindex + 544.0) * (base_qindex - target_qindex) /
-                         1279.0);
+  int boost = (int)round((base_qindex + cur_qoff) *
+                         (base_qindex - target_qindex) / 1279.0);
   boost = AOMMIN(cur_ceil, boost);
 
   // Variance Boost was designed to always operate in the lossy domain, so MINQ
