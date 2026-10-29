@@ -20,6 +20,24 @@
     {
       "unresolved": false,
       "key": {
+        "uuid": "54c4f67e_aa6355c3",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 2
+      },
+      "lineNbr": 17,
+      "author": {
+        "id": 26549
+      },
+      "writtenOn": "2026-10-29T15:29:45Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "dfe5a70b_5c077055",
+      "revId": "0f1058022b5f03553ec2545b6fa98344469eeb2f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
         "uuid": "cb77d9a4_a204ac81",
         "filename": "/PATCHSET_LEVEL",
         "patchSetId": 2
@@ -52,6 +70,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "7c3d80ea_2372f6f9",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 26549
+      },
+      "writtenOn": "2026-10-29T15:29:45Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "5b7e5cb2_51ef43ac",
+      "revId": "0f1058022b5f03553ec2545b6fa98344469eeb2f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "112589a1_0f0e43e1",
@@ -69,6 +105,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "085d9808_f9fc13a7",
+        "filename": "test/variance_test.cc",
+        "patchSetId": 2
+      },
+      "lineNbr": 89,
+      "author": {
+        "id": 26549
+      },
+      "writtenOn": "2026-10-29T15:29:45Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "112589a1_0f0e43e1",
+      "revId": "0f1058022b5f03553ec2545b6fa98344469eeb2f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "dfeb984f_0a9aeccd",
@@ -82,6 +136,24 @@
       "writtenOn": "2026-10-28T23:02:10Z",
       "side": 1,
       "message": "Nit: Change \"it\" to \"the variance\".",
+      "revId": "0f1058022b5f03553ec2545b6fa98344469eeb2f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "d3f381c8_ab9e70a2",
+        "filename": "test/variance_test.cc",
+        "patchSetId": 2
+      },
+      "lineNbr": 90,
+      "author": {
+        "id": 26549
+      },
+      "writtenOn": "2026-10-29T15:29:45Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "dfeb984f_0a9aeccd",
       "revId": "0f1058022b5f03553ec2545b6fa98344469eeb2f",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
