@@ -720,6 +720,10 @@ struct CommonQuantParams {
   int qmatrix_level_u; /*!< Level index for U plane */
   int qmatrix_level_v; /*!< Level index for V plane */
   /**@}*/
+
+  int ssim2_px;
+  int ssim2_is_portrait;
+  int ssim2_scale_thresh;
 };
 
 typedef struct CommonContexts CommonContexts;
