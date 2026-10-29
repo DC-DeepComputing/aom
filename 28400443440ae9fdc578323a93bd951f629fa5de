@@ -1,0 +1,174 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "fa56b1ef_2f44aeb3",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 11
+      },
+      "lineNbr": 29,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-29T20:29:25Z",
+      "side": 1,
+      "message": "The following excerpts from the commit message are useful information:\n\n\u003e A block can only copy from its own tile.\n\n\u003e Give each tile its own table with only the blocks that lie inside it.\n\u003e The encoder threads build the tables before the tiles are encoded, one\n\u003e tile per job, and av1_intrabc_hash_search() uses the table of the\n\u003e current tile. A frame with more than 16 tiles keeps a single\n\u003e table for the whole frame, which bounds the memory.\n\n\u003e The bucket arrays are now allocated only for the block sizes that get\n\u003e built. At speed 11 that is just 8x8.\n\nPlease make sure that this information also appears in some comments in the source code.",
+      "revId": "28400443440ae9fdc578323a93bd951f629fa5de",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "f6a8d052_79993f61",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 11
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-29T20:29:25Z",
+      "side": 1,
+      "message": "Ihor: I finally reviewed this CL. Thanks for your patience.\n\nSeveral of my review comments are related to recording and validating the size of the `intrabc_hash_info-\u003eframe_hash_buffer[j]` arrays. In the original code, these two buffers (named `block_hash_values`) were allocated, used, and freed within the following block of code, so it was more obvious what the buffer size was:\n\n```\n    // add to hash table\n    const int pic_width \u003d cpi-\u003esource-\u003ey_crop_width;\n    const int pic_height \u003d cpi-\u003esource-\u003ey_crop_height;\n    uint32_t *block_hash_values[2] \u003d { NULL };  // two buffers used ping-pong\n    bool error \u003d false;\n\n    for (int j \u003d 0; j \u003c 2; ++j) {\n      block_hash_values[j] \u003d (uint32_t *)aom_malloc(\n          sizeof(*block_hash_values[j]) * pic_width * pic_height);\n      if (!block_hash_values[j]) {\n        error \u003d true;\n        break;\n      }\n    }\n\n    av1_hash_table_init(intrabc_hash_info);\n    if (error ||\n        !av1_hash_table_create(\u0026intrabc_hash_info-\u003eintrabc_hash_table)) {\n      free_block_hash_buffers(block_hash_values);\n      aom_internal_error(cm-\u003eerror, AOM_CODEC_MEM_ERROR,\n                         \"Error allocating intrabc_hash_table and buffers\");\n    }\n    av1_generate_block_2x2_hash_value(cpi-\u003esource, block_hash_values[0]);\n    // Hash data generated for screen contents is used for intraBC ME\n    const int min_alloc_size \u003d block_size_wide[mi_params-\u003emi_alloc_bsize];\n    int max_sb_size \u003d (1 \u003c\u003c (cm-\u003eseq_params-\u003emib_size_log2 + MI_SIZE_LOG2));\n\n    if (cpi-\u003esf.mv_sf.hash_max_8x8_intrabc_blocks) {\n      max_sb_size \u003d AOMMIN(8, max_sb_size);\n    }\n\n    int src_idx \u003d 0;\n    for (int size \u003d 4; size \u003c\u003d max_sb_size; size *\u003d 2, src_idx \u003d !src_idx) {\n      const int dst_idx \u003d !src_idx;\n      av1_generate_block_hash_value(intrabc_hash_info, cpi-\u003esource, size,\n                                    block_hash_values[src_idx],\n                                    block_hash_values[dst_idx]);\n      if (size \u003e\u003d min_alloc_size \u0026\u0026\n          !av1_add_to_hash_map_by_row_with_precal_data(\n              \u0026intrabc_hash_info-\u003eintrabc_hash_table,\n              block_hash_values[dst_idx], pic_width, pic_height, size)) {\n        error \u003d true;\n        break;\n      }\n    }\n\n    free_block_hash_buffers(block_hash_values);\n\n    if (error) {\n      aom_internal_error(cm-\u003eerror, AOM_CODEC_MEM_ERROR,\n                         \"Error adding data to intrabc_hash_table\");\n    }\n```\n\nIn the new code, the `intrabc_hash_info-\u003eframe_hash_buffer[j]` arrays are allocated and used in different functions, so it is harder to analyze the code and verify that there are no out-of-bounds accesses to these arrays. This is why I suggest adding code to validate that at run time.",
+      "revId": "28400443440ae9fdc578323a93bd951f629fa5de",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "07b77f35_a5e2ccb3",
+        "filename": "av1/encoder/encodeframe.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 2071,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-29T20:29:25Z",
+      "side": 1,
+      "message": "Remember to set the corresponding buffer size or `pic_width` and `pic_height` fields to 0.",
+      "revId": "28400443440ae9fdc578323a93bd951f629fa5de",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "241d60e6_c276b5a8",
+        "filename": "av1/encoder/encodeframe.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 2076,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-29T20:29:25Z",
+      "side": 1,
+      "message": "Nit: I suggest changing the first parameter `cpi` to two parameters `cpi-\u003esource` and `cpi-\u003ecommon`. This makes it clear that the caller passes `cpi-\u003esource` to this function. It is helpful to the analysis of the code.",
+      "revId": "28400443440ae9fdc578323a93bd951f629fa5de",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "38318398_65b87129",
+        "filename": "av1/encoder/encodeframe.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 2097,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-29T20:29:25Z",
+      "side": 1,
+      "message": "Note: See also the comment at av1/encoder/hash_motion.h:82.\n\nAt av1/encoder/hash_motion.h:82, I suggest recording the size of `intrabc_hash_info-\u003eframe_hash_buffer[j]` or the `pic_width` and `pic_height` values used to allocate `intrabc_hash_info-\u003eframe_hash_buffer[j]`.\n\nBefore we use `block_hash_values`, we should validate that the following two variables are equal to the values recorded in the `intrabc_hash_info` struct:\n\n```\n  const int pic_width \u003d cpi-\u003esource-\u003ey_crop_width;\n  const int pic_height \u003d cpi-\u003esource-\u003ey_crop_height;\n```\n\nThen, we make sure `block_hash_values` is only used with `cpi-\u003esource`. This can be verified by code review (I did that). You can add a coment to emphasize that.",
+      "revId": "28400443440ae9fdc578323a93bd951f629fa5de",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "b88b523b_5a2bf5d9",
+        "filename": "av1/encoder/encodeframe.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 2105,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-29T20:29:25Z",
+      "side": 1,
+      "message": "Nit: Omit the outer parentheses:\n\n```\n  int max_sb_size \u003d 1 \u003c\u003c (cm-\u003eseq_params-\u003emib_size_log2 + MI_SIZE_LOG2);\n```",
+      "revId": "28400443440ae9fdc578323a93bd951f629fa5de",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "26328ab0_e697149a",
+        "filename": "av1/encoder/ethread.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 2020,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-29T20:29:25Z",
+      "side": 1,
+      "message": "Nit: Name the loop index variable `i` or `table_idx`.",
+      "revId": "28400443440ae9fdc578323a93bd951f629fa5de",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "182dd544_52d2d34a",
+        "filename": "av1/encoder/hash_motion.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 26,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-29T20:29:25Z",
+      "side": 1,
+      "message": "Nit: Rename this constant `kBucketsPerBlockSize`",
+      "revId": "28400443440ae9fdc578323a93bd951f629fa5de",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "4cf5fa62_bac0aee1",
+        "filename": "av1/encoder/hash_motion.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 144,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-29T20:29:25Z",
+      "side": 1,
+      "message": "Remember to set the corresponding buffer size or `pic_width` and `pic_height` fields to 0.",
+      "revId": "28400443440ae9fdc578323a93bd951f629fa5de",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "134c82b4_57a56808",
+        "filename": "av1/encoder/hash_motion.h",
+        "patchSetId": 11
+      },
+      "lineNbr": 82,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-29T20:29:25Z",
+      "side": 1,
+      "message": "Note: See also the comment in `av1_build_intrabc_hash_table()` at av1/encoder/encodeframe.c:2097.\n\nIMPORTANT: We should record the size of `frame_hash_buffer[j]`.\n\nIt is allocated as follows:\n\n```\n  const int pic_width \u003d cpi-\u003esource-\u003ey_crop_width;\n  const int pic_height \u003d cpi-\u003esource-\u003ey_crop_height;\n  ...\n  for (int j \u003d 0; j \u003c 2; ++j) {\n    intrabc_hash_info-\u003eframe_hash_buffer[j] \u003d (uint32_t *)aom_malloc(\n        sizeof(*intrabc_hash_info-\u003eframe_hash_buffer[j]) * pic_width *\n        pic_height);\n    ...\n  }\n```\n\nSo we should record the size `pic_width * pic_height` unless it can be inferred from other fields of this struct (which seems unlikely). We could also record `pic_width` and `pic_height` separately.",
+      "revId": "28400443440ae9fdc578323a93bd951f629fa5de",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
