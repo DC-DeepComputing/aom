@@ -33,6 +33,7 @@ typedef struct QUANT_PARAM {
   int use_quant_b_adapt;
   int use_optimize_b;
   int xform_quant_idx;
+  int ssim2_scale_thresh;
 } QUANT_PARAM;
 
 typedef void (*AV1_QUANT_FACADE)(const tran_low_t *coeff_ptr, intptr_t n_coeffs,
@@ -92,6 +93,8 @@ typedef struct {
   int v_dc_delta_q;
   int v_ac_delta_q;
   int sharpness;
+  int prev_px;
+  int prev_base_qindex;
 } DeltaQuantParams;
 
 typedef struct {
@@ -113,10 +116,19 @@ void av1_frame_init_quantizer(struct AV1_COMP *cpi);
 void av1_init_plane_quantizers(const struct AV1_COMP *cpi, MACROBLOCK *x,
                                int segment_id, const int do_update);
 
+#ifdef __cplusplus
 void av1_build_quantizer(aom_bit_depth_t bit_depth, int y_dc_delta_q,
                          int u_dc_delta_q, int u_ac_delta_q, int v_dc_delta_q,
                          int v_ac_delta_q, QUANTS *const quants,
-                         Dequants *const deq, int sharpness);
+                         Dequants *const deq, int sharpness,
+                         const CommonQuantParams *quant_params = NULL);
+#else
+void av1_build_quantizer(aom_bit_depth_t bit_depth, int y_dc_delta_q,
+                         int u_dc_delta_q, int u_ac_delta_q, int v_dc_delta_q,
+                         int v_ac_delta_q, QUANTS *const quants,
+                         Dequants *const deq, int sharpness,
+                         const CommonQuantParams *quant_params);
+#endif
 
 void av1_init_quantizer(EncQuantDequantParams *const enc_quant_dequant_params,
                         CommonQuantParams *quant_params,
