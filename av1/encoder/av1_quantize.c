@@ -1056,6 +1056,14 @@ void av1_set_quantizer(AV1_COMMON *const cm, int min_qmlevel, int max_qmlevel,
         const int y_min = use_y_0 ? 0 : 1;
         quant_params->qmatrix_level_y =
             clamp(quant_params->qmatrix_level_y - y_sub, y_min, max_qmlevel);
+        const bool use_uv_0 =
+            (qm_px >= 2600000 && quant_params->base_qindex >= 140);
+        const int uv_sub = use_uv_0 ? 2 : 1;
+        const int uv_min = use_uv_0 ? 0 : 1;
+        quant_params->qmatrix_level_u =
+            clamp(quant_params->qmatrix_level_u - uv_sub, uv_min, max_qmlevel);
+        quant_params->qmatrix_level_v =
+            clamp(quant_params->qmatrix_level_v - uv_sub, uv_min, max_qmlevel);
       } else if (quant_params->base_qindex >= 80) {
         quant_params->qmatrix_level_y =
             clamp(quant_params->qmatrix_level_y - 1, min_qmlevel, max_qmlevel);
