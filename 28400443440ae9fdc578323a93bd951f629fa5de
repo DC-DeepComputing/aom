@@ -227,6 +227,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "62955f01_69454fc5",
+        "filename": "av1/encoder/hash_motion.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 26,
+      "author": {
+        "id": 5220824
+      },
+      "writtenOn": "2026-10-29T21:02:12Z",
+      "side": 1,
+      "message": "Marked as resolved.",
+      "parentUuid": "182dd544_52d2d34a",
+      "revId": "28400443440ae9fdc578323a93bd951f629fa5de",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "4cf5fa62_bac0aee1",
@@ -244,6 +262,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "20ca4a6f_14f82d4e",
+        "filename": "av1/encoder/hash_motion.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 144,
+      "author": {
+        "id": 5220824
+      },
+      "writtenOn": "2026-10-29T21:02:12Z",
+      "side": 1,
+      "message": "Marked as resolved.",
+      "parentUuid": "4cf5fa62_bac0aee1",
+      "revId": "28400443440ae9fdc578323a93bd951f629fa5de",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "134c82b4_57a56808",
@@ -257,6 +293,24 @@
       "writtenOn": "2026-10-29T20:29:25Z",
       "side": 1,
       "message": "Note: See also the comment in `av1_build_intrabc_hash_table()` at av1/encoder/encodeframe.c:2097.\n\nIMPORTANT: We should record the size of `frame_hash_buffer[j]`.\n\nIt is allocated as follows:\n\n```\n  const int pic_width \u003d cpi-\u003esource-\u003ey_crop_width;\n  const int pic_height \u003d cpi-\u003esource-\u003ey_crop_height;\n  ...\n  for (int j \u003d 0; j \u003c 2; ++j) {\n    intrabc_hash_info-\u003eframe_hash_buffer[j] \u003d (uint32_t *)aom_malloc(\n        sizeof(*intrabc_hash_info-\u003eframe_hash_buffer[j]) * pic_width *\n        pic_height);\n    ...\n  }\n```\n\nSo we should record the size `pic_width * pic_height` unless it can be inferred from other fields of this struct (which seems unlikely). We could also record `pic_width` and `pic_height` separately.",
+      "revId": "28400443440ae9fdc578323a93bd951f629fa5de",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "27345d76_aa402f96",
+        "filename": "av1/encoder/hash_motion.h",
+        "patchSetId": 11
+      },
+      "lineNbr": 82,
+      "author": {
+        "id": 5220824
+      },
+      "writtenOn": "2026-10-29T21:02:12Z",
+      "side": 1,
+      "message": "Marked as resolved.",
+      "parentUuid": "134c82b4_57a56808",
       "revId": "28400443440ae9fdc578323a93bd951f629fa5de",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
