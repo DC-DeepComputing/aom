@@ -610,13 +610,22 @@ static int get_qzbin_factor(int q, aom_bit_depth_t bit_depth) {
 void av1_build_quantizer(aom_bit_depth_t bit_depth, int y_dc_delta_q,
                          int u_dc_delta_q, int u_ac_delta_q, int v_dc_delta_q,
                          int v_ac_delta_q, QUANTS *const quants,
-                         Dequants *const deq, int sharpness) {
+                         Dequants *const deq, int sharpness,
+                         const CommonQuantParams *quant_params) {
   int i, q, quant_QTX;
   const int sharpness_adjustment = 16 * (7 - sharpness) / 7;
+  const int round_opt =
+      (quant_params && quant_params->ssim2_px > 0) ? 26 : 0;
+  const int px = quant_params ? quant_params->ssim2_px : 0;
+  const int is_portrait = quant_params ? quant_params->ssim2_is_portrait : 0;
+  const int base_qindex = quant_params ? quant_params->base_qindex : 0;
 
   for (q = 0; q < QINDEX_RANGE; q++) {
-    const int qzbin_factor = get_qzbin_factor(q, bit_depth);
+    int qzbin_factor = get_qzbin_factor(q, bit_depth);
     int qrounding_factor = q == 0 ? 64 : 48;
+    if (round_opt != 0 && q > 0) {
+      qzbin_factor += 6;
+    }
 
     for (i = 0; i < 2; ++i) {
       int qrounding_factor_fp = 64;
@@ -624,7 +633,30 @@ void av1_build_quantizer(aom_bit_depth_t bit_depth, int y_dc_delta_q,
       if (sharpness != 0 && q != 0) {
         qrounding_factor = 64 - sharpness_adjustment;
         qrounding_factor_fp = 64 - sharpness_adjustment;
+        if (round_opt != 0) {
+          const int low_q_min = (px >= 3000000 || px < 15000) ? 100 : 120;
+          const bool is_low_q = (base_qindex >= 140 && q >= low_q_min);
+          if (px >= 1000000) {
+            if (is_low_q || q <= 22) {
+              qrounding_factor = 58;
+              qrounding_factor_fp = 58;
+            } else if (q >= 23 && q <= 60) {
+              qrounding_factor = 68;
+              qrounding_factor_fp = 68;
+            } else if (is_portrait && px >= 3000000 &&
+                       base_qindex >= 75 && base_qindex <= 100) {
+              qrounding_factor = 66;
+              qrounding_factor_fp = 66;
+            }
+          } else if (px > 0 && px < 15000) {
+            if (is_low_q || q <= 22) {
+              qrounding_factor = 58;
+              qrounding_factor_fp = 58;
+            }
+          }
+        }
       }
+      const int qrounding_factor_uv_fp = qrounding_factor_fp;
 
       // y quantizer with TX scale
       quant_QTX = i == 0 ? av1_dc_quant_QTX(q, y_dc_delta_q, bit_depth)
@@ -643,9 +675,12 @@ void av1_build_quantizer(aom_bit_depth_t bit_depth, int y_dc_delta_q,
       invert_quant(&quants->u_quant[q][i], &quants->u_quant_shift[q][i],
                    quant_QTX);
       quants->u_quant_fp[q][i] = (1 << 16) / quant_QTX;
-      quants->u_round_fp[q][i] = (qrounding_factor_fp * quant_QTX) >> 7;
+      quants->u_round_fp[q][i] = (qrounding_factor_uv_fp * quant_QTX) >> 7;
       quants->u_zbin[q][i] = ROUND_POWER_OF_TWO(qzbin_factor * quant_QTX, 7);
-      quants->u_round[q][i] = (qrounding_factor * quant_QTX) >> 7;
+      quants->u_round[q][i] =
+          ((round_opt != 0 ? qrounding_factor_uv_fp : qrounding_factor) *
+           quant_QTX) >>
+          7;
       deq->u_dequant_QTX[q][i] = quant_QTX;
 
       // v quantizer with TX scale
@@ -654,9 +689,12 @@ void av1_build_quantizer(aom_bit_depth_t bit_depth, int y_dc_delta_q,
       invert_quant(&quants->v_quant[q][i], &quants->v_quant_shift[q][i],
                    quant_QTX);
       quants->v_quant_fp[q][i] = (1 << 16) / quant_QTX;
-      quants->v_round_fp[q][i] = (qrounding_factor_fp * quant_QTX) >> 7;
+      quants->v_round_fp[q][i] = (qrounding_factor_uv_fp * quant_QTX) >> 7;
       quants->v_zbin[q][i] = ROUND_POWER_OF_TWO(qzbin_factor * quant_QTX, 7);
-      quants->v_round[q][i] = (qrounding_factor * quant_QTX) >> 7;
+      quants->v_round[q][i] =
+          ((round_opt != 0 ? qrounding_factor_uv_fp : qrounding_factor) *
+           quant_QTX) >>
+          7;
       deq->v_dequant_QTX[q][i] = quant_QTX;
     }
 
