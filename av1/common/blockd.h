@@ -1365,14 +1365,28 @@ static inline TX_SIZE depth_to_tx_size(int depth, BLOCK_SIZE bsize) {
 }
 
 static inline TX_SIZE av1_get_adjusted_tx_size(TX_SIZE tx_size) {
-  switch (tx_size) {
-    case TX_64X64:
-    case TX_64X32:
-    case TX_32X64: return TX_32X32;
-    case TX_64X16: return TX_32X16;
-    case TX_16X64: return TX_16X32;
-    default: return tx_size;
-  }
+  static const TX_SIZE adjusted_tx_size_tab[TX_SIZES_ALL] = {
+    TX_4X4,    // TX_4X4
+    TX_8X8,    // TX_8X8
+    TX_16X16,  // TX_16X16
+    TX_32X32,  // TX_32X32
+    TX_32X32,  // TX_64X64
+    TX_4X8,    // TX_4X8
+    TX_8X4,    // TX_8X4
+    TX_8X16,   // TX_8X16
+    TX_16X8,   // TX_16X8
+    TX_16X32,  // TX_16X32
+    TX_32X16,  // TX_32X16
+    TX_32X32,  // TX_32X64
+    TX_32X32,  // TX_64X32
+    TX_4X16,   // TX_4X16
+    TX_16X4,   // TX_16X4
+    TX_8X32,   // TX_8X32
+    TX_32X8,   // TX_32X8
+    TX_16X32,  // TX_16X64
+    TX_32X16,  // TX_64X16
+  };
+  return adjusted_tx_size_tab[tx_size];
 }
 
 static inline TX_SIZE av1_get_max_uv_txsize(BLOCK_SIZE bsize, int subsampling_x,
