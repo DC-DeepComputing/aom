@@ -15,45 +15,35 @@
 #include "av1/common/blockd.h"
 #include "av1/common/txb_common.h"
 #include "av1/encoder/encoder.h"
+#include "av1/encoder/encodetxb.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/*!\brief Adjust the magnitude of quantized coefficients to achieve better
- * rate-distortion (RD) trade-off.
- *
- * \ingroup coefficient_coding
- *
- * This function goes through each coefficient and greedily choose to lower
- * the coefficient magnitude by 1 or not based on the RD score.
- *
- * The coefficients are processing in reversed scan order.
- *
- * Note that, the end of block position (eob) may change if the original last
- * coefficient is lowered to zero.
- *
- * \param[in]    cpi            Top-level encoder structure
- * \param[in]    x              Pointer to structure holding the data for the
-                                current encoding macroblock
- * \param[in]    plane          The index of the current plane
- * \param[in]    block          The index of the current transform block in the
- * \param[in]    tx_size        The transform size
- * \param[in]    tx_type        The transform type
- * \param[in]    txb_ctx        Context info for entropy coding transform block
- * skip flag (tx_skip) and the sign of DC coefficient (dc_sign).
- * \param[out]   rate_cost      The entropy cost of coding the transform block
- * after adjustment of coefficients.
- * \param[in]    sharpness      When sharpness > 0, the function will be less
- * aggressive towards lowering the magnitude of coefficients.
- * In this way, the transform block will contain more high-frequency
- * coefficients and therefore will preserve the sharpness of the reconstructed
- * block.
- */
 int av1_optimize_txb(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
                      int block, TX_SIZE tx_size, TX_TYPE tx_type,
                      const TXB_CTX *const txb_ctx, int *rate_cost,
                      int sharpness);
+
+static inline int av1_optimize_b(const struct AV1_COMP *cpi, MACROBLOCK *x,
+                                 int plane, int block, TX_SIZE tx_size,
+                                 TX_TYPE tx_type, const TXB_CTX *const txb_ctx,
+                                 int *rate_cost) {
+  MACROBLOCKD *const xd = &x->e_mbd;
+  struct macroblock_plane *const p = &x->plane[plane];
+  const int eob = p->eobs[block];
+  const int segment_id = xd->mi[0]->segment_id;
+
+  if (eob == 0 || !cpi->optimize_seg_arr[segment_id] ||
+      xd->lossless[segment_id]) {
+    *rate_cost = av1_cost_skip_txb(&x->coeff_costs, txb_ctx, plane, tx_size);
+    return eob;
+  }
+
+  return av1_optimize_txb(cpi, x, plane, block, tx_size, tx_type, txb_ctx,
+                          rate_cost, cpi->oxcf.algo_cfg.sharpness);
+}
 
 /*!\brief Compute the entropy cost of coding coefficients in a transform block.
  *
