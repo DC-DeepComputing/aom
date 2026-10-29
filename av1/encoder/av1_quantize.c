@@ -214,7 +214,7 @@ void av1_quantize_fp_c(const tran_low_t *coeff_ptr, intptr_t n_coeffs,
                        const int16_t *scan, const int16_t *iscan) {
   quantize_fp_helper_c(coeff_ptr, n_coeffs, zbin_ptr, round_ptr, quant_ptr,
                        quant_shift_ptr, qcoeff_ptr, dqcoeff_ptr, dequant_ptr,
-                       eob_ptr, scan, iscan, NULL, NULL, 0);
+                       eob_ptr, scan, iscan, NULL, NULL, 0, 0);
 }
 
 void av1_quantize_lp_c(const int16_t *coeff_ptr, intptr_t n_coeffs,
@@ -256,7 +256,7 @@ void av1_quantize_fp_32x32_c(const tran_low_t *coeff_ptr, intptr_t n_coeffs,
                              const int16_t *scan, const int16_t *iscan) {
   quantize_fp_helper_c(coeff_ptr, n_coeffs, zbin_ptr, round_ptr, quant_ptr,
                        quant_shift_ptr, qcoeff_ptr, dqcoeff_ptr, dequant_ptr,
-                       eob_ptr, scan, iscan, NULL, NULL, 1);
+                       eob_ptr, scan, iscan, NULL, NULL, 1, 0);
 }
 
 void av1_quantize_fp_64x64_c(const tran_low_t *coeff_ptr, intptr_t n_coeffs,
@@ -268,7 +268,7 @@ void av1_quantize_fp_64x64_c(const tran_low_t *coeff_ptr, intptr_t n_coeffs,
                              const int16_t *scan, const int16_t *iscan) {
   quantize_fp_helper_c(coeff_ptr, n_coeffs, zbin_ptr, round_ptr, quant_ptr,
                        quant_shift_ptr, qcoeff_ptr, dqcoeff_ptr, dequant_ptr,
-                       eob_ptr, scan, iscan, NULL, NULL, 2);
+                       eob_ptr, scan, iscan, NULL, NULL, 2, 0);
 }
 
 void av1_quantize_fp_facade(const tran_low_t *coeff_ptr, intptr_t n_coeffs,
@@ -281,7 +281,8 @@ void av1_quantize_fp_facade(const tran_low_t *coeff_ptr, intptr_t n_coeffs,
     quantize_fp_helper_c(coeff_ptr, n_coeffs, p->zbin_QTX, p->round_fp_QTX,
                          p->quant_fp_QTX, p->quant_shift_QTX, qcoeff_ptr,
                          dqcoeff_ptr, p->dequant_QTX, eob_ptr, sc->scan,
-                         sc->iscan, qm_ptr, iqm_ptr, qparam->log_scale);
+                         sc->iscan, qm_ptr, iqm_ptr, qparam->log_scale,
+                         qparam->ssim2_scale_thresh);
   } else {
     switch (qparam->log_scale) {
       case 0:
@@ -1122,6 +1123,42 @@ void av1_set_quantizer(AV1_COMMON *const cm, int min_qmlevel, int max_qmlevel,
         max_qmlevel);
   } else {
     quant_params->qmatrix_level_v = quant_params->qmatrix_level_u;
+  }
+  if (tuning == AOM_TUNE_SSIMULACRA2) {
+    const int qm_px = cm->width * cm->height;
+    if (qm_px >= 1000000) {
+      if (quant_params->base_qindex >= 100) {
+        const bool use_y_0 =
+            (qm_px >= 2600000 && quant_params->base_qindex >= 140);
+        const int y_sub = use_y_0 ? 4 : 3;
+        const int y_min = use_y_0 ? 0 : 1;
+        quant_params->qmatrix_level_y =
+            clamp(quant_params->qmatrix_level_y - y_sub, y_min, max_qmlevel);
+        const bool use_uv_0 =
+            (qm_px >= 2600000 && quant_params->base_qindex >= 140);
+        const int uv_sub = use_uv_0 ? 2 : 1;
+        const int uv_min = use_uv_0 ? 0 : 1;
+        quant_params->qmatrix_level_u =
+            clamp(quant_params->qmatrix_level_u - uv_sub, uv_min, max_qmlevel);
+        quant_params->qmatrix_level_v =
+            clamp(quant_params->qmatrix_level_v - uv_sub, uv_min, max_qmlevel);
+      } else if (quant_params->base_qindex >= 80) {
+        quant_params->qmatrix_level_y =
+            clamp(quant_params->qmatrix_level_y - 1, min_qmlevel, max_qmlevel);
+      }
+    } else if (qm_px >= 30000 && qm_px < 150000 &&
+               quant_params->base_qindex >= 140) {
+      quant_params->qmatrix_level_y =
+          clamp(quant_params->qmatrix_level_y - 1, min_qmlevel, max_qmlevel);
+    } else if (qm_px >= 15000 && qm_px < 30000 &&
+               quant_params->base_qindex >= 140) {
+      quant_params->qmatrix_level_y =
+          clamp(quant_params->qmatrix_level_y + 1, min_qmlevel, max_qmlevel);
+    }
+    if (qm_px <= 1500 && quant_params->base_qindex <= 20) {
+      quant_params->qmatrix_level_y =
+          clamp(quant_params->qmatrix_level_y + 1, min_qmlevel, 11);
+    }
   }
 }
 
