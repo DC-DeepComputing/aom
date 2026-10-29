@@ -1110,9 +1110,12 @@ int av1_get_sbq_variance_boost(const AV1_COMP *cpi, const MACROBLOCK *x) {
   // The scaling coefficients were chosen empirically to maximize SSIMULACRA 2
   // scores, 10th percentile scores, and subjective quality. Boosts become
   // smaller (for a given variance) the lower the base qindex.
+  int cur_ceil = (cpi->oxcf.tune_cfg.tuning == AOM_TUNE_SSIMULACRA2)
+                     ? 40
+                     : VAR_BOOST_MAX_DELTAQ_RANGE;
   int boost = (int)round((base_qindex + 544.0) * (base_qindex - target_qindex) /
                          1279.0);
-  boost = AOMMIN(VAR_BOOST_MAX_DELTAQ_RANGE, boost);
+  boost = AOMMIN(cur_ceil, boost);
 
   // Variance Boost was designed to always operate in the lossy domain, so MINQ
   // is excluded.
