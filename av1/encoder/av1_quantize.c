@@ -1046,6 +1046,34 @@ void av1_set_quantizer(AV1_COMMON *const cm, int min_qmlevel, int max_qmlevel,
   } else {
     quant_params->qmatrix_level_v = quant_params->qmatrix_level_u;
   }
+  if (tuning == AOM_TUNE_SSIMULACRA2) {
+    const int qm_px = cm->width * cm->height;
+    if (qm_px >= 1000000) {
+      if (quant_params->base_qindex >= 100) {
+        const bool use_y_0 =
+            (qm_px >= 2600000 && quant_params->base_qindex >= 140);
+        const int y_sub = use_y_0 ? 4 : 3;
+        const int y_min = use_y_0 ? 0 : 1;
+        quant_params->qmatrix_level_y =
+            clamp(quant_params->qmatrix_level_y - y_sub, y_min, max_qmlevel);
+      } else if (quant_params->base_qindex >= 80) {
+        quant_params->qmatrix_level_y =
+            clamp(quant_params->qmatrix_level_y - 1, min_qmlevel, max_qmlevel);
+      }
+    } else if (qm_px >= 30000 && qm_px < 150000 &&
+               quant_params->base_qindex >= 140) {
+      quant_params->qmatrix_level_y =
+          clamp(quant_params->qmatrix_level_y - 1, min_qmlevel, max_qmlevel);
+    } else if (qm_px >= 15000 && qm_px < 30000 &&
+               quant_params->base_qindex >= 140) {
+      quant_params->qmatrix_level_y =
+          clamp(quant_params->qmatrix_level_y + 1, min_qmlevel, max_qmlevel);
+    }
+    if (qm_px <= 1500 && quant_params->base_qindex <= 20) {
+      quant_params->qmatrix_level_y =
+          clamp(quant_params->qmatrix_level_y + 1, min_qmlevel, 11);
+    }
+  }
 }
 
 // Table that converts 0-63 Q-range values passed in outside to the Qindex
