@@ -1631,10 +1631,39 @@ void av1_set_mb_ssim_rdmult_scaling(AV1_COMP *cpi) {
   // [0.2069, 4.8323].
   log_sum = exp(log_sum / (double)(num_rows * num_cols));
 
+  double rdmult_exp = 1.0;
+  if (cpi->oxcf.tune_cfg.tuning == AOM_TUNE_SSIMULACRA2) {
+    const int v_px = cpi->common.width * cpi->common.height;
+    const int v_bq = cpi->oxcf.rc_cfg.cq_level;
+    const int v_portrait = (cpi->common.height > cpi->common.width);
+    if (v_px >= 15000 && v_px < 30000 && v_bq >= 75 && v_bq < 110) {
+      rdmult_exp = 0.85;
+    } else if (v_px >= 2700000 && v_px < 2793000 && v_bq < 16) {
+      rdmult_exp = 0.85;
+    } else if (v_px >= 2793000 && v_px < 3000000 && !v_portrait &&
+               v_bq >= 75 && v_bq < 110) {
+      rdmult_exp = 0.90;
+    } else if (v_px >= 2000000 && v_px < 2700000 && v_bq < 16) {
+      rdmult_exp = 0.78;
+    } else if (v_px >= 30000 && v_px < 50000 &&
+               ((v_bq >= 140 && v_bq < 165) || (v_bq >= 28 && v_bq < 50))) {
+      rdmult_exp = 1.08;
+    } else if ((v_px >= 100000 && v_px < 200000 && v_bq < 16) ||
+               (v_px >= 1000 && v_px < 5000 && v_bq >= 75 && v_bq < 110)) {
+      rdmult_exp = 1.12;
+    } else if (v_px < 1000 && v_bq >= 140 && v_bq < 165) {
+      rdmult_exp = 1.15;
+    }
+  }
+
   for (int row = 0; row < num_rows; ++row) {
     for (int col = 0; col < num_cols; ++col) {
       const int index = row * num_cols + col;
       cpi->ssim_rdmult_scaling_factors[index] /= log_sum;
+      if (rdmult_exp != 1.0) {
+        cpi->ssim_rdmult_scaling_factors[index] =
+            pow(cpi->ssim_rdmult_scaling_factors[index], rdmult_exp);
+      }
     }
   }
 }
