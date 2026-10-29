@@ -373,6 +373,7 @@ void av1_setup_qmatrix(const CommonQuantParams *quant_params,
   qparam->qmatrix = av1_get_qmatrix(quant_params, xd, plane, tx_size, tx_type);
   qparam->iqmatrix =
       av1_get_iqmatrix(quant_params, xd, plane, tx_size, tx_type);
+  qparam->ssim2_scale_thresh = quant_params->ssim2_scale_thresh;
 }
 
 static void encode_block(int plane, int block, int blk_row, int blk_col,
