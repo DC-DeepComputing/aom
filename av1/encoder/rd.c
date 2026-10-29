@@ -389,7 +389,8 @@ static double def_kf_rd_multiplier(int qindex) {
 int av1_compute_rd_mult_based_on_qindex(aom_bit_depth_t bit_depth,
                                         FRAME_UPDATE_TYPE update_type,
                                         int qindex, aom_tune_metric tuning,
-                                        MODE mode) {
+                                        MODE mode, int geom_pixels,
+                                        int is_portrait) {
   const int q = av1_dc_quant_QTX(qindex, 0, bit_depth);
   int64_t rdmult = q * q;
   if (update_type == KF_UPDATE) {
@@ -428,7 +429,25 @@ int av1_compute_rd_mult_based_on_qindex(aom_bit_depth_t bit_depth,
       // initial qindex point [qindex 159 = (255 - 159) * 3 / 4] where
       // SSIMULACRA 2 scores for encodes with qindexes greater than 159 scored
       // at or above their equivalents with no rdmult adjustment.
-      weight = clamp(((255 - qindex) * 3) / 4, 0, 72) + 128;
+      int max_boost = 72;
+      if (tuning == AOM_TUNE_SSIMULACRA2) {
+        if (geom_pixels >= 3000000 &&
+            ((qindex >= 140 && qindex < 165) || qindex < 16)) {
+          max_boost = 78;
+        } else if (geom_pixels >= 2793000 && geom_pixels < 3000000 &&
+                   is_portrait && qindex >= 28 && qindex < 50) {
+          max_boost = 78;
+        } else if (geom_pixels >= 2793000 && geom_pixels < 3000000 &&
+                   !is_portrait && qindex < 16) {
+          max_boost = 84;
+        } else if (geom_pixels >= 100000 && geom_pixels < 200000 &&
+                   qindex >= 140 && qindex < 165) {
+          max_boost = 78;
+        } else if (geom_pixels < 5000 && qindex >= 75 && qindex < 110) {
+          max_boost = 60;
+        }
+      }
+      weight = clamp(((255 - qindex) * 3) / 4, 0, max_boost) + 128;
     }
     rdmult = (int64_t)((double)rdmult * weight / 128.0);
   }
@@ -450,9 +469,10 @@ int av1_compute_rd_mult(const int qindex, const aom_bit_depth_t bit_depth,
                         const FRAME_TYPE frame_type,
                         const int use_fixed_qp_offsets,
                         const int is_stat_consumption_stage,
-                        const aom_tune_metric tuning, const MODE mode) {
-  int64_t rdmult = av1_compute_rd_mult_based_on_qindex(bit_depth, update_type,
-                                                       qindex, tuning, mode);
+                        const aom_tune_metric tuning, const MODE mode,
+                        const int geom_pixels, const int is_portrait) {
+  int64_t rdmult = av1_compute_rd_mult_based_on_qindex(
+      bit_depth, update_type, qindex, tuning, mode, geom_pixels, is_portrait);
   if (is_stat_consumption_stage && (use_fixed_qp_offsets == 0) &&
       (frame_type != KEY_FRAME)) {
     // Layer depth adjustment
@@ -521,7 +541,8 @@ int av1_get_adaptive_rdmult(const AV1_COMP *cpi, double beta) {
                    layer_depth, boost_index, frame_type,
                    cpi->oxcf.q_cfg.use_fixed_qp_offsets,
                    is_stat_consumption_stage(cpi), cpi->oxcf.tune_cfg.tuning,
-                   cpi->oxcf.mode) /
+                   cpi->oxcf.mode, cm->width * cm->height,
+                   cm->height > cm->width) /
                beta);
 }
 #endif  // !CONFIG_REALTIME_ONLY
@@ -806,7 +827,7 @@ void av1_initialize_rd_consts(AV1_COMP *cpi) {
       cpi->ppi->gf_group.update_type[cpi->gf_frame_index], layer_depth,
       boost_index, frame_type, cpi->oxcf.q_cfg.use_fixed_qp_offsets,
       is_stat_consumption_stage(cpi), cpi->oxcf.tune_cfg.tuning,
-      cpi->oxcf.mode);
+      cpi->oxcf.mode, cm->width * cm->height, cm->height > cm->width);
 #if CONFIG_RD_COMMAND
   if (cpi->oxcf.pass == 2) {
     const RD_COMMAND *rd_command = &cpi->rd_command;
