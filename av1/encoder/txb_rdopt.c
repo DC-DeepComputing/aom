@@ -379,10 +379,10 @@ int av1_optimize_txb(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
   // av1_compute_rd_mult_based_on_qindex(), this helps preserve image
   // features (like repeating patterns and camera noise/film grain), which
   // improves SSIMULACRA 2 scores.
-  const int rshift = (cpi->oxcf.tune_cfg.tuning == AOM_TUNE_IQ ||
-                      cpi->oxcf.tune_cfg.tuning == AOM_TUNE_SSIMULACRA2)
-                         ? 7
-                         : 5;
+  const int rshift =
+      (cpi->oxcf.tune_cfg.tuning == AOM_TUNE_SSIMULACRA2)
+          ? 6
+          : ((cpi->oxcf.tune_cfg.tuning == AOM_TUNE_IQ) ? 7 : 5);
 
   const int(*trellis_rd_mult)[2] = cpi->sf.tx_sf.use_chroma_trellis_rd_mult
                                        ? plane_rd_mult_chroma
