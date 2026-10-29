@@ -16,6 +16,24 @@
       "message": "I noticed that this CL also changes the range encoder in entenc.c and entenc.h. I have been working on the same code for real time screen encoding and uploaded my change as https://aomedia-review.googlesource.com/c/aom/+/219321. It keeps the coder state in local variables over a whole transform block, and the output stays bit exact. In my tests at RT speed 11, the encoder was 2% to 6% faster, for both 4:2:0 and 4:4:4.\n\nThe two changes touch the same lines, so I wanted to ask how you would prefer to handle it. One option could be to move the entropy coder part into a separate CL, so the two approaches can be compared on their own. I\u0027m also happy to rebase my change on top of yours, or to adapt it if you see a better way.",
       "revId": "0956c401ed582314dadde1fd4733d90ca7e224b3",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "2a941e0e_396c7a62",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 4
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5216012
+      },
+      "writtenOn": "2026-10-29T10:38:11Z",
+      "side": 1,
+      "message": "Sorry, I posted this on the wrong CL. It was meant for https://aomedia-review.googlesource.com/c/aom/+/219203, which has the entropy coder changes. Please ignore it here.",
+      "parentUuid": "764bc2a1_452dc8ec",
+      "revId": "0956c401ed582314dadde1fd4733d90ca7e224b3",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
