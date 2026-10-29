@@ -1432,7 +1432,7 @@ static inline void init_mc_flow_dispenser(AV1_COMP *cpi, int frame_idx,
       cpi->ppi->gf_group.update_type[cpi->gf_frame_index], layer_depth,
       boost_index, frame_type, cpi->oxcf.q_cfg.use_fixed_qp_offsets,
       is_stat_consumption_stage(cpi), cpi->oxcf.tune_cfg.tuning,
-      cpi->oxcf.mode);
+      cpi->oxcf.mode, cm->width * cm->height, cm->height > cm->width);
 
   if (rdmult < 1) rdmult = 1;
   av1_set_error_per_bit(&x->errorperbit, rdmult);
@@ -1446,10 +1446,12 @@ static inline void init_mc_flow_dispenser(AV1_COMP *cpi, int frame_idx,
   const BitDepthInfo bd_info = get_bit_depth_info(xd);
   const FRAME_UPDATE_TYPE update_type =
       gf_group->update_type[cpi->gf_frame_index];
-  tpl_frame->base_rdmult = av1_compute_rd_mult_based_on_qindex(
-                               bd_info.bit_depth, update_type, base_qindex,
-                               cpi->oxcf.tune_cfg.tuning, cpi->oxcf.mode) /
-                           6;
+  tpl_frame->base_rdmult =
+      av1_compute_rd_mult_based_on_qindex(
+          bd_info.bit_depth, update_type, base_qindex,
+          cpi->oxcf.tune_cfg.tuning, cpi->oxcf.mode, cm->width * cm->height,
+          cm->height > cm->width) /
+      6;
 
   if (cpi->use_ducky_encode)
     tpl_frame->base_rdmult = gf_group->rdmult_val[frame_idx];
@@ -2316,7 +2318,7 @@ void av1_tpl_rdmult_setup_sb(AV1_COMP *cpi, MACROBLOCK *const x,
       cpi->ppi->gf_group.update_type[cpi->gf_frame_index], layer_depth,
       boost_index, frame_type, cpi->oxcf.q_cfg.use_fixed_qp_offsets,
       is_stat_consumption_stage(cpi), cpi->oxcf.tune_cfg.tuning,
-      cpi->oxcf.mode);
+      cpi->oxcf.mode, cm->width * cm->height, cm->height > cm->width);
 
   const int new_qindex_rdmult = quant_params->base_qindex +
                                 x->rdmult_delta_qindex +
@@ -2326,7 +2328,7 @@ void av1_tpl_rdmult_setup_sb(AV1_COMP *cpi, MACROBLOCK *const x,
       cpi->ppi->gf_group.update_type[cpi->gf_frame_index], layer_depth,
       boost_index, frame_type, cpi->oxcf.q_cfg.use_fixed_qp_offsets,
       is_stat_consumption_stage(cpi), cpi->oxcf.tune_cfg.tuning,
-      cpi->oxcf.mode);
+      cpi->oxcf.mode, cm->width * cm->height, cm->height > cm->width);
 
   const double scaling_factor = (double)new_rdmult / (double)orig_rdmult;
 
