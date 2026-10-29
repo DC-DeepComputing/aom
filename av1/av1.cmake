@@ -57,6 +57,7 @@ list(APPEND AOM_AV1_COMMON_SOURCES
             "${AOM_ROOT}/av1/common/frame_buffers.h"
             "${AOM_ROOT}/av1/common/idct.c"
             "${AOM_ROOT}/av1/common/idct.h"
+            "${AOM_ROOT}/av1/common/mfp_project.h"
             "${AOM_ROOT}/av1/common/mv.h"
             "${AOM_ROOT}/av1/common/mvref_common.c"
             "${AOM_ROOT}/av1/common/mvref_common.h"
@@ -304,6 +305,7 @@ list(APPEND AOM_AV1_COMMON_INTRIN_SSE4_1
             "${AOM_ROOT}/av1/common/x86/filterintra_sse4.c"
             "${AOM_ROOT}/av1/common/x86/highbd_inv_txfm_sse4.c"
             "${AOM_ROOT}/av1/common/x86/intra_edge_sse4.c"
+            "${AOM_ROOT}/av1/common/x86/mfp_project_row_sse4.c"
             "${AOM_ROOT}/av1/common/x86/reconinter_sse4.c"
             "${AOM_ROOT}/av1/common/x86/selfguided_sse4.c"
             "${AOM_ROOT}/av1/common/x86/warp_plane_sse4.c")
@@ -317,6 +319,7 @@ list(APPEND AOM_AV1_COMMON_INTRIN_AVX2
             "${AOM_ROOT}/av1/common/x86/convolve_avx2.c"
             "${AOM_ROOT}/av1/common/x86/highbd_inv_txfm_avx2.c"
             "${AOM_ROOT}/av1/common/x86/jnt_convolve_avx2.c"
+            "${AOM_ROOT}/av1/common/x86/mfp_project_row_avx2.c"
             "${AOM_ROOT}/av1/common/x86/reconinter_avx2.c"
             "${AOM_ROOT}/av1/common/x86/resize_avx2.c"
             "${AOM_ROOT}/av1/common/x86/selfguided_avx2.c"

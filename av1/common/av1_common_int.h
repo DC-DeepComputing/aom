@@ -103,12 +103,12 @@ enum {
 } UENUM1BYTE(REFRESH_FRAME_CONTEXT_MODE);
 
 #define MFMV_STACK_SIZE 3
-typedef struct {
+typedef struct TPL_MV_REF {
   int_mv mfmv0;
   uint8_t ref_frame_offset;
 } TPL_MV_REF;
 
-typedef struct {
+typedef struct MV_REF {
   int_mv mv;
   MV_REFERENCE_FRAME ref_frame;
 } MV_REF;

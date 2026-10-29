@@ -12,15 +12,16 @@
 #include <stdlib.h>
 
 #include "av1/common/mvref_common.h"
+#include "av1/common/mfp_project.h"
 #include "av1/common/warped_motion.h"
 
 // Although we assign 32 bit integers, all the values are strictly under 14
 // bits.
-static const int div_mult[32] = { 0,    16384, 8192, 5461, 4096, 3276, 2730,
-                                  2340, 2048,  1820, 1638, 1489, 1365, 1260,
-                                  1170, 1092,  1024, 963,  910,  862,  819,
-                                  780,  744,   712,  682,  655,  630,  606,
-                                  585,  564,   546,  528 };
+const int av1_mfp_div_mult[32] = { 0,    16384, 8192, 5461, 4096, 3276, 2730,
+                                   2340, 2048,  1820, 1638, 1489, 1365, 1260,
+                                   1170, 1092,  1024, 963,  910,  862,  819,
+                                   780,  744,   712,  682,  655,  630,  606,
+                                   585,  564,   546,  528 };
 
 // TODO(jingning): Consider the use of lookup table for (num / den)
 // altogether.
@@ -28,10 +29,13 @@ void av1_get_mv_projection(MV *output, MV ref, int num, int den) {
   den = AOMMIN(den, MAX_FRAME_DISTANCE);
   num = num > 0 ? AOMMIN(num, MAX_FRAME_DISTANCE)
                 : AOMMAX(num, -MAX_FRAME_DISTANCE);
+  // Callers pass stored motion vectors, which av1_copy_frame_mvs() limits to
+  // REFMVS_LIMIT. With |num| <= MAX_FRAME_DISTANCE and div_mult <= 1 << 14,
+  // |product| + (1 << 13) < 2^31, so the int arithmetic below cannot overflow.
   const int mv_row =
-      ROUND_POWER_OF_TWO_SIGNED(ref.row * num * div_mult[den], 14);
+      ROUND_POWER_OF_TWO_SIGNED(ref.row * num * av1_mfp_div_mult[den], 14);
   const int mv_col =
-      ROUND_POWER_OF_TWO_SIGNED(ref.col * num * div_mult[den], 14);
+      ROUND_POWER_OF_TWO_SIGNED(ref.col * num * av1_mfp_div_mult[den], 14);
   const int clamp_max = MV_UPP - 1;
   const int clamp_min = MV_LOW + 1;
   output->row = (int16_t)clamp(mv_row, clamp_min, clamp_max);
@@ -875,39 +879,19 @@ void av1_setup_frame_sign_bias(AV1_COMMON *cm) {
   }
 }
 
-#define MAX_OFFSET_WIDTH 64
-#define MAX_OFFSET_HEIGHT 0
-
-static int get_block_position(AV1_COMMON *cm, int *mi_r, int *mi_c, int blk_row,
-                              int blk_col, MV mv, int sign_bias) {
-  const int base_blk_row = (blk_row >> 3) << 3;
-  const int base_blk_col = (blk_col >> 3) << 3;
-
-  const int row_offset = (mv.row >= 0) ? (mv.row >> (4 + MI_SIZE_LOG2))
-                                       : -((-mv.row) >> (4 + MI_SIZE_LOG2));
-
-  const int col_offset = (mv.col >= 0) ? (mv.col >> (4 + MI_SIZE_LOG2))
-                                       : -((-mv.col) >> (4 + MI_SIZE_LOG2));
-
-  const int row =
-      (sign_bias == 1) ? blk_row - row_offset : blk_row + row_offset;
-  const int col =
-      (sign_bias == 1) ? blk_col - col_offset : blk_col + col_offset;
-
-  if (row < 0 || row >= (cm->mi_params.mi_rows >> 1) || col < 0 ||
-      col >= (cm->mi_params.mi_cols >> 1))
-    return 0;
-
-  if (row < base_blk_row - (MAX_OFFSET_HEIGHT >> 3) ||
-      row >= base_blk_row + 8 + (MAX_OFFSET_HEIGHT >> 3) ||
-      col < base_blk_col - (MAX_OFFSET_WIDTH >> 3) ||
-      col >= base_blk_col + 8 + (MAX_OFFSET_WIDTH >> 3))
-    return 0;
-
-  *mi_r = row;
-  *mi_c = col;
-
-  return 1;
+// src_row is one row of MV_REF (length mvs_cols). tpl_mvs is the full
+// temporal MV buffer, indexed as mi_r * tpl_stride + mi_c. av1_rtcd.h is
+// included before MV_REF and TPL_MV_REF are defined, so its prototype uses the
+// forward-declared struct MV_REF and struct TPL_MV_REF tags.
+void av1_mfp_project_row_c(const MV_REF *src_row, TPL_MV_REF *tpl_mvs,
+                           int tpl_stride, int blk_row, int mvs_cols,
+                           int mi_rows_half, int mi_cols_half,
+                           const int *ref_offset, int cur_offset, int dir) {
+  for (int blk_col = 0; blk_col < mvs_cols; ++blk_col) {
+    av1_mfp_project_one(src_row, tpl_mvs, tpl_stride, blk_row, blk_col,
+                        mi_rows_half, mi_cols_half, ref_offset, cur_offset,
+                        dir);
+  }
 }
 
 // Note: motion_filed_projection finds motion vectors of current frame's
@@ -948,42 +932,22 @@ static int motion_field_projection(AV1_COMMON *cm,
 
   if (dir == 2) start_to_current_frame_offset = -start_to_current_frame_offset;
 
+  // Frame-level invariant: every 8x8 fails the distance check, and the
+  // function still reports that this reference was consumed.
+  if (abs(start_to_current_frame_offset) > MAX_FRAME_DISTANCE) return 1;
+
   MV_REF *mv_ref_base = start_frame_buf->mvs;
   const int mvs_rows = (cm->mi_params.mi_rows + 1) >> 1;
   const int mvs_cols = (cm->mi_params.mi_cols + 1) >> 1;
+  const int tpl_stride = cm->mi_params.mi_stride >> 1;
+  const int mi_rows_half = cm->mi_params.mi_rows >> 1;
+  const int mi_cols_half = cm->mi_params.mi_cols >> 1;
 
   for (int blk_row = 0; blk_row < mvs_rows; ++blk_row) {
-    for (int blk_col = 0; blk_col < mvs_cols; ++blk_col) {
-      MV_REF *mv_ref = &mv_ref_base[blk_row * mvs_cols + blk_col];
-      MV fwd_mv = mv_ref->mv.as_mv;
-
-      if (mv_ref->ref_frame > INTRA_FRAME) {
-        int_mv this_mv;
-        int mi_r, mi_c;
-        const int ref_frame_offset = ref_offset[mv_ref->ref_frame];
-
-        int pos_valid =
-            abs(ref_frame_offset) <= MAX_FRAME_DISTANCE &&
-            ref_frame_offset > 0 &&
-            abs(start_to_current_frame_offset) <= MAX_FRAME_DISTANCE;
-
-        if (pos_valid) {
-          av1_get_mv_projection(&this_mv.as_mv, fwd_mv,
-                                start_to_current_frame_offset,
-                                ref_frame_offset);
-          pos_valid = get_block_position(cm, &mi_r, &mi_c, blk_row, blk_col,
-                                         this_mv.as_mv, dir >> 1);
-        }
-
-        if (pos_valid) {
-          const int mi_offset = mi_r * (cm->mi_params.mi_stride >> 1) + mi_c;
-
-          tpl_mvs_base[mi_offset].mfmv0.as_mv.row = fwd_mv.row;
-          tpl_mvs_base[mi_offset].mfmv0.as_mv.col = fwd_mv.col;
-          tpl_mvs_base[mi_offset].ref_frame_offset = ref_frame_offset;
-        }
-      }
-    }
+    av1_mfp_project_row(&mv_ref_base[blk_row * mvs_cols], tpl_mvs_base,
+                        tpl_stride, blk_row, mvs_cols, mi_rows_half,
+                        mi_cols_half, ref_offset, start_to_current_frame_offset,
+                        dir);
   }
 
   return 1;
