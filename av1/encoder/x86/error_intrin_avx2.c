@@ -228,7 +228,7 @@ static inline __m256i load_qm_weights_avx2(const qm_val_t *qmatrix,
   const uint32_t hi = w45 | w67;
 
   return _mm256_cvtepu8_epi32(
-      _mm_cvtsi64_si128((int64_t)((uint64_t)lo | ((uint64_t)hi << 32))));
+      _mm_insert_epi32(_mm_cvtsi32_si128((int)lo), (int)hi, 1));
 }
 
 int64_t av1_block_error_qm_avx2(const tran_low_t *coeff,
@@ -246,11 +246,10 @@ int64_t av1_block_error_qm_avx2(const tran_low_t *coeff,
   const int16_t *const scan_end = scan + block_size;
 
   for (; scan < scan_end; coeff += 8, dqcoeff += 8, scan += 8) {
-    // Load 8 transform coefficients and dequantized coefficients.
+    // Load 8 transform coefficients; skip if all 8 are zero (which also implies
+    // dqcoeff is zero).
     const __m256i coeff_reg = _mm256_loadu_si256((const __m256i *)coeff);
-    const __m256i dqcoeff_reg = _mm256_loadu_si256((const __m256i *)dqcoeff);
-    if (_mm256_testz_si256(dqcoeff_reg, dqcoeff_reg) &&
-        _mm256_testz_si256(coeff_reg, coeff_reg)) {
+    if (_mm256_testz_si256(coeff_reg, coeff_reg)) {
       continue;
     }
 
@@ -269,6 +268,7 @@ int64_t av1_block_error_qm_avx2(const tran_low_t *coeff,
 
     // When all 8 dequantized coefficients are zero, sse equals ssz for these 8
     // lanes; otherwise compute weighted squared error (coeff - dqcoeff)^2.
+    const __m256i dqcoeff_reg = _mm256_loadu_si256((const __m256i *)dqcoeff);
     if (_mm256_testz_si256(dqcoeff_reg, dqcoeff_reg)) {
       sse_reg = _mm256_add_epi64(sse_reg, sq);
     } else {
@@ -285,17 +285,15 @@ int64_t av1_block_error_qm_avx2(const tran_low_t *coeff,
     }
   }
 
-  // Save the higher 64 bit of each 128 bit lane and add to the low 64 bit.
-  const __m256i sse_reg_64hi = _mm256_srli_si256(sse_reg, 8);
-  const __m256i ssz_reg_64hi = _mm256_srli_si256(ssz_reg, 8);
-  sse_reg = _mm256_add_epi64(sse_reg, sse_reg_64hi);
-  ssz_reg = _mm256_add_epi64(ssz_reg, ssz_reg_64hi);
+  // Fold the upper 128-bit lane into the lower 128-bit lane, then sum the two
+  // 64-bit accumulators.
+  __m128i sse_reg128 = _mm_add_epi64(_mm256_castsi256_si128(sse_reg),
+                                     _mm256_extracti128_si256(sse_reg, 1));
+  __m128i ssz_reg128 = _mm_add_epi64(_mm256_castsi256_si128(ssz_reg),
+                                     _mm256_extracti128_si256(ssz_reg, 1));
 
-  // Add each 64 bit from each of the 128 bit lanes of the 256 bit register.
-  const __m128i sse_reg128 = _mm_add_epi64(
-      _mm256_castsi256_si128(sse_reg), _mm256_extracti128_si256(sse_reg, 1));
-  const __m128i ssz_reg128 = _mm_add_epi64(
-      _mm256_castsi256_si128(ssz_reg), _mm256_extracti128_si256(ssz_reg, 1));
+  sse_reg128 = _mm_add_epi64(sse_reg128, _mm_srli_si128(sse_reg128, 8));
+  ssz_reg128 = _mm_add_epi64(ssz_reg128, _mm_srli_si128(ssz_reg128, 8));
 
   // Store the results.
   *ssz = _mm_cvtsi128_si64(ssz_reg128);
