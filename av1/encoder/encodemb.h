@@ -27,6 +27,10 @@
 extern "C" {
 #endif
 
+#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
+#pragma GCC visibility push(hidden)
+#endif
+
 enum {
   AV1_XFORM_QUANT_FP = 0,
   AV1_XFORM_QUANT_B = 1,
@@ -341,6 +345,10 @@ static const uint16_t dc_coeff_scale[TX_SIZES_ALL] = {
   1024, 2048, 4096, 4096, 0,    1448, 1448, 2896, 2896, 2896,
   2896, 0,    0,    2048, 2048, 4096, 4096, 0,    0
 };
+
+#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
+#pragma GCC visibility pop
+#endif
 
 #ifdef __cplusplus
 }  // extern "C"
