@@ -122,6 +122,24 @@
       "parentUuid": "a404e985_46da1963",
       "revId": "fb8a3422af1913d4ed55807ad299005d629337bb",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "55392c86_2f65a1c7",
+        "filename": "test/decode_api_test.cc",
+        "patchSetId": 2
+      },
+      "lineNbr": 133,
+      "author": {
+        "id": 5244124
+      },
+      "writtenOn": "2026-10-30T02:40:02Z",
+      "side": 1,
+      "message": "Thank you. In patch set 4 I applied the new comment of `add_grain_if_needed()` from your patch, but kept releasing the grain image frame buffers by slot instead of restoring `num_grain_image_frame_buffers`, for two reasons:\n\n1. `apply_grain` is signaled per frame, so with AV1D_SET_OUTPUT_ALL_LAYERS an output frame may have film grain while an earlier one has none. Then `grain_image_frame_buffers[1]` is filled while `num_grain_image_frame_buffers` is 0: `assert(index \u003c\u003d ctx-\u003enum_grain_image_frame_buffers)` fails, and without the asserts the `j \u003c num_grain_image_frame_buffers` loop releases slot 0 (which is empty) and not slot 1, so the following temporal units get the first temporal unit\u0027s grain image again, and its frame buffer is never released. Patch set 4 adds a test for this case, EncodeAPI.FilmGrainInSpatialLayer1Only (a film grain table with entries only for the frames of spatial layer 1, three temporal units). With your patch applied (ASan + UBSan Debug build) it fails that assertion in the first temporal unit; with your two new asserts removed, temporal units 1 and 2 get temporal unit 0\u0027s grain image (their `user_priv` is temporal unit 0\u0027s). Patch set 4 passes it.\n\n2. Now that a slot whose `data` is set is returned as is, a failed `av1_add_film_grain()` must clear the slot as well as release its buffer; otherwise the next `aom_codec_get_frame()` call for that output frame trips the new assert or, without it, returns an image whose buffer has been released. `release_grain_image_frame_buffer()` does both. It also returns the buffer when `aom_img_alloc_with_cb()` fails after the get frame buffer callback succeeded (with a buffer that is too small).\n\nPatch set 4 also removes the iterator copies from the test, as you asked.",
+      "parentUuid": "a2096f52_71a59830",
+      "revId": "fb8a3422af1913d4ed55807ad299005d629337bb",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
