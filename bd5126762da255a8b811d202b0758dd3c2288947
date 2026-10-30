@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "10b4f014_8b11e284",
+        "filename": "test/encode_api_test.cc",
+        "patchSetId": 3
+      },
+      "lineNbr": 1874,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-30T02:03:56Z",
+      "side": 1,
+      "message": "Please delete the code that tests a copy of the iterator.\n\nSince tests may be used as sample code, we don\u0027t want to give the wrong impression that an iterator can be copied.",
+      "range": {
+        "startLine": 1866,
+        "startChar": 0,
+        "endLine": 1874,
+        "endChar": 3
+      },
+      "revId": "bd5126762da255a8b811d202b0758dd3c2288947",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
