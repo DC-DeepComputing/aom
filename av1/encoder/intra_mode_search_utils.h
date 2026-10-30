@@ -17,6 +17,8 @@
 #ifndef AOM_AV1_ENCODER_INTRA_MODE_SEARCH_UTILS_H_
 #define AOM_AV1_ENCODER_INTRA_MODE_SEARCH_UTILS_H_
 
+#include "config/av1_rtcd.h"
+
 #include "av1/common/enums.h"
 #include "av1/common/pred_common.h"
 #include "av1/common/reconintra.h"
@@ -104,40 +106,23 @@ static const NN_CONFIG av1_intra_hog_model_nnconfig = {
 
 #define FIX_PREC_BITS (16)
 static inline int get_hist_bin_idx(int dx, int dy) {
+  if (dy == 0) return 16;
   const int32_t ratio = (dy * (1 << FIX_PREC_BITS)) / dx;
 
-  // Find index by bisection
-  static const int thresholds[BINS] = {
+  DECLARE_ALIGNED(64, static const int32_t, thresholds[BINS]) = {
     -1334015, -441798, -261605, -183158, -138560, -109331, -88359, -72303,
     -59392,   -48579,  -39272,  -30982,  -23445,  -16400,  -9715,  -3194,
     3227,     9748,    16433,   23478,   31015,   39305,   48611,  59425,
     72336,    88392,   109364,  138593,  183191,  261638,  441831, INT32_MAX
   };
 
-  int lo_idx = 0, hi_idx = BINS - 1;
-  // Divide into segments of size 8 gives better performance than binary search
-  // here.
-  if (ratio <= thresholds[7]) {
-    lo_idx = 0;
-    hi_idx = 7;
-  } else if (ratio <= thresholds[15]) {
-    lo_idx = 8;
-    hi_idx = 15;
-  } else if (ratio <= thresholds[23]) {
-    lo_idx = 16;
-    hi_idx = 23;
-  } else {
-    lo_idx = 24;
-    hi_idx = 31;
-  }
-
-  for (int idx = lo_idx; idx <= hi_idx; idx++) {
-    if (ratio <= thresholds[idx]) {
-      return idx;
-    }
-  }
-  assert(0 && "No valid histogram bin found!");
-  return BINS - 1;
+  // Branchless 5-step binary search across the 32 thresholds.
+  int idx = (ratio > thresholds[15]) << 4;
+  idx += (ratio > thresholds[idx + 7]) << 3;
+  idx += (ratio > thresholds[idx + 3]) << 2;
+  idx += (ratio > thresholds[idx + 1]) << 1;
+  idx += (ratio > thresholds[idx]);
+  return idx;
 }
 #undef FIX_PREC_BITS
 
@@ -151,19 +136,32 @@ static inline void lowbd_generate_hog(const uint8_t *src, int stride, int rows,
   float total = 0.1f;
   src += stride;
   for (int r = 1; r < rows - 1; ++r) {
+    const uint8_t *row_above = src - stride;
+    const uint8_t *row_cur = src;
+    const uint8_t *row_below = src + stride;
+
+    // Prime the 3x3 sliding Sobel window with columns 0 and 1.
+    int v0 = row_above[0] + 2 * row_cur[0] + row_below[0];
+    int v1 = row_above[1] + 2 * row_cur[1] + row_below[1];
+    int d0 = row_below[0] - row_above[0];
+    int d1 = row_below[1] - row_above[1];
+
     for (int c = 1; c < cols - 1; ++c) {
-      const uint8_t *above = &src[c - stride];
-      const uint8_t *below = &src[c + stride];
-      const uint8_t *left = &src[c - 1];
-      const uint8_t *right = &src[c + 1];
-      // Calculate gradient using Sobel filters.
-      const int dx = (right[-stride] + 2 * right[0] + right[stride]) -
-                     (left[-stride] + 2 * left[0] + left[stride]);
-      const int dy = (below[-1] + 2 * below[0] + below[1]) -
-                     (above[-1] + 2 * above[0] + above[1]);
-      if (dx == 0 && dy == 0) continue;
+      // Load the incoming right column (c + 1) and update Sobel gradients.
+      const int above_r = row_above[c + 1];
+      const int cur_r = row_cur[c + 1];
+      const int below_r = row_below[c + 1];
+      const int v2 = above_r + 2 * cur_r + below_r;
+      const int d2 = below_r - above_r;
+      const int dx = v2 - v0;
+      const int dy = d0 + 2 * d1 + d2;
+      v0 = v1;
+      v1 = v2;
+      d0 = d1;
+      d1 = d2;
+
+      if ((dx | dy) == 0) continue;
       const int temp = abs(dx) + abs(dy);
-      if (!temp) continue;
       total += temp;
       if (dx == 0) {
         hist[0] += temp / 2;
@@ -195,21 +193,39 @@ static inline void lowbd_compute_gradient_info_sb(MACROBLOCK *const x,
   const int sb_width = block_size_wide[sb_size] >> ss_x;
   src += stride;
   for (int r = 1; r < sb_height - 1; ++r) {
+    const uint8_t *row_above = src - stride;
+    const uint8_t *row_cur = src;
+    const uint8_t *row_below = src + stride;
+
+    // Prime the 3x3 sliding Sobel window with columns 0 and 1.
+    int v0 = row_above[0] + 2 * row_cur[0] + row_below[0];
+    int v1 = row_above[1] + 2 * row_cur[1] + row_below[1];
+    int d0 = row_below[0] - row_above[0];
+    int d1 = row_below[1] - row_above[1];
+    PixelLevelGradientInfo *const row_info = grad_info_sb + r * sb_width;
+
     for (int c = 1; c < sb_width - 1; ++c) {
-      const uint8_t *above = &src[c - stride];
-      const uint8_t *below = &src[c + stride];
-      const uint8_t *left = &src[c - 1];
-      const uint8_t *right = &src[c + 1];
-      // Calculate gradient using Sobel filters.
-      const int dx = (right[-stride] + 2 * right[0] + right[stride]) -
-                     (left[-stride] + 2 * left[0] + left[stride]);
-      const int dy = (below[-1] + 2 * below[0] + below[1]) -
-                     (above[-1] + 2 * above[0] + above[1]);
-      grad_info_sb[r * sb_width + c].is_dx_zero = (dx == 0);
-      grad_info_sb[r * sb_width + c].abs_dx_abs_dy_sum =
-          (uint16_t)(abs(dx) + abs(dy));
-      grad_info_sb[r * sb_width + c].hist_bin_idx =
-          (dx != 0) ? get_hist_bin_idx(dx, dy) : -1;
+      // Load the incoming right column (c + 1) and update Sobel gradients.
+      const int above_r = row_above[c + 1];
+      const int cur_r = row_cur[c + 1];
+      const int below_r = row_below[c + 1];
+      const int v2 = above_r + 2 * cur_r + below_r;
+      const int d2 = below_r - above_r;
+      const int dx = v2 - v0;
+      const int dy = d0 + 2 * d1 + d2;
+      v0 = v1;
+      v1 = v2;
+      d0 = d1;
+      d1 = d2;
+
+      row_info[c].abs_dx_abs_dy_sum = (uint16_t)(abs(dx) + abs(dy));
+      if (dx == 0) {
+        row_info[c].is_dx_zero = 1;
+        row_info[c].hist_bin_idx = -1;
+      } else {
+        row_info[c].is_dx_zero = 0;
+        row_info[c].hist_bin_idx = (int8_t)get_hist_bin_idx(dx, dy);
+      }
     }
     src += stride;
   }
@@ -222,19 +238,32 @@ static inline void highbd_generate_hog(const uint8_t *src8, int stride,
   const uint16_t *src = CONVERT_TO_SHORTPTR(src8);
   src += stride;
   for (int r = 1; r < rows - 1; ++r) {
+    const uint16_t *row_above = src - stride;
+    const uint16_t *row_cur = src;
+    const uint16_t *row_below = src + stride;
+
+    // Prime the 3x3 sliding Sobel window with columns 0 and 1.
+    int v0 = row_above[0] + 2 * row_cur[0] + row_below[0];
+    int v1 = row_above[1] + 2 * row_cur[1] + row_below[1];
+    int d0 = row_below[0] - row_above[0];
+    int d1 = row_below[1] - row_above[1];
+
     for (int c = 1; c < cols - 1; ++c) {
-      const uint16_t *above = &src[c - stride];
-      const uint16_t *below = &src[c + stride];
-      const uint16_t *left = &src[c - 1];
-      const uint16_t *right = &src[c + 1];
-      // Calculate gradient using Sobel filters.
-      const int dx = (right[-stride] + 2 * right[0] + right[stride]) -
-                     (left[-stride] + 2 * left[0] + left[stride]);
-      const int dy = (below[-1] + 2 * below[0] + below[1]) -
-                     (above[-1] + 2 * above[0] + above[1]);
-      if (dx == 0 && dy == 0) continue;
+      // Load the incoming right column (c + 1) and update Sobel gradients.
+      const int above_r = row_above[c + 1];
+      const int cur_r = row_cur[c + 1];
+      const int below_r = row_below[c + 1];
+      const int v2 = above_r + 2 * cur_r + below_r;
+      const int d2 = below_r - above_r;
+      const int dx = v2 - v0;
+      const int dy = d0 + 2 * d1 + d2;
+      v0 = v1;
+      v1 = v2;
+      d0 = d1;
+      d1 = d2;
+
+      if ((dx | dy) == 0) continue;
       const int temp = abs(dx) + abs(dy);
-      if (!temp) continue;
       total += temp;
       if (dx == 0) {
         hist[0] += temp / 2;
@@ -266,21 +295,39 @@ static inline void highbd_compute_gradient_info_sb(MACROBLOCK *const x,
   const int sb_width = block_size_wide[sb_size] >> ss_x;
   src += stride;
   for (int r = 1; r < sb_height - 1; ++r) {
+    const uint16_t *row_above = src - stride;
+    const uint16_t *row_cur = src;
+    const uint16_t *row_below = src + stride;
+
+    // Prime the 3x3 sliding Sobel window with columns 0 and 1.
+    int v0 = row_above[0] + 2 * row_cur[0] + row_below[0];
+    int v1 = row_above[1] + 2 * row_cur[1] + row_below[1];
+    int d0 = row_below[0] - row_above[0];
+    int d1 = row_below[1] - row_above[1];
+    PixelLevelGradientInfo *const row_info = grad_info_sb + r * sb_width;
+
     for (int c = 1; c < sb_width - 1; ++c) {
-      const uint16_t *above = &src[c - stride];
-      const uint16_t *below = &src[c + stride];
-      const uint16_t *left = &src[c - 1];
-      const uint16_t *right = &src[c + 1];
-      // Calculate gradient using Sobel filters.
-      const int dx = (right[-stride] + 2 * right[0] + right[stride]) -
-                     (left[-stride] + 2 * left[0] + left[stride]);
-      const int dy = (below[-1] + 2 * below[0] + below[1]) -
-                     (above[-1] + 2 * above[0] + above[1]);
-      grad_info_sb[r * sb_width + c].is_dx_zero = (dx == 0);
-      grad_info_sb[r * sb_width + c].abs_dx_abs_dy_sum =
-          (uint16_t)(abs(dx) + abs(dy));
-      grad_info_sb[r * sb_width + c].hist_bin_idx =
-          (dx != 0) ? get_hist_bin_idx(dx, dy) : -1;
+      // Load the incoming right column (c + 1) and update Sobel gradients.
+      const int above_r = row_above[c + 1];
+      const int cur_r = row_cur[c + 1];
+      const int below_r = row_below[c + 1];
+      const int v2 = above_r + 2 * cur_r + below_r;
+      const int d2 = below_r - above_r;
+      const int dx = v2 - v0;
+      const int dy = d0 + 2 * d1 + d2;
+      v0 = v1;
+      v1 = v2;
+      d0 = d1;
+      d1 = d2;
+
+      row_info[c].abs_dx_abs_dy_sum = (uint16_t)(abs(dx) + abs(dy));
+      if (dx == 0) {
+        row_info[c].is_dx_zero = 1;
+        row_info[c].hist_bin_idx = -1;
+      } else {
+        row_info[c].is_dx_zero = 0;
+        row_info[c].hist_bin_idx = (int8_t)get_hist_bin_idx(dx, dy);
+      }
     }
     src += stride;
   }
@@ -291,13 +338,13 @@ static inline void generate_hog(const uint8_t *src8, int stride, int rows,
                                 int cols, float *hist, int highbd) {
 #if CONFIG_AV1_HIGHBITDEPTH
   if (highbd) {
-    highbd_generate_hog(src8, stride, rows, cols, hist);
+    av1_highbd_generate_hog(src8, stride, rows, cols, hist);
     return;
   }
 #else
   (void)highbd;
 #endif  // CONFIG_AV1_HIGHBITDEPTH
-  lowbd_generate_hog(src8, stride, rows, cols, hist);
+  av1_lowbd_generate_hog(src8, stride, rows, cols, hist);
 }
 
 static inline void compute_gradient_info_sb(MACROBLOCK *const x,
@@ -305,11 +352,11 @@ static inline void compute_gradient_info_sb(MACROBLOCK *const x,
                                             PLANE_TYPE plane) {
 #if CONFIG_AV1_HIGHBITDEPTH
   if (is_cur_buf_hbd(&x->e_mbd)) {
-    highbd_compute_gradient_info_sb(x, sb_size, plane);
+    av1_highbd_compute_gradient_info_sb(x, sb_size, plane);
     return;
   }
 #endif  // CONFIG_AV1_HIGHBITDEPTH
-  lowbd_compute_gradient_info_sb(x, sb_size, plane);
+  av1_lowbd_compute_gradient_info_sb(x, sb_size, plane);
 }
 
 // Gradient caching at superblock level is allowed only if all of the following
