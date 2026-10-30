@@ -43,6 +43,12 @@ using ErrorBlockLpFunc = int64_t (*)(const int16_t *coeff,
                                      const int16_t *dqcoeff,
                                      intptr_t block_size);
 
+using ErrorBlockQmFunc = int64_t (*)(const tran_low_t *coeff,
+                                     const tran_low_t *dqcoeff,
+                                     intptr_t block_size,
+                                     const qm_val_t *qmatrix,
+                                     const int16_t *scan, int64_t *ssz, int bd);
+
 using ErrorBlockParam =
     std::tuple<ErrorBlockFunc, ErrorBlockFunc, aom_bit_depth_t>;
 
@@ -61,6 +67,22 @@ int64_t BlockErrorLpWrapper(const tran_low_t *coeff, const tran_low_t *dqcoeff,
   *ssz = -1;
   return fn(reinterpret_cast<const int16_t *>(coeff),
             reinterpret_cast<const int16_t *>(dqcoeff), block_size);
+}
+
+template <ErrorBlockQmFunc fn>
+int64_t BlockErrorQmWrapper(const tran_low_t *coeff, const tran_low_t *dqcoeff,
+                            intptr_t block_size, int64_t *ssz, int bps) {
+  static qm_val_t qmatrix[4096];
+  static int16_t scan[4096];
+  static const bool initialized = [&]() {
+    for (int i = 0; i < 4096; ++i) {
+      qmatrix[i] = static_cast<qm_val_t>(16 + ((i * 37) & 0x7f));
+      scan[i] = static_cast<int16_t>(i);
+    }
+    return true;
+  }();
+  (void)initialized;
+  return fn(coeff, dqcoeff, block_size, qmatrix, scan, ssz, bps);
 }
 
 class ErrorBlockTest : public ::testing::TestWithParam<ErrorBlockParam> {
@@ -280,7 +302,13 @@ const ErrorBlockParam kErrorBlockTestParamsAvx2[] = {
   make_tuple(&BlockError8BitWrapper<av1_block_error_avx2>,
              &BlockError8BitWrapper<av1_block_error_c>, AOM_BITS_8),
   make_tuple(&BlockErrorLpWrapper<av1_block_error_lp_avx2>,
-             &BlockErrorLpWrapper<av1_block_error_lp_c>, AOM_BITS_8)
+             &BlockErrorLpWrapper<av1_block_error_lp_c>, AOM_BITS_8),
+  make_tuple(&BlockErrorQmWrapper<av1_block_error_qm_avx2>,
+             &BlockErrorQmWrapper<av1_block_error_qm_c>, AOM_BITS_8),
+  make_tuple(&BlockErrorQmWrapper<av1_block_error_qm_avx2>,
+             &BlockErrorQmWrapper<av1_block_error_qm_c>, AOM_BITS_10),
+  make_tuple(&BlockErrorQmWrapper<av1_block_error_qm_avx2>,
+             &BlockErrorQmWrapper<av1_block_error_qm_c>, AOM_BITS_12)
 };
 
 INSTANTIATE_TEST_SUITE_P(AVX2, ErrorBlockTest,
