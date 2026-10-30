@@ -82,11 +82,13 @@ static inline void alloc_compressor_data(AV1_COMP *cpi) {
     aom_internal_error(cm->error, AOM_CODEC_MEM_ERROR,
                        "Failed to allocate SMS tree");
   }
-  cpi->td.firstpass_ctx =
-      av1_alloc_pmc(cpi, BLOCK_16X16, &cpi->td.shared_coeff_buf);
-  if (!cpi->td.firstpass_ctx)
-    aom_internal_error(cm->error, AOM_CODEC_MEM_ERROR,
-                       "Failed to allocate PICK_MODE_CONTEXT");
+  if (is_stat_generation_stage(cpi) || cpi->ppi->lap_enabled) {
+    cpi->td.firstpass_ctx =
+        av1_alloc_pmc(cpi, BLOCK_16X16, &cpi->td.shared_coeff_buf);
+    if (!cpi->td.firstpass_ctx)
+      aom_internal_error(cm->error, AOM_CODEC_MEM_ERROR,
+                         "Failed to allocate PICK_MODE_CONTEXT");
+  }
 }
 
 // Allocate mbmi buffers which are used to store mode information at block
@@ -155,24 +157,27 @@ static inline void alloc_rdmult_scaling_factors(AV1_COMP *cpi) {
 
   aom_free(cpi->ssim_rdmult_scaling_factors);
   cpi->ssim_rdmult_scaling_factors = NULL;
+  CHECK_MEM_ERROR(cm, cpi->ssim_rdmult_scaling_factors,
+                  aom_malloc(num_rows * num_cols *
+                             sizeof(*cpi->ssim_rdmult_scaling_factors)));
   aom_free(cpi->tpl_rdmult_scaling_factors);
   cpi->tpl_rdmult_scaling_factors = NULL;
-  CHECK_MEM_ERROR(cm, cpi->ssim_rdmult_scaling_factors,
-                  aom_calloc(num_rows * num_cols,
-                             sizeof(*cpi->ssim_rdmult_scaling_factors)));
-  CHECK_MEM_ERROR(cm, cpi->tpl_rdmult_scaling_factors,
-                  aom_calloc(num_rows * num_cols,
-                             sizeof(*cpi->tpl_rdmult_scaling_factors)));
+  if (cpi->oxcf.kf_cfg.key_freq_max != 0) {
+    CHECK_MEM_ERROR(cm, cpi->tpl_rdmult_scaling_factors,
+                    aom_calloc(num_rows * num_cols,
+                               sizeof(*cpi->tpl_rdmult_scaling_factors)));
+  }
 
 #if CONFIG_TUNE_VMAF
-  {
+  aom_free(cpi->vmaf_info.rdmult_scaling_factors);
+  cpi->vmaf_info.rdmult_scaling_factors = NULL;
+  if (cpi->oxcf.tune_cfg.tuning >= AOM_TUNE_VMAF_WITH_PREPROCESSING &&
+      cpi->oxcf.tune_cfg.tuning <= AOM_TUNE_VMAF_SALIENCY_MAP) {
     const BLOCK_SIZE vmaf_bsize = BLOCK_64X64;
     const int vmaf_w = mi_size_wide[vmaf_bsize];
     const int vmaf_h = mi_size_high[vmaf_bsize];
     const int vmaf_num_cols = (max_mi_cols + vmaf_w - 1) / vmaf_w;
     const int vmaf_num_rows = (max_mi_rows + vmaf_h - 1) / vmaf_h;
-    aom_free(cpi->vmaf_info.rdmult_scaling_factors);
-    cpi->vmaf_info.rdmult_scaling_factors = NULL;
     CHECK_MEM_ERROR(cm, cpi->vmaf_info.rdmult_scaling_factors,
                     aom_calloc(vmaf_num_rows * vmaf_num_cols,
                                sizeof(*cpi->vmaf_info.rdmult_scaling_factors)));
@@ -180,13 +185,13 @@ static inline void alloc_rdmult_scaling_factors(AV1_COMP *cpi) {
 #endif  // CONFIG_TUNE_VMAF
 
 #if CONFIG_TUNE_BUTTERAUGLI
-  {
+  aom_free(cpi->butteraugli_info.rdmult_scaling_factors);
+  cpi->butteraugli_info.rdmult_scaling_factors = NULL;
+  if (cpi->oxcf.tune_cfg.tuning == AOM_TUNE_BUTTERAUGLI) {
     const int ba_w = mi_size_wide[butteraugli_rdo_bsize];
     const int ba_h = mi_size_high[butteraugli_rdo_bsize];
     const int ba_num_cols = (max_mi_cols + ba_w - 1) / ba_w;
     const int ba_num_rows = (max_mi_rows + ba_h - 1) / ba_h;
-    aom_free(cpi->butteraugli_info.rdmult_scaling_factors);
-    cpi->butteraugli_info.rdmult_scaling_factors = NULL;
     CHECK_MEM_ERROR(
         cm, cpi->butteraugli_info.rdmult_scaling_factors,
         aom_malloc(ba_num_rows * ba_num_cols *
@@ -195,15 +200,17 @@ static inline void alloc_rdmult_scaling_factors(AV1_COMP *cpi) {
 #endif  // CONFIG_TUNE_BUTTERAUGLI
 
 #if CONFIG_SALIENCY_MAP
-  {
+  aom_free(cpi->saliency_map);
+  cpi->saliency_map = NULL;
+  aom_free(cpi->sm_scaling_factor);
+  cpi->sm_scaling_factor = NULL;
+  if (cpi->oxcf.tune_cfg.tuning == AOM_TUNE_VMAF_SALIENCY_MAP) {
     const int max_width = cpi->oxcf.frm_dim_cfg.forced_max_frame_width
                               ? cpi->oxcf.frm_dim_cfg.forced_max_frame_width
                               : cm->width;
     const int max_height = cpi->oxcf.frm_dim_cfg.forced_max_frame_height
                                ? cpi->oxcf.frm_dim_cfg.forced_max_frame_height
                                : cm->height;
-    aom_free(cpi->saliency_map);
-    cpi->saliency_map = NULL;
     CHECK_MEM_ERROR(cm, cpi->saliency_map,
                     (uint8_t *)aom_calloc(max_height * max_width,
                                           sizeof(*cpi->saliency_map)));
@@ -214,8 +221,6 @@ static inline void alloc_rdmult_scaling_factors(AV1_COMP *cpi) {
     const int min_mi_h_sb = (1 << MIN_MIB_SIZE_LOG2);
     const int max_sb_cols = (max_mi_cols + min_mi_w_sb - 1) / min_mi_w_sb;
     const int max_sb_rows = (max_mi_rows + min_mi_h_sb - 1) / min_mi_h_sb;
-    aom_free(cpi->sm_scaling_factor);
-    cpi->sm_scaling_factor = NULL;
     CHECK_MEM_ERROR(cm, cpi->sm_scaling_factor,
                     (double *)aom_calloc(max_sb_rows * max_sb_cols,
                                          sizeof(*cpi->sm_scaling_factor)));
