@@ -31,9 +31,30 @@
 #define CDEF_INBUF_SIZE \
   (CDEF_BSTRIDE * ((1 << MAX_SB_SIZE_LOG2) + 2 * CDEF_VBORDER))
 
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC visibility push(hidden)
+#endif
+
 extern const int cdef_pri_taps[2][2];
 extern const int cdef_sec_taps[2];
 extern const int (*const cdef_directions)[2];
+
+static const int cdef_pri_taps_inline[2][2] = { { 4, 2 }, { 3, 3 } };
+
+DECLARE_ALIGNED(16, static const int, cdef_directions_padded_inline[12][2]) = {
+  { 1 * CDEF_BSTRIDE + 0, 2 * CDEF_BSTRIDE + 0 },
+  { 1 * CDEF_BSTRIDE + 0, 2 * CDEF_BSTRIDE - 1 },
+  { -1 * CDEF_BSTRIDE + 1, -2 * CDEF_BSTRIDE + 2 },
+  { 0 * CDEF_BSTRIDE + 1, -1 * CDEF_BSTRIDE + 2 },
+  { 0 * CDEF_BSTRIDE + 1, 0 * CDEF_BSTRIDE + 2 },
+  { 0 * CDEF_BSTRIDE + 1, 1 * CDEF_BSTRIDE + 2 },
+  { 1 * CDEF_BSTRIDE + 1, 2 * CDEF_BSTRIDE + 2 },
+  { 1 * CDEF_BSTRIDE + 0, 2 * CDEF_BSTRIDE + 1 },
+  { 1 * CDEF_BSTRIDE + 0, 2 * CDEF_BSTRIDE + 0 },
+  { 1 * CDEF_BSTRIDE + 0, 2 * CDEF_BSTRIDE - 1 },
+  { -1 * CDEF_BSTRIDE + 1, -2 * CDEF_BSTRIDE + 2 },
+  { 0 * CDEF_BSTRIDE + 1, -1 * CDEF_BSTRIDE + 2 },
+};
 
 typedef struct {
   uint8_t by;
@@ -53,6 +74,10 @@ void av1_cdef_filter_fb(uint8_t *dst8, uint16_t *dst16, int dstride,
                         int var[CDEF_NBLOCKS][CDEF_NBLOCKS], int pli,
                         cdef_list *dlist, int cdef_count, int level,
                         int sec_strength, int damping, int coeff_shift);
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC visibility pop
+#endif
 
 static inline void fill_rect(uint16_t *dst, int dstride, int v, int h,
                              uint16_t x) {
