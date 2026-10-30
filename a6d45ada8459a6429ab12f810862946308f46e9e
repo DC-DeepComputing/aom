@@ -16,6 +16,24 @@
       "message": "Nit: name the variable `hash_stride`.\n\nAlso at line 2162.",
       "revId": "a6d45ada8459a6429ab12f810862946308f46e9e",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "39f79877_aab30daa",
+        "filename": "av1/encoder/encodeframe.c",
+        "patchSetId": 9
+      },
+      "lineNbr": 2119,
+      "author": {
+        "id": 5216012
+      },
+      "writtenOn": "2026-10-30T15:46:25Z",
+      "side": 1,
+      "message": "Marked as resolved.",
+      "parentUuid": "a8210517_7f81fa83",
+      "revId": "a6d45ada8459a6429ab12f810862946308f46e9e",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
