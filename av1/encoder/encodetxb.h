@@ -24,6 +24,10 @@
 extern "C" {
 #endif
 
+#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
+#pragma GCC visibility push(hidden)
+#endif
+
 /*!\cond */
 #define TXB_SKIP_CTX_MASK 15
 #define DC_SIGN_CTX_SHIFT 4
@@ -240,6 +244,10 @@ static const int plane_rd_mult[REF_TYPES][PLANE_TYPES] = {
   { 16, 20 },
 };
 /*!\endcond */
+
+#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
+#pragma GCC visibility pop
+#endif
 
 #ifdef __cplusplus
 }
