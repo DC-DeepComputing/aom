@@ -19,6 +19,10 @@
 extern "C" {
 #endif
 
+#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
+#pragma GCC visibility push(hidden)
+#endif
+
 // Set this macro as 1 to collect data about tx size selection.
 #define COLLECT_TX_SIZE_DATA 0
 
@@ -191,6 +195,10 @@ void av1_txfm_rd_in_plane(MACROBLOCK *x, const AV1_COMP *cpi,
 int av1_txfm_search(const AV1_COMP *cpi, MACROBLOCK *x, BLOCK_SIZE bsize,
                     RD_STATS *rd_stats, RD_STATS *rd_stats_y,
                     RD_STATS *rd_stats_uv, int mode_rate, int64_t ref_best_rd);
+
+#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
+#pragma GCC visibility pop
+#endif
 
 #ifdef __cplusplus
 }  // extern "C"
