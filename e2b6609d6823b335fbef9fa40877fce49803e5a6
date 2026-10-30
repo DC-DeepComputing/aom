@@ -1,0 +1,28 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "286d7274_a585984c",
+        "filename": "test/quantize_func_test.cc",
+        "patchSetId": 7
+      },
+      "lineNbr": 80,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-10-30T20:33:38Z",
+      "side": 1,
+      "message": "`av1_qm_init()` only populates `gqmatrix` and `giqmatrix` under `#if CONFIG_QUANT_MATRIX || CONFIG_AV1_DECODER` (`av1/common/quant_common.c:278`). When built with `-DCONFIG_QUANT_MATRIX\u003d0 -DCONFIG_AV1_DECODER\u003d0`, `qm_ptr` and `iqm_ptr` are `nullptr`, causing `av1_quantize_fp_qm_avx2` and `av1_highbd_quantize_fp_qm_avx2` to segfault. Could we guard these helpers and the `quan_fp_qm_wrapper` test entries with `#if CONFIG_QUANT_MATRIX || CONFIG_AV1_DECODER`?",
+      "range": {
+        "startLine": 60,
+        "startChar": 0,
+        "endLine": 80,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "e2b6609d6823b335fbef9fa40877fce49803e5a6",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
