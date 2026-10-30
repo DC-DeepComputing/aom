@@ -21,6 +21,10 @@
 extern "C" {
 #endif
 
+#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
+#pragma GCC visibility push(hidden)
+#endif
+
 /*!\brief Adjust the magnitude of quantized coefficients to achieve better
  * rate-distortion (RD) trade-off.
  *
@@ -139,6 +143,10 @@ int av1_cost_coeffs_txb_laplacian(const MACROBLOCK *x, const int plane,
                                   const TXB_CTX *const txb_ctx,
                                   const int reduced_tx_set_used,
                                   const int adjust_eob);
+#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
+#pragma GCC visibility pop
+#endif
+
 #ifdef __cplusplus
 }
 #endif
