@@ -54,6 +54,8 @@ using QuantizeFpQmFunc = void (*)(
     const int16_t *dequant_ptr, uint16_t *eob_ptr, const int16_t *scan,
     const int16_t *iscan, const qm_val_t *qm_ptr, const qm_val_t *iqm_ptr,
     int log_scale);
+using QuantizeBQmFunc = void (*)(QUAN_PARAM_LIST, const qm_val_t *qm_ptr,
+                                 const qm_val_t *iqm_ptr, int log_scale);
 
 #undef LP_QUANTIZE_PARAM_LIST
 
@@ -77,6 +79,17 @@ void quan_fp_qm_wrapper(QUAN_PARAM_LIST) {
   const int log_scale = av1_get_tx_scale(tx_size);
   fn(coeff_ptr, n_coeffs, round_ptr, quant_ptr, qcoeff_ptr, dqcoeff_ptr,
      dequant_ptr, eob_ptr, scan, iscan, qm_ptr, iqm_ptr, log_scale);
+}
+
+template <QuantizeBQmFunc fn, TX_SIZE tx_size, int qm_level = 5>
+void quan_b_qm_wrapper(QUAN_PARAM_LIST) {
+  const CommonQuantParams *qm_params = GetQmParams();
+  const qm_val_t *qm_ptr = qm_params->gqmatrix[qm_level][0][tx_size];
+  const qm_val_t *iqm_ptr = qm_params->giqmatrix[qm_level][0][tx_size];
+  const int log_scale = av1_get_tx_scale(tx_size);
+  fn(coeff_ptr, n_coeffs, zbin_ptr, round_ptr, quant_ptr, quant_shift_ptr,
+     qcoeff_ptr, dqcoeff_ptr, dequant_ptr, eob_ptr, scan, iscan, qm_ptr,
+     iqm_ptr, log_scale);
 }
 
 #if CONFIG_AV1_HIGHBITDEPTH
@@ -612,6 +625,33 @@ const QuantizeParam<QuantizeFunc> kQParamArrayAvx2[] = {
              static_cast<TX_SIZE>(TX_32X32), TYPE_B, AOM_BITS_12),
   make_tuple(&aom_highbd_quantize_b_64x64_c, &aom_highbd_quantize_b_64x64_avx2,
              static_cast<TX_SIZE>(TX_64X64), TYPE_B, AOM_BITS_12),
+  make_tuple(&quan_b_qm_wrapper<av1_highbd_quantize_b_qm_c, TX_16X16>,
+             &quan_b_qm_wrapper<av1_highbd_quantize_b_qm_avx2, TX_16X16>,
+             static_cast<TX_SIZE>(TX_16X16), TYPE_B, AOM_BITS_8),
+  make_tuple(&quan_b_qm_wrapper<av1_highbd_quantize_b_qm_c, TX_16X16>,
+             &quan_b_qm_wrapper<av1_highbd_quantize_b_qm_avx2, TX_16X16>,
+             static_cast<TX_SIZE>(TX_16X16), TYPE_B, AOM_BITS_10),
+  make_tuple(&quan_b_qm_wrapper<av1_highbd_quantize_b_qm_c, TX_16X16>,
+             &quan_b_qm_wrapper<av1_highbd_quantize_b_qm_avx2, TX_16X16>,
+             static_cast<TX_SIZE>(TX_16X16), TYPE_B, AOM_BITS_12),
+  make_tuple(&quan_b_qm_wrapper<av1_highbd_quantize_b_qm_c, TX_32X32>,
+             &quan_b_qm_wrapper<av1_highbd_quantize_b_qm_avx2, TX_32X32>,
+             static_cast<TX_SIZE>(TX_32X32), TYPE_B, AOM_BITS_8),
+  make_tuple(&quan_b_qm_wrapper<av1_highbd_quantize_b_qm_c, TX_32X32>,
+             &quan_b_qm_wrapper<av1_highbd_quantize_b_qm_avx2, TX_32X32>,
+             static_cast<TX_SIZE>(TX_32X32), TYPE_B, AOM_BITS_10),
+  make_tuple(&quan_b_qm_wrapper<av1_highbd_quantize_b_qm_c, TX_32X32>,
+             &quan_b_qm_wrapper<av1_highbd_quantize_b_qm_avx2, TX_32X32>,
+             static_cast<TX_SIZE>(TX_32X32), TYPE_B, AOM_BITS_12),
+  make_tuple(&quan_b_qm_wrapper<av1_highbd_quantize_b_qm_c, TX_64X64>,
+             &quan_b_qm_wrapper<av1_highbd_quantize_b_qm_avx2, TX_64X64>,
+             static_cast<TX_SIZE>(TX_64X64), TYPE_B, AOM_BITS_8),
+  make_tuple(&quan_b_qm_wrapper<av1_highbd_quantize_b_qm_c, TX_64X64>,
+             &quan_b_qm_wrapper<av1_highbd_quantize_b_qm_avx2, TX_64X64>,
+             static_cast<TX_SIZE>(TX_64X64), TYPE_B, AOM_BITS_10),
+  make_tuple(&quan_b_qm_wrapper<av1_highbd_quantize_b_qm_c, TX_64X64>,
+             &quan_b_qm_wrapper<av1_highbd_quantize_b_qm_avx2, TX_64X64>,
+             static_cast<TX_SIZE>(TX_64X64), TYPE_B, AOM_BITS_12),
 #if !CONFIG_REALTIME_ONLY
   make_tuple(&aom_highbd_quantize_b_adaptive_c,
              &aom_highbd_quantize_b_adaptive_avx2,
@@ -646,6 +686,15 @@ const QuantizeParam<QuantizeFunc> kQParamArrayAvx2[] = {
   make_tuple(&aom_quantize_b_32x32_c, &aom_quantize_b_32x32_avx2,
              static_cast<TX_SIZE>(TX_32X32), TYPE_B, AOM_BITS_8),
   make_tuple(&aom_quantize_b_64x64_c, &aom_quantize_b_64x64_avx2,
+             static_cast<TX_SIZE>(TX_64X64), TYPE_B, AOM_BITS_8),
+  make_tuple(&quan_b_qm_wrapper<av1_quantize_b_qm_c, TX_16X16>,
+             &quan_b_qm_wrapper<av1_quantize_b_qm_avx2, TX_16X16>,
+             static_cast<TX_SIZE>(TX_16X16), TYPE_B, AOM_BITS_8),
+  make_tuple(&quan_b_qm_wrapper<av1_quantize_b_qm_c, TX_32X32>,
+             &quan_b_qm_wrapper<av1_quantize_b_qm_avx2, TX_32X32>,
+             static_cast<TX_SIZE>(TX_32X32), TYPE_B, AOM_BITS_8),
+  make_tuple(&quan_b_qm_wrapper<av1_quantize_b_qm_c, TX_64X64>,
+             &quan_b_qm_wrapper<av1_quantize_b_qm_avx2, TX_64X64>,
              static_cast<TX_SIZE>(TX_64X64), TYPE_B, AOM_BITS_8),
 };
 
