@@ -18,6 +18,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "b1bc65bd_6d6f62a7",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 3
+      },
+      "lineNbr": 26,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-10-30T18:27:34Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "20a86883_ea2c03a1",
+      "revId": "ee41fe94abe8bc01fc81e852475fe9ae2c6de4cf",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "ecd7be86_4396ce2c",
@@ -31,6 +49,24 @@
       "writtenOn": "2026-10-29T16:45:00Z",
       "side": 1,
       "message": "Since `av1_quantize_fp_qm` is a new SIMD function, could you please add unit tests (and perhaps perf tests) for `av1_quantize_fp_qm`?",
+      "revId": "ee41fe94abe8bc01fc81e852475fe9ae2c6de4cf",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "d7316662_f505f842",
+        "filename": "av1/common/av1_rtcd_defs.pl",
+        "patchSetId": 3
+      },
+      "lineNbr": 315,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-10-30T18:27:34Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "ecd7be86_4396ce2c",
       "revId": "ee41fe94abe8bc01fc81e852475fe9ae2c6de4cf",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
