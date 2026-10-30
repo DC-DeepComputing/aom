@@ -1,5 +1,17 @@
+<<<<<<< HEAD   (ead0096eea66f0b30618abc83e209fad20900042 Fix integer overflow on large block variances when picking m)
 yyyy-mm-dd next version
   This release is ABI compatible with the last release.
+||||||| BASE   (af3dc9aadc793c1b00edc003e3fc19a44fdeb574 Update CHANGELOG for v3.15.2)
+=======
+2026-10-20 v3.15.3
+  This release is ABI compatible with the last release. See
+  https://aomedia.googlesource.com/aom/+log/v3.15.2..v3.15.3 for all the
+  commits in this release.
+
+  - Bug Fixes
+    * Bug oss-fuzz:572842743: Integer-overflow in
+      av1_choose_var_based_partitioning.
+>>>>>>> BRANCH (b141d9c45db236335351c8a4b2a14b3ade27c937 Guard Avg16x16IntegerOverflow test w/ HIGHBITDEPTH)
 
 2026-10-06 v3.15.2
   This release is ABI compatible with the last release. See
