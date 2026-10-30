@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "8ae76a9b_3fe75d70",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 5
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-30T16:30:08Z",
+      "side": 1,
+      "message": "Thanks for fixing the test. That error was introduced when the test was ported to high bit depth in https://aomedia-review.googlesource.com/c/aom/+/182881.",
+      "revId": "3a213463fb56aca5dba69c29b4b1d65faa2c623e",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "2fa70e4e_4301ea36",
+        "filename": "av1/av1_cx_iface.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 1038,
+      "author": {
+        "id": 9545
+      },
+      "writtenOn": "2026-10-30T16:30:08Z",
+      "side": 1,
+      "message": "Optional: We could also consider checking the stride only when there is more than one row:\n\n```\n    for (int plane \u003d 0; plane \u003c num_planes; ++plane) {\n      const int plane_height \u003d aom_img_plane_height(img, plane);\n      if ((((uintptr_t)img-\u003eplanes[plane]) \u0026 1) ||\n          (plane_height \u003e 1 \u0026\u0026 (img-\u003estride[plane] \u0026 1))) {\n```",
+      "revId": "3a213463fb56aca5dba69c29b4b1d65faa2c623e",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
