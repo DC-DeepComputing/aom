@@ -1851,7 +1851,7 @@ static inline void store_buffer_16bit_to_32bit_w8_avx2(const __m128i *const in,
 static void av1_lowbd_fwd_txfm2d_8x8_avx2(const int16_t *input, int32_t *output,
                                           int stride, TX_TYPE tx_type, int bd) {
   (void)bd;
-  __m128i buf0[8], buf1[8], *buf;
+  __m128i buf0[8], buf1[8];
   const int8_t *shift = av1_fwd_txfm_shift_ls[TX_8X8];
 
   // Fast path for DCT_DCT: bypass function pointer table and flip checks.
@@ -1864,26 +1864,20 @@ static void av1_lowbd_fwd_txfm2d_8x8_avx2(const int16_t *input, int32_t *output,
     return;
   }
 
-  const int txw_idx = get_txw_idx(TX_8X8);
-  const int txh_idx = get_txh_idx(TX_8X8);
-  const int cos_bit_col = av1_fwd_cos_bit_col[txw_idx][txh_idx];
-  const int cos_bit_row = av1_fwd_cos_bit_row[txw_idx][txh_idx];
-  const transform_1d_sse2 col_txfm = col_txfm8x8_arr[tx_type];
-  const transform_1d_sse2 row_txfm = row_txfm8x8_arr[tx_type];
   int ud_flip, lr_flip;
-
   get_flip_cfg(tx_type, &ud_flip, &lr_flip);
-  // Condition to check shift bit is avoided while round shifting, by assuming
-  // that shift[0] will always be positive.
   assert(shift[0] > 0);
   if (ud_flip)
     load_buffer_and_flip_round_shift(input, stride, buf0, shift[0]);
   else
     load_buffer_and_round_shift(input, stride, buf0, shift[0]);
 
-  col_txfm(buf0, buf0, cos_bit_col);
-  // Condition to check shift bit is avoided while round shifting, by assuming
-  // that shift[1] will always be negative.
+  switch (vtx_tab[tx_type]) {
+    case DCT_1D: fdct8x8_new_sse2(buf0, buf0, 13); break;
+    case ADST_1D:
+    case FLIPADST_1D: fadst8x8_new_sse2(buf0, buf0, 13); break;
+    default: fidentity8x8_new_sse2(buf0, buf0, 13); break;
+  }
   assert(shift[1] < 0);
 
   if (lr_flip) {
@@ -1892,13 +1886,15 @@ static void av1_lowbd_fwd_txfm2d_8x8_avx2(const int16_t *input, int32_t *output,
     transpose_round_shift_8x8(buf0, buf1, shift[1]);
   }
 
-  buf = buf1;
-  row_txfm(buf, buf, cos_bit_row);
+  switch (htx_tab[tx_type]) {
+    case DCT_1D: fdct8x8_new_sse2(buf1, buf1, 13); break;
+    case ADST_1D:
+    case FLIPADST_1D: fadst8x8_new_sse2(buf1, buf1, 13); break;
+    default: fidentity8x8_new_sse2(buf1, buf1, 13); break;
+  }
 
-  // Round and shift operation is avoided here as the shift bit is assumed to be
-  // zero always.
   assert(shift[2] == 0);
-  store_buffer_16bit_to_32bit_w8_avx2(buf, output, 8, 8);
+  store_buffer_16bit_to_32bit_w8_avx2(buf1, output, 8, 8);
 }
 
 static void lowbd_fwd_txfm2d_16x16_avx2(const int16_t *input, int32_t *output,
