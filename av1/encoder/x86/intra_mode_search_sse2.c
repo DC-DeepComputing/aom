@@ -143,13 +143,8 @@ void av1_lowbd_compute_gradient_info_sb_sse2(MACROBLOCK *const x,
       d1 = d2;
 
       row_info[c].abs_dx_abs_dy_sum = (uint16_t)(abs(dx) + abs(dy));
-      if (dx == 0) {
-        row_info[c].is_dx_zero = 1;
-        row_info[c].hist_bin_idx = -1;
-      } else {
-        row_info[c].is_dx_zero = 0;
-        row_info[c].hist_bin_idx = (int8_t)get_hist_bin_idx_sse2(dx, dy);
-      }
+      row_info[c].hist_bin_idx =
+          (dx == 0) ? BINS : (int8_t)get_hist_bin_idx_sse2(dx, dy);
     }
     src += stride;
   }
@@ -243,13 +238,8 @@ void av1_highbd_compute_gradient_info_sb_sse2(MACROBLOCK *const x,
       d1 = d2;
 
       row_info[c].abs_dx_abs_dy_sum = (uint16_t)(abs(dx) + abs(dy));
-      if (dx == 0) {
-        row_info[c].is_dx_zero = 1;
-        row_info[c].hist_bin_idx = -1;
-      } else {
-        row_info[c].is_dx_zero = 0;
-        row_info[c].hist_bin_idx = (int8_t)get_hist_bin_idx_sse2(dx, dy);
-      }
+      row_info[c].hist_bin_idx =
+          (dx == 0) ? BINS : (int8_t)get_hist_bin_idx_sse2(dx, dy);
     }
     src += stride;
   }
