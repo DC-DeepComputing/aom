@@ -150,23 +150,24 @@ static const uint8_t clip_max3[256] = {
 static AOM_FORCE_INLINE int get_nz_mag(const uint8_t *const levels,
                                        const int bhl, const TX_CLASS tx_class) {
   int mag;
+  const intptr_t stride = (1 << bhl) + TX_PAD_HOR;
 
   // Note: AOMMIN(level, 3) is useless for decoder since level < 3.
-  mag = clip_max3[levels[(1 << bhl) + TX_PAD_HOR]];  // { 0, 1 }
-  mag += clip_max3[levels[1]];                       // { 1, 0 }
+  mag = clip_max3[levels[stride]];  // { 0, 1 }
+  mag += clip_max3[levels[1]];      // { 1, 0 }
 
   if (tx_class == TX_CLASS_2D) {
-    mag += clip_max3[levels[(1 << bhl) + TX_PAD_HOR + 1]];          // { 1, 1 }
-    mag += clip_max3[levels[(2 << bhl) + (2 << TX_PAD_HOR_LOG2)]];  // { 0, 2 }
-    mag += clip_max3[levels[2]];                                    // { 2, 0 }
+    mag += clip_max3[levels[stride + 1]];  // { 1, 1 }
+    mag += clip_max3[levels[stride * 2]];  // { 0, 2 }
+    mag += clip_max3[levels[2]];           // { 2, 0 }
   } else if (tx_class == TX_CLASS_VERT) {
     mag += clip_max3[levels[2]];  // { 2, 0 }
     mag += clip_max3[levels[3]];  // { 3, 0 }
     mag += clip_max3[levels[4]];  // { 4, 0 }
   } else {
-    mag += clip_max3[levels[(2 << bhl) + (2 << TX_PAD_HOR_LOG2)]];  // { 0, 2 }
-    mag += clip_max3[levels[(3 << bhl) + (3 << TX_PAD_HOR_LOG2)]];  // { 0, 3 }
-    mag += clip_max3[levels[(4 << bhl) + (4 << TX_PAD_HOR_LOG2)]];  // { 0, 4 }
+    mag += clip_max3[levels[stride * 2]];  // { 0, 2 }
+    mag += clip_max3[levels[stride * 3]];  // { 0, 3 }
+    mag += clip_max3[levels[stride * 4]];  // { 0, 4 }
   }
 
   return mag;
@@ -255,6 +256,25 @@ static AOM_FORCE_INLINE int get_lower_levels_ctx(const uint8_t *levels,
   const int stats =
       get_nz_mag(levels + get_padded_idx(coeff_idx, bhl), bhl, tx_class);
   return get_nz_map_ctx_from_stats(stats, coeff_idx, bhl, tx_size, tx_class);
+}
+
+// Specialized variant for AC coefficients (coeff_idx > 0), skipping the
+// redundant (tx_class | coeff_idx) == 0 check.
+static AOM_FORCE_INLINE int get_lower_levels_ctx_simple(const uint8_t *levels,
+                                                        int coeff_idx, int bhl,
+                                                        TX_SIZE tx_size,
+                                                        TX_CLASS tx_class) {
+  const int stats =
+      get_nz_mag(levels + get_padded_idx(coeff_idx, bhl), bhl, tx_class);
+  int ctx = (stats + 1) >> 1;
+  ctx = AOMMIN(ctx, 4);
+  switch (tx_class) {
+    case TX_CLASS_2D: return ctx + av1_nz_map_ctx_offset[tx_size][coeff_idx];
+    case TX_CLASS_HORIZ: return ctx + nz_map_ctx_offset_1d[coeff_idx >> bhl];
+    case TX_CLASS_VERT:
+      return ctx + nz_map_ctx_offset_1d[coeff_idx & ((1 << bhl) - 1)];
+    default: return 0;
+  }
 }
 
 static inline int get_lower_levels_ctx_general(int is_last, int scan_idx,
