@@ -125,25 +125,7 @@ void av1_write_intra_coeffs_mb(const AV1_COMMON *const cm, MACROBLOCK *x,
  */
 static inline uint8_t av1_get_txb_entropy_context(const tran_low_t *qcoeff,
                                                   const SCAN_ORDER *scan_order,
-                                                  int eob) {
-  if (eob == 0) return 0;
-  if (eob == 1) {
-    int cul_level = AOMMIN(COEFF_CONTEXT_MASK, abs(qcoeff[0]));
-    set_dc_sign(&cul_level, qcoeff[0]);
-    return (uint8_t)cul_level;
-  }
-  const int16_t *const scan = scan_order->scan;
-  int cul_level = 0;
-  for (int c = 0; c < eob; ++c) {
-    cul_level += abs(qcoeff[scan[c]]);
-    if (cul_level > COEFF_CONTEXT_MASK) break;
-  }
-
-  cul_level = AOMMIN(COEFF_CONTEXT_MASK, cul_level);
-  set_dc_sign(&cul_level, qcoeff[0]);
-
-  return (uint8_t)cul_level;
-}
+                                                  int eob);
 
 /*!\brief Update the probability model (cdf) and the entropy context related to
  * coefficient coding for all transform blocks in the intra macroblock.
