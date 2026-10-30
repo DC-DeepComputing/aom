@@ -82,6 +82,7 @@ static const int av1_ext_tx_set_idx_to_type[2][AOMMAX(EXT_TX_SETS_INTRA,
 void av1_fill_mode_rates(AV1_COMMON *const cm, ModeCosts *mode_costs,
                          FRAME_CONTEXT *fc) {
   int i, j;
+  const int is_intra_only = frame_is_intra_only(cm);
 
   for (i = 0; i < PARTITION_CONTEXTS; ++i)
     av1_cost_tokens_from_cdf(mode_costs->partition_cost[i],
@@ -122,32 +123,36 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, ModeCosts *mode_costs,
                                fc->filter_intra_cdfs[i], NULL);
   }
 
-  for (i = 0; i < SWITCHABLE_FILTER_CONTEXTS; ++i)
-    av1_cost_tokens_from_cdf(mode_costs->switchable_interp_costs[i],
-                             fc->switchable_interp_cdf[i], NULL);
+  if (!is_intra_only) {
+    for (i = 0; i < SWITCHABLE_FILTER_CONTEXTS; ++i)
+      av1_cost_tokens_from_cdf(mode_costs->switchable_interp_costs[i],
+                               fc->switchable_interp_cdf[i], NULL);
+  }
 
-  for (i = 0; i < PALATTE_BSIZE_CTXS; ++i) {
-    av1_cost_tokens_from_cdf(mode_costs->palette_y_size_cost[i],
-                             fc->palette_y_size_cdf[i], NULL);
-    av1_cost_tokens_from_cdf(mode_costs->palette_uv_size_cost[i],
-                             fc->palette_uv_size_cdf[i], NULL);
-    for (j = 0; j < PALETTE_Y_MODE_CONTEXTS; ++j) {
-      av1_cost_tokens_from_cdf(mode_costs->palette_y_mode_cost[i][j],
-                               fc->palette_y_mode_cdf[i][j], NULL);
+  if (cm->features.allow_screen_content_tools) {
+    for (i = 0; i < PALATTE_BSIZE_CTXS; ++i) {
+      av1_cost_tokens_from_cdf(mode_costs->palette_y_size_cost[i],
+                               fc->palette_y_size_cdf[i], NULL);
+      av1_cost_tokens_from_cdf(mode_costs->palette_uv_size_cost[i],
+                               fc->palette_uv_size_cdf[i], NULL);
+      for (j = 0; j < PALETTE_Y_MODE_CONTEXTS; ++j) {
+        av1_cost_tokens_from_cdf(mode_costs->palette_y_mode_cost[i][j],
+                                 fc->palette_y_mode_cdf[i][j], NULL);
+      }
     }
-  }
 
-  for (i = 0; i < PALETTE_UV_MODE_CONTEXTS; ++i) {
-    av1_cost_tokens_from_cdf(mode_costs->palette_uv_mode_cost[i],
-                             fc->palette_uv_mode_cdf[i], NULL);
-  }
+    for (i = 0; i < PALETTE_UV_MODE_CONTEXTS; ++i) {
+      av1_cost_tokens_from_cdf(mode_costs->palette_uv_mode_cost[i],
+                               fc->palette_uv_mode_cdf[i], NULL);
+    }
 
-  for (i = 0; i < PALETTE_SIZES; ++i) {
-    for (j = 0; j < PALETTE_COLOR_INDEX_CONTEXTS; ++j) {
-      av1_cost_tokens_from_cdf(mode_costs->palette_y_color_cost[i][j],
-                               fc->palette_y_color_index_cdf[i][j], NULL);
-      av1_cost_tokens_from_cdf(mode_costs->palette_uv_color_cost[i][j],
-                               fc->palette_uv_color_index_cdf[i][j], NULL);
+    for (i = 0; i < PALETTE_SIZES; ++i) {
+      for (j = 0; j < PALETTE_COLOR_INDEX_CONTEXTS; ++j) {
+        av1_cost_tokens_from_cdf(mode_costs->palette_y_color_cost[i][j],
+                                 fc->palette_y_color_index_cdf[i][j], NULL);
+        av1_cost_tokens_from_cdf(mode_costs->palette_uv_color_cost[i][j],
+                                 fc->palette_uv_color_index_cdf[i][j], NULL);
+      }
     }
   }
 
@@ -184,11 +189,13 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, ModeCosts *mode_costs,
 
   for (i = TX_4X4; i < EXT_TX_SIZES; ++i) {
     int s;
-    for (s = 1; s < EXT_TX_SETS_INTER; ++s) {
-      if (use_inter_ext_tx_for_txsize[s][i]) {
-        av1_cost_tokens_from_cdf(
-            mode_costs->inter_tx_type_costs[s][i], fc->inter_ext_tx_cdf[s][i],
-            av1_ext_tx_inv[av1_ext_tx_set_idx_to_type[1][s]]);
+    if (!is_intra_only || av1_allow_intrabc(cm)) {
+      for (s = 1; s < EXT_TX_SETS_INTER; ++s) {
+        if (use_inter_ext_tx_for_txsize[s][i]) {
+          av1_cost_tokens_from_cdf(
+              mode_costs->inter_tx_type_costs[s][i], fc->inter_ext_tx_cdf[s][i],
+              av1_ext_tx_inv[av1_ext_tx_set_idx_to_type[1][s]]);
+        }
       }
     }
     for (s = 1; s < EXT_TX_SETS_INTRA; ++s) {
@@ -206,19 +213,23 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, ModeCosts *mode_costs,
     av1_cost_tokens_from_cdf(mode_costs->angle_delta_cost[i],
                              fc->angle_delta_cdf[i], NULL);
   }
-  av1_cost_tokens_from_cdf(mode_costs->intrabc_cost, fc->intrabc_cdf, NULL);
-
-  for (i = 0; i < SPATIAL_PREDICTION_PROBS; ++i) {
-    av1_cost_tokens_from_cdf(mode_costs->spatial_pred_cost[i],
-                             fc->seg.spatial_pred_seg_cdf[i], NULL);
+  if (av1_allow_intrabc(cm)) {
+    av1_cost_tokens_from_cdf(mode_costs->intrabc_cost, fc->intrabc_cdf, NULL);
   }
 
-  for (i = 0; i < SEG_TEMPORAL_PRED_CTXS; ++i) {
-    av1_cost_tokens_from_cdf(mode_costs->tmp_pred_cost[i], fc->seg.pred_cdf[i],
-                             NULL);
+  if (cm->seg.enabled) {
+    for (i = 0; i < SPATIAL_PREDICTION_PROBS; ++i) {
+      av1_cost_tokens_from_cdf(mode_costs->spatial_pred_cost[i],
+                               fc->seg.spatial_pred_seg_cdf[i], NULL);
+    }
   }
 
-  if (!frame_is_intra_only(cm)) {
+  if (!is_intra_only) {
+    for (i = 0; i < SEG_TEMPORAL_PRED_CTXS; ++i) {
+      av1_cost_tokens_from_cdf(mode_costs->tmp_pred_cost[i],
+                               fc->seg.pred_cdf[i], NULL);
+    }
+
     for (i = 0; i < COMP_INTER_CONTEXTS; ++i) {
       av1_cost_tokens_from_cdf(mode_costs->comp_inter_cost[i],
                                fc->comp_inter_cdf[i], NULL);
@@ -652,24 +663,35 @@ void av1_fill_coeff_costs(CoeffCosts *coeff_costs, FRAME_CONTEXT *fc,
         av1_cost_tokens_from_cdf(pcost->eob_extra_cost[ctx],
                                  fc->eob_extra_cdf[tx_size][plane][ctx], NULL);
 
-      for (int ctx = 0; ctx < DC_SIGN_CONTEXTS; ++ctx)
-        av1_cost_tokens_from_cdf(pcost->dc_sign_cost[ctx],
-                                 fc->dc_sign_cdf[plane][ctx], NULL);
+      if (tx_size == 0) {
+        for (int ctx = 0; ctx < DC_SIGN_CONTEXTS; ++ctx)
+          av1_cost_tokens_from_cdf(pcost->dc_sign_cost[ctx],
+                                   fc->dc_sign_cdf[plane][ctx], NULL);
+      } else {
+        memcpy(pcost->dc_sign_cost,
+               coeff_costs->coeff_costs[0][plane].dc_sign_cost,
+               sizeof(pcost->dc_sign_cost));
+      }
 
-      for (int ctx = 0; ctx < LEVEL_CONTEXTS; ++ctx) {
-        int br_rate[BR_CDF_SIZE];
-        int prev_cost = 0;
-        int i, j;
-        av1_cost_tokens_from_cdf(
-            br_rate, fc->coeff_br_cdf[AOMMIN(tx_size, TX_32X32)][plane][ctx],
-            NULL);
-        for (i = 0; i < COEFF_BASE_RANGE; i += BR_CDF_SIZE - 1) {
-          for (j = 0; j < BR_CDF_SIZE - 1; j++) {
-            pcost->lps_cost[ctx][i + j] = prev_cost + br_rate[j];
+      if (tx_size <= TX_32X32) {
+        for (int ctx = 0; ctx < LEVEL_CONTEXTS; ++ctx) {
+          int br_rate[BR_CDF_SIZE];
+          int prev_cost = 0;
+          int i, j;
+          av1_cost_tokens_from_cdf(br_rate,
+                                   fc->coeff_br_cdf[tx_size][plane][ctx], NULL);
+          for (i = 0; i < COEFF_BASE_RANGE; i += BR_CDF_SIZE - 1) {
+            for (j = 0; j < BR_CDF_SIZE - 1; j++) {
+              pcost->lps_cost[ctx][i + j] = prev_cost + br_rate[j];
+            }
+            prev_cost += br_rate[j];
           }
-          prev_cost += br_rate[j];
+          pcost->lps_cost[ctx][i] = prev_cost;
         }
-        pcost->lps_cost[ctx][i] = prev_cost;
+      } else {
+        memcpy(pcost->lps_cost,
+               coeff_costs->coeff_costs[TX_32X32][plane].lps_cost,
+               sizeof(pcost->lps_cost));
       }
     }
   }
