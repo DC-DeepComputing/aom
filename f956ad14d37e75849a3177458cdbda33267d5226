@@ -20,6 +20,24 @@
     {
       "unresolved": false,
       "key": {
+        "uuid": "8628c61a_0460441b",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 4
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-10-30T02:54:58Z",
+      "side": 1,
+      "message": "Thanks Ihor! Your range-coder state approach in aomedia | 219321 is much more comprehensive (keeping low, rng, and cnt in registers across the block and making od_ec_encode_cdf_q15 branchless). I\u0027ve removed the entenc.c and entenc.h changes from this CL so your CL can land cleanly without conflicts.",
+      "parentUuid": "f9115381_8f397ec8",
+      "revId": "f956ad14d37e75849a3177458cdbda33267d5226",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
         "uuid": "e91e9a54_da9c2bea",
         "filename": "aom_dsp/entenc.h",
         "patchSetId": 4
