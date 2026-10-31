@@ -16,6 +16,24 @@
       "message": "Inlining av1_cost_tokens_from_cdf() makes real-time encodes much slower on x86 with clang-cl. In RT, coeff_cost_upd_level and mode_cost_upd_level stay at INTERNAL_COST_UPD_SB, so av1_fill_mode_rates() and av1_fill_coeff_costs() run for every superblock. With this inlined, av1_fill_mode_rates() grows from ~12 KB to ~21 KB of code (clang-cl 19.1.5).\n\nOn a Ryzen 9 5900X, speed 11, 1 thread, this CL alone takes the encode from 578 ms to 696 ms (+20%). AMD uProf shows the same instruction count and data access, but CPI in the cost fill code goes from 0.38 to 0.57-0.66, with 2-3x more op cache misses and 2x more L1 I-cache misses. Branch mispredicts are unchanged. Moving the function back to cost.c recovers it and stays bit exact. arm64 (M3 Pro) shows no difference either way. The unsigned av1_cost_symbol_clamped() change here is a win on x86, so I\u0027d keep that part.\n\nSuggested fix, which is what I measured: move av1_cost_tokens_from_cdf() back to cost.c as a normal function and keep only the declaration in cost.h, as before this CL. Removing the inline keyword is not enough, because a static function in the header still gets inlined. Please keep the unsigned av1_cost_symbol_clamped() change, it makes x86 3 to 6% faster.",
       "revId": "121192bd6c81e520ea352cc38107f907194638e2",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "1c6c1d20_4335dc80",
+        "filename": "av1/encoder/cost.h",
+        "patchSetId": 11
+      },
+      "lineNbr": 55,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-10-31T17:49:11Z",
+      "side": 1,
+      "message": "Thanks for the info. Done",
+      "parentUuid": "53250525_fefa1638",
+      "revId": "121192bd6c81e520ea352cc38107f907194638e2",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
