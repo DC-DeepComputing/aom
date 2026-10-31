@@ -32,6 +32,10 @@
 extern "C" {
 #endif
 
+#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
+#pragma GCC visibility push(hidden)
+#endif
+
 struct aom_writer {
   unsigned int pos;
   uint8_t *buffer;
@@ -103,6 +107,10 @@ static inline void aom_write_symbol(aom_writer *w, int symb, aom_cdf_prob *cdf,
   aom_write_cdf(w, symb, cdf, nsymbs);
   if (w->allow_update_cdf) update_cdf(cdf, symb, nsymbs);
 }
+
+#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
+#pragma GCC visibility pop
+#endif
 
 #ifdef __cplusplus
 }  // extern "C"

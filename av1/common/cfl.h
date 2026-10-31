@@ -15,6 +15,10 @@
 #include "av1/common/av1_common_int.h"
 #include "av1/common/blockd.h"
 
+#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
+#pragma GCC visibility push(hidden)
+#endif
+
 // Can we use CfL for the current block?
 static inline CFL_ALLOWED_TYPE is_cfl_allowed(const MACROBLOCKD *xd) {
   const MB_MODE_INFO *mbmi = xd->mi[0];
@@ -293,5 +297,9 @@ void cfl_load_dc_pred(MACROBLOCKD *const xd, uint8_t *dst, int dst_stride,
     /* index the function pointer array out of bounds. */                   \
     return pred[tx_size % TX_SIZES_ALL];                                    \
   }
+
+#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
+#pragma GCC visibility pop
+#endif
 
 #endif  // AOM_AV1_COMMON_CFL_H_
