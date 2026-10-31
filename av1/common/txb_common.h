@@ -118,8 +118,8 @@ static AOM_FORCE_INLINE int get_br_ctx_stride(const uint8_t *const levels,
                                               const int bhl,
                                               const intptr_t stride,
                                               const TX_CLASS tx_class) {
-  const int col = c >> bhl;
-  const uint8_t *const lv = levels + c + (col << TX_PAD_HOR_LOG2);
+  const intptr_t col = (intptr_t)c >> bhl;
+  const uint8_t *const lv = levels + (intptr_t)c + (col << TX_PAD_HOR_LOG2);
   const uint8_t *const lvs = lv + stride;
   int mag = lv[1] + lvs[0];
   switch (tx_class) {
@@ -128,7 +128,7 @@ static AOM_FORCE_INLINE int get_br_ctx_stride(const uint8_t *const levels,
       mag = AOMMIN((mag + 1) >> 1, 6);
       if (c == 0) return mag;
       const int row = c & ((int)stride - (TX_PAD_HOR + 1));
-      if ((row | col) < 2) return mag + 7;
+      if ((row | (int)col) < 2) return mag + 7;
       break;
     }
     case TX_CLASS_HORIZ:
@@ -163,8 +163,8 @@ static AOM_FORCE_INLINE int get_br_ctx_simple_stride(
     const int c,  // raster order > 0
     const int bhl, const intptr_t stride, const TX_CLASS tx_class) {
   assert(c > 0);
-  const int col = c >> bhl;
-  const uint8_t *const lv = levels + c + (col << TX_PAD_HOR_LOG2);
+  const intptr_t col = (intptr_t)c >> bhl;
+  const uint8_t *const lv = levels + (intptr_t)c + (col << TX_PAD_HOR_LOG2);
   const uint8_t *const lvs = lv + stride;
   int mag = lv[1] + lvs[0];
   switch (tx_class) {
@@ -172,7 +172,7 @@ static AOM_FORCE_INLINE int get_br_ctx_simple_stride(
       const int row = c & ((int)stride - (TX_PAD_HOR + 1));
       mag += lvs[1];
       mag = AOMMIN((mag + 1) >> 1, 6);
-      return mag + (((row | col) < 2) ? 7 : 14);
+      return mag + (((row | (int)col) < 2) ? 7 : 14);
     }
     case TX_CLASS_HORIZ:
       mag += lvs[stride];
@@ -333,16 +333,17 @@ static AOM_FORCE_INLINE int get_lower_levels_ctx_fast(
     const uint8_t *levels, int coeff_idx, int bhl, intptr_t stride,
     const int8_t *nz_map_ctx_offset, TX_CLASS tx_class) {
   if ((tx_class | coeff_idx) == 0) return 0;
-  const int col = coeff_idx >> bhl;
-  const int stats = get_nz_mag_stride(
-      levels + coeff_idx + (col << TX_PAD_HOR_LOG2), stride, tx_class);
+  const intptr_t col = (intptr_t)coeff_idx >> bhl;
+  const int stats =
+      get_nz_mag_stride(levels + (intptr_t)coeff_idx + (col << TX_PAD_HOR_LOG2),
+                        stride, tx_class);
   int ctx = (stats + 1) >> 1;
   ctx = AOMMIN(ctx, 4);
   switch (tx_class) {
     case TX_CLASS_2D: return ctx + nz_map_ctx_offset[coeff_idx];
     case TX_CLASS_HORIZ: return ctx + nz_map_ctx_offset_1d[col];
     case TX_CLASS_VERT:
-      return ctx + nz_map_ctx_offset_1d[coeff_idx - (col << bhl)];
+      return ctx + nz_map_ctx_offset_1d[coeff_idx & ((int)stride - 5)];
     default: return 0;
   }
 }
@@ -352,9 +353,10 @@ static AOM_FORCE_INLINE int get_lower_levels_ctx_fast(
 static AOM_FORCE_INLINE int get_lower_levels_ctx_simple_fast(
     const uint8_t *levels, int coeff_idx, int bhl, intptr_t stride,
     const int8_t *nz_map_ctx_offset, TX_CLASS tx_class) {
-  const int col = coeff_idx >> bhl;
-  const int stats = get_nz_mag_stride(
-      levels + coeff_idx + (col << TX_PAD_HOR_LOG2), stride, tx_class);
+  const intptr_t col = (intptr_t)coeff_idx >> bhl;
+  const int stats =
+      get_nz_mag_stride(levels + (intptr_t)coeff_idx + (col << TX_PAD_HOR_LOG2),
+                        stride, tx_class);
   int ctx = (stats + 1) >> 1;
   ctx = AOMMIN(ctx, 4);
   switch (tx_class) {
@@ -388,22 +390,24 @@ static inline uint8_t av1_get_txb_entropy_context(const tran_low_t *qcoeff,
                                                   const SCAN_ORDER *scan_order,
                                                   int eob) {
   if (eob == 0) return 0;
+  const tran_low_t dc_val = qcoeff[0];
+  const int dc_sign = ((dc_val < 0) + ((dc_val > 0) << 1))
+                      << COEFF_CONTEXT_BITS;
+  int cul_level = abs(dc_val);
+  if (cul_level >= COEFF_CONTEXT_MASK) {
+    return (uint8_t)(COEFF_CONTEXT_MASK | dc_sign);
+  }
   if (eob == 1) {
-    int cul_level = AOMMIN(COEFF_CONTEXT_MASK, abs(qcoeff[0]));
-    set_dc_sign(&cul_level, qcoeff[0]);
-    return (uint8_t)cul_level;
+    return (uint8_t)(cul_level | dc_sign);
   }
   const int16_t *const scan = scan_order->scan;
-  int cul_level = 0;
-  for (int c = 0; c < eob; ++c) {
+  for (int c = 1; c < eob; ++c) {
     cul_level += abs(qcoeff[scan[c]]);
-    if (cul_level > COEFF_CONTEXT_MASK) break;
+    if (cul_level >= COEFF_CONTEXT_MASK) {
+      return (uint8_t)(COEFF_CONTEXT_MASK | dc_sign);
+    }
   }
-
-  cul_level = AOMMIN(COEFF_CONTEXT_MASK, cul_level);
-  set_dc_sign(&cul_level, qcoeff[0]);
-
-  return (uint8_t)cul_level;
+  return (uint8_t)(cul_level | dc_sign);
 }
 
 #ifdef __cplusplus
