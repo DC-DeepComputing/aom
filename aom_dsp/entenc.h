@@ -19,6 +19,10 @@
 extern "C" {
 #endif
 
+#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
+#pragma GCC visibility push(hidden)
+#endif
+
 typedef uint64_t od_ec_enc_window;
 
 typedef struct od_ec_enc od_ec_enc;
@@ -97,6 +101,10 @@ static inline void write_enc_data_to_out_buf(unsigned char *out, uint32_t offs,
   }
   *enc_offs = offs + num_bytes_ready;
 }
+
+#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
+#pragma GCC visibility pop
+#endif
 
 #ifdef __cplusplus
 }  // extern "C"
