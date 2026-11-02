@@ -46,8 +46,6 @@ void cfl_store_dc_pred(MACROBLOCKD *const xd, const uint8_t *input,
 
 static void cfl_load_dc_pred_lbd(const int16_t *dc_pred_cache, uint8_t *dst,
                                  int dst_stride, int width, int height) {
-  // Load the cached 1D row into scalar registers once and broadcast across all
-  // height rows to avoid repeated memory reads per row.
   switch (width) {
     case 4: {
       uint32_t v;
@@ -104,8 +102,6 @@ static void cfl_load_dc_pred_lbd(const int16_t *dc_pred_cache, uint8_t *dst,
 
 static void cfl_load_dc_pred_hbd(const int16_t *dc_pred_cache, uint16_t *dst,
                                  int dst_stride, int width, int height) {
-  // Load the cached 1D row into scalar registers once and broadcast across all
-  // height rows to avoid repeated memory reads per row.
   switch (width) {
     case 4: {
       uint64_t v;
@@ -172,16 +168,25 @@ void cfl_load_dc_pred(MACROBLOCKD *const xd, uint8_t *dst, int dst_stride,
 // Due to frame boundary issues, it is possible that the total area covered by
 // chroma exceeds that of luma. When this happens, we fill the missing pixels by
 // repeating the last columns and/or rows.
-static inline void cfl_pad(CFL_CTX *cfl, int width, int height) {
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
+static void cfl_pad_border(CFL_CTX *cfl, int width, int height) {
   const int diff_width = width - cfl->buf_width;
   const int diff_height = height - cfl->buf_height;
 
   if (diff_width > 0) {
     const int min_height = height - diff_height;
     uint16_t *recon_buf_q3 = cfl->recon_buf_q3 + (width - diff_width);
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC unroll 1
+#endif
     for (int j = 0; j < min_height; j++) {
       const uint16_t last_pixel = recon_buf_q3[-1];
       assert(recon_buf_q3 + diff_width <= cfl->recon_buf_q3 + CFL_BUF_SQUARE);
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC unroll 1
+#endif
       for (int i = 0; i < diff_width; i++) {
         recon_buf_q3[i] = last_pixel;
       }
@@ -192,15 +197,27 @@ static inline void cfl_pad(CFL_CTX *cfl, int width, int height) {
   if (diff_height > 0) {
     uint16_t *recon_buf_q3 =
         cfl->recon_buf_q3 + ((height - diff_height) * CFL_BUF_LINE);
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC unroll 1
+#endif
     for (int j = 0; j < diff_height; j++) {
       const uint16_t *last_row_q3 = recon_buf_q3 - CFL_BUF_LINE;
       assert(recon_buf_q3 + width <= cfl->recon_buf_q3 + CFL_BUF_SQUARE);
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC unroll 1
+#endif
       for (int i = 0; i < width; i++) {
         recon_buf_q3[i] = last_row_q3[i];
       }
       recon_buf_q3 += CFL_BUF_LINE;
     }
     cfl->buf_height = height;
+  }
+}
+
+static inline void cfl_pad(CFL_CTX *cfl, int width, int height) {
+  if (UNLIKELY(width > cfl->buf_width || height > cfl->buf_height)) {
+    cfl_pad_border(cfl, width, height);
   }
 }
 
@@ -298,6 +315,12 @@ void av1_cfl_predict_block(MACROBLOCKD *const xd, uint8_t *dst, int dst_stride,
   }
 #endif
   cfl_get_predict_lbd_fn(tx_size)(cfl->ac_buf_q3, dst, dst_stride, alpha_q3);
+}
+
+cfl_predict_lbd_fn av1_get_cfl_predict_lbd_fn(TX_SIZE tx_size) {
+  return (cfl_get_predict_lbd_fn != cfl_get_predict_lbd_fn_c)
+             ? cfl_get_predict_lbd_fn(tx_size)
+             : NULL;
 }
 
 static void cfl_luma_subsampling_420_lbd_c(const uint8_t *input,
