@@ -173,6 +173,15 @@ static inline int aom_get_qmlevel_444_chroma(int qindex, int first, int last) {
   return clamp(chroma_qm_level, first, last);
 }
 
+#define QM_TOTAL_SIZE 3344
+extern const qm_val_t av1_wt_matrix_ref[NUM_QM_LEVELS - 1][2][QM_TOTAL_SIZE];
+extern qm_val_t av1_wt_matrix_scan_ref[NUM_QM_LEVELS - 1][2][QM_TOTAL_SIZE];
+
+static inline const qm_val_t *av1_get_qmatrix_scan(const qm_val_t *qmatrix) {
+  return &av1_wt_matrix_scan_ref[0][0][0] +
+         (qmatrix - &av1_wt_matrix_ref[0][0][0]);
+}
+
 // Initialize all global quant/dequant matrices.
 void av1_qm_init(struct CommonQuantParams *quant_params, int num_planes);
 
