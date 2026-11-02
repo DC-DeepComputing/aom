@@ -860,6 +860,12 @@ typedef struct {
   bool is_dx_zero;
 } PixelLevelGradientInfo;
 
+#if HAVE_AVX2
+void av1_lowbd_compute_gradient_info_sb_avx2(
+    const uint8_t *src, int stride, PixelLevelGradientInfo *grad_info_sb,
+    int sb_height, int sb_width);
+#endif
+
 // Structure to hold the variance and log(1 + variance) for 4x4 sub-blocks.
 typedef struct {
   double log_var;

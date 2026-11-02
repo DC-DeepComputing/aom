@@ -44,16 +44,6 @@ DECLARE_ALIGNED(32, static const uint32_t,
                 shuffle_weight_layer0[2][8]) = { { 0, 1, 2, 3, 4, 0, 1, 2 },
                                                  { 3, 4, 0, 1, 2, 3, 4, 0 } };
 
-// Shuffle mask used to rearrange weights corresponding to layer 1 and layer 2.
-// For layer 1 and layer 2, convolution happens at 2x2 as filter_width and
-// filter_height are equal to 2. So rearranging the weights in the
-// order shown below to match source pixels. Basically this mask replicates
-// the weights across the width of 2.
-DECLARE_ALIGNED(32, static const uint32_t,
-                shuffle_weight_layer_1_and_2[2][8]) = {
-  { 0, 1, 0, 1, 0, 1, 0, 1 }, { 2, 3, 2, 3, 2, 3, 2, 3 }
-};
-
 // After the stages of multiplication and accumulation, the output values
 // in the register will be jumbled. In order to store register into
 // output buffer in a proper way, the following mask is applied on output
@@ -118,37 +108,6 @@ static inline void prepare_weights_for_5x5_convolve(
     }                                                                  \
   } while (0)
 
-// Load masks needed for shuffling of output and weights.
-static inline void load_shuffle_masks_for_2x2_convolve(__m256i *output_mask,
-                                                       __m256i *weight_mask) {
-  // Load shuffle buffer needed to sort the output.
-  *output_mask =
-      _mm256_load_si256((const __m256i *)shuffle_output_layer_1_and_2);
-
-  // Load shuffle buffers needed for weight.
-  weight_mask[0] =
-      _mm256_load_si256((const __m256i *)shuffle_weight_layer_1_and_2[0]);
-  weight_mask[1] =
-      _mm256_load_si256((const __m256i *)shuffle_weight_layer_1_and_2[1]);
-}
-
-// Load weights needed for layer 1 and 2 (for 2x2 block processing),
-// and fill the registers appropriately to match source pixel mapping.
-static inline void prepare_weights_for_2x2_convolve(
-    const float *layer_config_weights, int off, const int cstep,
-    __m256 *shuffle_weight, __m256i *weight_mask) {
-  // Weights needed for 2x2 block.
-  float weight[4] = { 0 };
-  for (int i = 0; i < 4; ++i) {
-    weight[i] = layer_config_weights[off];
-    off += cstep;
-  }
-
-  const __m256 weight_vec = _mm256_castps128_ps256(_mm_loadu_ps(weight));
-  shuffle_weight[0] = _mm256_permutevar8x32_ps(weight_vec, weight_mask[0]);
-  shuffle_weight[1] = _mm256_permutevar8x32_ps(weight_vec, weight_mask[1]);
-}
-
 // Do convolution of one 5x5 block.
 #define PERFORM_CONVOLVE_FOR_1_5X5_BLOCK(w, accum0, in_stride)           \
   do {                                                                   \
@@ -180,58 +139,6 @@ static inline void prepare_weights_for_2x2_convolve(
     load_src[1] = _mm_add_ps(load_src[1], load_src[3]);                  \
     accum0 = _mm_add_ps(accum0, load_src[1]);                            \
   } while (0)
-
-// Do convolution on 8 horizontal 2x2 blocks.
-static inline void perform_convolve_for_8h_2x2_blocks(const float *input_ptr,
-                                                      int in_stride,
-                                                      __m256 *weight,
-                                                      __m256 *out_accum) {
-  __m256 load_src[4];
-  // Load input into source registers.
-  load_src[0] = _mm256_loadu_ps(input_ptr);
-  load_src[1] = _mm256_loadu_ps(input_ptr + 8);
-  load_src[2] = _mm256_loadu_ps(input_ptr + in_stride);
-  load_src[3] = _mm256_loadu_ps(input_ptr + in_stride + 8);
-
-  // Multiply the loaded input with corresponding weights.
-  load_src[0] = _mm256_mul_ps(load_src[0], weight[0]);
-  load_src[1] = _mm256_mul_ps(load_src[1], weight[0]);
-  load_src[2] = _mm256_mul_ps(load_src[2], weight[1]);
-  load_src[3] = _mm256_mul_ps(load_src[3], weight[1]);
-
-  // Accumulate across 2x2 blocks.
-  load_src[0] = _mm256_add_ps(load_src[0], load_src[2]);
-  load_src[1] = _mm256_add_ps(load_src[1], load_src[3]);
-  load_src[0] = _mm256_hadd_ps(load_src[0], load_src[1]);
-
-  *out_accum = _mm256_add_ps(*out_accum, load_src[0]);
-}
-
-// Do convolution on 8 (4 horizontal x 2 vertical) 2x2 blocks.
-static inline void perform_convolve_for_4hx2v_2x2_blocks(const float *input_ptr,
-                                                         int in_stride,
-                                                         __m256 *weight,
-                                                         __m256 *out_accum) {
-  __m256 load_src[4];
-  // Load input into source registers.
-  load_src[0] = _mm256_loadu_ps(input_ptr);
-  load_src[1] = _mm256_loadu_ps(input_ptr + in_stride);
-  load_src[2] = _mm256_loadu_ps(input_ptr + (in_stride * 2));
-  load_src[3] = _mm256_loadu_ps(input_ptr + (in_stride * 3));
-
-  // Multiply the loaded input with corresponding weights.
-  load_src[0] = _mm256_mul_ps(load_src[0], weight[0]);
-  load_src[1] = _mm256_mul_ps(load_src[1], weight[1]);
-  load_src[2] = _mm256_mul_ps(load_src[2], weight[0]);
-  load_src[3] = _mm256_mul_ps(load_src[3], weight[1]);
-
-  // Accumulate across 2x2 blocks.
-  load_src[0] = _mm256_add_ps(load_src[0], load_src[1]);
-  load_src[2] = _mm256_add_ps(load_src[2], load_src[3]);
-  load_src[0] = _mm256_hadd_ps(load_src[0], load_src[2]);
-
-  *out_accum = _mm256_add_ps(*out_accum, load_src[0]);
-}
 
 // AVX2 variant of av1_cnn_convolve_no_maxpool_padding_valid_c(), when
 // filter_width and filter_height are equal to 5.
@@ -275,53 +182,88 @@ static void cnn_convolve_no_maxpool_padding_valid_5x5_avx2(
   // filter needs to be applied.
   const int kMinWidthFor3_5x5Blocks = (kSkipWidth * 2) + kFilterWidth;
   int i = start_idx;
-  // When in_channels == 1 (Layer 0), process 4 output channels simultaneously
-  // to reuse the loaded and permuted 5x5 source windows across 4 weight sets.
-  if (layer_config->in_channels == 1 && channel_step == 1) {
+  if (layer_config->in_channels == 1 && channel_step == 1 && in_width == 65 &&
+      in_height <= 68) {
+    DECLARE_ALIGNED(32, float, s_buf[68][5][2][8]);
+    DECLARE_ALIGNED(16, float, tail_buf[68][4]);
+    float col4_buf[68];
+    const int max_r = ((in_height - kFilterHeight) & ~3) + kFilterHeight;
+    for (int r = 0; r < max_r; ++r) {
+      const float *row_ptr = &input[0][r * in_stride];
+      for (int g = 0; g < 5; ++g) {
+        const float *p = row_ptr + g * 12;
+        _mm256_store_ps(s_buf[r][g][0],
+                        _mm256_permutevar8x32_ps(_mm256_loadu_ps(p), block0_1));
+        _mm256_store_ps(s_buf[r][g][1], _mm256_permutevar8x32_ps(
+                                            _mm256_loadu_ps(p + 7), block1_2));
+      }
+      _mm_store_ps(tail_buf[r], _mm_loadu_ps(row_ptr + 60));
+      col4_buf[r] = row_ptr[64];
+    }
+    DECLARE_ALIGNED(32, float, w_row[8]) = { 0 };
     for (; i + 3 < layer_config->out_channels; i += 4) {
       const float out_ch_bias[4] = { layer_config->bias[i],
                                      layer_config->bias[i + 1],
                                      layer_config->bias[i + 2],
                                      layer_config->bias[i + 3] };
-      __m256 shuffle_weight[4][10];
-      float weight[4][5][8] = { { { 0 } } };
+      DECLARE_ALIGNED(32, float, shuffle_weight[4][10][8]);
+      float w_col4[4][5];
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC unroll 1
+#endif
       for (int ch = 0; ch < 4; ++ch) {
-        prepare_weights_for_5x5_convolve(layer_config->weights, i + ch,
-                                         weight[ch], cstep, shuffle_weight[ch],
-                                         weight_mask_0, weight_mask_1);
+        const float *w_ptr = layer_config->weights + i + ch;
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC unroll 1
+#endif
+        for (int row = 0; row < 5; ++row) {
+          w_row[0] = w_ptr[(row * 5 + 0) * cstep];
+          w_row[1] = w_ptr[(row * 5 + 1) * cstep];
+          w_row[2] = w_ptr[(row * 5 + 2) * cstep];
+          w_row[3] = w_ptr[(row * 5 + 3) * cstep];
+          w_col4[ch][row] = w_row[4] = w_ptr[(row * 5 + 4) * cstep];
+          const __m256 w_lo =
+              _mm256_permutevar8x32_ps(_mm256_load_ps(w_row), weight_mask_0);
+          _mm256_store_ps(shuffle_weight[ch][row], w_lo);
+          _mm256_store_ps(shuffle_weight[ch][5 + row],
+                          _mm256_permutevar8x32_ps(w_lo, weight_mask_1));
+        }
       }
-
       for (int h = 0, u = 0; h < in_height - kFilterHeight + 1;
            h += kSkipHeight, ++u) {
         const int out_h = u * out_stride;
-        int v = 0;
-        int w = 0;
-        int rem_width = in_width;
-
-        // Process 3 horizontal 5x5 blocks at a time across 4 output channels.
-        while (rem_width >= kMinWidthFor3_5x5Blocks) {
-          __m256 accum_src_0[4] = { _mm256_setzero_ps(), _mm256_setzero_ps(),
-                                    _mm256_setzero_ps(), _mm256_setzero_ps() };
-          __m256 accum_src_1[4] = { _mm256_setzero_ps(), _mm256_setzero_ps(),
-                                    _mm256_setzero_ps(), _mm256_setzero_ps() };
-          const float *input_ptr = &input[0][h * in_stride + w];
-          for (int row = 0; row < 5; row++) {
-            const __m256 s0 =
-                _mm256_permutevar8x32_ps(_mm256_loadu_ps(input_ptr), block0_1);
-            const __m256 s1 = _mm256_permutevar8x32_ps(
-                _mm256_loadu_ps(input_ptr + 7), block1_2);
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC unroll 1
+#endif
+        for (int g = 0; g < 5; ++g) {
+          const __m256 s0_0 = _mm256_load_ps(s_buf[h + 0][g][0]);
+          const __m256 s1_0 = _mm256_load_ps(s_buf[h + 0][g][1]);
+          __m256 accum_src_0[4] = {
+            _mm256_mul_ps(s0_0, _mm256_load_ps(shuffle_weight[0][0])),
+            _mm256_mul_ps(s0_0, _mm256_load_ps(shuffle_weight[1][0])),
+            _mm256_mul_ps(s0_0, _mm256_load_ps(shuffle_weight[2][0])),
+            _mm256_mul_ps(s0_0, _mm256_load_ps(shuffle_weight[3][0]))
+          };
+          __m256 accum_src_1[4] = {
+            _mm256_mul_ps(s1_0, _mm256_load_ps(shuffle_weight[0][5])),
+            _mm256_mul_ps(s1_0, _mm256_load_ps(shuffle_weight[1][5])),
+            _mm256_mul_ps(s1_0, _mm256_load_ps(shuffle_weight[2][5])),
+            _mm256_mul_ps(s1_0, _mm256_load_ps(shuffle_weight[3][5]))
+          };
+          for (int row = 1; row < 5; ++row) {
+            const __m256 s0 = _mm256_load_ps(s_buf[h + row][g][0]);
+            const __m256 s1 = _mm256_load_ps(s_buf[h + row][g][1]);
             for (int ch = 0; ch < 4; ++ch) {
-              accum_src_0[ch] =
-                  _mm256_add_ps(_mm256_mul_ps(s0, shuffle_weight[ch][0 + row]),
-                                accum_src_0[ch]);
-              accum_src_1[ch] =
-                  _mm256_add_ps(_mm256_mul_ps(s1, shuffle_weight[ch][5 + row]),
-                                accum_src_1[ch]);
+              accum_src_0[ch] = _mm256_add_ps(
+                  _mm256_mul_ps(s0, _mm256_load_ps(shuffle_weight[ch][row])),
+                  accum_src_0[ch]);
+              accum_src_1[ch] = _mm256_add_ps(
+                  _mm256_mul_ps(s1,
+                                _mm256_load_ps(shuffle_weight[ch][5 + row])),
+                  accum_src_1[ch]);
             }
-            input_ptr += in_stride;
           }
-
-          // Reduce each channel's 3-block partial sums and add bias.
+          const int v = out_h + g * 3;
           for (int ch = 0; ch < 4; ++ch) {
             __m256 accum = _mm256_hadd_ps(accum_src_0[ch], accum_src_1[ch]);
             __m128 tmp_reg_0 = _mm256_extractf128_ps(accum_src_0[ch], 1);
@@ -331,64 +273,49 @@ static void cnn_convolve_no_maxpool_padding_valid_5x5_avx2(
             __m128 tmp_reg_2 = _mm_add_ps(accum_l, tmp_reg_0);
             __m128 tmp_reg_3 = _mm_add_ps(tmp_reg_0, accum_h);
             __m128 tmp_reg_4 = _mm_add_ps(tmp_reg_1, accum_h);
-
-            output[i + ch][out_h + v] =
+            output[i + ch][v] =
                 out_ch_bias[ch] + _mm_cvtss_f32(tmp_reg_2) +
                 _mm_cvtss_f32(_mm_shuffle_ps(accum_l, accum_l, 1));
-            output[i + ch][out_h + v + 1] =
+            output[i + ch][v + 1] =
                 out_ch_bias[ch] +
                 _mm_cvtss_f32(_mm_shuffle_ps(tmp_reg_3, tmp_reg_3, 1)) +
                 _mm_cvtss_f32(_mm_shuffle_ps(accum_l, accum_l, 2));
-            output[i + ch][out_h + v + 2] =
+            output[i + ch][v + 2] =
                 out_ch_bias[ch] +
                 _mm_cvtss_f32(_mm_shuffle_ps(tmp_reg_4, tmp_reg_4, 2)) +
                 _mm_cvtss_f32(_mm_shuffle_ps(accum_l, accum_l, 3));
           }
-
-          v += 3;
-          w += kSkipWidthForNextIter;
-          rem_width -= kSkipWidthForNextIter;
         }
-
-        // Process remaining single 5x5 blocks across 4 output channels.
-        while (rem_width >= kFilterWidth) {
-          const float *input_ptr = &input[0][h * in_stride + w];
-          __m128 src_rows[5];
-          float col4[5];
-          for (int row = 0; row < 5; ++row) {
-            src_rows[row] = _mm_loadu_ps(input_ptr);
-            col4[row] = input_ptr[4];
-            input_ptr += in_stride;
-          }
-
-          for (int ch = 0; ch < 4; ++ch) {
-            float last_column_sum = 0;
-            for (int row = 0; row < 5; ++row) {
-              last_column_sum += col4[row] * weight[ch][row][4];
-            }
-            __m128 r0 = _mm_mul_ps(
-                src_rows[0], _mm256_castps256_ps128(shuffle_weight[ch][0]));
-            __m128 r1 = _mm_mul_ps(
-                src_rows[1], _mm256_castps256_ps128(shuffle_weight[ch][1]));
-            __m128 r2 = _mm_mul_ps(
-                src_rows[2], _mm256_castps256_ps128(shuffle_weight[ch][2]));
-            __m128 r3 = _mm_mul_ps(
-                src_rows[3], _mm256_castps256_ps128(shuffle_weight[ch][3]));
-            __m128 r4 = _mm_mul_ps(
-                src_rows[4], _mm256_castps256_ps128(shuffle_weight[ch][4]));
-            __m128 accum = _mm_add_ps(r0, _mm_setzero_ps());
-            r1 = _mm_add_ps(r1, r2);
-            r3 = _mm_add_ps(r3, r4);
-            r1 = _mm_add_ps(r1, r3);
-            accum = _mm_add_ps(accum, r1);
-            accum = _mm_hadd_ps(accum, accum);
-            output[i + ch][out_h + v] =
-                out_ch_bias[ch] + last_column_sum + _mm_cvtss_f32(accum) +
-                _mm_cvtss_f32(_mm_shuffle_ps(accum, accum, 1));
-          }
-          v += 1;
-          w += kSkipWidth;
-          rem_width -= kSkipWidth;
+        const __m128 src0 = _mm_load_ps(tail_buf[h + 0]);
+        const __m128 src1 = _mm_load_ps(tail_buf[h + 1]);
+        const __m128 src2 = _mm_load_ps(tail_buf[h + 2]);
+        const __m128 src3 = _mm_load_ps(tail_buf[h + 3]);
+        const __m128 src4 = _mm_load_ps(tail_buf[h + 4]);
+        const float c4_0 = col4_buf[h + 0];
+        const float c4_1 = col4_buf[h + 1];
+        const float c4_2 = col4_buf[h + 2];
+        const float c4_3 = col4_buf[h + 3];
+        const float c4_4 = col4_buf[h + 4];
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC unroll 1
+#endif
+        for (int ch = 0; ch < 4; ++ch) {
+          float last_column_sum = c4_0 * w_col4[ch][0] + c4_1 * w_col4[ch][1] +
+                                  c4_2 * w_col4[ch][2] + c4_3 * w_col4[ch][3] +
+                                  c4_4 * w_col4[ch][4];
+          __m128 r0 = _mm_mul_ps(src0, _mm_load_ps(shuffle_weight[ch][0]));
+          __m128 r1 = _mm_mul_ps(src1, _mm_load_ps(shuffle_weight[ch][1]));
+          __m128 r2 = _mm_mul_ps(src2, _mm_load_ps(shuffle_weight[ch][2]));
+          __m128 r3 = _mm_mul_ps(src3, _mm_load_ps(shuffle_weight[ch][3]));
+          __m128 r4 = _mm_mul_ps(src4, _mm_load_ps(shuffle_weight[ch][4]));
+          r1 = _mm_add_ps(r1, r2);
+          r3 = _mm_add_ps(r3, r4);
+          r1 = _mm_add_ps(r1, r3);
+          __m128 accum = _mm_add_ps(r0, r1);
+          accum = _mm_hadd_ps(accum, accum);
+          output[i + ch][out_h + 15] =
+              out_ch_bias[ch] + last_column_sum + _mm_cvtss_f32(accum) +
+              _mm_cvtss_f32(_mm_shuffle_ps(accum, accum, 1));
         }
       }
     }
@@ -484,48 +411,91 @@ static inline void cnn_convolve_no_maxpool_padding_valid_layer1_avx2(
     const float **input, int in_stride,
     const CNN_LAYER_CONFIG *const layer_config, float **output, int out_stride,
     int start_idx, const int cstep, const int channel_step) {
-  __m256i weight_mask[2];
-  __m256i shuffle_output_mask;
-  load_shuffle_masks_for_2x2_convolve(&shuffle_output_mask, weight_mask);
+  const __m256i shuffle_output_mask =
+      _mm256_load_si256((const __m256i *)shuffle_output_layer_1_and_2);
 
-  const int kInHeight = 16;
-  const int kFilterHeight = 2;
-  const int kSkipHeight = 2;
-  for (int i = start_idx; i < layer_config->out_channels; i += channel_step) {
-    __m256 bias_reg = _mm256_set1_ps(layer_config->bias[i]);
-    // out_accum registers are used to store the 2x2 convolve outputs
-    // (calculated over input block size), which are accumulated across the
-    // in_channels. As per the design, each iteration of for loop processes 8
-    // (horizontal) 2x2 blocks and stores in corresponding out_accum register
-    // (as input size is 16x16, a total of 64 2x2 blocks are present and 8
-    // out_accum registers are enough to store the outputs).
-    // Hence for loops corresponding to 'j' and 'h', below, run over the number
-    // of out_accum registers.
-    __m256 out_accum[8];
-    for (int j = 0; j < 8; ++j) out_accum[j] = bias_reg;
-    for (int k = 0; k < layer_config->in_channels; ++k) {
-      __m256 shuffle_weight[2];
-      int off = k * layer_config->out_channels + i;
-      // In layer 1, the convolution process happens at 2x2.
-      // The weights needed for 2x2 block are same across the in-channels,
-      // which is why the load of weights happens once for each in-channel.
-      prepare_weights_for_2x2_convolve(layer_config->weights, off, cstep,
-                                       shuffle_weight, weight_mask);
-
-      for (int h = 0, u = 0; h < kInHeight - kFilterHeight + 1;
-           h += kSkipHeight, ++u) {
-        const float *input_ptr = &input[k][h * in_stride];
-        perform_convolve_for_8h_2x2_blocks(input_ptr, in_stride, shuffle_weight,
-                                           &out_accum[u]);
+  const float *const w = layer_config->weights;
+  const int in_channels = layer_config->in_channels;
+  const int out_channels = layer_config->out_channels;
+  const int cstep2 = cstep * 2;
+  const int cstep3 = cstep * 3;
+  if (in_channels <= 20) {
+    DECLARE_ALIGNED(32, float, in_shuf[20][8][4][8]);
+    for (int k = 0; k < in_channels; ++k) {
+      const float *in_k = input[k];
+      for (int u = 0; u < 8; ++u) {
+        const __m256 r0_lo = _mm256_loadu_ps(in_k);
+        const __m256 r0_hi = _mm256_loadu_ps(in_k + 8);
+        const __m256 r1_lo = _mm256_loadu_ps(in_k + in_stride);
+        const __m256 r1_hi = _mm256_loadu_ps(in_k + in_stride + 8);
+        _mm256_store_ps(
+            in_shuf[k][u][0],
+            _mm256_shuffle_ps(r0_lo, r0_hi, _MM_SHUFFLE(2, 0, 2, 0)));
+        _mm256_store_ps(
+            in_shuf[k][u][1],
+            _mm256_shuffle_ps(r0_lo, r0_hi, _MM_SHUFFLE(3, 1, 3, 1)));
+        _mm256_store_ps(
+            in_shuf[k][u][2],
+            _mm256_shuffle_ps(r1_lo, r1_hi, _MM_SHUFFLE(2, 0, 2, 0)));
+        _mm256_store_ps(
+            in_shuf[k][u][3],
+            _mm256_shuffle_ps(r1_lo, r1_hi, _MM_SHUFFLE(3, 1, 3, 1)));
+        in_k += in_stride * 2;
       }
     }
-    // Store output of layer 1.
-    for (int j = 0; j < 8; ++j) {
-      _mm256_storeu_ps(
-          &output[i][j * out_stride],
-          _mm256_permutevar8x32_ps(out_accum[j], shuffle_output_mask));
+    for (int i = start_idx; i < out_channels; i += channel_step) {
+      const __m256 b0 = _mm256_set1_ps(layer_config->bias[i]);
+      __m256 s0 = b0, s1 = b0, s2 = b0, s3 = b0;
+      __m256 s4 = b0, s5 = b0, s6 = b0, s7 = b0;
+      for (int k = 0; k < in_channels; ++k) {
+        const int off0 = k * out_channels + i;
+        const __m256 w0_0 = _mm256_set1_ps(w[off0]);
+        const __m256 w0_1 = _mm256_set1_ps(w[off0 + cstep]);
+        const __m256 w0_2 = _mm256_set1_ps(w[off0 + cstep2]);
+        const __m256 w0_3 = _mm256_set1_ps(w[off0 + cstep3]);
+#define ACCUM_L1(u, acc)                                                      \
+  do {                                                                        \
+    const __m256 pl =                                                         \
+        _mm256_add_ps(_mm256_mul_ps(_mm256_load_ps(in_shuf[k][u][0]), w0_0),  \
+                      _mm256_mul_ps(_mm256_load_ps(in_shuf[k][u][2]), w0_2)); \
+    const __m256 pr =                                                         \
+        _mm256_add_ps(_mm256_mul_ps(_mm256_load_ps(in_shuf[k][u][1]), w0_1),  \
+                      _mm256_mul_ps(_mm256_load_ps(in_shuf[k][u][3]), w0_3)); \
+    acc = _mm256_add_ps(acc, _mm256_add_ps(pl, pr));                          \
+  } while (0)
+        ACCUM_L1(0, s0);
+        ACCUM_L1(1, s1);
+        ACCUM_L1(2, s2);
+        ACCUM_L1(3, s3);
+        ACCUM_L1(4, s4);
+        ACCUM_L1(5, s5);
+        ACCUM_L1(6, s6);
+        ACCUM_L1(7, s7);
+#undef ACCUM_L1
+      }
+      _mm256_storeu_ps(&output[i][0 * out_stride],
+                       _mm256_permutevar8x32_ps(s0, shuffle_output_mask));
+      _mm256_storeu_ps(&output[i][1 * out_stride],
+                       _mm256_permutevar8x32_ps(s1, shuffle_output_mask));
+      _mm256_storeu_ps(&output[i][2 * out_stride],
+                       _mm256_permutevar8x32_ps(s2, shuffle_output_mask));
+      _mm256_storeu_ps(&output[i][3 * out_stride],
+                       _mm256_permutevar8x32_ps(s3, shuffle_output_mask));
+      _mm256_storeu_ps(&output[i][4 * out_stride],
+                       _mm256_permutevar8x32_ps(s4, shuffle_output_mask));
+      _mm256_storeu_ps(&output[i][5 * out_stride],
+                       _mm256_permutevar8x32_ps(s5, shuffle_output_mask));
+      _mm256_storeu_ps(&output[i][6 * out_stride],
+                       _mm256_permutevar8x32_ps(s6, shuffle_output_mask));
+      _mm256_storeu_ps(&output[i][7 * out_stride],
+                       _mm256_permutevar8x32_ps(s7, shuffle_output_mask));
     }
+    return;
   }
+
+  av1_cnn_convolve_no_maxpool_padding_valid_c(input, 16, 16, in_stride,
+                                              layer_config, output, out_stride,
+                                              start_idx, cstep, channel_step);
 }
 
 // AVX2 implementation for layer 2.
@@ -533,51 +503,248 @@ static inline void cnn_convolve_no_maxpool_padding_valid_layer2_avx2(
     const float **input, int in_stride,
     const CNN_LAYER_CONFIG *const layer_config, float **output, int out_stride,
     int start_idx, const int cstep, const int channel_step) {
-  __m256i weight_mask[2];
-  __m256i shuffle_output_mask;
-  load_shuffle_masks_for_2x2_convolve(&shuffle_output_mask, weight_mask);
+  const __m256i shuffle_output_mask =
+      _mm256_load_si256((const __m256i *)shuffle_output_layer_1_and_2);
 
-  const int kInHeight = 8;
-  const int kFilterHeight = 2;
-  const int kSkipHeight = 2;
-  for (int i = start_idx; i < layer_config->out_channels; i += channel_step) {
-    __m256 bias_reg = _mm256_set1_ps(layer_config->bias[i]);
-    // out_accum registers are used to store the 2x2 convolve outputs
-    // (calculated over input block size), which are accumulated across the
-    // in_channels. As per the design, each iteration of for loop processes 8
-    // (4 horizontal x 2 vertical) 2x2 blocks and stores in corresponding
-    // out_accum register (as input size is 8x8, a total of 16 2x2 blocks are
-    // present and 2 out_accum registers are enough to store the outputs).
-    // Hence for loops corresponding to 'j' and 'h', below, run over the number
-    // of out_accum registers.
-    __m256 out_accum[2];
-
-    // Height needs to be moved to go to next iteration of processing
-    // while processing 2 2x2 blocks vertically.
-    const int kSkipHeightForNextIter = kSkipHeight * 2;
-    for (int j = 0; j < 2; ++j) out_accum[j] = bias_reg;
-    for (int k = 0; k < layer_config->in_channels; ++k) {
-      __m256 shuffle_weight[2];
-      int off = k * layer_config->out_channels + i;
-      // In layer 2, the convolution process happens at 2x2.
-      // The weights needed for 2x2 block are same across the in-channels,
-      // which is why the load of weights happens once for each in-channel.
-      prepare_weights_for_2x2_convolve(layer_config->weights, off, cstep,
-                                       shuffle_weight, weight_mask);
-
-      for (int h = 0, u = 0; h < kInHeight - kFilterHeight + 1;
-           h += kSkipHeightForNextIter, ++u) {
-        const float *input_ptr = &input[k][h * in_stride];
-        perform_convolve_for_4hx2v_2x2_blocks(input_ptr, in_stride,
-                                              shuffle_weight, &out_accum[u]);
+  const float *const w = layer_config->weights;
+  const int in_channels = layer_config->in_channels;
+  const int out_channels = layer_config->out_channels;
+  const int cstep2 = cstep * 2;
+  const int cstep3 = cstep * 3;
+  if (in_channels <= 20) {
+    DECLARE_ALIGNED(32, float, in_shuf[20][2][4][8]);
+    for (int k = 0; k < in_channels; ++k) {
+      const float *in_k = input[k];
+      for (int u = 0; u < 2; ++u) {
+        const __m256 r0 = _mm256_loadu_ps(in_k);
+        const __m256 r1 = _mm256_loadu_ps(in_k + in_stride);
+        const __m256 r2 = _mm256_loadu_ps(in_k + in_stride * 2);
+        const __m256 r3 = _mm256_loadu_ps(in_k + in_stride * 3);
+        _mm256_store_ps(in_shuf[k][u][0],
+                        _mm256_shuffle_ps(r0, r2, _MM_SHUFFLE(2, 0, 2, 0)));
+        _mm256_store_ps(in_shuf[k][u][1],
+                        _mm256_shuffle_ps(r0, r2, _MM_SHUFFLE(3, 1, 3, 1)));
+        _mm256_store_ps(in_shuf[k][u][2],
+                        _mm256_shuffle_ps(r1, r3, _MM_SHUFFLE(2, 0, 2, 0)));
+        _mm256_store_ps(in_shuf[k][u][3],
+                        _mm256_shuffle_ps(r1, r3, _MM_SHUFFLE(3, 1, 3, 1)));
+        in_k += in_stride * 4;
       }
     }
-    // Store output of layer 2.
-    for (int j = 0; j < 2; ++j) {
-      _mm256_storeu_ps(
-          &output[i][j * out_stride * 2],
-          _mm256_permutevar8x32_ps(out_accum[j], shuffle_output_mask));
+    int i = start_idx;
+    if (channel_step == 1) {
+      for (; i + 1 < out_channels; i += 2) {
+        const __m256 b0 = _mm256_set1_ps(layer_config->bias[i]);
+        const __m256 b1 = _mm256_set1_ps(layer_config->bias[i + 1]);
+        __m256 s0_0 = b0, s0_1 = b0;
+        __m256 s1_0 = b1, s1_1 = b1;
+        for (int k = 0; k < in_channels; ++k) {
+          const int off0 = k * out_channels + i;
+#define ACCUM_L2_CH(ch, s_u0, s_u1)                                         \
+  do {                                                                      \
+    const __m256 wa = _mm256_set1_ps(w[off0 + (ch)]);                       \
+    const __m256 wb = _mm256_set1_ps(w[off0 + (ch) + cstep]);               \
+    const __m256 wc = _mm256_set1_ps(w[off0 + (ch) + cstep2]);              \
+    const __m256 wd = _mm256_set1_ps(w[off0 + (ch) + cstep3]);              \
+    const __m256 pl0 =                                                      \
+        _mm256_add_ps(_mm256_mul_ps(_mm256_load_ps(in_shuf[k][0][0]), wa),  \
+                      _mm256_mul_ps(_mm256_load_ps(in_shuf[k][0][2]), wc)); \
+    const __m256 pr0 =                                                      \
+        _mm256_add_ps(_mm256_mul_ps(_mm256_load_ps(in_shuf[k][0][1]), wb),  \
+                      _mm256_mul_ps(_mm256_load_ps(in_shuf[k][0][3]), wd)); \
+    s_u0 = _mm256_add_ps(s_u0, _mm256_add_ps(pl0, pr0));                    \
+    const __m256 pl1 =                                                      \
+        _mm256_add_ps(_mm256_mul_ps(_mm256_load_ps(in_shuf[k][1][0]), wa),  \
+                      _mm256_mul_ps(_mm256_load_ps(in_shuf[k][1][2]), wc)); \
+    const __m256 pr1 =                                                      \
+        _mm256_add_ps(_mm256_mul_ps(_mm256_load_ps(in_shuf[k][1][1]), wb),  \
+                      _mm256_mul_ps(_mm256_load_ps(in_shuf[k][1][3]), wd)); \
+    s_u1 = _mm256_add_ps(s_u1, _mm256_add_ps(pl1, pr1));                    \
+  } while (0)
+          ACCUM_L2_CH(0, s0_0, s0_1);
+          ACCUM_L2_CH(1, s1_0, s1_1);
+        }
+        _mm256_storeu_ps(&output[i][0],
+                         _mm256_permutevar8x32_ps(s0_0, shuffle_output_mask));
+        _mm256_storeu_ps(&output[i][out_stride * 2],
+                         _mm256_permutevar8x32_ps(s0_1, shuffle_output_mask));
+        _mm256_storeu_ps(&output[i + 1][0],
+                         _mm256_permutevar8x32_ps(s1_0, shuffle_output_mask));
+        _mm256_storeu_ps(&output[i + 1][out_stride * 2],
+                         _mm256_permutevar8x32_ps(s1_1, shuffle_output_mask));
+      }
     }
+    for (; i < out_channels; i += channel_step) {
+      const __m256 b0 = _mm256_set1_ps(layer_config->bias[i]);
+      __m256 s0_0 = b0, s0_1 = b0;
+      for (int k = 0; k < in_channels; ++k) {
+        const int off0 = k * out_channels + i;
+        ACCUM_L2_CH(0, s0_0, s0_1);
+      }
+      _mm256_storeu_ps(&output[i][0],
+                       _mm256_permutevar8x32_ps(s0_0, shuffle_output_mask));
+      _mm256_storeu_ps(&output[i][out_stride * 2],
+                       _mm256_permutevar8x32_ps(s0_1, shuffle_output_mask));
+    }
+#undef ACCUM_L2_CH
+    return;
+  }
+  av1_cnn_convolve_no_maxpool_padding_valid_c(input, 8, 8, in_stride,
+                                              layer_config, output, out_stride,
+                                              start_idx, cstep, channel_step);
+}
+
+static inline void cnn_convolve_no_maxpool_padding_valid_layer3_avx2(
+    const float **input, int in_stride,
+    const CNN_LAYER_CONFIG *const layer_config, float **output, int out_stride,
+    int start_idx, const int cstep, const int channel_step) {
+  const float *const w = layer_config->weights;
+  const int out_channels = layer_config->out_channels;
+  const int in_channels = layer_config->in_channels;
+  const int cstep2 = cstep * 2;
+  const int cstep3 = cstep * 3;
+  int i = start_idx;
+  if (channel_step == 1) {
+    for (; i + 3 < out_channels; i += 4) {
+      __m128 sum0 = _mm_set1_ps(layer_config->bias[i]);
+      __m128 sum1 = _mm_set1_ps(layer_config->bias[i + 1]);
+      __m128 sum2 = _mm_set1_ps(layer_config->bias[i + 2]);
+      __m128 sum3 = _mm_set1_ps(layer_config->bias[i + 3]);
+      for (int k = 0; k < in_channels; ++k) {
+        const float *in_k = input[k];
+        const __m128 r0 = _mm_loadu_ps(in_k);
+        const __m128 r1 = _mm_loadu_ps(in_k + in_stride);
+        const __m128 r2 = _mm_loadu_ps(in_k + in_stride * 2);
+        const __m128 r3 = _mm_loadu_ps(in_k + in_stride * 3);
+        const __m128 p0 = _mm_shuffle_ps(r0, r2, _MM_SHUFFLE(2, 0, 2, 0));
+        const __m128 p1 = _mm_shuffle_ps(r0, r2, _MM_SHUFFLE(3, 1, 3, 1));
+        const __m128 p2 = _mm_shuffle_ps(r1, r3, _MM_SHUFFLE(2, 0, 2, 0));
+        const __m128 p3 = _mm_shuffle_ps(r1, r3, _MM_SHUFFLE(3, 1, 3, 1));
+        const int off = k * out_channels + i;
+
+        sum0 = _mm_add_ps(sum0, _mm_mul_ps(_mm_set1_ps(w[off]), p0));
+        sum0 = _mm_add_ps(sum0, _mm_mul_ps(_mm_set1_ps(w[off + cstep]), p1));
+        sum0 = _mm_add_ps(sum0, _mm_mul_ps(_mm_set1_ps(w[off + cstep2]), p2));
+        sum0 = _mm_add_ps(sum0, _mm_mul_ps(_mm_set1_ps(w[off + cstep3]), p3));
+
+        sum1 = _mm_add_ps(sum1, _mm_mul_ps(_mm_set1_ps(w[off + 1]), p0));
+        sum1 =
+            _mm_add_ps(sum1, _mm_mul_ps(_mm_set1_ps(w[off + 1 + cstep]), p1));
+        sum1 =
+            _mm_add_ps(sum1, _mm_mul_ps(_mm_set1_ps(w[off + 1 + cstep2]), p2));
+        sum1 =
+            _mm_add_ps(sum1, _mm_mul_ps(_mm_set1_ps(w[off + 1 + cstep3]), p3));
+
+        sum2 = _mm_add_ps(sum2, _mm_mul_ps(_mm_set1_ps(w[off + 2]), p0));
+        sum2 =
+            _mm_add_ps(sum2, _mm_mul_ps(_mm_set1_ps(w[off + 2 + cstep]), p1));
+        sum2 =
+            _mm_add_ps(sum2, _mm_mul_ps(_mm_set1_ps(w[off + 2 + cstep2]), p2));
+        sum2 =
+            _mm_add_ps(sum2, _mm_mul_ps(_mm_set1_ps(w[off + 2 + cstep3]), p3));
+
+        sum3 = _mm_add_ps(sum3, _mm_mul_ps(_mm_set1_ps(w[off + 3]), p0));
+        sum3 =
+            _mm_add_ps(sum3, _mm_mul_ps(_mm_set1_ps(w[off + 3 + cstep]), p1));
+        sum3 =
+            _mm_add_ps(sum3, _mm_mul_ps(_mm_set1_ps(w[off + 3 + cstep2]), p2));
+        sum3 =
+            _mm_add_ps(sum3, _mm_mul_ps(_mm_set1_ps(w[off + 3 + cstep3]), p3));
+      }
+      _mm_storel_pi((__m64 *)&output[i][0], sum0);
+      _mm_storeh_pi((__m64 *)&output[i][out_stride], sum0);
+      _mm_storel_pi((__m64 *)&output[i + 1][0], sum1);
+      _mm_storeh_pi((__m64 *)&output[i + 1][out_stride], sum1);
+      _mm_storel_pi((__m64 *)&output[i + 2][0], sum2);
+      _mm_storeh_pi((__m64 *)&output[i + 2][out_stride], sum2);
+      _mm_storel_pi((__m64 *)&output[i + 3][0], sum3);
+      _mm_storeh_pi((__m64 *)&output[i + 3][out_stride], sum3);
+    }
+  }
+  for (; i < out_channels; i += channel_step) {
+    __m128 sum = _mm_set1_ps(layer_config->bias[i]);
+    for (int k = 0; k < in_channels; ++k) {
+      const float *in_k = input[k];
+      const __m128 r0 = _mm_loadu_ps(in_k);
+      const __m128 r1 = _mm_loadu_ps(in_k + in_stride);
+      const __m128 r2 = _mm_loadu_ps(in_k + in_stride * 2);
+      const __m128 r3 = _mm_loadu_ps(in_k + in_stride * 3);
+      const __m128 p0 = _mm_shuffle_ps(r0, r2, _MM_SHUFFLE(2, 0, 2, 0));
+      const __m128 p1 = _mm_shuffle_ps(r0, r2, _MM_SHUFFLE(3, 1, 3, 1));
+      const __m128 p2 = _mm_shuffle_ps(r1, r3, _MM_SHUFFLE(2, 0, 2, 0));
+      const __m128 p3 = _mm_shuffle_ps(r1, r3, _MM_SHUFFLE(3, 1, 3, 1));
+      const int off = k * out_channels + i;
+      sum = _mm_add_ps(sum, _mm_mul_ps(_mm_set1_ps(w[off]), p0));
+      sum = _mm_add_ps(sum, _mm_mul_ps(_mm_set1_ps(w[off + cstep]), p1));
+      sum = _mm_add_ps(sum, _mm_mul_ps(_mm_set1_ps(w[off + cstep2]), p2));
+      sum = _mm_add_ps(sum, _mm_mul_ps(_mm_set1_ps(w[off + cstep3]), p3));
+    }
+    _mm_storel_pi((__m64 *)&output[i][0], sum);
+    _mm_storeh_pi((__m64 *)&output[i][out_stride], sum);
+  }
+}
+
+static inline void cnn_convolve_no_maxpool_padding_valid_layer4_avx2(
+    const float **input, int in_stride,
+    const CNN_LAYER_CONFIG *const layer_config, float **output, int start_idx,
+    const int cstep, const int channel_step) {
+  const float *const w = layer_config->weights;
+  const int out_channels = layer_config->out_channels;
+  const int in_channels = layer_config->in_channels;
+  const int cstep2 = cstep * 2;
+  const int cstep3 = cstep * 3;
+  int i = start_idx;
+  if (channel_step == 1) {
+    for (; i + 7 < out_channels; i += 8) {
+      __m256 sum = _mm256_loadu_ps(&layer_config->bias[i]);
+      for (int k = 0; k < in_channels; ++k) {
+        const float *in_k = input[k];
+        const int off = k * out_channels + i;
+        sum = _mm256_add_ps(sum, _mm256_mul_ps(_mm256_loadu_ps(&w[off]),
+                                               _mm256_set1_ps(in_k[0])));
+        sum = _mm256_add_ps(sum, _mm256_mul_ps(_mm256_loadu_ps(&w[off + cstep]),
+                                               _mm256_set1_ps(in_k[1])));
+        sum =
+            _mm256_add_ps(sum, _mm256_mul_ps(_mm256_loadu_ps(&w[off + cstep2]),
+                                             _mm256_set1_ps(in_k[in_stride])));
+        sum = _mm256_add_ps(sum,
+                            _mm256_mul_ps(_mm256_loadu_ps(&w[off + cstep3]),
+                                          _mm256_set1_ps(in_k[in_stride + 1])));
+      }
+      float res[8];
+      _mm256_storeu_ps(res, sum);
+      for (int c = 0; c < 8; ++c) output[i + c][0] = res[c];
+    }
+    for (; i + 3 < out_channels; i += 4) {
+      __m128 sum = _mm_loadu_ps(&layer_config->bias[i]);
+      for (int k = 0; k < in_channels; ++k) {
+        const float *in_k = input[k];
+        const int off = k * out_channels + i;
+        sum = _mm_add_ps(
+            sum, _mm_mul_ps(_mm_loadu_ps(&w[off]), _mm_set1_ps(in_k[0])));
+        sum = _mm_add_ps(sum, _mm_mul_ps(_mm_loadu_ps(&w[off + cstep]),
+                                         _mm_set1_ps(in_k[1])));
+        sum = _mm_add_ps(sum, _mm_mul_ps(_mm_loadu_ps(&w[off + cstep2]),
+                                         _mm_set1_ps(in_k[in_stride])));
+        sum = _mm_add_ps(sum, _mm_mul_ps(_mm_loadu_ps(&w[off + cstep3]),
+                                         _mm_set1_ps(in_k[in_stride + 1])));
+      }
+      float res[4];
+      _mm_storeu_ps(res, sum);
+      for (int c = 0; c < 4; ++c) output[i + c][0] = res[c];
+    }
+  }
+  for (; i < out_channels; i += channel_step) {
+    float sum = layer_config->bias[i];
+    for (int k = 0; k < in_channels; ++k) {
+      const float *in_k = input[k];
+      const int off = k * out_channels + i;
+      sum += w[off] * in_k[0];
+      sum += w[off + cstep] * in_k[1];
+      sum += w[off + cstep2] * in_k[in_stride];
+      sum += w[off + cstep3] * in_k[in_stride + 1];
+    }
+    output[i][0] = sum;
   }
 }
 
@@ -605,10 +772,14 @@ static void cnn_convolve_no_maxpool_padding_valid_2x2_avx2(
     cnn_convolve_no_maxpool_padding_valid_layer2_avx2(
         input, in_stride, layer_config, output, out_stride, start_idx, cstep,
         channel_step);
+  } else if (in_width == 4 && in_height == 4) {
+    cnn_convolve_no_maxpool_padding_valid_layer3_avx2(
+        input, in_stride, layer_config, output, out_stride, start_idx, cstep,
+        channel_step);
+  } else if (in_width == 2 && in_height == 2) {
+    cnn_convolve_no_maxpool_padding_valid_layer4_avx2(
+        input, in_stride, layer_config, output, start_idx, cstep, channel_step);
   } else {
-    // For layer equal to 3 and 4, the input is of size 4x4 and 2x2
-    // respectively. Implementing SIMD for these cases might not be optimal,
-    // which is why we call C path for layer >= 3.
     av1_cnn_convolve_no_maxpool_padding_valid_c(
         input, in_width, in_height, in_stride, layer_config, output, out_stride,
         start_idx, cstep, channel_step);
