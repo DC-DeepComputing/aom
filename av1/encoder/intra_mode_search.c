@@ -229,7 +229,6 @@ static int rd_pick_filter_intra_sby(const AV1_COMP *const cpi, MACROBLOCK *x,
   FILTER_INTRA_MODE mode;
   TX_SIZE best_tx_size = TX_8X8;
   FILTER_INTRA_MODE_INFO filter_intra_mode_info;
-  uint8_t best_tx_type_map[MAX_MIB_SIZE * MAX_MIB_SIZE];
   av1_zero(filter_intra_mode_info);
   mbmi->filter_intra_mode_info.use_filter_intra = 1;
   mbmi->mode = DC_PRED;
@@ -269,7 +268,8 @@ static int rd_pick_filter_intra_sby(const AV1_COMP *const cpi, MACROBLOCK *x,
     this_rd = RDCOST(x->rdmult, this_rate, tokenonly_rd_stats.dist);
 
     // Visual quality adjustment based on recon vs source variance.
-    if ((cpi->oxcf.mode == ALLINTRA) && (this_rd != INT64_MAX)) {
+    if ((cpi->oxcf.mode == ALLINTRA) &&
+        (INTRA_RD_VAR_THRESH(cpi->oxcf.speed) > 0) && (this_rd != INT64_MAX)) {
       this_rd = (int64_t)(this_rd * intra_rd_variance_factor(cpi, x, bsize));
     }
 
@@ -282,7 +282,7 @@ static int rd_pick_filter_intra_sby(const AV1_COMP *const cpi, MACROBLOCK *x,
       *best_rd = this_rd;
       best_tx_size = mbmi->tx_size;
       filter_intra_mode_info = mbmi->filter_intra_mode_info;
-      av1_copy_array(best_tx_type_map, xd->tx_type_map, ctx->num_4x4_blk);
+      av1_copy_tx_type_map(ctx->tx_type_map, xd->tx_type_map, ctx->num_4x4_blk);
       *rate = this_rate;
       *rate_tokenonly = tokenonly_rd_stats.rate;
       *distortion = tokenonly_rd_stats.dist;
@@ -295,7 +295,6 @@ static int rd_pick_filter_intra_sby(const AV1_COMP *const cpi, MACROBLOCK *x,
     mbmi->mode = DC_PRED;
     mbmi->tx_size = best_tx_size;
     mbmi->filter_intra_mode_info = filter_intra_mode_info;
-    av1_copy_array(ctx->tx_type_map, best_tx_type_map, ctx->num_4x4_blk);
     return 1;
   } else {
     return 0;
@@ -363,25 +362,54 @@ void av1_count_colors_highbd(const uint8_t *src8, int stride, int rows,
   }
 }
 
+static inline int count_bits_64(uint64_t x) {
+#if defined(__GNUC__) || defined(__clang__)
+  return __builtin_popcountll(x);
+#else
+  x = x - ((x >> 1) & 0x5555555555555555ULL);
+  x = (x & 0x3333333333333333ULL) + ((x >> 2) & 0x3333333333333333ULL);
+  return (
+      int)((((x + (x >> 4)) & 0x0F0F0F0F0F0F0F0FULL) * 0x0101010101010101ULL) >>
+           56);
+#endif
+}
+
 bool av1_count_colors_with_threshold(const uint8_t *src, int stride, int rows,
                                      int cols, int num_colors_threshold,
                                      int *num_colors) {
-  bool has_color[1 << 8] = { false };
-  *num_colors = 0;
+  uint64_t seen0[4] = { 0 };
+  uint64_t seen1[4] = { 0 };
+  int max_possible = 0;
 
-  for (int r = 0; r < rows; ++r) {
-    for (int c = 0; c < cols; ++c) {
-      const int this_val = src[r * stride + c];
-      if (!has_color[this_val]) {
-        has_color[this_val] = true;
-        (*num_colors)++;
-        if (*num_colors > num_colors_threshold) {
-          // We're over the threshold, so we can exit early
-          return false;
-        }
-      }
+  do {
+    const uint8_t *p = src;
+    const uint8_t *const end_even = src + (cols & ~1);
+    while (p < end_even) {
+      const uint8_t v0 = p[0];
+      const uint8_t v1 = p[1];
+      seen0[v0 >> 6] |= 1ULL << (v0 & 63);
+      seen1[v1 >> 6] |= 1ULL << (v1 & 63);
+      p += 2;
     }
-  }
+    if (cols & 1) {
+      const uint8_t v0 = p[0];
+      seen0[v0 >> 6] |= 1ULL << (v0 & 63);
+    }
+    src += stride;
+    max_possible += cols;
+    if (max_possible > num_colors_threshold || rows == 1) {
+      const int count = count_bits_64(seen0[0] | seen1[0]) +
+                        count_bits_64(seen0[1] | seen1[1]) +
+                        count_bits_64(seen0[2] | seen1[2]) +
+                        count_bits_64(seen0[3] | seen1[3]);
+      if (count > num_colors_threshold) {
+        *num_colors = count;
+        return false;
+      }
+      max_possible = count;
+    }
+  } while (--rows > 0);
+  *num_colors = max_possible;
   return true;
 }
 
@@ -434,13 +462,20 @@ static inline int prune_intra_y_mode(int64_t this_model_rd,
                                      int64_t top_intra_model_rd[],
                                      int max_model_cnt_allowed,
                                      int model_rd_index_for_pruning) {
-  for (int i = 0; i < max_model_cnt_allowed; i++) {
-    if (this_model_rd < top_intra_model_rd[i]) {
-      for (int j = max_model_cnt_allowed - 1; j > i; j--) {
-        top_intra_model_rd[j] = top_intra_model_rd[j - 1];
+  assert(max_model_cnt_allowed > 0 &&
+         max_model_cnt_allowed <= TOP_INTRA_MODEL_COUNT);
+  if (this_model_rd < top_intra_model_rd[max_model_cnt_allowed - 1]) {
+    for (int i = 0; i < max_model_cnt_allowed; i++) {
+      if (this_model_rd < top_intra_model_rd[i]) {
+        const int64_t r0 = top_intra_model_rd[0];
+        const int64_t r1 = top_intra_model_rd[1];
+        const int64_t r2 = top_intra_model_rd[2];
+        if (i <= 2 && max_model_cnt_allowed >= 4) top_intra_model_rd[3] = r2;
+        if (i <= 1 && max_model_cnt_allowed >= 3) top_intra_model_rd[2] = r1;
+        if (i == 0 && max_model_cnt_allowed >= 2) top_intra_model_rd[1] = r0;
+        top_intra_model_rd[i] = this_model_rd;
+        break;
       }
-      top_intra_model_rd[i] = this_model_rd;
-      break;
     }
   }
   if (this_model_rd > top_intra_model_rd[model_rd_index_for_pruning]) return 1;
@@ -559,11 +594,14 @@ static void cfl_idx_to_sign_and_alpha(int cfl_idx, CFL_SIGN_TYPE *cfl_sign,
   }
 }
 
-static int64_t cfl_compute_rd(const AV1_COMP *const cpi, MACROBLOCK *x,
-                              int plane, TX_SIZE tx_size,
-                              BLOCK_SIZE plane_bsize, int cfl_idx,
-                              int fast_mode, RD_STATS *rd_stats) {
-  assert(IMPLIES(fast_mode, rd_stats == NULL));
+#if defined(__GNUC__) && !defined(__clang__)
+__attribute__((noinline, noclone))
+#elif defined(__clang__)
+__attribute__((noinline))
+#endif
+static int64_t cfl_compute_rd_fast(const AV1_COMP *const cpi, MACROBLOCK *x,
+                                   int plane, TX_SIZE tx_size,
+                                   BLOCK_SIZE plane_bsize, int cfl_idx) {
   const AV1_COMMON *const cm = &cpi->common;
   MACROBLOCKD *const xd = &x->e_mbd;
   MB_MODE_INFO *const mbmi = xd->mi[0];
@@ -578,17 +616,9 @@ static int64_t cfl_compute_rd(const AV1_COMP *const cpi, MACROBLOCK *x,
   mbmi->cfl_alpha_signs =
       PLANE_SIGN_TO_JOINT_SIGN(cfl_plane, cfl_sign, dummy_sign);
   mbmi->cfl_alpha_idx = (cfl_alpha << CFL_ALPHABET_SIZE_LOG2) + cfl_alpha;
-  int64_t cfl_cost;
-  if (fast_mode) {
-    cfl_cost = intra_model_rd(cm, x, plane, plane_bsize, tx_size,
-                              /*use_hadamard=*/0, cpi->do_border_pad);
-  } else {
-    av1_init_rd_stats(rd_stats);
-    av1_txfm_rd_in_plane(x, cpi, rd_stats, INT64_MAX, 0, plane, plane_bsize,
-                         tx_size, FTXS_NONE);
-    av1_rd_cost_update(x->rdmult, rd_stats);
-    cfl_cost = rd_stats->rdcost;
-  }
+  const int64_t cfl_cost =
+      intra_model_rd(cm, x, plane, plane_bsize, tx_size, /*use_hadamard=*/0,
+                     cpi->do_border_pad);
   mbmi->cfl_alpha_signs = orig_cfl_alpha_signs;
   mbmi->cfl_alpha_idx = orig_cfl_alpha_idx;
   return cfl_cost;
@@ -598,32 +628,95 @@ static const int cfl_dir_ls[2] = { 1, -1 };
 
 // If cfl_search_range is CFL_MAGS_SIZE, return zero. Otherwise return the index
 // of the best alpha found using intra_model_rd().
+#if defined(__GNUC__) && !defined(__clang__)
+__attribute__((noinline, noclone))
+#elif defined(__clang__)
+__attribute__((noinline))
+#endif
 static int cfl_pick_plane_parameter(const AV1_COMP *const cpi, MACROBLOCK *x,
                                     int plane, TX_SIZE tx_size,
+                                    BLOCK_SIZE plane_bsize,
                                     int cfl_search_range) {
   assert(cfl_search_range >= 1 && cfl_search_range <= CFL_MAGS_SIZE);
 
   if (cfl_search_range == CFL_MAGS_SIZE) return CFL_INDEX_ZERO;
 
-  const MACROBLOCKD *const xd = &x->e_mbd;
-  const MB_MODE_INFO *const mbmi = xd->mi[0];
+  MACROBLOCKD *const xd = &x->e_mbd;
+  MB_MODE_INFO *const mbmi = xd->mi[0];
   assert(mbmi->uv_mode == UV_CFL_PRED);
-  const MACROBLOCKD_PLANE *pd = &xd->plane[plane];
-  const BLOCK_SIZE plane_bsize =
-      get_plane_block_size(mbmi->bsize, pd->subsampling_x, pd->subsampling_y);
 
   int est_best_cfl_idx = CFL_INDEX_ZERO;
-  int fast_mode = 1;
+#if HAVE_SSSE3 && (defined(__SSE2__) || defined(_M_X64) || \
+                   (defined(_M_IX86_FP) && _M_IX86_FP >= 2))
+  if (LIKELY(!is_cur_buf_hbd(xd) && !mbmi->palette_mode_info.palette_size[1] &&
+             (!cpi->do_border_pad ||
+              (x->pix_to_bottom_edge >= 0 && x->pix_to_right_edge >= 0) ||
+              (max_block_high(xd, plane_bsize, plane) <=
+                   tx_size_high_unit[tx_size] &&
+               max_block_wide(xd, plane_bsize, plane) <=
+                   tx_size_wide_unit[tx_size])))) {
+    const cfl_predict_lbd_fn predict_lbd = av1_get_cfl_predict_lbd_fn(tx_size);
+    if (LIKELY(predict_lbd != NULL)) {
+      struct macroblock_plane *const p = &x->plane[plane];
+      uint8_t *const dst = xd->plane[plane].dst.buf;
+      const int dst_stride = xd->plane[plane].dst.stride;
+      const uint8_t *const src = p->src.buf;
+      const int src_stride = p->src.stride;
+      const int txbw = tx_size_wide[tx_size];
+      const int txbh = tx_size_high[tx_size];
+      const int n_coeffs = tx_size_2d[tx_size];
+      const int8_t orig_cfl_alpha_signs = mbmi->cfl_alpha_signs;
+      const uint8_t orig_cfl_alpha_idx = mbmi->cfl_alpha_idx;
+      mbmi->cfl_alpha_signs = (plane == AOM_PLANE_U) ? 0 : 2;
+      mbmi->cfl_alpha_idx = 0;
+      av1_predict_intra_block_facade(&cpi->common, xd, plane, 0, 0, tx_size);
+      mbmi->cfl_alpha_signs = orig_cfl_alpha_signs;
+      mbmi->cfl_alpha_idx = orig_cfl_alpha_idx;
+      TxfmParam txfm_param;
+      txfm_param.tx_type = DCT_DCT;
+      txfm_param.tx_size = tx_size;
+      txfm_param.lossless = 0;
+      txfm_param.bd = 8;
+      txfm_param.is_hbd = 0;
+      txfm_param.tx_set_type = EXT_TX_SET_ALL16;
+      aom_subtract_block(txbh, txbw, p->src_diff, txbw, src, src_stride, dst,
+                         dst_stride);
+      av1_lowbd_fwd_txfm(p->src_diff, p->coeff, txbw, &txfm_param);
+      int64_t best_cfl_cost = aom_satd(p->coeff, n_coeffs);
+      const uint8_t dc_val =
+          ((const uint8_t *)xd->cfl.dc_pred_cache[plane - 1])[0];
+      for (int si = 0; si < 2; ++si) {
+        const int dir = cfl_dir_ls[si];
+        for (int i = 1; i <= CFL_INDEX_ZERO; ++i) {
+          const int alpha_q3 = dir * i;
+          dst[0] = dc_val;
+          predict_lbd(xd->cfl.ac_buf_q3, dst, dst_stride, alpha_q3);
+          aom_subtract_block(txbh, txbw, p->src_diff, txbw, src, src_stride,
+                             dst, dst_stride);
+          av1_lowbd_fwd_txfm(p->src_diff, p->coeff, txbw, &txfm_param);
+          const int64_t cfl_cost = aom_satd(p->coeff, n_coeffs);
+          if (cfl_cost < best_cfl_cost) {
+            best_cfl_cost = cfl_cost;
+            est_best_cfl_idx = CFL_INDEX_ZERO + alpha_q3;
+          } else {
+            break;
+          }
+        }
+      }
+      return est_best_cfl_idx;
+    }
+  }
+#endif
   int start_cfl_idx = CFL_INDEX_ZERO;
-  int64_t best_cfl_cost = cfl_compute_rd(cpi, x, plane, tx_size, plane_bsize,
-                                         start_cfl_idx, fast_mode, NULL);
+  int64_t best_cfl_cost =
+      cfl_compute_rd_fast(cpi, x, plane, tx_size, plane_bsize, start_cfl_idx);
   for (int si = 0; si < 2; ++si) {
     const int dir = cfl_dir_ls[si];
     for (int i = 1; i < CFL_MAGS_SIZE; ++i) {
       int cfl_idx = start_cfl_idx + dir * i;
       if (cfl_idx < 0 || cfl_idx >= CFL_MAGS_SIZE) break;
-      int64_t cfl_cost = cfl_compute_rd(cpi, x, plane, tx_size, plane_bsize,
-                                        cfl_idx, fast_mode, NULL);
+      int64_t cfl_cost =
+          cfl_compute_rd_fast(cpi, x, plane, tx_size, plane_bsize, cfl_idx);
       if (cfl_cost < best_cfl_cost) {
         best_cfl_cost = cfl_cost;
         est_best_cfl_idx = cfl_idx;
@@ -641,10 +734,31 @@ static inline void set_invalid_cfl_parameters(uint8_t *best_cfl_alpha_idx,
   *best_cfl_alpha_signs = 0;
 }
 
+static void cfl_eval_plane_rd(const AV1_COMP *const cpi, MACROBLOCK *x,
+                              int plane, TX_SIZE tx_size,
+                              BLOCK_SIZE plane_bsize, int cfl_idx,
+                              RD_STATS *rd_stats) {
+  MB_MODE_INFO *const mbmi = x->e_mbd.mi[0];
+  const int cfl_plane = get_cfl_pred_type(plane);
+  CFL_SIGN_TYPE cfl_sign;
+  int cfl_alpha;
+  cfl_idx_to_sign_and_alpha(cfl_idx, &cfl_sign, &cfl_alpha);
+  const int8_t orig_cfl_alpha_signs = mbmi->cfl_alpha_signs;
+  const uint8_t orig_cfl_alpha_idx = mbmi->cfl_alpha_idx;
+  mbmi->cfl_alpha_signs =
+      PLANE_SIGN_TO_JOINT_SIGN(cfl_plane, cfl_sign, CFL_SIGN_NEG);
+  mbmi->cfl_alpha_idx = (cfl_alpha << CFL_ALPHABET_SIZE_LOG2) + cfl_alpha;
+  av1_init_rd_stats(rd_stats);
+  av1_txfm_rd_in_plane(x, cpi, rd_stats, INT64_MAX, 0, plane, plane_bsize,
+                       tx_size, FTXS_NONE);
+  mbmi->cfl_alpha_signs = orig_cfl_alpha_signs;
+  mbmi->cfl_alpha_idx = orig_cfl_alpha_idx;
+}
+
 static void cfl_pick_plane_rd(const AV1_COMP *const cpi, MACROBLOCK *x,
                               int plane, TX_SIZE tx_size, int cfl_search_range,
                               RD_STATS cfl_rd_arr[CFL_MAGS_SIZE],
-                              int est_best_cfl_idx) {
+                              int est_best_cfl_idx, int *idx_lo, int *idx_hi) {
   assert(cfl_search_range >= 1 && cfl_search_range <= CFL_MAGS_SIZE);
   const MACROBLOCKD *const xd = &x->e_mbd;
   const MB_MODE_INFO *const mbmi = xd->mi[0];
@@ -653,14 +767,11 @@ static void cfl_pick_plane_rd(const AV1_COMP *const cpi, MACROBLOCK *x,
   const BLOCK_SIZE plane_bsize =
       get_plane_block_size(mbmi->bsize, pd->subsampling_x, pd->subsampling_y);
 
-  for (int cfl_idx = 0; cfl_idx < CFL_MAGS_SIZE; ++cfl_idx) {
-    av1_invalid_rd_stats(&cfl_rd_arr[cfl_idx]);
-  }
-
-  int fast_mode = 0;
-  int start_cfl_idx = est_best_cfl_idx;
-  cfl_compute_rd(cpi, x, plane, tx_size, plane_bsize, start_cfl_idx, fast_mode,
-                 &cfl_rd_arr[start_cfl_idx]);
+  const int start_cfl_idx = est_best_cfl_idx;
+  *idx_lo = AOMMAX(0, start_cfl_idx - (cfl_search_range - 1));
+  *idx_hi = AOMMIN(CFL_MAGS_SIZE - 1, start_cfl_idx + (cfl_search_range - 1));
+  cfl_eval_plane_rd(cpi, x, plane, tx_size, plane_bsize, start_cfl_idx,
+                    &cfl_rd_arr[start_cfl_idx]);
 
   if (cfl_search_range == 1) return;
 
@@ -669,10 +780,69 @@ static void cfl_pick_plane_rd(const AV1_COMP *const cpi, MACROBLOCK *x,
     for (int i = 1; i < cfl_search_range; ++i) {
       int cfl_idx = start_cfl_idx + dir * i;
       if (cfl_idx < 0 || cfl_idx >= CFL_MAGS_SIZE) break;
-      cfl_compute_rd(cpi, x, plane, tx_size, plane_bsize, cfl_idx, fast_mode,
-                     &cfl_rd_arr[cfl_idx]);
+      cfl_eval_plane_rd(cpi, x, plane, tx_size, plane_bsize, cfl_idx,
+                        &cfl_rd_arr[cfl_idx]);
     }
   }
+}
+
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
+static int cfl_rd_pick_alpha_multi(
+    MACROBLOCK *const x, const AV1_COMP *const cpi, TX_SIZE tx_size,
+    int64_t ref_best_rd, int cfl_search_range, int est_best_cfl_idx_u,
+    int est_best_cfl_idx_v, RD_STATS *best_rd_stats,
+    uint8_t *best_cfl_alpha_idx, int8_t *best_cfl_alpha_signs) {
+  const ModeCosts *mode_costs = &x->mode_costs;
+  RD_STATS cfl_rd_arr_u[CFL_MAGS_SIZE];
+  RD_STATS cfl_rd_arr_v[CFL_MAGS_SIZE];
+  MACROBLOCKD *const xd = &x->e_mbd;
+  int u_lo, u_hi, v_lo, v_hi;
+  cfl_pick_plane_rd(cpi, x, 1, tx_size, cfl_search_range, cfl_rd_arr_u,
+                    est_best_cfl_idx_u, &u_lo, &u_hi);
+  cfl_pick_plane_rd(cpi, x, 2, tx_size, cfl_search_range, cfl_rd_arr_v,
+                    est_best_cfl_idx_v, &v_lo, &v_hi);
+
+  clear_cfl_dc_pred_cache_flags(&xd->cfl);
+
+  for (int ui = u_lo; ui <= u_hi; ++ui) {
+    if (cfl_rd_arr_u[ui].rate == INT_MAX) continue;
+    int cfl_alpha_u;
+    CFL_SIGN_TYPE cfl_sign_u;
+    cfl_idx_to_sign_and_alpha(ui, &cfl_sign_u, &cfl_alpha_u);
+    for (int vi = v_lo; vi <= v_hi; ++vi) {
+      if (cfl_rd_arr_v[vi].rate == INT_MAX) continue;
+      int cfl_alpha_v;
+      CFL_SIGN_TYPE cfl_sign_v;
+      cfl_idx_to_sign_and_alpha(vi, &cfl_sign_v, &cfl_alpha_v);
+      // cfl_sign_u == CFL_SIGN_ZERO && cfl_sign_v == CFL_SIGN_ZERO is not a
+      // valid parameter for CFL
+      if (cfl_sign_u == CFL_SIGN_ZERO && cfl_sign_v == CFL_SIGN_ZERO) continue;
+      int joint_sign = cfl_sign_u * CFL_SIGNS + cfl_sign_v - 1;
+      RD_STATS rd_stats = cfl_rd_arr_u[ui];
+      av1_merge_rd_stats(&rd_stats, &cfl_rd_arr_v[vi]);
+      if (rd_stats.rate != INT_MAX) {
+        rd_stats.rate +=
+            mode_costs->cfl_cost[joint_sign][CFL_PRED_U][cfl_alpha_u];
+        rd_stats.rate +=
+            mode_costs->cfl_cost[joint_sign][CFL_PRED_V][cfl_alpha_v];
+      }
+      av1_rd_cost_update(x->rdmult, &rd_stats);
+      if (rd_stats.rdcost < best_rd_stats->rdcost) {
+        *best_rd_stats = rd_stats;
+        *best_cfl_alpha_idx =
+            (cfl_alpha_u << CFL_ALPHABET_SIZE_LOG2) + cfl_alpha_v;
+        *best_cfl_alpha_signs = joint_sign;
+      }
+    }
+  }
+  if (best_rd_stats->rdcost >= ref_best_rd) {
+    av1_invalid_rd_stats(best_rd_stats);
+    set_invalid_cfl_parameters(best_cfl_alpha_idx, best_cfl_alpha_signs);
+    return 0;
+  }
+  return 1;
 }
 
 /*!\brief Pick the optimal parameters for Chroma to Luma (CFL) component
@@ -703,6 +873,9 @@ static void cfl_pick_plane_rd(const AV1_COMP *const cpi, MACROBLOCK *x,
  * \param[out]   best_cfl_alpha_signs   Best CFL joint signs
  *
  */
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
 static int cfl_rd_pick_alpha(MACROBLOCK *const x, const AV1_COMP *const cpi,
                              TX_SIZE tx_size, int64_t ref_best_rd,
                              int cfl_search_range, RD_STATS *best_rd_stats,
@@ -710,9 +883,10 @@ static int cfl_rd_pick_alpha(MACROBLOCK *const x, const AV1_COMP *const cpi,
                              int8_t *best_cfl_alpha_signs) {
   assert(cfl_search_range >= 1 && cfl_search_range <= CFL_MAGS_SIZE);
   const ModeCosts *mode_costs = &x->mode_costs;
-  RD_STATS cfl_rd_arr_u[CFL_MAGS_SIZE];
-  RD_STATS cfl_rd_arr_v[CFL_MAGS_SIZE];
   MACROBLOCKD *const xd = &x->e_mbd;
+  MB_MODE_INFO *const mbmi = xd->mi[0];
+  const BLOCK_SIZE plane_bsize = get_plane_block_size(
+      mbmi->bsize, xd->plane[1].subsampling_x, xd->plane[1].subsampling_y);
   int est_best_cfl_idx_u, est_best_cfl_idx_v;
 
   av1_invalid_rd_stats(best_rd_stats);
@@ -722,12 +896,12 @@ static int cfl_rd_pick_alpha(MACROBLOCK *const x, const AV1_COMP *const cpi,
   // returning to avoid the unintentional usage of cached dc pred data.
   xd->cfl.use_dc_pred_cache = true;
   // Evaluate alpha parameter of each chroma plane.
-  est_best_cfl_idx_u =
-      cfl_pick_plane_parameter(cpi, x, 1, tx_size, cfl_search_range);
-  est_best_cfl_idx_v =
-      cfl_pick_plane_parameter(cpi, x, 2, tx_size, cfl_search_range);
+  est_best_cfl_idx_u = cfl_pick_plane_parameter(cpi, x, 1, tx_size, plane_bsize,
+                                                cfl_search_range);
+  est_best_cfl_idx_v = cfl_pick_plane_parameter(cpi, x, 2, tx_size, plane_bsize,
+                                                cfl_search_range);
 
-  if (cfl_search_range == 1) {
+  if (LIKELY(cfl_search_range == 1)) {
     // For cfl_search_range=1, further refinement of alpha is not enabled. Hence
     // CfL index=0 for both the chroma planes implies invalid CfL mode.
     if (est_best_cfl_idx_u == CFL_INDEX_ZERO &&
@@ -739,14 +913,15 @@ static int cfl_rd_pick_alpha(MACROBLOCK *const x, const AV1_COMP *const cpi,
 
     int cfl_alpha_u, cfl_alpha_v;
     CFL_SIGN_TYPE cfl_sign_u, cfl_sign_v;
-    const MB_MODE_INFO *mbmi = xd->mi[0];
     cfl_idx_to_sign_and_alpha(est_best_cfl_idx_u, &cfl_sign_u, &cfl_alpha_u);
     cfl_idx_to_sign_and_alpha(est_best_cfl_idx_v, &cfl_sign_v, &cfl_alpha_v);
     const int joint_sign = cfl_sign_u * CFL_SIGNS + cfl_sign_v - 1;
     // Compute alpha and mode signaling rate.
-    const int rate_overhead =
+    const int cfl_rate =
         mode_costs->cfl_cost[joint_sign][CFL_PRED_U][cfl_alpha_u] +
-        mode_costs->cfl_cost[joint_sign][CFL_PRED_V][cfl_alpha_v] +
+        mode_costs->cfl_cost[joint_sign][CFL_PRED_V][cfl_alpha_v];
+    const int rate_overhead =
+        cfl_rate +
         mode_costs
             ->intra_uv_mode_cost[is_cfl_allowed(xd)][mbmi->mode][UV_CFL_PRED];
     // Skip the CfL mode evaluation if the RD cost derived using the rate needed
@@ -756,56 +931,42 @@ static int cfl_rd_pick_alpha(MACROBLOCK *const x, const AV1_COMP *const cpi,
       clear_cfl_dc_pred_cache_flags(&xd->cfl);
       return 0;
     }
-  }
-
-  // Compute the rd cost of each chroma plane using the alpha parameters which
-  // were already evaluated.
-  cfl_pick_plane_rd(cpi, x, 1, tx_size, cfl_search_range, cfl_rd_arr_u,
-                    est_best_cfl_idx_u);
-  cfl_pick_plane_rd(cpi, x, 2, tx_size, cfl_search_range, cfl_rd_arr_v,
-                    est_best_cfl_idx_v);
-
-  clear_cfl_dc_pred_cache_flags(&xd->cfl);
-
-  for (int ui = 0; ui < CFL_MAGS_SIZE; ++ui) {
-    if (cfl_rd_arr_u[ui].rate == INT_MAX) continue;
-    int cfl_alpha_u;
-    CFL_SIGN_TYPE cfl_sign_u;
-    cfl_idx_to_sign_and_alpha(ui, &cfl_sign_u, &cfl_alpha_u);
-    for (int vi = 0; vi < CFL_MAGS_SIZE; ++vi) {
-      if (cfl_rd_arr_v[vi].rate == INT_MAX) continue;
-      int cfl_alpha_v;
-      CFL_SIGN_TYPE cfl_sign_v;
-      cfl_idx_to_sign_and_alpha(vi, &cfl_sign_v, &cfl_alpha_v);
-      // cfl_sign_u == CFL_SIGN_ZERO && cfl_sign_v == CFL_SIGN_ZERO is not a
-      // valid parameter for CFL
-      if (cfl_sign_u == CFL_SIGN_ZERO && cfl_sign_v == CFL_SIGN_ZERO) continue;
-      int joint_sign = cfl_sign_u * CFL_SIGNS + cfl_sign_v - 1;
-      RD_STATS rd_stats = cfl_rd_arr_u[ui];
-      av1_merge_rd_stats(&rd_stats, &cfl_rd_arr_v[vi]);
-      if (rd_stats.rate != INT_MAX) {
-        rd_stats.rate +=
-            mode_costs->cfl_cost[joint_sign][CFL_PRED_U][cfl_alpha_u];
-        rd_stats.rate +=
-            mode_costs->cfl_cost[joint_sign][CFL_PRED_V][cfl_alpha_v];
+    const int8_t orig_cfl_alpha_signs = mbmi->cfl_alpha_signs;
+    const uint8_t orig_cfl_alpha_idx = mbmi->cfl_alpha_idx;
+    mbmi->cfl_alpha_signs = joint_sign;
+    mbmi->cfl_alpha_idx = (cfl_alpha_u << CFL_ALPHABET_SIZE_LOG2) + cfl_alpha_v;
+    RD_STATS rd_u, rd_v;
+    av1_init_rd_stats(&rd_u);
+    av1_txfm_rd_in_plane(x, cpi, &rd_u, INT64_MAX, 0, 1, plane_bsize, tx_size,
+                         FTXS_NONE);
+    av1_init_rd_stats(&rd_v);
+    av1_txfm_rd_in_plane(x, cpi, &rd_v, INT64_MAX, 0, 2, plane_bsize, tx_size,
+                         FTXS_NONE);
+    clear_cfl_dc_pred_cache_flags(&xd->cfl);
+    if (rd_u.rate != INT_MAX && rd_v.rate != INT_MAX) {
+      av1_merge_rd_stats(&rd_u, &rd_v);
+      if (rd_u.rate != INT_MAX) {
+        rd_u.rate += cfl_rate;
       }
-      av1_rd_cost_update(x->rdmult, &rd_stats);
-      if (rd_stats.rdcost < best_rd_stats->rdcost) {
-        *best_rd_stats = rd_stats;
+      av1_rd_cost_update(x->rdmult, &rd_u);
+      if (rd_u.rdcost < ref_best_rd) {
+        *best_rd_stats = rd_u;
         *best_cfl_alpha_idx =
             (cfl_alpha_u << CFL_ALPHABET_SIZE_LOG2) + cfl_alpha_v;
         *best_cfl_alpha_signs = joint_sign;
+        return 1;
       }
     }
-  }
-  if (best_rd_stats->rdcost >= ref_best_rd) {
-    av1_invalid_rd_stats(best_rd_stats);
-    // Set invalid CFL parameters here since the rdcost is not better than
-    // ref_best_rd.
+    mbmi->cfl_alpha_signs = orig_cfl_alpha_signs;
+    mbmi->cfl_alpha_idx = orig_cfl_alpha_idx;
     set_invalid_cfl_parameters(best_cfl_alpha_idx, best_cfl_alpha_signs);
     return 0;
   }
-  return 1;
+
+  return cfl_rd_pick_alpha_multi(x, cpi, tx_size, ref_best_rd, cfl_search_range,
+                                 est_best_cfl_idx_u, est_best_cfl_idx_v,
+                                 best_rd_stats, best_cfl_alpha_idx,
+                                 best_cfl_alpha_signs);
 }
 
 static bool should_prune_chroma_smooth_pred_based_on_source_variance(
@@ -860,54 +1021,61 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
                                  cpi->optimize_seg_arr[mbmi->segment_id]);
     xd->cfl.store_y = 0;
   }
-  IntraModeSearchState intra_search_state;
-  init_intra_mode_search_state(&intra_search_state);
+  uint8_t directional_mode_skip_mask[UV_INTRA_MODES] = { 0 };
+  int dir_mode_skip_mask_ready = 0;
   const CFL_ALLOWED_TYPE cfl_allowed = is_cfl_allowed(xd);
+  const SPEED_FEATURES *const sf = &cpi->sf;
+  const int (*const uv_mode_cost)[UV_INTRA_MODES] =
+      &mode_costs->intra_uv_mode_cost[cfl_allowed][mbmi->mode];
+
+  assert(mbmi->mode < INTRA_MODES);
+  uint32_t allowed_uv_mask =
+      sf->intra_sf.intra_uv_mode_mask[txsize_sqr_up_map[max_tx_size]];
+  if (sf->intra_sf.prune_chroma_modes_using_luma_winner) {
+    allowed_uv_mask &= av1_derived_chroma_intra_mode_used_flag[mbmi->mode];
+  }
+  if (!intra_mode_cfg->enable_diagonal_intra) {
+    allowed_uv_mask &=
+        ~((1U << UV_D45_PRED) | (1U << UV_D135_PRED) | (1U << UV_D113_PRED) |
+          (1U << UV_D157_PRED) | (1U << UV_D203_PRED) | (1U << UV_D67_PRED));
+  }
+  if (!intra_mode_cfg->enable_directional_intra) {
+    allowed_uv_mask &=
+        ~((1U << UV_V_PRED) | (1U << UV_H_PRED) | (1U << UV_D45_PRED) |
+          (1U << UV_D135_PRED) | (1U << UV_D113_PRED) | (1U << UV_D157_PRED) |
+          (1U << UV_D203_PRED) | (1U << UV_D67_PRED));
+  }
+  if (!intra_mode_cfg->enable_smooth_intra) {
+    allowed_uv_mask &= ~((1U << UV_SMOOTH_PRED) | (1U << UV_SMOOTH_V_PRED) |
+                         (1U << UV_SMOOTH_H_PRED));
+  }
+  if (!intra_mode_cfg->enable_paeth_intra) {
+    allowed_uv_mask &= ~(1U << UV_PAETH_PRED);
+  }
+  if (!cfl_allowed || !intra_mode_cfg->enable_cfl_intra) {
+    allowed_uv_mask &= ~(1U << UV_CFL_PRED);
+  }
+  const int use_angle_delta =
+      av1_use_angle_delta(mbmi->bsize) && intra_mode_cfg->enable_angle_delta;
 
   // Search through all non-palette modes.
   for (int mode_idx = 0; mode_idx < UV_INTRA_MODES; ++mode_idx) {
-    int this_rate;
-    RD_STATS tokenonly_rd_stats;
-    UV_PREDICTION_MODE uv_mode = uv_rd_search_mode_order[mode_idx];
+    const UV_PREDICTION_MODE uv_mode = uv_rd_search_mode_order[mode_idx];
+    if (!(allowed_uv_mask & (1U << uv_mode))) continue;
 
     // Skip the current mode evaluation if the RD cost derived using the mode
     // signaling rate exceeds the best_rd so far.
-    const int mode_rate =
-        mode_costs->intra_uv_mode_cost[cfl_allowed][mbmi->mode][uv_mode];
+    const int mode_rate = (*uv_mode_cost)[uv_mode];
     if (RDCOST(x->rdmult, mode_rate, 0) > best_rd) continue;
 
-    PREDICTION_MODE intra_mode = get_uv_mode(uv_mode);
-    const int is_diagonal_mode = av1_is_diagonal_mode(intra_mode);
+    int this_rate;
+    RD_STATS tokenonly_rd_stats;
+    const PREDICTION_MODE intra_mode = get_uv_mode(uv_mode);
     const int is_directional_mode = av1_is_directional_mode(intra_mode);
 
-    if (is_diagonal_mode && !cpi->oxcf.intra_mode_cfg.enable_diagonal_intra)
-      continue;
-    if (is_directional_mode &&
-        !cpi->oxcf.intra_mode_cfg.enable_directional_intra)
-      continue;
-
-    if (!(cpi->sf.intra_sf.intra_uv_mode_mask[txsize_sqr_up_map[max_tx_size]] &
-          (1 << uv_mode)))
-      continue;
-    if (!intra_mode_cfg->enable_smooth_intra && uv_mode >= UV_SMOOTH_PRED &&
-        uv_mode <= UV_SMOOTH_H_PRED)
-      continue;
-
-    if (!intra_mode_cfg->enable_paeth_intra && uv_mode == UV_PAETH_PRED)
-      continue;
-
-    assert(mbmi->mode < INTRA_MODES);
-    if (cpi->sf.intra_sf.prune_chroma_modes_using_luma_winner &&
-        !(av1_derived_chroma_intra_mode_used_flag[mbmi->mode] & (1 << uv_mode)))
-      continue;
-
     mbmi->uv_mode = uv_mode;
-
-    // Init variables for cfl and angle delta
-    const SPEED_FEATURES *sf = &cpi->sf;
     mbmi->angle_delta[PLANE_TYPE_UV] = 0;
     if (uv_mode == UV_CFL_PRED) {
-      if (!cfl_allowed || !intra_mode_cfg->enable_cfl_intra) continue;
       assert(!is_directional_mode);
       const TX_SIZE uv_tx_size = av1_get_tx_size(AOM_PLANE_U, xd);
       if (!cfl_rd_pick_alpha(x, cpi, uv_tx_size, best_rd,
@@ -915,10 +1083,9 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
                              &mbmi->cfl_alpha_idx, &mbmi->cfl_alpha_signs)) {
         continue;
       }
-    } else if (is_directional_mode && av1_use_angle_delta(mbmi->bsize) &&
-               intra_mode_cfg->enable_angle_delta) {
+    } else if (is_directional_mode && use_angle_delta) {
       if (sf->intra_sf.chroma_intra_pruning_with_hog &&
-          !intra_search_state.dir_mode_skip_mask_ready) {
+          !dir_mode_skip_mask_ready) {
         static const float thresh[2][4] = {
           { -1.2f, 0.0f, 0.0f, 1.2f },    // Interframe
           { -1.2f, -1.2f, -0.6f, 0.4f },  // Intraframe
@@ -929,17 +1096,15 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
             x, bsize, cm->seq_params->sb_size,
             thresh[is_intra_frame]
                   [sf->intra_sf.chroma_intra_pruning_with_hog - 1],
-            intra_search_state.directional_mode_skip_mask, is_chroma);
-        intra_search_state.dir_mode_skip_mask_ready = 1;
+            directional_mode_skip_mask, is_chroma);
+        dir_mode_skip_mask_ready = 1;
       }
-      if (intra_search_state.directional_mode_skip_mask[uv_mode]) {
+      if (directional_mode_skip_mask[uv_mode]) {
         continue;
       }
 
       // Search through angle delta
-      const int rate_overhead =
-          mode_costs->intra_uv_mode_cost[cfl_allowed][mbmi->mode][uv_mode];
-      if (!rd_pick_intra_angle_sbuv(cpi, x, bsize, rate_overhead, best_rd,
+      if (!rd_pick_intra_angle_sbuv(cpi, x, bsize, mode_rate, best_rd,
                                     &this_rate, &tokenonly_rd_stats))
         continue;
     } else {
@@ -953,10 +1118,8 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
         continue;
       }
     }
-    const int mode_cost =
-        mode_costs->intra_uv_mode_cost[cfl_allowed][mbmi->mode][uv_mode];
     this_rate = tokenonly_rd_stats.rate +
-                intra_mode_info_cost_uv(cpi, x, mbmi, bsize, mode_cost);
+                intra_mode_info_cost_uv(cpi, x, mbmi, bsize, mode_rate);
     this_rd = RDCOST(x->rdmult, this_rate, tokenonly_rd_stats.dist);
 
 #if CONFIG_AV1_HIGHBITDEPTH
@@ -1044,7 +1207,7 @@ int av1_search_palette_mode(IntraModeSearchState *intra_search_state,
     return skippable;
   }
 
-  av1_copy_array(xd->tx_type_map, best_tx_type_map, ctx->num_4x4_blk);
+  av1_copy_tx_type_map(xd->tx_type_map, best_tx_type_map, ctx->num_4x4_blk);
   memcpy(color_map, best_palette_color_map,
          rows * cols * sizeof(best_palette_color_map[0]));
 
@@ -1129,7 +1292,7 @@ void av1_search_palette_mode_luma(const AV1_COMP *cpi, MACROBLOCK *x,
     return;
   }
 
-  av1_copy_array(xd->tx_type_map, best_tx_type_map, ctx->num_4x4_blk);
+  av1_copy_tx_type_map(xd->tx_type_map, best_tx_type_map, ctx->num_4x4_blk);
   memcpy(color_map, best_palette_color_map,
          rows * cols * sizeof(best_palette_color_map[0]));
 
@@ -1191,7 +1354,7 @@ static inline int intra_block_yrd(const AV1_COMP *const cpi, MACROBLOCK *x,
     *rate_tokenonly = this_rate_tokenonly;
     *distortion = rd_stats.dist;
     *skippable = rd_stats.skip_txfm;
-    av1_copy_array(ctx->tx_type_map, xd->tx_type_map, ctx->num_4x4_blk);
+    av1_copy_tx_type_map(ctx->tx_type_map, xd->tx_type_map, ctx->num_4x4_blk);
     return 1;
   }
   return 0;
@@ -1221,7 +1384,7 @@ static inline void handle_filter_intra_mode(const AV1_COMP *cpi, MACROBLOCK *x,
   TX_SIZE best_tx_size = mbmi->tx_size;
   FILTER_INTRA_MODE best_fi_mode = FILTER_DC_PRED;
   uint8_t best_tx_type_map[MAX_MIB_SIZE * MAX_MIB_SIZE];
-  av1_copy_array(best_tx_type_map, xd->tx_type_map, ctx->num_4x4_blk);
+  av1_copy_tx_type_map(best_tx_type_map, xd->tx_type_map, ctx->num_4x4_blk);
   mbmi->filter_intra_mode_info.use_filter_intra = 1;
   for (FILTER_INTRA_MODE fi_mode = FILTER_DC_PRED; fi_mode < FILTER_INTRA_MODES;
        ++fi_mode) {
@@ -1239,7 +1402,7 @@ static inline void handle_filter_intra_mode(const AV1_COMP *cpi, MACROBLOCK *x,
     }
     if (this_rd_tmp < best_rd_so_far) {
       best_tx_size = mbmi->tx_size;
-      av1_copy_array(best_tx_type_map, xd->tx_type_map, ctx->num_4x4_blk);
+      av1_copy_tx_type_map(best_tx_type_map, xd->tx_type_map, ctx->num_4x4_blk);
       best_fi_mode = fi_mode;
       *rd_stats_y = rd_stats_y_fi;
       filter_intra_selected_flag = 1;
@@ -1248,7 +1411,7 @@ static inline void handle_filter_intra_mode(const AV1_COMP *cpi, MACROBLOCK *x,
   }
 
   mbmi->tx_size = best_tx_size;
-  av1_copy_array(xd->tx_type_map, best_tx_type_map, ctx->num_4x4_blk);
+  av1_copy_tx_type_map(xd->tx_type_map, best_tx_type_map, ctx->num_4x4_blk);
 
   if (filter_intra_selected_flag) {
     mbmi->filter_intra_mode_info.use_filter_intra = 1;
@@ -1540,10 +1703,58 @@ int64_t av1_rd_pick_intra_sby_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
     }
   }
 
+  const TX_SIZE tx_size = AOMMIN(TX_32X32, max_txsize_lookup[bsize]);
+  const int reorder_delta_angle =
+      intra_sf->prune_luma_odd_delta_angles_in_intra != 0;
+  const int base_model_rd_idx = intra_sf->top_intra_model_count_allowed - 1;
+  uint16_t reduce_model_rd_idx_mask = 0;
+  if (intra_sf->adapt_top_model_rd_count_using_neighbors &&
+      base_model_rd_idx > 0) {
+    const uint16_t neq_left =
+        xd->left_available ? (xd->left_mbmi->mode < INTRA_MODES
+                                  ? (uint16_t)~(1u << xd->left_mbmi->mode)
+                                  : 0xFFFFu)
+                           : 0;
+    const uint16_t neq_above =
+        xd->up_available ? (xd->above_mbmi->mode < INTRA_MODES
+                                ? (uint16_t)~(1u << xd->above_mbmi->mode)
+                                : 0xFFFFu)
+                         : 0;
+    reduce_model_rd_idx_mask =
+        (x->qindex <= 127) ? (neq_left | neq_above) : (neq_left & neq_above);
+  }
+  const int base_non_dc_cost =
+      av1_allow_intrabc(&cpi->common) ? x->mode_costs.intrabc_cost[0] : 0;
+  int dc_extra_cost = base_non_dc_cost;
+  if (av1_allow_palette(cpi->common.features.allow_screen_content_tools,
+                        bsize)) {
+    dc_extra_cost +=
+        x->mode_costs.palette_y_mode_cost[av1_get_palette_bsize_ctx(bsize)]
+                                         [av1_get_palette_mode_ctx(xd)][0];
+  }
+  if (av1_filter_intra_allowed_bsize(&cpi->common, bsize)) {
+    dc_extra_cost += x->mode_costs.filter_intra_cost[bsize][0];
+  }
+  const int use_angle_delta_bsize = av1_use_angle_delta(bsize);
+  const int use_var_factor = (cpi->oxcf.mode == ALLINTRA) &&
+                             (INTRA_RD_VAR_THRESH(cpi->oxcf.speed) > 0);
+#if HAVE_AVX2
+  const int is_single_txb =
+      !is_cur_buf_hbd(xd) &&
+      (!cpi->do_border_pad ||
+       (x->pix_to_bottom_edge >= 0 && x->pix_to_right_edge >= 0)) &&
+      max_block_high(xd, bsize, 0) <= tx_size_high_unit[tx_size] &&
+      max_block_wide(xd, bsize, 0) <= tx_size_wide_unit[tx_size] &&
+      (uintptr_t)aom_satd == (uintptr_t)aom_satd_avx2;
+#endif
+
   for (int mode_idx = INTRA_MODE_START; mode_idx < max_mode_idx; ++mode_idx) {
-    set_y_mode_and_delta_angle(mode_idx, mbmi,
-                               intra_sf->prune_luma_odd_delta_angles_in_intra);
-    if (!(allowed_mode_mask & (1 << mbmi->mode))) continue;
+    set_y_mode_and_delta_angle(mode_idx, mbmi, reorder_delta_angle);
+    const PREDICTION_MODE mode = mbmi->mode;
+    if (!(allowed_mode_mask & (1 << mode))) {
+      if (mode_idx >= INTRA_MODE_END) mode_idx += 2 * MAX_ANGLE_DELTA - 1;
+      continue;
+    }
 
     RD_STATS this_rd_stats;
     int this_rate, this_rate_tokenonly, s;
@@ -1552,17 +1763,25 @@ int64_t av1_rd_pick_intra_sby_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
 
     if ((luma_delta_angle & 1) &&
         prune_luma_odd_delta_angles_using_rd_cost(
-            mbmi, intra_modes_rd_cost[mbmi->mode], best_rd,
-            intra_sf->prune_luma_odd_delta_angles_in_intra))
+            mbmi, intra_modes_rd_cost[mode], best_rd, reorder_delta_angle))
       continue;
 
-    const TX_SIZE tx_size = AOMMIN(TX_32X32, max_txsize_lookup[bsize]);
-    const int64_t this_model_rd =
-        intra_model_rd(&cpi->common, x, 0, bsize, tx_size, /*use_hadamard=*/1,
-                       cpi->do_border_pad);
+    int64_t this_model_rd;
+#if HAVE_AVX2
+    if (LIKELY(is_single_txb)) {
+      av1_predict_intra_block_facade(&cpi->common, xd, 0, 0, 0, tx_size);
+      this_model_rd = aom_hadamard_sub_satd_avx2(
+          tx_size, x->plane[0].src.buf, x->plane[0].src.stride,
+          xd->plane[0].dst.buf, xd->plane[0].dst.stride);
+    } else
+#endif
+    {
+      this_model_rd = intra_model_rd(&cpi->common, x, 0, bsize, tx_size,
+                                     /*use_hadamard=*/1, cpi->do_border_pad);
+    }
 
     const int model_rd_index_for_pruning =
-        get_model_rd_index_for_pruning(x, intra_sf);
+        base_model_rd_idx - ((reduce_model_rd_idx_mask >> mode) & 1);
 
     if (prune_intra_y_mode(this_model_rd, &best_model_rd, top_intra_model_rd,
                            intra_sf->top_intra_model_count_allowed,
@@ -1580,18 +1799,26 @@ int64_t av1_rd_pick_intra_sby_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
 
     if (this_rate_tokenonly == INT_MAX) continue;
 
-    this_rate =
-        this_rd_stats.rate +
-        intra_mode_info_cost_y(cpi, x, mbmi, bsize, bmode_costs[mbmi->mode], 0);
+    int mode_info_cost = bmode_costs[mode];
+    if (mode == DC_PRED) {
+      mode_info_cost += dc_extra_cost;
+    } else {
+      mode_info_cost += base_non_dc_cost;
+      if (use_angle_delta_bsize && av1_is_directional_mode(mode)) {
+        mode_info_cost +=
+            x->mode_costs.angle_delta_cost[mode - V_PRED]
+                                          [MAX_ANGLE_DELTA + luma_delta_angle];
+      }
+    }
+    this_rate = this_rd_stats.rate + mode_info_cost;
     this_rd = RDCOST(x->rdmult, this_rate, this_distortion);
 
     // Visual quality adjustment based on recon vs source variance.
-    if ((cpi->oxcf.mode == ALLINTRA) && (this_rd != INT64_MAX)) {
+    if (use_var_factor && (this_rd != INT64_MAX)) {
       this_rd = (int64_t)(this_rd * intra_rd_variance_factor(cpi, x, bsize));
     }
 
-    intra_modes_rd_cost[mbmi->mode][luma_delta_angle + MAX_ANGLE_DELTA + 1] =
-        this_rd;
+    intra_modes_rd_cost[mode][luma_delta_angle + MAX_ANGLE_DELTA + 1] = this_rd;
 
     // Collect mode stats for multiwinner mode processing
     const int txfm_search_done = 1;
@@ -1612,7 +1839,7 @@ int64_t av1_rd_pick_intra_sby_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
       *rate_tokenonly = this_rate_tokenonly;
       *distortion = this_distortion;
       *skippable = s;
-      av1_copy_array(ctx->tx_type_map, xd->tx_type_map, ctx->num_4x4_blk);
+      av1_copy_tx_type_map(ctx->tx_type_map, xd->tx_type_map, ctx->num_4x4_blk);
     }
   }
 
@@ -1692,30 +1919,6 @@ int64_t av1_rd_pick_intra_sby_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
     }
   }
   *mbmi = best_mbmi;
-  av1_copy_array(xd->tx_type_map, ctx->tx_type_map, ctx->num_4x4_blk);
+  av1_copy_tx_type_map(xd->tx_type_map, ctx->tx_type_map, ctx->num_4x4_blk);
   return best_rd;
 }
-
-void av1_lowbd_generate_hog_c(const uint8_t *src, int stride, int rows,
-                              int cols, float *hist) {
-  lowbd_generate_hog(src, stride, rows, cols, hist);
-}
-
-void av1_lowbd_compute_gradient_info_sb_c(MACROBLOCK *const x,
-                                          BLOCK_SIZE sb_size,
-                                          PLANE_TYPE plane) {
-  lowbd_compute_gradient_info_sb(x, sb_size, plane);
-}
-
-#if CONFIG_AV1_HIGHBITDEPTH
-void av1_highbd_generate_hog_c(const uint8_t *src8, int stride, int rows,
-                               int cols, float *hist) {
-  highbd_generate_hog(src8, stride, rows, cols, hist);
-}
-
-void av1_highbd_compute_gradient_info_sb_c(MACROBLOCK *const x,
-                                           BLOCK_SIZE sb_size,
-                                           PLANE_TYPE plane) {
-  highbd_compute_gradient_info_sb(x, sb_size, plane);
-}
-#endif  // CONFIG_AV1_HIGHBITDEPTH
