@@ -529,6 +529,9 @@ typedef struct encode_block_pass1_args {
   MACROBLOCK *x;
 } encode_block_pass1_args;
 
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
 static void encode_block_pass1(int plane, int block, int blk_row, int blk_col,
                                BLOCK_SIZE plane_bsize, TX_SIZE tx_size,
                                void *arg) {
@@ -638,25 +641,39 @@ void av1_encode_sb(const struct AV1_COMP *cpi, MACROBLOCK *x, BLOCK_SIZE bsize,
   }
 }
 
+struct intra_b_args {
+  const AV1_COMP *cpi;
+  MACROBLOCK *x;
+  const ENTROPY_CONTEXT *ta;
+  const ENTROPY_CONTEXT *tl;
+  const qm_val_t *seg_qmatrix;
+  const qm_val_t *seg_iqmatrix;
+  TxfmParam txfm_param;
+  QUANT_PARAM quant_param;
+  BLOCK_SIZE plane_bsize;
+  TX_SIZE tx_size;
+  int plane;
+  int use_trellis;
+};
+
 #if defined(__GNUC__) || defined(__clang__)
 __attribute__((noinline))
 #endif
-static void encode_block_intra(int plane, int block, int blk_row, int blk_col,
-                               BLOCK_SIZE plane_bsize, TX_SIZE tx_size,
-                               void *arg) {
-  struct encode_b_args *const args = arg;
+static void encode_block_intra(struct intra_b_args *const args, int block,
+                               int blk_row, int blk_col) {
   const AV1_COMP *const cpi = args->cpi;
   const AV1_COMMON *const cm = &cpi->common;
   MACROBLOCK *const x = args->x;
   MACROBLOCKD *const xd = &x->e_mbd;
+  const int plane = args->plane;
+  const BLOCK_SIZE plane_bsize = args->plane_bsize;
+  const TX_SIZE tx_size = args->tx_size;
   struct macroblock_plane *const p = &x->plane[plane];
   struct macroblockd_plane *const pd = &xd->plane[plane];
   tran_low_t *dqcoeff = p->dqcoeff + BLOCK_OFFSET(block);
-  PLANE_TYPE plane_type = get_plane_type(plane);
   uint16_t *eob = &p->eobs[block];
   const int dst_stride = pd->dst.stride;
   uint8_t *dst = &pd->dst.buf[(blk_row * dst_stride + blk_col) << MI_SIZE_LOG2];
-  int dummy_rate_cost = 0;
 
   av1_predict_intra_block_facade(cm, xd, plane, blk_col, blk_row, tx_size);
 
@@ -665,36 +682,33 @@ static void encode_block_intra(int plane, int block, int blk_row, int blk_col,
     *eob = 0;
     p->txb_entropy_ctx[block] = 0;
   } else {
-    const ENTROPY_CONTEXT *a = &args->ta[blk_col];
-    const ENTROPY_CONTEXT *l = &args->tl[blk_row];
-    tx_type = av1_get_tx_type(xd, plane_type, blk_row, blk_col, tx_size,
-                              cm->features.reduced_tx_set_used);
-    TX_TYPE primary_tx_type = is_stat_generation_stage(cpi) ? DCT_DCT : tx_type;
-    av1_subtract_txb(x, plane, plane_bsize, blk_col, blk_row, tx_size,
-                     primary_tx_type, cpi->do_border_pad);
-    TxfmParam txfm_param;
-    QUANT_PARAM quant_param;
-    const int use_trellis =
-        is_trellis_used(args->enable_optimize_b, args->dry_run);
-    int quant_idx;
-    if (use_trellis)
-      quant_idx = AV1_XFORM_QUANT_FP;
-    else
-      quant_idx =
-          USE_B_QUANT_NO_TRELLIS ? AV1_XFORM_QUANT_B : AV1_XFORM_QUANT_FP;
+    tx_type = av1_get_tx_type(xd, get_plane_type(plane), blk_row, blk_col,
+                              tx_size, cm->features.reduced_tx_set_used);
+    const TX_TYPE primary_tx_type =
+        is_stat_generation_stage(cpi) ? DCT_DCT : tx_type;
+    const int diff_stride = block_size_wide[plane_bsize];
+    const int src_stride = p->src.stride;
+    const uint8_t *src =
+        &p->src.buf[(blk_row * src_stride + blk_col) << MI_SIZE_LOG2];
+    int16_t *src_diff =
+        &p->src_diff[(blk_row * diff_stride + blk_col) << MI_SIZE_LOG2];
+    av1_subtract_block(x, tx_size_high[tx_size], tx_size_wide[tx_size],
+                       src_diff, diff_stride, src, src_stride, dst, dst_stride,
+                       plane, plane_bsize, blk_col, blk_row, primary_tx_type,
+                       cpi->do_border_pad);
+    args->txfm_param.tx_type = tx_type;
+    args->quant_param.qmatrix = (tx_type < IDTX) ? args->seg_qmatrix : NULL;
+    args->quant_param.iqmatrix = (tx_type < IDTX) ? args->seg_iqmatrix : NULL;
 
-    av1_setup_xform(cm, x, tx_size, tx_type, &txfm_param);
-    av1_setup_quant(tx_size, use_trellis, quant_idx,
-                    cpi->oxcf.q_cfg.quant_b_adapt, &quant_param);
-    av1_setup_qmatrix(&cm->quant_params, xd, plane, tx_size, tx_type,
-                      &quant_param);
-
-    av1_xform_quant(x, plane, block, blk_row, blk_col, plane_bsize, &txfm_param,
-                    &quant_param);
-    if (use_trellis) {
+    av1_fwd_txfm(src_diff, p->coeff + BLOCK_OFFSET(block), diff_stride,
+                 &args->txfm_param);
+    av1_quant(x, plane, block, &args->txfm_param, &args->quant_param);
+    if (args->use_trellis) {
       TXB_CTX txb_ctx;
-      get_txb_ctx(plane_bsize, tx_size, plane, a, l, &txb_ctx);
-      av1_optimize_b(args->cpi, x, plane, block, tx_size, tx_type, &txb_ctx,
+      int dummy_rate_cost = 0;
+      get_txb_ctx(plane_bsize, tx_size, plane, &args->ta[blk_col],
+                  &args->tl[blk_row], &txb_ctx);
+      av1_optimize_b(cpi, x, plane, block, tx_size, tx_type, &txb_ctx,
                      &dummy_rate_cost);
     }
   }
@@ -705,19 +719,7 @@ static void encode_block_intra(int plane, int block, int blk_row, int blk_col,
                                 cm->features.reduced_tx_set_used);
   }
 
-  // TODO(jingning): Temporarily disable txk_type check for eob=0 case.
-  // It is possible that certain collision in hash index would cause
-  // the assertion failure. To further optimize the rate-distortion
-  // performance, we need to re-visit this part and enable this assert
-  // again.
   if (*eob == 0 && plane == 0) {
-#if 0
-    if (args->cpi->oxcf.q_cfg.aq_mode == NO_AQ
-        && args->cpi->oxcf.q_cfg.deltaq_mode == NO_DELTA_Q) {
-      assert(xd->tx_type_map[blk_row * xd->tx_type_map_stride + blk_col)] ==
-          DCT_DCT);
-    }
-#endif
     update_txk_array(xd, blk_row, blk_col, tx_size, DCT_DCT);
   }
 
@@ -726,21 +728,6 @@ static void encode_block_intra(int plane, int block, int blk_row, int blk_col,
     cfl_store_tx(xd, blk_row, blk_col, tx_size, plane_bsize);
   }
 #endif
-}
-
-static void encode_block_intra_and_set_context(int plane, int block,
-                                               int blk_row, int blk_col,
-                                               BLOCK_SIZE plane_bsize,
-                                               TX_SIZE tx_size, void *arg) {
-  encode_block_intra(plane, block, blk_row, blk_col, plane_bsize, tx_size, arg);
-
-  struct encode_b_args *const args = arg;
-  if (is_trellis_used(args->enable_optimize_b, args->dry_run)) {
-    MACROBLOCK *x = args->x;
-    ENTROPY_CONTEXT *a = &args->ta[blk_col];
-    ENTROPY_CONTEXT *l = &args->tl[blk_row];
-    av1_set_txb_context(x, plane, block, tx_size, a, l);
-  }
 }
 
 void av1_encode_intra_block_plane(const struct AV1_COMP *cpi, MACROBLOCK *x,
@@ -755,27 +742,75 @@ void av1_encode_intra_block_plane(const struct AV1_COMP *cpi, MACROBLOCK *x,
   const int ss_y = pd->subsampling_y;
   const BLOCK_SIZE plane_bsize = get_plane_block_size(bsize, ss_x, ss_y);
   const TX_SIZE tx_size = av1_get_tx_size(plane, xd);
-  if (plane_bsize == txsize_to_bsize[tx_size] && xd->mb_to_right_edge >= 0 &&
-      xd->mb_to_bottom_edge >= 0) {
-    struct encode_b_args arg = { cpi,
-                                 x,
-                                 NULL,
-                                 (ENTROPY_CONTEXT *)pd->above_entropy_context,
-                                 (ENTROPY_CONTEXT *)pd->left_entropy_context,
-                                 dry_run,
-                                 enable_optimize_b };
-    encode_block_intra(plane, 0, 0, 0, plane_bsize, tx_size, &arg);
-    return;
+  const int use_trellis = is_trellis_used(enable_optimize_b, dry_run);
+
+  struct intra_b_args arg;
+  arg.cpi = cpi;
+  arg.x = x;
+  arg.plane_bsize = plane_bsize;
+  arg.tx_size = tx_size;
+  arg.plane = plane;
+  arg.use_trellis = use_trellis;
+  if (!xd->mi[0]->skip_txfm) {
+    const int seg_id = xd->mi[0]->segment_id;
+    const int quant_idx =
+        use_trellis
+            ? AV1_XFORM_QUANT_FP
+            : (USE_B_QUANT_NO_TRELLIS ? AV1_XFORM_QUANT_B : AV1_XFORM_QUANT_FP);
+    arg.seg_qmatrix = pd->seg_qmatrix[seg_id][tx_size];
+    arg.seg_iqmatrix = pd->seg_iqmatrix[seg_id][tx_size];
+    av1_setup_xform(&cpi->common, x, tx_size, DCT_DCT, &arg.txfm_param);
+    av1_setup_quant(tx_size, use_trellis, quant_idx,
+                    cpi->oxcf.q_cfg.quant_b_adapt, &arg.quant_param);
   }
 
   ENTROPY_CONTEXT ta[MAX_MIB_SIZE];
   ENTROPY_CONTEXT tl[MAX_MIB_SIZE];
-  struct encode_b_args arg = {
-    cpi, x, NULL, ta, tl, dry_run, enable_optimize_b
-  };
-  if (is_trellis_used(enable_optimize_b, dry_run)) {
+  if (plane_bsize == txsize_to_bsize[tx_size]) {
+    if (LIKELY(xd->mb_to_right_edge >= 0 && xd->mb_to_bottom_edge >= 0)) {
+      arg.ta = pd->above_entropy_context;
+      arg.tl = pd->left_entropy_context;
+    } else {
+      if (use_trellis) av1_get_entropy_contexts(plane_bsize, pd, ta, tl);
+      arg.ta = ta;
+      arg.tl = tl;
+    }
+    encode_block_intra(&arg, 0, 0, 0);
+    return;
+  }
+
+  if (use_trellis) {
     av1_get_entropy_contexts(plane_bsize, pd, ta, tl);
   }
-  av1_foreach_transformed_block_in_plane(
-      xd, plane_bsize, plane, encode_block_intra_and_set_context, &arg);
+  arg.ta = ta;
+  arg.tl = tl;
+  const uint8_t txw_unit = tx_size_wide_unit[tx_size];
+  const uint8_t txh_unit = tx_size_high_unit[tx_size];
+  const int step = txw_unit * txh_unit;
+  const int max_blocks_wide = max_block_wide(xd, plane_bsize, plane);
+  const int max_blocks_high = max_block_high(xd, plane_bsize, plane);
+  const BLOCK_SIZE max_unit_bsize =
+      get_plane_block_size(BLOCK_64X64, ss_x, ss_y);
+  const int mu_blocks_wide =
+      AOMMIN(mi_size_wide[max_unit_bsize], max_blocks_wide);
+  const int mu_blocks_high =
+      AOMMIN(mi_size_high[max_unit_bsize], max_blocks_high);
+
+  int block = 0;
+  for (int r = 0; r < max_blocks_high; r += mu_blocks_high) {
+    const int unit_height = AOMMIN(mu_blocks_high + r, max_blocks_high);
+    for (int c = 0; c < max_blocks_wide; c += mu_blocks_wide) {
+      const int unit_width = AOMMIN(mu_blocks_wide + c, max_blocks_wide);
+      for (int blk_row = r; blk_row < unit_height; blk_row += txh_unit) {
+        for (int blk_col = c; blk_col < unit_width; blk_col += txw_unit) {
+          encode_block_intra(&arg, block, blk_row, blk_col);
+          if (use_trellis) {
+            av1_set_txb_context(x, plane, block, tx_size, &ta[blk_col],
+                                &tl[blk_row]);
+          }
+          block += step;
+        }
+      }
+    }
+  }
 }

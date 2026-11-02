@@ -17,7 +17,9 @@
 #ifndef AOM_AV1_ENCODER_INTRA_MODE_SEARCH_UTILS_H_
 #define AOM_AV1_ENCODER_INTRA_MODE_SEARCH_UTILS_H_
 
-#include "config/av1_rtcd.h"
+#if defined(__SSE2__)
+#include <emmintrin.h>
+#endif
 
 #include "av1/common/enums.h"
 #include "av1/common/pred_common.h"
@@ -31,10 +33,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-#endif
-
-#if defined(__GNUC__) && __GNUC__ >= 4
-#pragma GCC visibility push(hidden)
 #endif
 
 /*!\cond */
@@ -120,13 +118,30 @@ static inline int get_hist_bin_idx(int dx, int dy) {
     72336,    88392,   109364,  138593,  183191,  261638,  441831, INT32_MAX
   };
 
-  // Branchless 5-step binary search across the 32 thresholds.
+#if defined(__SSE2__) && (defined(__GNUC__) || defined(__clang__))
+  const int lo_idx = (ratio > -3194) << 4;
+  const __m128i v_ratio = _mm_set1_epi32(ratio);
+  const __m128i c0 = _mm_cmpgt_epi32(
+      v_ratio, _mm_load_si128((const __m128i *)&thresholds[lo_idx]));
+  const __m128i c1 = _mm_cmpgt_epi32(
+      v_ratio, _mm_load_si128((const __m128i *)&thresholds[lo_idx + 4]));
+  const __m128i c2 = _mm_cmpgt_epi32(
+      v_ratio, _mm_load_si128((const __m128i *)&thresholds[lo_idx + 8]));
+  const __m128i c3 = _mm_cmpgt_epi32(
+      v_ratio, _mm_load_si128((const __m128i *)&thresholds[lo_idx + 12]));
+  const __m128i p01 = _mm_packs_epi32(c0, c1);
+  const __m128i p23 = _mm_packs_epi32(c2, c3);
+  const __m128i p0123 = _mm_packs_epi16(p01, p23);
+  const uint32_t mask = (uint32_t)_mm_movemask_epi8(p0123);
+  return lo_idx + __builtin_ctz(~mask);
+#else
   int idx = (ratio > thresholds[15]) << 4;
   idx += (ratio > thresholds[idx + 7]) << 3;
   idx += (ratio > thresholds[idx + 3]) << 2;
   idx += (ratio > thresholds[idx + 1]) << 1;
   idx += (ratio > thresholds[idx]);
   return idx;
+#endif
 }
 #undef FIX_PREC_BITS
 
@@ -143,15 +158,11 @@ static inline void lowbd_generate_hog(const uint8_t *src, int stride, int rows,
     const uint8_t *row_above = src - stride;
     const uint8_t *row_cur = src;
     const uint8_t *row_below = src + stride;
-
-    // Prime the 3x3 sliding Sobel window with columns 0 and 1.
     int v0 = row_above[0] + 2 * row_cur[0] + row_below[0];
     int v1 = row_above[1] + 2 * row_cur[1] + row_below[1];
     int d0 = row_below[0] - row_above[0];
     int d1 = row_below[1] - row_above[1];
-
     for (int c = 1; c < cols - 1; ++c) {
-      // Load the incoming right column (c + 1) and update Sobel gradients.
       const int above_r = row_above[c + 1];
       const int cur_r = row_cur[c + 1];
       const int below_r = row_below[c + 1];
@@ -163,7 +174,6 @@ static inline void lowbd_generate_hog(const uint8_t *src, int stride, int rows,
       v1 = v2;
       d0 = d1;
       d1 = d2;
-
       if ((dx | dy) == 0) continue;
       const int temp = abs(dx) + abs(dy);
       total += temp;
@@ -200,16 +210,12 @@ static inline void lowbd_compute_gradient_info_sb(MACROBLOCK *const x,
     const uint8_t *row_above = src - stride;
     const uint8_t *row_cur = src;
     const uint8_t *row_below = src + stride;
-
-    // Prime the 3x3 sliding Sobel window with columns 0 and 1.
     int v0 = row_above[0] + 2 * row_cur[0] + row_below[0];
     int v1 = row_above[1] + 2 * row_cur[1] + row_below[1];
     int d0 = row_below[0] - row_above[0];
     int d1 = row_below[1] - row_above[1];
     PixelLevelGradientInfo *const row_info = grad_info_sb + r * sb_width;
-
     for (int c = 1; c < sb_width - 1; ++c) {
-      // Load the incoming right column (c + 1) and update Sobel gradients.
       const int above_r = row_above[c + 1];
       const int cur_r = row_cur[c + 1];
       const int below_r = row_below[c + 1];
@@ -221,7 +227,6 @@ static inline void lowbd_compute_gradient_info_sb(MACROBLOCK *const x,
       v1 = v2;
       d0 = d1;
       d1 = d2;
-
       row_info[c].abs_dx_abs_dy_sum = (uint16_t)(abs(dx) + abs(dy));
       row_info[c].hist_bin_idx =
           (dx == 0) ? BINS : (int8_t)get_hist_bin_idx(dx, dy);
@@ -240,15 +245,11 @@ static inline void highbd_generate_hog(const uint8_t *src8, int stride,
     const uint16_t *row_above = src - stride;
     const uint16_t *row_cur = src;
     const uint16_t *row_below = src + stride;
-
-    // Prime the 3x3 sliding Sobel window with columns 0 and 1.
     int v0 = row_above[0] + 2 * row_cur[0] + row_below[0];
     int v1 = row_above[1] + 2 * row_cur[1] + row_below[1];
     int d0 = row_below[0] - row_above[0];
     int d1 = row_below[1] - row_above[1];
-
     for (int c = 1; c < cols - 1; ++c) {
-      // Load the incoming right column (c + 1) and update Sobel gradients.
       const int above_r = row_above[c + 1];
       const int cur_r = row_cur[c + 1];
       const int below_r = row_below[c + 1];
@@ -260,7 +261,6 @@ static inline void highbd_generate_hog(const uint8_t *src8, int stride,
       v1 = v2;
       d0 = d1;
       d1 = d2;
-
       if ((dx | dy) == 0) continue;
       const int temp = abs(dx) + abs(dy);
       total += temp;
@@ -297,16 +297,12 @@ static inline void highbd_compute_gradient_info_sb(MACROBLOCK *const x,
     const uint16_t *row_above = src - stride;
     const uint16_t *row_cur = src;
     const uint16_t *row_below = src + stride;
-
-    // Prime the 3x3 sliding Sobel window with columns 0 and 1.
     int v0 = row_above[0] + 2 * row_cur[0] + row_below[0];
     int v1 = row_above[1] + 2 * row_cur[1] + row_below[1];
     int d0 = row_below[0] - row_above[0];
     int d1 = row_below[1] - row_above[1];
     PixelLevelGradientInfo *const row_info = grad_info_sb + r * sb_width;
-
     for (int c = 1; c < sb_width - 1; ++c) {
-      // Load the incoming right column (c + 1) and update Sobel gradients.
       const int above_r = row_above[c + 1];
       const int cur_r = row_cur[c + 1];
       const int below_r = row_below[c + 1];
@@ -318,7 +314,6 @@ static inline void highbd_compute_gradient_info_sb(MACROBLOCK *const x,
       v1 = v2;
       d0 = d1;
       d1 = d2;
-
       row_info[c].abs_dx_abs_dy_sum = (uint16_t)(abs(dx) + abs(dy));
       row_info[c].hist_bin_idx =
           (dx == 0) ? BINS : (int8_t)get_hist_bin_idx(dx, dy);
@@ -328,17 +323,20 @@ static inline void highbd_compute_gradient_info_sb(MACROBLOCK *const x,
 }
 #endif  // CONFIG_AV1_HIGHBITDEPTH
 
-static inline void generate_hog(const uint8_t *src8, int stride, int rows,
-                                int cols, float *hist, int highbd) {
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline, unused))
+#endif
+static void generate_hog(const uint8_t *src8, int stride, int rows, int cols,
+                         float *hist, int highbd) {
 #if CONFIG_AV1_HIGHBITDEPTH
   if (highbd) {
-    av1_highbd_generate_hog(src8, stride, rows, cols, hist);
+    highbd_generate_hog(src8, stride, rows, cols, hist);
     return;
   }
 #else
   (void)highbd;
 #endif  // CONFIG_AV1_HIGHBITDEPTH
-  av1_lowbd_generate_hog(src8, stride, rows, cols, hist);
+  lowbd_generate_hog(src8, stride, rows, cols, hist);
 }
 
 static inline void compute_gradient_info_sb(MACROBLOCK *const x,
@@ -346,11 +344,22 @@ static inline void compute_gradient_info_sb(MACROBLOCK *const x,
                                             PLANE_TYPE plane) {
 #if CONFIG_AV1_HIGHBITDEPTH
   if (is_cur_buf_hbd(&x->e_mbd)) {
-    av1_highbd_compute_gradient_info_sb(x, sb_size, plane);
+    highbd_compute_gradient_info_sb(x, sb_size, plane);
     return;
   }
 #endif  // CONFIG_AV1_HIGHBITDEPTH
-  av1_lowbd_compute_gradient_info_sb(x, sb_size, plane);
+#if HAVE_AVX2
+  if (aom_satd == aom_satd_avx2) {
+    const int ss_x = x->e_mbd.plane[plane].subsampling_x;
+    const int ss_y = x->e_mbd.plane[plane].subsampling_y;
+    av1_lowbd_compute_gradient_info_sb_avx2(
+        x->plane[plane].src.buf, x->plane[plane].src.stride,
+        x->pixel_gradient_info + plane * MAX_SB_SQUARE,
+        block_size_high[sb_size] >> ss_y, block_size_wide[sb_size] >> ss_x);
+    return;
+  }
+#endif
+  lowbd_compute_gradient_info_sb(x, sb_size, plane);
 }
 
 // Gradient caching at superblock level is allowed only if all of the following
@@ -401,13 +410,13 @@ static inline void produce_gradients_for_sb(AV1_COMP *cpi, MACROBLOCK *x,
 }
 
 // Reuses the pixel level gradient data generated at superblock level for block
-// level histogram computation.
-static inline void generate_hog_using_gradient_cache(const MACROBLOCK *x,
+// level histogram computation. Returns false if all gradients in the block are
+// zero.
+static inline bool generate_hog_using_gradient_cache(const MACROBLOCK *x,
                                                      int rows, int cols,
                                                      BLOCK_SIZE sb_size,
                                                      PLANE_TYPE plane,
                                                      float *hist) {
-  float total = 0.1f;
   const int ss_x = x->e_mbd.plane[plane].subsampling_x;
   const int ss_y = x->e_mbd.plane[plane].subsampling_y;
   const int sb_width = block_size_wide[sb_size] >> ss_x;
@@ -423,31 +432,105 @@ static inline void generate_hog_using_gradient_cache(const MACROBLOCK *x,
                                                 plane * MAX_SB_SQUARE +
                                                 block_offset_in_grad_cache;
 
-  // Accumulate cached gradients in integers first, using bin BINS as a sentinel
-  // bucket for dx == 0 so the inner loop is branchless.
-  uint32_t int_hist[BINS + 1] = { 0 };
+  DECLARE_ALIGNED(16, int32_t, int_hist[2][BINS + 4]);
+#if defined(__SSE2__)
+  const __m128i zero = _mm_setzero_si128();
+  for (int i = 0; i < 2; ++i) {
+    _mm_store_si128((__m128i *)(int_hist[i] + 0), zero);
+    _mm_store_si128((__m128i *)(int_hist[i] + 4), zero);
+    _mm_store_si128((__m128i *)(int_hist[i] + 8), zero);
+    _mm_store_si128((__m128i *)(int_hist[i] + 12), zero);
+    _mm_store_si128((__m128i *)(int_hist[i] + 16), zero);
+    _mm_store_si128((__m128i *)(int_hist[i] + 20), zero);
+    _mm_store_si128((__m128i *)(int_hist[i] + 24), zero);
+    _mm_store_si128((__m128i *)(int_hist[i] + 28), zero);
+    int_hist[i][BINS] = 0;
+  }
+#else
+  memset(int_hist, 0, sizeof(int_hist));
+#endif
+  // Retrieve the cached gradient information and generate the histogram.
   for (int r = 1; r < rows - 1; ++r) {
-    const PixelLevelGradientInfo *const row_info = grad_info_blk + r * sb_width;
-    for (int c = 1; c < cols - 1; ++c) {
-      const uint16_t abs_dx_abs_dy_sum = row_info[c].abs_dx_abs_dy_sum;
-      if (!abs_dx_abs_dy_sum) continue;
-      total += abs_dx_abs_dy_sum;
-      const uint8_t idx = (uint8_t)row_info[c].hist_bin_idx;
-      assert(idx <= BINS);
-      int_hist[idx] += abs_dx_abs_dy_sum;
+    const PixelLevelGradientInfo *p = grad_info_blk + r * sb_width + 1;
+    const int num_cols = cols - 2;
+    if (num_cols <= 0) continue;
+    const PixelLevelGradientInfo *const p_end = p + (num_cols & ~1);
+    while (p < p_end) {
+      int_hist[0][(uint8_t)p[0].hist_bin_idx] += p[0].abs_dx_abs_dy_sum;
+      int_hist[1][(uint8_t)p[1].hist_bin_idx] += p[1].abs_dx_abs_dy_sum;
+      p += 2;
+    }
+    if (num_cols & 1) {
+      int_hist[0][(uint8_t)p[0].hist_bin_idx] += p[0].abs_dx_abs_dy_sum;
     }
   }
-
-  const uint32_t dx_zero_half = int_hist[BINS] >> 1;
-  int_hist[0] += dx_zero_half;
-  int_hist[BINS - 1] += dx_zero_half;
+#if defined(__SSE2__)
+  __m128i v0 =
+      _mm_add_epi32(_mm_load_si128((const __m128i *)(int_hist[0] + 0)),
+                    _mm_load_si128((const __m128i *)(int_hist[1] + 0)));
+  __m128i v1 =
+      _mm_add_epi32(_mm_load_si128((const __m128i *)(int_hist[0] + 4)),
+                    _mm_load_si128((const __m128i *)(int_hist[1] + 4)));
+  __m128i v2 =
+      _mm_add_epi32(_mm_load_si128((const __m128i *)(int_hist[0] + 8)),
+                    _mm_load_si128((const __m128i *)(int_hist[1] + 8)));
+  __m128i v3 =
+      _mm_add_epi32(_mm_load_si128((const __m128i *)(int_hist[0] + 12)),
+                    _mm_load_si128((const __m128i *)(int_hist[1] + 12)));
+  __m128i v4 =
+      _mm_add_epi32(_mm_load_si128((const __m128i *)(int_hist[0] + 16)),
+                    _mm_load_si128((const __m128i *)(int_hist[1] + 16)));
+  __m128i v5 =
+      _mm_add_epi32(_mm_load_si128((const __m128i *)(int_hist[0] + 20)),
+                    _mm_load_si128((const __m128i *)(int_hist[1] + 20)));
+  __m128i v6 =
+      _mm_add_epi32(_mm_load_si128((const __m128i *)(int_hist[0] + 24)),
+                    _mm_load_si128((const __m128i *)(int_hist[1] + 24)));
+  __m128i v7 =
+      _mm_add_epi32(_mm_load_si128((const __m128i *)(int_hist[0] + 28)),
+                    _mm_load_si128((const __m128i *)(int_hist[1] + 28)));
+  const __m128i s01 = _mm_add_epi32(v0, v1);
+  const __m128i s23 = _mm_add_epi32(v2, v3);
+  const __m128i s45 = _mm_add_epi32(v4, v5);
+  const __m128i s67 = _mm_add_epi32(v6, v7);
+  __m128i sum = _mm_add_epi32(_mm_add_epi32(s01, s23), _mm_add_epi32(s45, s67));
+  sum = _mm_add_epi32(sum, _mm_srli_si128(sum, 8));
+  sum = _mm_add_epi32(sum, _mm_srli_si128(sum, 4));
+  const int32_t dx_zero = int_hist[0][BINS] + int_hist[1][BINS];
+  const int32_t int_total = _mm_cvtsi128_si32(sum) + dx_zero;
+  if (int_total == 0) return false;
+  const __m128i v_half = _mm_cvtsi32_si128(dx_zero >> 1);
+  v0 = _mm_add_epi32(v0, v_half);
+  v7 = _mm_add_epi32(v7, _mm_slli_si128(v_half, 12));
+  const __m128 v_total = _mm_set1_ps(0.1f + (float)int_total);
+  _mm_storeu_ps(hist + 0, _mm_div_ps(_mm_cvtepi32_ps(v0), v_total));
+  _mm_storeu_ps(hist + 4, _mm_div_ps(_mm_cvtepi32_ps(v1), v_total));
+  _mm_storeu_ps(hist + 8, _mm_div_ps(_mm_cvtepi32_ps(v2), v_total));
+  _mm_storeu_ps(hist + 12, _mm_div_ps(_mm_cvtepi32_ps(v3), v_total));
+  _mm_storeu_ps(hist + 16, _mm_div_ps(_mm_cvtepi32_ps(v4), v_total));
+  _mm_storeu_ps(hist + 20, _mm_div_ps(_mm_cvtepi32_ps(v5), v_total));
+  _mm_storeu_ps(hist + 24, _mm_div_ps(_mm_cvtepi32_ps(v6), v_total));
+  _mm_storeu_ps(hist + 28, _mm_div_ps(_mm_cvtepi32_ps(v7), v_total));
+#else
+  int32_t int_total = int_hist[0][BINS] + int_hist[1][BINS];
   for (int b = 0; b < BINS; ++b) {
-    hist[b] = (float)int_hist[b];
+    int_hist[0][b] += int_hist[1][b];
+    int_total += int_hist[0][b];
+  }
+  if (int_total == 0) return false;
+  const float total = 0.1f + (float)int_total;
+  const int32_t dx_zero_half = (int_hist[0][BINS] + int_hist[1][BINS]) >> 1;
+  int_hist[0][0] += dx_zero_half;
+  int_hist[0][BINS - 1] += dx_zero_half;
+  for (int b = 0; b < BINS; ++b) {
+    hist[b] = (float)int_hist[0][b];
   }
   normalize_hog(total, hist);
+#endif
+  return true;
 }
 
-static inline void collect_hog_data(const MACROBLOCK *x, BLOCK_SIZE bsize,
+static inline bool collect_hog_data(const MACROBLOCK *x, BLOCK_SIZE bsize,
                                     BLOCK_SIZE sb_size, int plane, float *hog) {
   const MACROBLOCKD *xd = &x->e_mbd;
   const struct macroblockd_plane *const pd = &xd->plane[plane];
@@ -461,35 +544,54 @@ static inline void collect_hog_data(const MACROBLOCK *x, BLOCK_SIZE bsize,
   const int cols =
       ((xd->mb_to_right_edge >= 0) ? bw : (xd->mb_to_right_edge >> 3) + bw) >>
       ss_x;
+  if (rows <= 2 || cols <= 2) return false;
 
   // If gradient data is already generated at SB level, reuse the cached data.
   // Otherwise, compute the data.
-  if (x->is_sb_gradient_cached[plane]) {
-    generate_hog_using_gradient_cache(x, rows, cols, sb_size, plane, hog);
+  if (LIKELY(x->is_sb_gradient_cached[plane])) {
+    if (!generate_hog_using_gradient_cache(x, rows, cols, sb_size, plane, hog))
+      return false;
   } else {
+    memset(hog, 0, sizeof(*hog) * BINS);
     const uint8_t *src = x->plane[plane].src.buf;
     const int src_stride = x->plane[plane].src.stride;
     generate_hog(src, src_stride, rows, cols, hog, is_cur_buf_hbd(xd));
   }
 
   // Scale the hog so the luma and chroma are on the same scale
-  if (ss_x | ss_y) {
+  if (plane != AOM_PLANE_Y && (ss_x | ss_y)) {
     const float scale = (float)((1 + ss_x) * (1 + ss_y));
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC unroll 2
+#endif
     for (int b = 0; b < BINS; ++b) {
       hog[b] *= scale;
     }
   }
+  return true;
 }
 
 static inline void prune_intra_mode_with_hog(
     const MACROBLOCK *x, BLOCK_SIZE bsize, BLOCK_SIZE sb_size, float th,
     uint8_t *directional_mode_skip_mask, int is_chroma) {
   const int plane = is_chroma ? AOM_PLANE_U : AOM_PLANE_Y;
-  float hist[BINS] = { 0.0f };
-  collect_hog_data(x, bsize, sb_size, plane, hist);
+  float hist[BINS];
+  if (!collect_hog_data(x, bsize, sb_size, plane, hist)) {
+    static const float kZeroHogScores[DIRECTIONAL_MODES] = {
+      231.0f / 512.0f,  356.0f / 512.0f,  -367.0f / 512.0f, -327.0f / 512.0f,
+      -307.0f / 512.0f, -231.0f / 512.0f, 29.0f / 512.0f,   -237.0f / 512.0f,
+    };
+    for (UV_PREDICTION_MODE uv_mode = UV_V_PRED; uv_mode <= UV_D67_PRED;
+         uv_mode++) {
+      if (kZeroHogScores[uv_mode - UV_V_PRED] <= th) {
+        directional_mode_skip_mask[uv_mode] = 1;
+      }
+    }
+    return;
+  }
 
   // Make prediction for each of the mode
-  float scores[DIRECTIONAL_MODES] = { 0.0f };
+  float scores[DIRECTIONAL_MODES];
   av1_nn_predict(hist, &av1_intra_hog_model_nnconfig, 1, scores);
   for (UV_PREDICTION_MODE uv_mode = UV_V_PRED; uv_mode <= UV_D67_PRED;
        uv_mode++) {
@@ -526,9 +628,15 @@ static inline void init_src_var_info_of_4x4_sub_blocks(
   if (!is_src_var_for_4x4_sub_blocks_caching_enabled(cpi)) return;
 
   const int mi_count_in_sb = mi_size_wide[sb_size] * mi_size_high[sb_size];
-  for (int i = 0; i < mi_count_in_sb; i++) {
-    src_var_info_of_4x4_sub_blocks[i].var = -1;
-    src_var_info_of_4x4_sub_blocks[i].log_var = -1.0;
+  if (INTRA_RD_VAR_THRESH(cpi->oxcf.speed) <= 0) {
+    for (int i = 0; i < mi_count_in_sb; i++) {
+      src_var_info_of_4x4_sub_blocks[i].var = -1;
+    }
+  } else {
+    for (int i = 0; i < mi_count_in_sb; i++) {
+      src_var_info_of_4x4_sub_blocks[i].var = -1;
+      src_var_info_of_4x4_sub_blocks[i].log_var = -1.0;
+    }
   }
 }
 
@@ -561,51 +669,51 @@ static inline int intra_mode_info_cost_y(const AV1_COMP *cpi,
   // Can only activate one mode.
   assert(((mbmi->mode != DC_PRED) + use_palette + use_intrabc +
           use_filter_intra) <= 1);
-  const int try_palette = av1_allow_palette(
-      cpi->common.features.allow_screen_content_tools, mbmi->bsize);
-  if (try_palette && mbmi->mode == DC_PRED) {
-    const MACROBLOCKD *xd = &x->e_mbd;
-    const int bsize_ctx = av1_get_palette_bsize_ctx(bsize);
-    const int mode_ctx = av1_get_palette_mode_ctx(xd);
-    total_rate +=
-        mode_costs->palette_y_mode_cost[bsize_ctx][mode_ctx][use_palette];
-    if (use_palette) {
-      const uint8_t *const color_map = xd->plane[0].color_index_map;
-      int block_width, block_height, rows, cols;
-      av1_get_block_dimensions(bsize, 0, xd, &block_width, &block_height, &rows,
-                               &cols);
-      const int plt_size = mbmi->palette_mode_info.palette_size[0];
-      int palette_mode_cost =
-          mode_costs
-              ->palette_y_size_cost[bsize_ctx][plt_size - PALETTE_MIN_SIZE] +
-          write_uniform_cost(plt_size, color_map[0]);
-      uint16_t color_cache[2 * PALETTE_MAX_SIZE];
-      const int n_cache = av1_get_palette_cache(xd, 0, color_cache);
-      palette_mode_cost +=
-          av1_palette_color_cost_y(&mbmi->palette_mode_info, color_cache,
-                                   n_cache, cpi->common.seq_params->bit_depth);
-      if (!discount_color_cost)
-        palette_mode_cost +=
-            av1_cost_color_map(x, 0, bsize, mbmi->tx_size, PALETTE_MAP);
+  if (mbmi->mode == DC_PRED) {
+    if (av1_allow_palette(cpi->common.features.allow_screen_content_tools,
+                          mbmi->bsize)) {
+      const MACROBLOCKD *xd = &x->e_mbd;
+      const int bsize_ctx = av1_get_palette_bsize_ctx(bsize);
+      const int mode_ctx = av1_get_palette_mode_ctx(xd);
+      total_rate +=
+          mode_costs->palette_y_mode_cost[bsize_ctx][mode_ctx][use_palette];
+      if (use_palette) {
+        const uint8_t *const color_map = xd->plane[0].color_index_map;
+        int block_width, block_height, rows, cols;
+        av1_get_block_dimensions(bsize, 0, xd, &block_width, &block_height,
+                                 &rows, &cols);
+        const int plt_size = mbmi->palette_mode_info.palette_size[0];
+        int palette_mode_cost =
+            mode_costs
+                ->palette_y_size_cost[bsize_ctx][plt_size - PALETTE_MIN_SIZE] +
+            write_uniform_cost(plt_size, color_map[0]);
+        uint16_t color_cache[2 * PALETTE_MAX_SIZE];
+        const int n_cache = av1_get_palette_cache(xd, 0, color_cache);
+        palette_mode_cost += av1_palette_color_cost_y(
+            &mbmi->palette_mode_info, color_cache, n_cache,
+            cpi->common.seq_params->bit_depth);
+        if (!discount_color_cost)
+          palette_mode_cost +=
+              av1_cost_color_map(x, 0, bsize, mbmi->tx_size, PALETTE_MAP);
 
-      total_rate += palette_mode_cost;
+        total_rate += palette_mode_cost;
+      }
     }
-  }
-  if (av1_filter_intra_allowed(&cpi->common, mbmi)) {
-    total_rate += mode_costs->filter_intra_cost[mbmi->bsize][use_filter_intra];
-    if (use_filter_intra) {
+    if (!use_palette &&
+        av1_filter_intra_allowed_bsize(&cpi->common, mbmi->bsize)) {
       total_rate +=
-          mode_costs->filter_intra_mode_cost[mbmi->filter_intra_mode_info
-                                                 .filter_intra_mode];
+          mode_costs->filter_intra_cost[mbmi->bsize][use_filter_intra];
+      if (use_filter_intra) {
+        total_rate +=
+            mode_costs->filter_intra_mode_cost[mbmi->filter_intra_mode_info
+                                                   .filter_intra_mode];
+      }
     }
-  }
-  if (av1_is_directional_mode(mbmi->mode)) {
-    if (av1_use_angle_delta(bsize)) {
-      total_rate +=
-          mode_costs->angle_delta_cost[mbmi->mode - V_PRED]
-                                      [MAX_ANGLE_DELTA +
-                                       mbmi->angle_delta[PLANE_TYPE_Y]];
-    }
+  } else if (av1_is_directional_mode(mbmi->mode) &&
+             av1_use_angle_delta(bsize)) {
+    total_rate += mode_costs->angle_delta_cost[mbmi->mode - V_PRED]
+                                              [MAX_ANGLE_DELTA +
+                                               mbmi->angle_delta[PLANE_TYPE_Y]];
   }
   if (av1_allow_intrabc(&cpi->common))
     total_rate += mode_costs->intrabc_cost[use_intrabc];
@@ -627,33 +735,34 @@ static inline int intra_mode_info_cost_uv(const AV1_COMP *cpi,
   // Can only activate one mode.
   assert(((uv_mode != UV_DC_PRED) + use_palette + mbmi->use_intrabc) <= 1);
 
-  const int try_palette = av1_allow_palette(
-      cpi->common.features.allow_screen_content_tools, mbmi->bsize);
-  if (try_palette && uv_mode == UV_DC_PRED) {
-    const PALETTE_MODE_INFO *pmi = &mbmi->palette_mode_info;
-    total_rate +=
-        mode_costs->palette_uv_mode_cost[pmi->palette_size[0] > 0][use_palette];
-    if (use_palette) {
-      const int bsize_ctx = av1_get_palette_bsize_ctx(bsize);
-      const int plt_size = pmi->palette_size[1];
-      const MACROBLOCKD *xd = &x->e_mbd;
-      const uint8_t *const color_map = xd->plane[1].color_index_map;
-      int palette_mode_cost =
+  if (uv_mode == UV_DC_PRED) {
+    if (av1_allow_palette(cpi->common.features.allow_screen_content_tools,
+                          mbmi->bsize)) {
+      const PALETTE_MODE_INFO *pmi = &mbmi->palette_mode_info;
+      total_rate +=
           mode_costs
-              ->palette_uv_size_cost[bsize_ctx][plt_size - PALETTE_MIN_SIZE] +
-          write_uniform_cost(plt_size, color_map[0]);
-      uint16_t color_cache[2 * PALETTE_MAX_SIZE];
-      const int n_cache = av1_get_palette_cache(xd, 1, color_cache);
-      palette_mode_cost += av1_palette_color_cost_uv(
-          pmi, color_cache, n_cache, cpi->common.seq_params->bit_depth);
-      palette_mode_cost +=
-          av1_cost_color_map(x, 1, bsize, mbmi->tx_size, PALETTE_MAP);
-      total_rate += palette_mode_cost;
+              ->palette_uv_mode_cost[pmi->palette_size[0] > 0][use_palette];
+      if (use_palette) {
+        const int bsize_ctx = av1_get_palette_bsize_ctx(bsize);
+        const int plt_size = pmi->palette_size[1];
+        const MACROBLOCKD *xd = &x->e_mbd;
+        const uint8_t *const color_map = xd->plane[1].color_index_map;
+        int palette_mode_cost =
+            mode_costs
+                ->palette_uv_size_cost[bsize_ctx][plt_size - PALETTE_MIN_SIZE] +
+            write_uniform_cost(plt_size, color_map[0]);
+        uint16_t color_cache[2 * PALETTE_MAX_SIZE];
+        const int n_cache = av1_get_palette_cache(xd, 1, color_cache);
+        palette_mode_cost += av1_palette_color_cost_uv(
+            pmi, color_cache, n_cache, cpi->common.seq_params->bit_depth);
+        palette_mode_cost +=
+            av1_cost_color_map(x, 1, bsize, mbmi->tx_size, PALETTE_MAP);
+        total_rate += palette_mode_cost;
+      }
     }
-  }
-  const PREDICTION_MODE intra_mode = get_uv_mode(uv_mode);
-  if (av1_is_directional_mode(intra_mode)) {
-    if (av1_use_angle_delta(bsize)) {
+  } else {
+    const PREDICTION_MODE intra_mode = get_uv_mode(uv_mode);
+    if (av1_is_directional_mode(intra_mode) && av1_use_angle_delta(bsize)) {
       total_rate +=
           mode_costs->angle_delta_cost[intra_mode - V_PRED]
                                       [mbmi->angle_delta[PLANE_TYPE_UV] +
@@ -664,6 +773,11 @@ static inline int intra_mode_info_cost_uv(const AV1_COMP *cpi,
 }
 
 /*!\cond */
+#if HAVE_AVX2
+int aom_hadamard_sub_satd_avx2(int tx_size, const uint8_t *src,
+                               ptrdiff_t src_stride, const uint8_t *dst,
+                               ptrdiff_t dst_stride);
+#endif
 // Makes a quick intra prediction and estimate the rdcost with a model without
 // going through the whole txfm/quantize/itxfm process.
 static int64_t intra_model_rd(const AV1_COMMON *cm, MACROBLOCK *const x,
@@ -683,6 +797,23 @@ static int64_t intra_model_rd(const AV1_COMMON *cm, MACROBLOCK *const x,
   int64_t satd_cost = 0;
   struct macroblock_plane *p = &x->plane[plane];
   struct macroblockd_plane *pd = &xd->plane[plane];
+#if HAVE_AVX2
+  if (LIKELY(use_hadamard && !bd_info.use_highbitdepth_buf &&
+             (!do_border_pad ||
+              (x->pix_to_bottom_edge >= 0 && x->pix_to_right_edge >= 0)) &&
+             aom_satd == aom_satd_avx2)) {
+    for (row = 0; row < max_blocks_high; row += stepr) {
+      for (col = 0; col < max_blocks_wide; col += stepc) {
+        av1_predict_intra_block_facade(cm, xd, plane, col, row, tx_size);
+        satd_cost += aom_hadamard_sub_satd_avx2(
+            tx_size, p->src.buf + (((row * p->src.stride) + col) << 2),
+            p->src.stride, pd->dst.buf + (((row * pd->dst.stride) + col) << 2),
+            pd->dst.stride);
+      }
+    }
+    return satd_cost;
+  }
+#endif
   // Prediction.
   for (row = 0; row < max_blocks_high; row += stepr) {
     for (col = 0; col < max_blocks_wide; col += stepc) {
@@ -731,10 +862,6 @@ static inline int model_intra_yrd_and_prune(const AV1_COMP *const cpi,
   }
   return 0;
 }
-
-#if defined(__GNUC__) && __GNUC__ >= 4
-#pragma GCC visibility pop
-#endif
 
 #ifdef __cplusplus
 }  // extern "C"

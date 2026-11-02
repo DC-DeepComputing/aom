@@ -1264,14 +1264,13 @@ static inline void update_txk_array(MACROBLOCKD *const xd, int blk_row,
   const int stride = xd->tx_type_map_stride;
   xd->tx_type_map[blk_row * stride + blk_col] = tx_type;
 
-  const int txw = tx_size_wide_unit[tx_size];
-  const int txh = tx_size_high_unit[tx_size];
   // The 16x16 unit is due to the constraint from tx_64x64 which sets the
   // maximum tx size for chroma as 32x32. Coupled with 4x1 transform block
   // size, the constraint takes effect in 32x16 / 16x32 size too. To solve
   // the intricacy, cover all the 16x16 units inside a 64 level transform.
-  if (txw == tx_size_wide_unit[TX_64X64] ||
-      txh == tx_size_high_unit[TX_64X64]) {
+  if (UNLIKELY(txsize_sqr_up_map[tx_size] == TX_64X64)) {
+    const int txw = tx_size_wide_unit[tx_size];
+    const int txh = tx_size_high_unit[tx_size];
     const int tx_unit = tx_size_wide_unit[TX_16X16];
     for (int idy = 0; idy < txh; idy += tx_unit) {
       for (int idx = 0; idx < txw; idx += tx_unit) {
@@ -1286,28 +1285,33 @@ static inline TX_TYPE av1_get_tx_type(const MACROBLOCKD *xd,
                                       int blk_col, TX_SIZE tx_size,
                                       int reduced_tx_set) {
   const MB_MODE_INFO *const mbmi = xd->mi[0];
-  if (xd->lossless[mbmi->segment_id] || txsize_sqr_up_map[tx_size] > TX_32X32) {
+  const TX_SIZE tx_size_sqr_up = txsize_sqr_up_map[tx_size];
+  if (xd->lossless[mbmi->segment_id] || tx_size_sqr_up > TX_32X32) {
     return DCT_DCT;
   }
 
-  TX_TYPE tx_type;
   if (plane_type == PLANE_TYPE_Y) {
-    tx_type = xd->tx_type_map[blk_row * xd->tx_type_map_stride + blk_col];
-  } else {
-    if (is_inter_block(mbmi)) {
-      // scale back to y plane's coordinate
-      const struct macroblockd_plane *const pd = &xd->plane[plane_type];
-      blk_row <<= pd->subsampling_y;
-      blk_col <<= pd->subsampling_x;
-      tx_type = xd->tx_type_map[blk_row * xd->tx_type_map_stride + blk_col];
-    } else {
-      // In intra mode, uv planes don't share the same prediction mode as y
-      // plane, so the tx_type should not be shared
-      tx_type = intra_mode_to_tx_type(mbmi, PLANE_TYPE_UV);
-    }
+    return xd->tx_type_map[blk_row * xd->tx_type_map_stride + blk_col];
+  }
+
+  if (!is_inter_block(mbmi)) {
+    // In intra mode, uv planes don't share the same prediction mode as y
+    // plane, so the tx_type should not be shared
+    return (tx_size_sqr_up == TX_32X32)
+               ? (TX_TYPE)DCT_DCT
+               : intra_mode_to_tx_type(mbmi, PLANE_TYPE_UV);
+  }
+
+  // scale back to y plane's coordinate
+  const struct macroblockd_plane *const pd = &xd->plane[plane_type];
+  blk_row <<= pd->subsampling_y;
+  blk_col <<= pd->subsampling_x;
+  TX_TYPE tx_type = xd->tx_type_map[blk_row * xd->tx_type_map_stride + blk_col];
+  if (tx_type != DCT_DCT) {
     const TxSetType tx_set_type =
-        av1_get_ext_tx_set_type(tx_size, is_inter_block(mbmi), reduced_tx_set);
-    if (!av1_ext_tx_used[tx_set_type][tx_type]) tx_type = DCT_DCT;
+        av1_get_ext_tx_set_type(tx_size, 1, reduced_tx_set);
+    if (!(av1_ext_tx_used_flag[tx_set_type] & (1 << tx_type)))
+      tx_type = DCT_DCT;
   }
   assert(tx_type < TX_TYPES);
   assert(av1_ext_tx_used[av1_get_ext_tx_set_type(tx_size, is_inter_block(mbmi),
@@ -1446,27 +1450,67 @@ static inline int max_block_high(const MACROBLOCKD *xd, BLOCK_SIZE bsize,
   return max_blocks_high >> MI_SIZE_LOG2;
 }
 
-// Fast power-of-two specialization for filling n ENTROPY_CONTEXT bytes with val
-// using fixed-width scalar stores instead of a runtime memset call.
+static inline void av1_copy_tx_type_map(uint8_t *dst, const uint8_t *src,
+                                        int n) {
+  assert(n >= 1 && (n & (n - 1)) == 0);
+  if (n <= 2) {
+    dst[0] = src[0];
+    dst[n - 1] = src[n - 1];
+  } else if (n <= 8) {
+    uint32_t v0, v1;
+    memcpy(&v0, src, 4);
+    memcpy(&v1, src + (n - 4), 4);
+    memcpy(dst, &v0, 4);
+    memcpy(dst + (n - 4), &v1, 4);
+  } else if (n <= 32) {
+    uint64_t v0, v1, v2, v3;
+    memcpy(&v0, src, 8);
+    memcpy(&v1, src + 8, 8);
+    memcpy(&v2, src + (n - 16), 8);
+    memcpy(&v3, src + (n - 8), 8);
+    memcpy(dst, &v0, 8);
+    memcpy(dst + 8, &v1, 8);
+    memcpy(dst + (n - 16), &v2, 8);
+    memcpy(dst + (n - 8), &v3, 8);
+  } else {
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC unroll 1
+#endif
+    for (int i = 0; i < n; i += 64) {
+      uint64_t v0, v1, v2, v3, v4, v5, v6, v7;
+      memcpy(&v0, src + i, 8);
+      memcpy(&v1, src + i + 8, 8);
+      memcpy(&v2, src + i + 16, 8);
+      memcpy(&v3, src + i + 24, 8);
+      memcpy(&v4, src + i + 32, 8);
+      memcpy(&v5, src + i + 40, 8);
+      memcpy(&v6, src + i + 48, 8);
+      memcpy(&v7, src + i + 56, 8);
+      memcpy(dst + i, &v0, 8);
+      memcpy(dst + i + 8, &v1, 8);
+      memcpy(dst + i + 16, &v2, 8);
+      memcpy(dst + i + 24, &v3, 8);
+      memcpy(dst + i + 32, &v4, 8);
+      memcpy(dst + i + 40, &v5, 8);
+      memcpy(dst + i + 48, &v6, 8);
+      memcpy(dst + i + 56, &v7, 8);
+    }
+  }
+}
+
 static inline void av1_fill_entropy_ctx_pow2(ENTROPY_CONTEXT *dst, uint8_t val,
                                              int n) {
-  if (n == 1) {
+  assert(n == 1 || n == 2 || n == 4 || n == 8 || n == 16);
+  if (n <= 2) {
     dst[0] = val;
-  } else if (n == 2) {
-    const uint16_t v2 = (uint16_t)val * 0x0101u;
-    memcpy(dst, &v2, 2);
+    dst[n - 1] = val;
   } else if (n == 4) {
     const uint32_t v4 = (uint32_t)val * 0x01010101u;
     memcpy(dst, &v4, 4);
-  } else if (n == 8) {
-    const uint64_t v8 = (uint64_t)val * 0x0101010101010101ULL;
-    memcpy(dst, &v8, 8);
-  } else if (n == 16) {
-    const uint64_t v8 = (uint64_t)val * 0x0101010101010101ULL;
-    memcpy(dst, &v8, 8);
-    memcpy(dst + 8, &v8, 8);
   } else {
-    memset(dst, val, sizeof(*dst) * n);
+    const uint64_t v8 = (uint64_t)val * 0x0101010101010101ULL;
+    memcpy(dst, &v8, 8);
+    memcpy(dst + (n - 8), &v8, 8);
   }
 }
 
