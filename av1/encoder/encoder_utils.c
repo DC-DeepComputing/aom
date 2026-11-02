@@ -11,8 +11,12 @@
 
 #include <assert.h>
 #include <string.h>
+#if defined(__SSE2__)
+#include <emmintrin.h>
+#endif
 
 #include "aom/aomcx.h"
+#include "aom_util/aom_thread.h"
 
 #include "av1/common/av1_common_int.h"
 #include "av1/encoder/bitstream.h"
@@ -1480,22 +1484,111 @@ int av1_is_integer_mv(const YV12_BUFFER_CONFIG *cur_picture,
   return 0;
 }
 
-void av1_set_mb_ssim_rdmult_scaling(AV1_COMP *cpi) {
+#if defined(__SSE2__)
+// Computes the sum of the 4 per-pixel 8x8 variances inside a full 8-bit 16x16
+// block using SSE2, matching 4 calls to av1_get_perpixel_variance_facade(...,
+// BLOCK_8X8, AOM_PLANE_Y).
+static inline uint32_t ssim_var_16x16_8bit_sse2(const uint8_t *src,
+                                                int stride) {
+  const __m128i zero = _mm_setzero_si128();
+  uint32_t total_var = 0;
+  for (int half = 0; half < 2; ++half) {
+    const uint8_t *p = src + (half * 8) * (ptrdiff_t)stride;
+    __m128i sad = zero;
+    __m128i sse_l = zero;
+    __m128i sse_r = zero;
+    for (int r = 0; r < 8; ++r) {
+      const __m128i v = _mm_loadu_si128((const __m128i *)p);
+      p += stride;
+      sad = _mm_add_epi64(sad, _mm_sad_epu8(v, zero));
+      const __m128i vlo = _mm_unpacklo_epi8(v, zero);
+      const __m128i vhi = _mm_unpackhi_epi8(v, zero);
+      sse_l = _mm_add_epi32(sse_l, _mm_madd_epi16(vlo, vlo));
+      sse_r = _mm_add_epi32(sse_r, _mm_madd_epi16(vhi, vhi));
+    }
+    const uint32_t sum0 = (uint32_t)_mm_cvtsi128_si32(sad);
+    const uint32_t sum1 = (uint32_t)_mm_cvtsi128_si32(_mm_srli_si128(sad, 8));
+
+    sse_l = _mm_add_epi32(sse_l, _mm_srli_si128(sse_l, 8));
+    sse_l = _mm_add_epi32(sse_l, _mm_srli_si128(sse_l, 4));
+    const uint32_t sse0 = (uint32_t)_mm_cvtsi128_si32(sse_l);
+
+    sse_r = _mm_add_epi32(sse_r, _mm_srli_si128(sse_r, 8));
+    sse_r = _mm_add_epi32(sse_r, _mm_srli_si128(sse_r, 4));
+    const uint32_t sse1 = (uint32_t)_mm_cvtsi128_si32(sse_r);
+
+    const uint32_t var0 = ((sse0 - ((sum0 * sum0) >> 6)) + 32) >> 6;
+    const uint32_t var1 = ((sse1 - ((sum1 * sum1) >> 6)) + 32) >> 6;
+    total_var += var0 + var1;
+  }
+  return total_var;
+}
+#endif
+
+typedef struct {
+  AV1_COMP *cpi;
+  int row_start;
+  int row_end;
+  int num_cols;
+  int compute_log;
+  double log_sum;
+} SsimRdmultStrip;
+
+static int ssim_rdmult_strip_hook(void *arg1, void *arg2) {
+  (void)arg2;
+  SsimRdmultStrip *const job = (SsimRdmultStrip *)arg1;
+  AV1_COMP *const cpi = job->cpi;
   const CommonModeInfoParams *const mi_params = &cpi->common.mi_params;
   const MACROBLOCKD *const xd = &cpi->td.mb.e_mbd;
-  uint8_t *y_buffer = cpi->source->y_buffer;
+  uint8_t *const y_buffer = cpi->source->y_buffer;
   const int y_stride = cpi->source->y_stride;
-  const int block_size = BLOCK_16X16;
-
-  const int num_mi_w = mi_size_wide[block_size];
-  const int num_mi_h = mi_size_high[block_size];
-  const int num_cols = (mi_params->mi_cols + num_mi_w - 1) / num_mi_w;
-  const int num_rows = (mi_params->mi_rows + num_mi_h - 1) / num_mi_h;
+  const int num_mi_w = mi_size_wide[BLOCK_16X16];
+  const int num_mi_h = mi_size_high[BLOCK_16X16];
+  const int num_cols = job->num_cols;
+  const int use_hbd = cpi->source->flags & YV12_FLAG_HIGHBITDEPTH;
+  const int full_cols = mi_params->mi_cols / num_mi_w;
+  const int compute_log = job->compute_log;
   double log_sum = 0.0;
 
-  // Loop through each 16x16 block.
-  for (int row = 0; row < num_rows; ++row) {
-    for (int col = 0; col < num_cols; ++col) {
+  for (int row = job->row_start; row < job->row_end; ++row) {
+    const int full_row = ((row + 1) * num_mi_h <= mi_params->mi_rows);
+    int col = 0;
+#if defined(__SSE2__)
+    if (!use_hbd && full_row) {
+      uint32_t prev_var_sum = UINT32_MAX;
+      double prev_var = 0.0;
+      double prev_log_var = 0.0;
+      const uint8_t *row_ptr =
+          y_buffer + ((row * num_mi_h) << 2) * (ptrdiff_t)y_stride;
+      for (; col < full_cols; ++col) {
+        const int index = row * num_cols + col;
+        const uint32_t var_sum =
+            ssim_var_16x16_8bit_sse2(row_ptr + col * 16, y_stride);
+        double var;
+        if (var_sum == prev_var_sum) {
+          var = prev_var;
+          cpi->ssim_rdmult_scaling_factors[index] = var;
+          if (compute_log) log_sum += prev_log_var;
+        } else {
+          var = (double)var_sum * 0.25;
+          var = 67.035434 * (1 - exp(-0.0021489 * var)) + 17.492222;
+          assert(var > 17.0 && var < 85.0);
+          prev_var_sum = var_sum;
+          prev_var = var;
+          cpi->ssim_rdmult_scaling_factors[index] = var;
+          if (compute_log) {
+            prev_log_var = log(var);
+            log_sum += prev_log_var;
+          }
+        }
+      }
+    }
+#else
+    (void)use_hbd;
+    (void)full_row;
+    (void)full_cols;
+#endif
+    for (; col < num_cols; ++col) {
       double var = 0.0, num_of_var = 0.0;
       const int index = row * num_cols + col;
 
@@ -1523,29 +1616,42 @@ void av1_set_mb_ssim_rdmult_scaling(AV1_COMP *cpi) {
       // Curve fitting with an exponential model on all 16x16 blocks from the
       // midres dataset.
       var = 67.035434 * (1 - exp(-0.0021489 * var)) + 17.492222;
-
-      // As per the above computation, var will be in the range of
-      // [17.492222, 84.527656], assuming the data type is of infinite
-      // precision. The following assert conservatively checks if var is in
-      // the range of [17.0, 85.0] to avoid any issues due to the precision of
-      // the relevant data type.
       assert(var > 17.0 && var < 85.0);
       cpi->ssim_rdmult_scaling_factors[index] = var;
-      log_sum += log(var);
+      if (compute_log) log_sum += log(var);
     }
   }
+  job->log_sum = log_sum;
+  return 1;
+}
+
+void av1_set_mb_ssim_rdmult_scaling(AV1_COMP *cpi) {
+  const CommonModeInfoParams *const mi_params = &cpi->common.mi_params;
+  const int block_size = BLOCK_16X16;
+  const int num_mi_w = mi_size_wide[block_size];
+  const int num_mi_h = mi_size_high[block_size];
+  const int num_cols = (mi_params->mi_cols + num_mi_w - 1) / num_mi_w;
+  const int num_rows = (mi_params->mi_rows + num_mi_h - 1) / num_mi_h;
+  const int total_blocks = num_rows * num_cols;
+
+  SsimRdmultStrip job;
+  job.cpi = cpi;
+  job.row_start = 0;
+  job.row_end = num_rows;
+  job.num_cols = num_cols;
+  job.compute_log = 1;
+  job.log_sum = 0.0;
+  ssim_rdmult_strip_hook(&job, NULL);
+  double log_sum = job.log_sum;
 
   // As log_sum holds the geometric mean, it will be in the range
   // [17.492222, 84.527656]. Hence, in the below loop, the value of
   // cpi->ssim_rdmult_scaling_factors[index] would be in the range
   // [0.2069, 4.8323].
-  log_sum = exp(log_sum / (double)(num_rows * num_cols));
+  log_sum = exp(log_sum / (double)total_blocks);
 
-  for (int row = 0; row < num_rows; ++row) {
-    for (int col = 0; col < num_cols; ++col) {
-      const int index = row * num_cols + col;
-      cpi->ssim_rdmult_scaling_factors[index] /= log_sum;
-    }
+  for (int i = 0; i < total_blocks; ++i) {
+    cpi->ssim_rdmult_scaling_factors[i] /= log_sum;
   }
 }
 
