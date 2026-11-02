@@ -67,10 +67,16 @@ void *aom_memalign(size_t align, size_t size) {
 void *aom_malloc(size_t size) { return aom_memalign(DEFAULT_ALIGNMENT, size); }
 
 void *aom_calloc(size_t num, size_t size) {
+  void *x = NULL;
   if (!check_size_argument_overflow(num, size, DEFAULT_ALIGNMENT)) return NULL;
-  const size_t total_size = num * size;
-  void *const x = aom_malloc(total_size);
-  if (x) memset(x, 0, total_size);
+  const size_t aligned_size =
+      num * size + GetAllocationPaddingSize(DEFAULT_ALIGNMENT);
+  void *const addr = calloc(1, aligned_size);
+  if (addr) {
+    x = aom_align_addr((unsigned char *)addr + ADDRESS_STORAGE_SIZE,
+                       DEFAULT_ALIGNMENT);
+    SetActualMallocAddress(x, addr);
+  }
   return x;
 }
 
