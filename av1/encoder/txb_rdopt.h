@@ -21,10 +21,6 @@
 extern "C" {
 #endif
 
-#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
-#pragma GCC visibility push(hidden)
-#endif
-
 int av1_optimize_txb_multi(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
                            int block, TX_SIZE tx_size, TX_TYPE tx_type,
                            const TXB_CTX *const txb_ctx, int *rate_cost,
@@ -77,6 +73,10 @@ static inline int av1_optimize_b(const struct AV1_COMP *cpi, MACROBLOCK *x,
   if (eob == 0 || !cpi->optimize_seg_arr[segment_id] ||
       xd->lossless[segment_id]) {
     *rate_cost = av1_cost_skip_txb(&x->coeff_costs, txb_ctx, plane, tx_size);
+    if (UNLIKELY(eob > 0)) {
+      p->txb_entropy_ctx[block] = av1_get_txb_entropy_context(
+          p->qcoeff + BLOCK_OFFSET(block), get_scan(tx_size, tx_type), eob);
+    }
     return eob;
   }
 
@@ -153,9 +153,6 @@ int av1_cost_coeffs_txb_laplacian(const MACROBLOCK *x, const int plane,
                                   const TXB_CTX *const txb_ctx,
                                   const int reduced_tx_set_used,
                                   const int adjust_eob);
-#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
-#pragma GCC visibility pop
-#endif
 
 #ifdef __cplusplus
 }
