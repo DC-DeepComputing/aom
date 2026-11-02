@@ -1,0 +1,55 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "e8b7f80f_c47484a2",
+        "filename": "av1/encoder/encodemb.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 18,
+      "author": {
+        "id": 5022
+      },
+      "writtenOn": "2026-11-02T18:06:49Z",
+      "side": 1,
+      "message": "Why this is needed?\n\nIf this consistently provides better performance, you can just take it outside the flag and have it on all the time.",
+      "range": {
+        "startLine": 15,
+        "startChar": 0,
+        "endLine": 18,
+        "endChar": 6
+      },
+      "fixSuggestions": [
+        {
+          "fixId": "76dcaf4e_fd2702d7",
+          "description": "prompt_to_edit API",
+          "replacements": [
+            {
+              "path": "av1/encoder/encodemb.h",
+              "range": {
+                "startLine": 16,
+                "startChar": 0,
+                "endLine": 17,
+                "endChar": 0
+              },
+              "replacement": ""
+            },
+            {
+              "path": "av1/encoder/encodemb.h",
+              "range": {
+                "startLine": 18,
+                "startChar": 0,
+                "endLine": 19,
+                "endChar": 0
+              },
+              "replacement": ""
+            }
+          ]
+        }
+      ],
+      "revId": "ab0f7acd5f36ef6160a4d9577b300559770d11fc",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
