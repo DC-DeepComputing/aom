@@ -812,9 +812,7 @@ static inline void store_winner_mode_stats(
       // No mode has higher rd cost than this_rd
       return;
     } else if (mode_idx < max_winner_mode_count - 1) {
-      // Create a slot for current mode and move others to the next slot.
-      // Only copy the active fields up to color_index_map, and copy the active
-      // portion of color_index_map only when palette mode is used.
+      // Create a slot for current mode and move others to the next slot
       const int move_end =
           AOMMIN(x->winner_mode_count, max_winner_mode_count - 1);
       for (int j = move_end; j > mode_idx; --j) {

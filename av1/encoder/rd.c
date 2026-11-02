@@ -9,6 +9,16 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
+#if defined(__GNUC__) && !defined(__clang__) && \
+    (defined(__x86_64__) || defined(__i386__))
+#pragma GCC push_options
+#pragma GCC target("avx2")
+#include <immintrin.h>
+#pragma GCC pop_options
+#elif defined(__clang__) && (defined(__x86_64__) || defined(__i386__))
+#include <immintrin.h>
+#endif
+
 #include <assert.h>
 #include <limits.h>
 #include <math.h>
@@ -79,49 +89,170 @@ static const int av1_ext_tx_set_idx_to_type[2][AOMMAX(EXT_TX_SETS_INTRA,
   },
 };
 
-void av1_fill_mode_rates(AV1_COMMON *const cm, ModeCosts *mode_costs,
-                         FRAME_CONTEXT *fc) {
-  int i, j;
-  const int is_intra_only = frame_is_intra_only(cm);
+#if HAVE_AVX2 && defined(__GNUC__) && !defined(__clang__) && \
+    (defined(__x86_64__) || defined(__i386__))
+#pragma GCC push_options
+#pragma GCC target("avx2")
 
-  for (i = 0; i < PARTITION_CONTEXTS; ++i)
-    av1_cost_tokens_from_cdf(mode_costs->partition_cost[i],
-                             fc->partition_cdf[i], NULL);
+static AOM_FORCE_INLINE __m256i cost_8_symbols_avx2(__m256i p15) {
+  const __m256i u = _mm256_castps_si256(_mm256_cvtepi32_ps(p15));
+  const __m256i shift =
+      _mm256_sub_epi32(_mm256_set1_epi32(141), _mm256_srli_epi32(u, 23));
+  const __m256i mant = _mm256_and_si256(u, _mm256_set1_epi32(0x7fffff));
+  const __m256i prob_idx =
+      _mm256_srli_epi32(_mm256_add_epi32(mant, _mm256_set1_epi32(32768)), 16);
+  const __m256i tbl =
+      _mm256_i32gather_epi32((const int *)av1_prob_cost, prob_idx, 2);
+  const __m256i cost_tbl = _mm256_and_si256(tbl, _mm256_set1_epi32(0xffff));
+  return _mm256_add_epi32(cost_tbl,
+                          _mm256_slli_epi32(shift, AV1_PROB_COST_SHIFT));
+}
+
+static AOM_FORCE_INLINE void cost_4_cdf2_avx2(int (*costs)[2],
+                                              const aom_cdf_prob (*cdf)[3]) {
+  const __m128i vc = _mm_setr_epi32(cdf[0][0], cdf[1][0], cdf[2][0], cdf[3][0]);
+  const __m128i v0 = _mm_sub_epi32(_mm_set1_epi32(CDF_PROB_TOP), vc);
+  __m256i p = _mm256_inserti128_si256(
+      _mm256_castsi128_si256(_mm_unpacklo_epi32(v0, vc)),
+      _mm_unpackhi_epi32(v0, vc), 1);
+  p = _mm256_max_epi32(p, _mm256_set1_epi32(EC_MIN_PROB));
+  p = _mm256_min_epi32(p, _mm256_set1_epi32(CDF_PROB_TOP - 1));
+  _mm256_storeu_si256((__m256i *)costs, cost_8_symbols_avx2(p));
+}
+
+static AOM_FORCE_INLINE void cost_1_cdf2(int *costs, const aom_cdf_prob *cdf) {
+  const int c0 = cdf[0];
+  costs[0] = av1_cost_symbol_clamped(
+      clamp(CDF_PROB_TOP - c0, EC_MIN_PROB, CDF_PROB_TOP - 1));
+  costs[1] = av1_cost_symbol_clamped(clamp(c0, EC_MIN_PROB, CDF_PROB_TOP - 1));
+}
+
+static AOM_FORCE_INLINE void cost_2_cdf3_avx2(int (*costs)[4],
+                                              const aom_cdf_prob (*cdf)[4]) {
+  const __m256i vc =
+      _mm256_cvtepu16_epi32(_mm_loadu_si128((const __m128i *)cdf));
+  const __m256i prev = _mm256_blend_epi32(
+      _mm256_slli_si256(vc, 4), _mm256_set1_epi32(CDF_PROB_TOP), 0x11);
+  __m256i p = _mm256_sub_epi32(prev, vc);
+  p = _mm256_max_epi32(p, _mm256_set1_epi32(EC_MIN_PROB));
+  p = _mm256_min_epi32(p, _mm256_set1_epi32(CDF_PROB_TOP - 1));
+  const __m256i c =
+      _mm256_blend_epi32(cost_8_symbols_avx2(p), _mm256_setzero_si256(), 0x88);
+  _mm256_storeu_si256((__m256i *)costs, c);
+}
+
+static AOM_FORCE_INLINE __m256i cost_2_cdf4_avx2(const aom_cdf_prob *cdf0,
+                                                 const aom_cdf_prob *cdf1) {
+  const __m128i c01 =
+      _mm_unpacklo_epi64(_mm_loadl_epi64((const __m128i *)cdf0),
+                         _mm_loadl_epi64((const __m128i *)cdf1));
+  const __m256i vc = _mm256_cvtepu16_epi32(c01);
+  const __m256i prev = _mm256_blend_epi32(
+      _mm256_slli_si256(vc, 4), _mm256_set1_epi32(CDF_PROB_TOP), 0x11);
+  __m256i p = _mm256_sub_epi32(prev, vc);
+  p = _mm256_max_epi32(p, _mm256_set1_epi32(EC_MIN_PROB));
+  p = _mm256_min_epi32(p, _mm256_set1_epi32(CDF_PROB_TOP - 1));
+  return cost_8_symbols_avx2(p);
+}
+
+static AOM_FORCE_INLINE __m256i cost_1_cdf8_avx2(const aom_cdf_prob *cdf) {
+  const __m128i c16 = _mm_loadu_si128((const __m128i *)cdf);
+  const __m256i vc = _mm256_cvtepu16_epi32(c16);
+  const __m256i vprev =
+      _mm256_blend_epi32(_mm256_cvtepu16_epi32(_mm_slli_si128(c16, 2)),
+                         _mm256_set1_epi32(CDF_PROB_TOP), 0x01);
+  __m256i p = _mm256_sub_epi32(vprev, vc);
+  p = _mm256_max_epi32(p, _mm256_set1_epi32(EC_MIN_PROB));
+  p = _mm256_min_epi32(p, _mm256_set1_epi32(CDF_PROB_TOP - 1));
+  return cost_8_symbols_avx2(p);
+}
+
+static AOM_FORCE_INLINE void cost_cdf_9_to_16_avx2(int *costs,
+                                                   const aom_cdf_prob *cdf,
+                                                   int n) {
+  _mm256_storeu_si256((__m256i *)costs, cost_1_cdf8_avx2(cdf));
+  const __m256i vprev =
+      _mm256_cvtepu16_epi32(_mm_loadu_si128((const __m128i *)(cdf + n - 9)));
+  const __m256i vc =
+      _mm256_cvtepu16_epi32(_mm_loadu_si128((const __m128i *)(cdf + n - 8)));
+  __m256i p = _mm256_sub_epi32(vprev, vc);
+  p = _mm256_max_epi32(p, _mm256_set1_epi32(EC_MIN_PROB));
+  p = _mm256_min_epi32(p, _mm256_set1_epi32(CDF_PROB_TOP - 1));
+  _mm256_storeu_si256((__m256i *)(costs + n - 8), cost_8_symbols_avx2(p));
+}
+static __attribute__((noinline)) void cost_tokens_cold(int *costs,
+                                                       const aom_cdf_prob *cdf,
+                                                       const int *inv);
+
+static void fill_mode_rates_avx2(AV1_COMMON *const cm, ModeCosts *mode_costs,
+                                 FRAME_CONTEXT *fc, const int is_intra_only) {
+  int i, j;
+  (void)use_intra_ext_tx_for_txsize;
+  for (i = 0; i < 4; i += 2) {
+    const __m256i c =
+        cost_2_cdf4_avx2(fc->partition_cdf[i], fc->partition_cdf[i + 1]);
+    _mm_storeu_si128((__m128i *)mode_costs->partition_cost[i],
+                     _mm256_castsi256_si128(c));
+    _mm_storeu_si128((__m128i *)mode_costs->partition_cost[i + 1],
+                     _mm256_extracti128_si256(c, 1));
+  }
+#pragma GCC unroll 1
+  for (i = 4; i < 16; ++i)
+    cost_cdf_9_to_16_avx2(mode_costs->partition_cost[i], fc->partition_cdf[i],
+                          EXT_PARTITION_TYPES);
+#pragma GCC unroll 1
+  for (i = 16; i < PARTITION_CONTEXTS; ++i)
+    _mm256_storeu_si256((__m256i *)mode_costs->partition_cost[i],
+                        cost_1_cdf8_avx2(fc->partition_cdf[i]));
 
   if (cm->current_frame.skip_mode_info.skip_mode_flag) {
-    for (i = 0; i < SKIP_MODE_CONTEXTS; ++i) {
-      av1_cost_tokens_from_cdf(mode_costs->skip_mode_cost[i],
-                               fc->skip_mode_cdfs[i], NULL);
-    }
+    for (i = 0; i < SKIP_MODE_CONTEXTS; ++i)
+      cost_1_cdf2(mode_costs->skip_mode_cost[i], fc->skip_mode_cdfs[i]);
   } else {
     av1_zero(mode_costs->skip_mode_cost);
   }
 
-  for (i = 0; i < SKIP_CONTEXTS; ++i) {
-    av1_cost_tokens_from_cdf(mode_costs->skip_txfm_cost[i],
-                             fc->skip_txfm_cdfs[i], NULL);
-  }
+  for (i = 0; i < SKIP_CONTEXTS; ++i)
+    cost_1_cdf2(mode_costs->skip_txfm_cost[i], fc->skip_txfm_cdfs[i]);
 
-  for (i = 0; i < KF_MODE_CONTEXTS; ++i)
+#pragma GCC unroll 1
+  for (i = 0; i < KF_MODE_CONTEXTS; ++i) {
+#pragma GCC unroll 1
     for (j = 0; j < KF_MODE_CONTEXTS; ++j)
-      av1_cost_tokens_from_cdf(mode_costs->y_mode_costs[i][j],
-                               fc->kf_y_cdf[i][j], NULL);
-
-  for (i = 0; i < BLOCK_SIZE_GROUPS; ++i)
-    av1_cost_tokens_from_cdf(mode_costs->mbmode_cost[i], fc->y_mode_cdf[i],
-                             NULL);
-  for (i = 0; i < CFL_ALLOWED_TYPES; ++i)
-    for (j = 0; j < INTRA_MODES; ++j)
-      av1_cost_tokens_from_cdf(mode_costs->intra_uv_mode_cost[i][j],
-                               fc->uv_mode_cdf[i][j], NULL);
-
-  av1_cost_tokens_from_cdf(mode_costs->filter_intra_mode_cost,
-                           fc->filter_intra_mode_cdf, NULL);
-  for (i = 0; i < BLOCK_SIZES_ALL; ++i) {
-    if (av1_filter_intra_allowed_bsize(cm, i))
-      av1_cost_tokens_from_cdf(mode_costs->filter_intra_cost[i],
-                               fc->filter_intra_cdfs[i], NULL);
+      cost_cdf_9_to_16_avx2(mode_costs->y_mode_costs[i][j], fc->kf_y_cdf[i][j],
+                            INTRA_MODES);
   }
+
+#pragma GCC unroll 1
+  for (i = 0; i < BLOCK_SIZE_GROUPS; ++i)
+    cost_cdf_9_to_16_avx2(mode_costs->mbmode_cost[i], fc->y_mode_cdf[i],
+                          INTRA_MODES);
+
+#pragma GCC unroll 1
+  for (j = 0; j < INTRA_MODES; ++j) {
+    cost_cdf_9_to_16_avx2(mode_costs->intra_uv_mode_cost[0][j],
+                          fc->uv_mode_cdf[0][j], INTRA_MODES);
+    cost_cdf_9_to_16_avx2(mode_costs->intra_uv_mode_cost[1][j],
+                          fc->uv_mode_cdf[1][j], UV_INTRA_MODES);
+  }
+
+  _mm256_storeu_si256((__m256i *)mode_costs->filter_intra_mode_cost,
+                      cost_1_cdf8_avx2(fc->filter_intra_mode_cdf));
+  if (cm->seq_params->enable_filter_intra) {
+    cost_4_cdf2_avx2(&mode_costs->filter_intra_cost[0],
+                     &fc->filter_intra_cdfs[0]);
+    cost_4_cdf2_avx2(&mode_costs->filter_intra_cost[4],
+                     &fc->filter_intra_cdfs[4]);
+    cost_1_cdf2(mode_costs->filter_intra_cost[8], fc->filter_intra_cdfs[8]);
+    cost_1_cdf2(mode_costs->filter_intra_cost[9], fc->filter_intra_cdfs[9]);
+    cost_4_cdf2_avx2(&mode_costs->filter_intra_cost[16],
+                     &fc->filter_intra_cdfs[16]);
+  }
+
+#pragma GCC unroll 1
+  for (i = 0; i < DIRECTIONAL_MODES; ++i)
+    _mm256_storeu_si256((__m256i *)mode_costs->angle_delta_cost[i],
+                        cost_1_cdf8_avx2(fc->angle_delta_cdf[i]));
 
   if (!is_intra_only) {
     for (i = 0; i < SWITCHABLE_FILTER_CONTEXTS; ++i)
@@ -130,101 +261,398 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, ModeCosts *mode_costs,
   }
 
   if (cm->features.allow_screen_content_tools) {
-    for (i = 0; i < PALATTE_BSIZE_CTXS; ++i) {
-      av1_cost_tokens_from_cdf(mode_costs->palette_y_size_cost[i],
-                               fc->palette_y_size_cdf[i], NULL);
-      av1_cost_tokens_from_cdf(mode_costs->palette_uv_size_cost[i],
-                               fc->palette_uv_size_cdf[i], NULL);
-      for (j = 0; j < PALETTE_Y_MODE_CONTEXTS; ++j) {
-        av1_cost_tokens_from_cdf(mode_costs->palette_y_mode_cost[i][j],
-                                 fc->palette_y_mode_cdf[i][j], NULL);
-      }
-    }
-
-    for (i = 0; i < PALETTE_UV_MODE_CONTEXTS; ++i) {
-      av1_cost_tokens_from_cdf(mode_costs->palette_uv_mode_cost[i],
-                               fc->palette_uv_mode_cdf[i], NULL);
-    }
-
+#pragma GCC unroll 1
+    for (i = 0; i < PALATTE_BSIZE_CTXS; ++i)
+      _mm256_storeu_si256((__m256i *)mode_costs->palette_y_size_cost[i],
+                          cost_1_cdf8_avx2(fc->palette_y_size_cdf[i]));
+#pragma GCC unroll 1
+    for (i = 0; i < PALATTE_BSIZE_CTXS; ++i)
+      _mm256_storeu_si256((__m256i *)mode_costs->palette_uv_size_cost[i],
+                          cost_1_cdf8_avx2(fc->palette_uv_size_cdf[i]));
+#pragma GCC unroll 1
     for (i = 0; i < PALETTE_SIZES; ++i) {
+#pragma GCC unroll 1
       for (j = 0; j < PALETTE_COLOR_INDEX_CONTEXTS; ++j) {
-        av1_cost_tokens_from_cdf(mode_costs->palette_y_color_cost[i][j],
-                                 fc->palette_y_color_index_cdf[i][j], NULL);
-        av1_cost_tokens_from_cdf(mode_costs->palette_uv_color_cost[i][j],
-                                 fc->palette_uv_color_index_cdf[i][j], NULL);
+        _mm256_storeu_si256(
+            (__m256i *)mode_costs->palette_y_color_cost[i][j],
+            cost_1_cdf8_avx2(fc->palette_y_color_index_cdf[i][j]));
+        _mm256_storeu_si256(
+            (__m256i *)mode_costs->palette_uv_color_cost[i][j],
+            cost_1_cdf8_avx2(fc->palette_uv_color_index_cdf[i][j]));
       }
     }
+    int (*pym_cost)[2] = (int (*)[2])mode_costs->palette_y_mode_cost;
+    const aom_cdf_prob(*pym_cdf)[3] =
+        (const aom_cdf_prob(*)[3])fc->palette_y_mode_cdf;
+#pragma GCC unroll 1
+    for (i = 0; i < 20; i += 4) cost_4_cdf2_avx2(&pym_cost[i], &pym_cdf[i]);
+    cost_1_cdf2(pym_cost[20], pym_cdf[20]);
+    for (i = 0; i < PALETTE_UV_MODE_CONTEXTS; ++i)
+      cost_1_cdf2(mode_costs->palette_uv_mode_cost[i],
+                  fc->palette_uv_mode_cdf[i]);
   }
 
   int sign_cost[CFL_JOINT_SIGNS];
-  av1_cost_tokens_from_cdf(sign_cost, fc->cfl_sign_cdf, NULL);
+  _mm256_storeu_si256((__m256i *)sign_cost, cost_1_cdf8_avx2(fc->cfl_sign_cdf));
+  int alpha_cost[CFL_ALPHA_CONTEXTS][CFL_ALPHABET_SIZE];
+#pragma GCC unroll 1
+  for (i = 0; i < CFL_ALPHA_CONTEXTS; ++i)
+    cost_cdf_9_to_16_avx2(alpha_cost[i], fc->cfl_alpha_cdf[i],
+                          CFL_ALPHABET_SIZE);
+#pragma GCC unroll 1
   for (int joint_sign = 0; joint_sign < CFL_JOINT_SIGNS; joint_sign++) {
     int *cost_u = mode_costs->cfl_cost[joint_sign][CFL_PRED_U];
     int *cost_v = mode_costs->cfl_cost[joint_sign][CFL_PRED_V];
+    const __m256i vsign = _mm256_set1_epi32(sign_cost[joint_sign]);
     if (CFL_SIGN_U(joint_sign) == CFL_SIGN_ZERO) {
-      memset(cost_u, 0, CFL_ALPHABET_SIZE * sizeof(*cost_u));
+      _mm256_storeu_si256((__m256i *)&cost_u[0], vsign);
+      _mm256_storeu_si256((__m256i *)&cost_u[8], vsign);
     } else {
-      const aom_cdf_prob *cdf_u = fc->cfl_alpha_cdf[CFL_CONTEXT_U(joint_sign)];
-      av1_cost_tokens_from_cdf(cost_u, cdf_u, NULL);
+      const int *au = alpha_cost[CFL_CONTEXT_U(joint_sign)];
+      _mm256_storeu_si256(
+          (__m256i *)&cost_u[0],
+          _mm256_add_epi32(_mm256_loadu_si256((const __m256i *)&au[0]), vsign));
+      _mm256_storeu_si256(
+          (__m256i *)&cost_u[8],
+          _mm256_add_epi32(_mm256_loadu_si256((const __m256i *)&au[8]), vsign));
     }
     if (CFL_SIGN_V(joint_sign) == CFL_SIGN_ZERO) {
-      memset(cost_v, 0, CFL_ALPHABET_SIZE * sizeof(*cost_v));
+      const __m256i vzero = _mm256_setzero_si256();
+      _mm256_storeu_si256((__m256i *)&cost_v[0], vzero);
+      _mm256_storeu_si256((__m256i *)&cost_v[8], vzero);
     } else {
-      const aom_cdf_prob *cdf_v = fc->cfl_alpha_cdf[CFL_CONTEXT_V(joint_sign)];
-      av1_cost_tokens_from_cdf(cost_v, cdf_v, NULL);
+      const int *av = alpha_cost[CFL_CONTEXT_V(joint_sign)];
+      _mm256_storeu_si256((__m256i *)&cost_v[0],
+                          _mm256_loadu_si256((const __m256i *)&av[0]));
+      _mm256_storeu_si256((__m256i *)&cost_v[8],
+                          _mm256_loadu_si256((const __m256i *)&av[8]));
     }
-    for (int u = 0; u < CFL_ALPHABET_SIZE; u++)
-      cost_u[u] += sign_cost[joint_sign];
   }
 
-  for (i = 0; i < MAX_TX_CATS; ++i)
-    for (j = 0; j < TX_SIZE_CONTEXTS; ++j)
-      av1_cost_tokens_from_cdf(mode_costs->tx_size_cost[i][j],
-                               fc->tx_size_cdf[i][j], NULL);
-
-  for (i = 0; i < TXFM_PARTITION_CONTEXTS; ++i) {
-    av1_cost_tokens_from_cdf(mode_costs->txfm_partition_cost[i],
-                             fc->txfm_partition_cdf[i], NULL);
+  for (j = 0; j < TX_SIZE_CONTEXTS; ++j)
+    cost_1_cdf2(mode_costs->tx_size_cost[0][j], fc->tx_size_cdf[0][j]);
+#pragma GCC unroll 1
+  for (i = 1; i < MAX_TX_CATS; ++i) {
+    const __m256i c01 =
+        cost_2_cdf4_avx2(fc->tx_size_cdf[i][0], fc->tx_size_cdf[i][1]);
+    _mm_storeu_si128((__m128i *)mode_costs->tx_size_cost[i][0],
+                     _mm256_castsi256_si128(c01));
+    _mm_storeu_si128((__m128i *)mode_costs->tx_size_cost[i][1],
+                     _mm256_extracti128_si256(c01, 1));
+    const __m256i c2 =
+        cost_2_cdf4_avx2(fc->tx_size_cdf[i][2], fc->tx_size_cdf[i][2]);
+    _mm_storeu_si128((__m128i *)mode_costs->tx_size_cost[i][2],
+                     _mm256_castsi256_si128(c2));
   }
 
-  for (i = TX_4X4; i < EXT_TX_SIZES; ++i) {
-    int s;
-    if (!is_intra_only || av1_allow_intrabc(cm)) {
+#pragma GCC unroll 1
+  for (i = 0; i < 20; i += 4)
+    cost_4_cdf2_avx2(&mode_costs->txfm_partition_cost[i],
+                     &fc->txfm_partition_cdf[i]);
+  cost_1_cdf2(mode_costs->txfm_partition_cost[20], fc->txfm_partition_cdf[20]);
+
+  if (!is_intra_only || av1_allow_intrabc(cm)) {
+#pragma GCC unroll 1
+    for (i = TX_4X4; i < EXT_TX_SIZES; ++i) {
+      int s;
+#pragma GCC unroll 1
       for (s = 1; s < EXT_TX_SETS_INTER; ++s) {
         if (use_inter_ext_tx_for_txsize[s][i]) {
-          av1_cost_tokens_from_cdf(
-              mode_costs->inter_tx_type_costs[s][i], fc->inter_ext_tx_cdf[s][i],
-              av1_ext_tx_inv[av1_ext_tx_set_idx_to_type[1][s]]);
-        }
-      }
-    }
-    for (s = 1; s < EXT_TX_SETS_INTRA; ++s) {
-      if (use_intra_ext_tx_for_txsize[s][i]) {
-        for (j = 0; j < INTRA_MODES; ++j) {
-          av1_cost_tokens_from_cdf(
-              mode_costs->intra_tx_type_costs[s][i][j],
-              fc->intra_ext_tx_cdf[s][i][j],
-              av1_ext_tx_inv[av1_ext_tx_set_idx_to_type[0][s]]);
+          cost_tokens_cold(mode_costs->inter_tx_type_costs[s][i],
+                           fc->inter_ext_tx_cdf[s][i],
+                           av1_ext_tx_inv[av1_ext_tx_set_idx_to_type[1][s]]);
         }
       }
     }
   }
-  for (i = 0; i < DIRECTIONAL_MODES; ++i) {
-    av1_cost_tokens_from_cdf(mode_costs->angle_delta_cost[i],
-                             fc->angle_delta_cdf[i], NULL);
+
+  int p1_lo = 0x04060501, p1_hi = 0x07030200;
+  const __m256i perm1 = _mm256_cvtepu8_epi32(
+      _mm_insert_epi32(_mm_cvtsi32_si128(p1_lo), p1_hi, 1));
+#pragma GCC unroll 1
+  for (i = 0; i < 2; ++i) {
+#pragma GCC unroll 1
+    for (j = 0; j < INTRA_MODES; ++j) {
+      int *dst = mode_costs->intra_tx_type_costs[1][i][j];
+      const __m256i p = _mm256_permutevar8x32_epi32(
+          cost_1_cdf8_avx2(fc->intra_ext_tx_cdf[1][i][j]), perm1);
+      _mm_storeu_si128((__m128i *)&dst[0], _mm256_castsi256_si128(p));
+      _mm_storeu_si128((__m128i *)&dst[9], _mm256_extracti128_si256(p, 1));
+    }
   }
+  int p2_lo = 0x02040301, p2_hi = 0x07060500;
+  const __m256i perm2 = _mm256_cvtepu8_epi32(
+      _mm_insert_epi32(_mm_cvtsi32_si128(p2_lo), p2_hi, 1));
+#pragma GCC unroll 1
+  for (j = 0; j < INTRA_MODES; ++j) {
+    int *dst = mode_costs->intra_tx_type_costs[2][2][j];
+    const __m256i c = cost_1_cdf8_avx2(fc->intra_ext_tx_cdf[2][2][j]);
+    const __m256i p = _mm256_permutevar8x32_epi32(c, perm2);
+    _mm_storeu_si128((__m128i *)&dst[0], _mm256_castsi256_si128(p));
+    dst[9] = _mm_cvtsi128_si32(_mm256_castsi256_si128(c));
+  }
+
   if (av1_allow_intrabc(cm)) {
-    av1_cost_tokens_from_cdf(mode_costs->intrabc_cost, fc->intrabc_cdf, NULL);
+    cost_1_cdf2(mode_costs->intrabc_cost, fc->intrabc_cdf);
   }
 
   if (cm->seg.enabled) {
     for (i = 0; i < SPATIAL_PREDICTION_PROBS; ++i) {
-      av1_cost_tokens_from_cdf(mode_costs->spatial_pred_cost[i],
-                               fc->seg.spatial_pred_seg_cdf[i], NULL);
+      _mm256_storeu_si256((__m256i *)mode_costs->spatial_pred_cost[i],
+                          cost_1_cdf8_avx2(fc->seg.spatial_pred_seg_cdf[i]));
     }
   }
+}
+
+static __attribute__((noinline)) void cost_tokens_cold(int *costs,
+                                                       const aom_cdf_prob *cdf,
+                                                       const int *inv) {
+  av1_cost_tokens_from_cdf(costs, cdf, inv);
+}
+#pragma GCC pop_options
+#endif
+
+void av1_fill_mode_rates(AV1_COMMON *const cm, ModeCosts *mode_costs,
+                         FRAME_CONTEXT *fc) {
+  int i, j;
+  const int is_intra_only = frame_is_intra_only(cm);
+
+#if HAVE_AVX2 && defined(__GNUC__) && !defined(__clang__) && \
+    (defined(__x86_64__) || defined(__i386__))
+  if (aom_satd == aom_satd_avx2) {
+    fill_mode_rates_avx2(cm, mode_costs, fc, is_intra_only);
+  } else {
+#endif
+    for (i = 0; i < PARTITION_CONTEXTS; ++i)
+      av1_cost_tokens_from_cdf(mode_costs->partition_cost[i],
+                               fc->partition_cdf[i], NULL);
+
+    if (cm->current_frame.skip_mode_info.skip_mode_flag) {
+      for (i = 0; i < SKIP_MODE_CONTEXTS; ++i) {
+        av1_cost_tokens_from_cdf(mode_costs->skip_mode_cost[i],
+                                 fc->skip_mode_cdfs[i], NULL);
+      }
+    } else {
+      av1_zero(mode_costs->skip_mode_cost);
+    }
+
+    for (i = 0; i < SKIP_CONTEXTS; ++i) {
+      av1_cost_tokens_from_cdf(mode_costs->skip_txfm_cost[i],
+                               fc->skip_txfm_cdfs[i], NULL);
+    }
+
+    for (i = 0; i < KF_MODE_CONTEXTS; ++i)
+      for (j = 0; j < KF_MODE_CONTEXTS; ++j)
+        av1_cost_tokens_from_cdf(mode_costs->y_mode_costs[i][j],
+                                 fc->kf_y_cdf[i][j], NULL);
+
+    for (i = 0; i < BLOCK_SIZE_GROUPS; ++i)
+      av1_cost_tokens_from_cdf(mode_costs->mbmode_cost[i], fc->y_mode_cdf[i],
+                               NULL);
+    for (i = 0; i < CFL_ALLOWED_TYPES; ++i)
+      for (j = 0; j < INTRA_MODES; ++j)
+        av1_cost_tokens_from_cdf(mode_costs->intra_uv_mode_cost[i][j],
+                                 fc->uv_mode_cdf[i][j], NULL);
+
+    av1_cost_tokens_from_cdf(mode_costs->filter_intra_mode_cost,
+                             fc->filter_intra_mode_cdf, NULL);
+    for (i = 0; i < BLOCK_SIZES_ALL; ++i) {
+      if (av1_filter_intra_allowed_bsize(cm, i))
+        av1_cost_tokens_from_cdf(mode_costs->filter_intra_cost[i],
+                                 fc->filter_intra_cdfs[i], NULL);
+    }
+
+    if (!is_intra_only) {
+      for (i = 0; i < SWITCHABLE_FILTER_CONTEXTS; ++i)
+        av1_cost_tokens_from_cdf(mode_costs->switchable_interp_costs[i],
+                                 fc->switchable_interp_cdf[i], NULL);
+    }
+
+    if (cm->features.allow_screen_content_tools) {
+      for (i = 0; i < PALATTE_BSIZE_CTXS; ++i) {
+        av1_cost_tokens_from_cdf(mode_costs->palette_y_size_cost[i],
+                                 fc->palette_y_size_cdf[i], NULL);
+        av1_cost_tokens_from_cdf(mode_costs->palette_uv_size_cost[i],
+                                 fc->palette_uv_size_cdf[i], NULL);
+        for (j = 0; j < PALETTE_Y_MODE_CONTEXTS; ++j) {
+          av1_cost_tokens_from_cdf(mode_costs->palette_y_mode_cost[i][j],
+                                   fc->palette_y_mode_cdf[i][j], NULL);
+        }
+      }
+
+      for (i = 0; i < PALETTE_UV_MODE_CONTEXTS; ++i) {
+        av1_cost_tokens_from_cdf(mode_costs->palette_uv_mode_cost[i],
+                                 fc->palette_uv_mode_cdf[i], NULL);
+      }
+
+      for (i = 0; i < PALETTE_SIZES; ++i) {
+        for (j = 0; j < PALETTE_COLOR_INDEX_CONTEXTS; ++j) {
+          av1_cost_tokens_from_cdf(mode_costs->palette_y_color_cost[i][j],
+                                   fc->palette_y_color_index_cdf[i][j], NULL);
+          av1_cost_tokens_from_cdf(mode_costs->palette_uv_color_cost[i][j],
+                                   fc->palette_uv_color_index_cdf[i][j], NULL);
+        }
+      }
+    }
+
+    int sign_cost[CFL_JOINT_SIGNS];
+    av1_cost_tokens_from_cdf(sign_cost, fc->cfl_sign_cdf, NULL);
+    for (int joint_sign = 0; joint_sign < CFL_JOINT_SIGNS; joint_sign++) {
+      int *cost_u = mode_costs->cfl_cost[joint_sign][CFL_PRED_U];
+      int *cost_v = mode_costs->cfl_cost[joint_sign][CFL_PRED_V];
+      if (CFL_SIGN_U(joint_sign) == CFL_SIGN_ZERO) {
+        memset(cost_u, 0, CFL_ALPHABET_SIZE * sizeof(*cost_u));
+      } else {
+        const aom_cdf_prob *cdf_u =
+            fc->cfl_alpha_cdf[CFL_CONTEXT_U(joint_sign)];
+        av1_cost_tokens_from_cdf(cost_u, cdf_u, NULL);
+      }
+      if (CFL_SIGN_V(joint_sign) == CFL_SIGN_ZERO) {
+        memset(cost_v, 0, CFL_ALPHABET_SIZE * sizeof(*cost_v));
+      } else {
+        const aom_cdf_prob *cdf_v =
+            fc->cfl_alpha_cdf[CFL_CONTEXT_V(joint_sign)];
+        av1_cost_tokens_from_cdf(cost_v, cdf_v, NULL);
+      }
+      for (int u = 0; u < CFL_ALPHABET_SIZE; u++)
+        cost_u[u] += sign_cost[joint_sign];
+    }
+
+    for (i = 0; i < MAX_TX_CATS; ++i)
+      for (j = 0; j < TX_SIZE_CONTEXTS; ++j)
+        av1_cost_tokens_from_cdf(mode_costs->tx_size_cost[i][j],
+                                 fc->tx_size_cdf[i][j], NULL);
+
+    for (i = 0; i < TXFM_PARTITION_CONTEXTS; ++i) {
+      av1_cost_tokens_from_cdf(mode_costs->txfm_partition_cost[i],
+                               fc->txfm_partition_cdf[i], NULL);
+    }
+
+    for (i = TX_4X4; i < EXT_TX_SIZES; ++i) {
+      int s;
+      if (!is_intra_only || av1_allow_intrabc(cm)) {
+        for (s = 1; s < EXT_TX_SETS_INTER; ++s) {
+          if (use_inter_ext_tx_for_txsize[s][i]) {
+            av1_cost_tokens_from_cdf(
+                mode_costs->inter_tx_type_costs[s][i],
+                fc->inter_ext_tx_cdf[s][i],
+                av1_ext_tx_inv[av1_ext_tx_set_idx_to_type[1][s]]);
+          }
+        }
+      }
+      for (s = 1; s < EXT_TX_SETS_INTRA; ++s) {
+        if (use_intra_ext_tx_for_txsize[s][i]) {
+          for (j = 0; j < INTRA_MODES; ++j) {
+            av1_cost_tokens_from_cdf(
+                mode_costs->intra_tx_type_costs[s][i][j],
+                fc->intra_ext_tx_cdf[s][i][j],
+                av1_ext_tx_inv[av1_ext_tx_set_idx_to_type[0][s]]);
+          }
+        }
+      }
+    }
+    for (i = 0; i < DIRECTIONAL_MODES; ++i) {
+      av1_cost_tokens_from_cdf(mode_costs->angle_delta_cost[i],
+                               fc->angle_delta_cdf[i], NULL);
+    }
+    if (av1_allow_intrabc(cm)) {
+      av1_cost_tokens_from_cdf(mode_costs->intrabc_cost, fc->intrabc_cdf, NULL);
+    }
+
+    if (cm->seg.enabled) {
+      for (i = 0; i < SPATIAL_PREDICTION_PROBS; ++i) {
+        av1_cost_tokens_from_cdf(mode_costs->spatial_pred_cost[i],
+                                 fc->seg.spatial_pred_seg_cdf[i], NULL);
+      }
+    }
+#if HAVE_AVX2 && defined(__GNUC__) && !defined(__clang__) && \
+    (defined(__x86_64__) || defined(__i386__))
+  }
+#endif
 
   if (!is_intra_only) {
+#if HAVE_AVX2 && defined(__GNUC__) && !defined(__clang__) && \
+    (defined(__x86_64__) || defined(__i386__))
+#pragma GCC unroll 1
+    for (i = 0; i < SEG_TEMPORAL_PRED_CTXS; ++i)
+      cost_tokens_cold(mode_costs->tmp_pred_cost[i], fc->seg.pred_cdf[i], NULL);
+#pragma GCC unroll 1
+    for (i = 0; i < COMP_INTER_CONTEXTS; ++i)
+      cost_tokens_cold(mode_costs->comp_inter_cost[i], fc->comp_inter_cdf[i],
+                       NULL);
+#pragma GCC unroll 1
+    for (i = 0; i < REF_CONTEXTS; ++i) {
+#pragma GCC unroll 1
+      for (j = 0; j < SINGLE_REFS - 1; ++j)
+        cost_tokens_cold(mode_costs->single_ref_cost[i][j],
+                         fc->single_ref_cdf[i][j], NULL);
+#pragma GCC unroll 1
+      for (j = 0; j < FWD_REFS - 1; ++j)
+        cost_tokens_cold(mode_costs->comp_ref_cost[i][j],
+                         fc->comp_ref_cdf[i][j], NULL);
+#pragma GCC unroll 1
+      for (j = 0; j < BWD_REFS - 1; ++j)
+        cost_tokens_cold(mode_costs->comp_bwdref_cost[i][j],
+                         fc->comp_bwdref_cdf[i][j], NULL);
+    }
+#pragma GCC unroll 1
+    for (i = 0; i < COMP_REF_TYPE_CONTEXTS; ++i)
+      cost_tokens_cold(mode_costs->comp_ref_type_cost[i],
+                       fc->comp_ref_type_cdf[i], NULL);
+#pragma GCC unroll 1
+    for (i = 0; i < UNI_COMP_REF_CONTEXTS; ++i)
+#pragma GCC unroll 1
+      for (j = 0; j < UNIDIR_COMP_REFS - 1; ++j)
+        cost_tokens_cold(mode_costs->uni_comp_ref_cost[i][j],
+                         fc->uni_comp_ref_cdf[i][j], NULL);
+#pragma GCC unroll 1
+    for (i = 0; i < INTRA_INTER_CONTEXTS; ++i)
+      cost_tokens_cold(mode_costs->intra_inter_cost[i], fc->intra_inter_cdf[i],
+                       NULL);
+#pragma GCC unroll 1
+    for (i = 0; i < NEWMV_MODE_CONTEXTS; ++i) {
+      cost_tokens_cold(mode_costs->newmv_mode_cost[i], fc->newmv_cdf[i], NULL);
+      cost_tokens_cold(mode_costs->refmv_mode_cost[i], fc->refmv_cdf[i], NULL);
+      cost_tokens_cold(mode_costs->comp_idx_cost[i], fc->compound_index_cdf[i],
+                       NULL);
+      cost_tokens_cold(mode_costs->comp_group_idx_cost[i],
+                       fc->comp_group_idx_cdf[i], NULL);
+    }
+#pragma GCC unroll 1
+    for (i = 0; i < GLOBALMV_MODE_CONTEXTS; ++i)
+      cost_tokens_cold(mode_costs->zeromv_mode_cost[i], fc->zeromv_cdf[i],
+                       NULL);
+#pragma GCC unroll 1
+    for (i = 0; i < DRL_MODE_CONTEXTS; ++i)
+      cost_tokens_cold(mode_costs->drl_mode_cost0[i], fc->drl_cdf[i], NULL);
+#pragma GCC unroll 1
+    for (i = 0; i < INTER_MODE_CONTEXTS; ++i)
+      cost_tokens_cold(mode_costs->inter_compound_mode_cost[i],
+                       fc->inter_compound_mode_cdf[i], NULL);
+#pragma GCC unroll 1
+    for (i = 0; i < BLOCK_SIZES_ALL; ++i) {
+      cost_tokens_cold(mode_costs->compound_type_cost[i],
+                       fc->compound_type_cdf[i], NULL);
+      cost_tokens_cold(mode_costs->wedge_interintra_cost[i],
+                       fc->wedge_interintra_cdf[i], NULL);
+      if (av1_is_wedge_used(i))
+        cost_tokens_cold(mode_costs->wedge_idx_cost[i], fc->wedge_idx_cdf[i],
+                         NULL);
+    }
+#pragma GCC unroll 1
+    for (i = 0; i < BLOCK_SIZE_GROUPS; ++i) {
+      cost_tokens_cold(mode_costs->interintra_cost[i], fc->interintra_cdf[i],
+                       NULL);
+      cost_tokens_cold(mode_costs->interintra_mode_cost[i],
+                       fc->interintra_mode_cdf[i], NULL);
+    }
+#pragma GCC unroll 1
+    for (i = BLOCK_8X8; i < BLOCK_SIZES_ALL; i++) {
+      cost_tokens_cold(mode_costs->motion_mode_cost[i], fc->motion_mode_cdf[i],
+                       NULL);
+      cost_tokens_cold(mode_costs->motion_mode_cost1[i], fc->obmc_cdf[i], NULL);
+    }
+#else
     for (i = 0; i < SEG_TEMPORAL_PRED_CTXS; ++i) {
       av1_cost_tokens_from_cdf(mode_costs->tmp_pred_cost[i],
                                fc->seg.pred_cdf[i], NULL);
@@ -330,6 +758,7 @@ void av1_fill_mode_rates(AV1_COMMON *const cm, ModeCosts *mode_costs,
       av1_cost_tokens_from_cdf(mode_costs->comp_group_idx_cost[i],
                                fc->comp_group_idx_cdf[i], NULL);
     }
+#endif
   }
 }
 
@@ -610,9 +1039,136 @@ static void set_block_thresholds(const AV1_COMMON *cm, RD_OPT *rd,
   }
 }
 
+#if HAVE_AVX2 && defined(__GNUC__) && !defined(__clang__) && \
+    (defined(__x86_64__) || defined(__i386__))
+#pragma GCC push_options
+#pragma GCC target("avx2")
+
+static AOM_FORCE_INLINE void fill_lps_cost_sse2(int *lps, __m128i v) {
+  const __m128i v3 = _mm_shuffle_epi32(v, 0xff);
+  _mm_storeu_si128((__m128i *)&lps[0], v);
+  v = _mm_add_epi32(v, v3);
+  _mm_storeu_si128((__m128i *)&lps[3], v);
+  v = _mm_add_epi32(v, v3);
+  _mm_storeu_si128((__m128i *)&lps[6], v);
+  v = _mm_add_epi32(v, v3);
+  _mm_storeu_si128((__m128i *)&lps[9], v);
+}
+
+static void fill_coeff_costs_avx2(CoeffCosts *coeff_costs, FRAME_CONTEXT *fc,
+                                  const int nplanes) {
+  for (int plane = 0; plane < nplanes; ++plane) {
+    for (int ctx = 0; ctx < 2; ++ctx) {
+      _mm256_storeu_si256(
+          (__m256i *)coeff_costs->eob_costs[0][plane].eob_cost[ctx],
+          cost_1_cdf8_avx2(fc->eob_flag_cdf16[plane][ctx]));
+      _mm256_storeu_si256(
+          (__m256i *)coeff_costs->eob_costs[1][plane].eob_cost[ctx],
+          cost_1_cdf8_avx2(fc->eob_flag_cdf32[plane][ctx]));
+      _mm256_storeu_si256(
+          (__m256i *)coeff_costs->eob_costs[2][plane].eob_cost[ctx],
+          cost_1_cdf8_avx2(fc->eob_flag_cdf64[plane][ctx]));
+      _mm256_storeu_si256(
+          (__m256i *)coeff_costs->eob_costs[3][plane].eob_cost[ctx],
+          cost_1_cdf8_avx2(fc->eob_flag_cdf128[plane][ctx]));
+      cost_cdf_9_to_16_avx2(coeff_costs->eob_costs[4][plane].eob_cost[ctx],
+                            fc->eob_flag_cdf256[plane][ctx], 9);
+      cost_cdf_9_to_16_avx2(coeff_costs->eob_costs[5][plane].eob_cost[ctx],
+                            fc->eob_flag_cdf512[plane][ctx], 10);
+      cost_cdf_9_to_16_avx2(coeff_costs->eob_costs[6][plane].eob_cost[ctx],
+                            fc->eob_flag_cdf1024[plane][ctx], 11);
+    }
+  }
+  const __m256i base_lit_offset =
+      _mm256_setr_epi32(0, 0, 0, 0, 0, av1_cost_literal(1), av1_cost_literal(1),
+                        av1_cost_literal(1));
+  for (int tx_size = 0; tx_size < TX_SIZES; ++tx_size) {
+    for (int plane = 0; plane < nplanes; ++plane) {
+      LV_MAP_COEFF_COST *pcost = &coeff_costs->coeff_costs[tx_size][plane];
+
+      if (plane == 0) {
+        cost_4_cdf2_avx2(&pcost->txb_skip_cost[0],
+                         &fc->txb_skip_cdf[tx_size][0]);
+        cost_4_cdf2_avx2(&pcost->txb_skip_cost[4],
+                         &fc->txb_skip_cdf[tx_size][4]);
+        cost_4_cdf2_avx2(&pcost->txb_skip_cost[8],
+                         &fc->txb_skip_cdf[tx_size][8]);
+        cost_1_cdf2(pcost->txb_skip_cost[12], fc->txb_skip_cdf[tx_size][12]);
+      } else {
+        memcpy(pcost->txb_skip_cost,
+               coeff_costs->coeff_costs[tx_size][0].txb_skip_cost,
+               sizeof(pcost->txb_skip_cost));
+      }
+
+      cost_2_cdf3_avx2(&pcost->base_eob_cost[0],
+                       &fc->coeff_base_eob_cdf[tx_size][plane][0]);
+      cost_2_cdf3_avx2(&pcost->base_eob_cost[2],
+                       &fc->coeff_base_eob_cdf[tx_size][plane][2]);
+
+      for (int ctx = 0; ctx < SIG_COEF_CONTEXTS; ctx += 2) {
+        const __m256i costs =
+            cost_2_cdf4_avx2(fc->coeff_base_cdf[tx_size][plane][ctx],
+                             fc->coeff_base_cdf[tx_size][plane][ctx + 1]);
+        const __m256i c0 = _mm256_add_epi32(
+            _mm256_permute2x128_si256(costs, costs, 0x00), base_lit_offset);
+        const __m256i c1 = _mm256_add_epi32(
+            _mm256_permute2x128_si256(costs, costs, 0x11), base_lit_offset);
+        _mm256_storeu_si256((__m256i *)pcost->base_cost[ctx], c0);
+        _mm256_storeu_si256((__m256i *)pcost->base_cost[ctx + 1], c1);
+      }
+
+      cost_4_cdf2_avx2(&pcost->eob_extra_cost[0],
+                       &fc->eob_extra_cdf[tx_size][plane][0]);
+      cost_4_cdf2_avx2(&pcost->eob_extra_cost[4],
+                       &fc->eob_extra_cdf[tx_size][plane][4]);
+      cost_1_cdf2(pcost->eob_extra_cost[8],
+                  fc->eob_extra_cdf[tx_size][plane][8]);
+
+      if (tx_size == 0) {
+        cost_1_cdf2(pcost->dc_sign_cost[0], fc->dc_sign_cdf[plane][0]);
+        cost_1_cdf2(pcost->dc_sign_cost[1], fc->dc_sign_cdf[plane][1]);
+        cost_1_cdf2(pcost->dc_sign_cost[2], fc->dc_sign_cdf[plane][2]);
+      } else {
+        memcpy(pcost->dc_sign_cost,
+               coeff_costs->coeff_costs[0][plane].dc_sign_cost,
+               sizeof(pcost->dc_sign_cost));
+      }
+
+      if (tx_size <= TX_32X32) {
+        for (int ctx = 0; ctx < LEVEL_CONTEXTS - 1; ctx += 2) {
+          const __m256i br =
+              cost_2_cdf4_avx2(fc->coeff_br_cdf[tx_size][plane][ctx],
+                               fc->coeff_br_cdf[tx_size][plane][ctx + 1]);
+          fill_lps_cost_sse2(pcost->lps_cost[ctx], _mm256_castsi256_si128(br));
+          fill_lps_cost_sse2(pcost->lps_cost[ctx + 1],
+                             _mm256_extracti128_si256(br, 1));
+        }
+        const __m256i br_last = cost_2_cdf4_avx2(
+            fc->coeff_br_cdf[tx_size][plane][LEVEL_CONTEXTS - 1],
+            fc->coeff_br_cdf[tx_size][plane][LEVEL_CONTEXTS - 1]);
+        fill_lps_cost_sse2(pcost->lps_cost[LEVEL_CONTEXTS - 1],
+                           _mm256_castsi256_si128(br_last));
+      } else {
+        memcpy(pcost->lps_cost,
+               coeff_costs->coeff_costs[TX_32X32][plane].lps_cost,
+               sizeof(pcost->lps_cost));
+      }
+    }
+  }
+}
+#pragma GCC pop_options
+#endif
+
 void av1_fill_coeff_costs(CoeffCosts *coeff_costs, FRAME_CONTEXT *fc,
                           const int num_planes) {
   const int nplanes = AOMMIN(num_planes, PLANE_TYPES);
+#if HAVE_AVX2 && defined(__GNUC__) && !defined(__clang__) && \
+    (defined(__x86_64__) || defined(__i386__))
+  if (aom_satd == aom_satd_avx2) {
+    fill_coeff_costs_avx2(coeff_costs, fc, nplanes);
+    return;
+  }
+#endif
   for (int eob_multi_size = 0; eob_multi_size < 7; ++eob_multi_size) {
     for (int plane = 0; plane < nplanes; ++plane) {
       LV_MAP_EOB_COST *pcost = &coeff_costs->eob_costs[eob_multi_size][plane];
