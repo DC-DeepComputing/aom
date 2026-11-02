@@ -104,13 +104,17 @@ static inline void fdct8x8_new_sse2(const __m128i *input, __m128i *output,
   x2[1] = _mm_adds_epi16(x1[1], x1[2]);
   x2[2] = _mm_subs_epi16(x1[1], x1[2]);
   x2[4] = x1[4];
+#ifdef __AVX2__
   btf_16_sse2(cospi_m32_p32, cospi_p32_p32, x1[5], x1[6], x2[5], x2[6]);
+#else
+  btf_16_lat9_sse2(cospi_m32_p32, cospi_p32_p32, x1[5], x1[6], x2[5], x2[6]);
+#endif
   x2[7] = x1[7];
 
   // stage 3
   __m128i x3[8];
-  btf_16_sse2(cospi_p32_p32, cospi_p32_m32, x2[0], x2[1], x3[0], x3[1]);
-  btf_16_sse2(cospi_p48_p16, cospi_m16_p48, x2[2], x2[3], x3[2], x3[3]);
+  btf_16_dual_avx2(cospi_p32_p32, cospi_p32_m32, cospi_p48_p16, cospi_m16_p48,
+                   x2[0], x2[1], x2[2], x2[3], x3[0], x3[1], x3[2], x3[3]);
   x3[4] = _mm_adds_epi16(x2[4], x2[5]);
   x3[5] = _mm_subs_epi16(x2[4], x2[5]);
   x3[6] = _mm_subs_epi16(x2[7], x2[6]);
@@ -121,15 +125,18 @@ static inline void fdct8x8_new_sse2(const __m128i *input, __m128i *output,
   output[4] = x3[1];
   output[2] = x3[2];
   output[6] = x3[3];
-  btf_16_sse2(cospi_p56_p08, cospi_m08_p56, x3[4], x3[7], output[1], output[7]);
-  btf_16_sse2(cospi_p24_p40, cospi_m40_p24, x3[5], x3[6], output[5], output[3]);
+  btf_16_dual_avx2(cospi_p56_p08, cospi_m08_p56, cospi_p24_p40, cospi_m40_p24,
+                   x3[4], x3[7], x3[5], x3[6], output[1], output[7], output[5],
+                   output[3]);
 }
 
 static inline void fadst8x8_new_sse2(const __m128i *input, __m128i *output,
                                      int8_t cos_bit) {
   const int32_t *cospi = cospi_arr(cos_bit);
   const __m128i __zero = _mm_setzero_si128();
+#ifndef __AVX2__
   const __m128i __rounding = _mm_set1_epi32(1 << (cos_bit - 1));
+#endif
 
   const __m128i cospi_p32_p32 = pair_set_epi16(cospi[32], cospi[32]);
   const __m128i cospi_p32_m32 = pair_set_epi16(cospi[32], -cospi[32]);
@@ -160,10 +167,10 @@ static inline void fadst8x8_new_sse2(const __m128i *input, __m128i *output,
   __m128i x2[8];
   x2[0] = x1[0];
   x2[1] = x1[1];
-  btf_16_sse2(cospi_p32_p32, cospi_p32_m32, x1[2], x1[3], x2[2], x2[3]);
   x2[4] = x1[4];
   x2[5] = x1[5];
-  btf_16_sse2(cospi_p32_p32, cospi_p32_m32, x1[6], x1[7], x2[6], x2[7]);
+  btf_16_dual_avx2(cospi_p32_p32, cospi_p32_m32, cospi_p32_p32, cospi_p32_m32,
+                   x1[2], x1[3], x1[6], x1[7], x2[2], x2[3], x2[6], x2[7]);
 
   // stage 3
   __m128i x3[8];
@@ -182,8 +189,8 @@ static inline void fadst8x8_new_sse2(const __m128i *input, __m128i *output,
   x4[1] = x3[1];
   x4[2] = x3[2];
   x4[3] = x3[3];
-  btf_16_sse2(cospi_p16_p48, cospi_p48_m16, x3[4], x3[5], x4[4], x4[5]);
-  btf_16_sse2(cospi_m48_p16, cospi_p16_p48, x3[6], x3[7], x4[6], x4[7]);
+  btf_16_dual_avx2(cospi_p16_p48, cospi_p48_m16, cospi_m48_p16, cospi_p16_p48,
+                   x3[4], x3[5], x3[6], x3[7], x4[4], x4[5], x4[6], x4[7]);
 
   // stage 5, 6 and 7
   output[7] = _mm_adds_epi16(x4[0], x4[4]);
@@ -195,14 +202,12 @@ static inline void fadst8x8_new_sse2(const __m128i *input, __m128i *output,
   output[2] = _mm_adds_epi16(x4[3], x4[7]);
   output[6] = _mm_subs_epi16(x4[3], x4[7]);
 
-  btf_16_sse2(cospi_p04_p60, cospi_p60_m04, output[7], output[0], output[7],
-              output[0]);
-  btf_16_sse2(cospi_p20_p44, cospi_p44_m20, output[5], output[2], output[5],
-              output[2]);
-  btf_16_sse2(cospi_p36_p28, cospi_p28_m36, output[3], output[4], output[3],
-              output[4]);
-  btf_16_sse2(cospi_p52_p12, cospi_p12_m52, output[1], output[6], output[1],
-              output[6]);
+  btf_16_dual_avx2(cospi_p04_p60, cospi_p60_m04, cospi_p20_p44, cospi_p44_m20,
+                   output[7], output[0], output[5], output[2], output[7],
+                   output[0], output[5], output[2]);
+  btf_16_dual_avx2(cospi_p36_p28, cospi_p28_m36, cospi_p52_p12, cospi_p12_m52,
+                   output[3], output[4], output[1], output[6], output[3],
+                   output[4], output[1], output[6]);
 }
 
 static inline void fdct8x8_cb13_sse2(const __m128i *input, __m128i *output,
