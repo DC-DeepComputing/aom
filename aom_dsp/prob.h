@@ -22,6 +22,11 @@
 #include "aom_ports/bitops.h"
 #include "aom_ports/mem.h"
 
+#if defined(__SSE2__)
+#include <emmintrin.h>
+#include <string.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -126,15 +131,75 @@ static inline void update_cdf(aom_cdf_prob *cdf, int8_t val, int nsymbs) {
   //  4 + (count >> 4) + (nsymbs > 3).
   const int rate = 4 + (count >> 4) + (nsymbs > 3);
 
+#if defined(__GNUC__) || defined(__clang__)
+  if (__builtin_constant_p(nsymbs)) {
+    if (nsymbs == 2) {
+      const int mask = val - 1;
+      const int c = cdf[0];
+      cdf[0] = (aom_cdf_prob)(c - mask + (((mask | CDF_PROB_TOP) - c) >> rate));
+      cdf[2] = (aom_cdf_prob)(count + (count < 32));
+      return;
+    }
+#if defined(__SSE2__)
+    if (nsymbs == 3) {
+      int32_t cdf32;
+      memcpy(&cdf32, cdf, sizeof(cdf32));
+      __m128i cdf_vec = _mm_cvtsi32_si128(cdf32);
+      const __m128i index = _mm_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8);
+      const __m128i sym_vec = _mm_set1_epi16(val);
+      const __m128i mask = _mm_cmpgt_epi16(index, sym_vec);
+      const __m128i a =
+          _mm_or_si128(mask, _mm_set1_epi16((int16_t)CDF_PROB_TOP));
+      const __m128i diff = _mm_sub_epi16(a, cdf_vec);
+      const __m128i cdf_offset = _mm_sub_epi16(cdf_vec, mask);
+      const __m128i delta = _mm_sra_epi16(diff, _mm_cvtsi32_si128(rate));
+      cdf_vec = _mm_add_epi16(cdf_offset, delta);
+      cdf32 = _mm_cvtsi128_si32(cdf_vec);
+      memcpy(cdf, &cdf32, sizeof(cdf32));
+      cdf[3] = (aom_cdf_prob)(count + (count < 32));
+      return;
+    }
+    if (nsymbs == 4 || nsymbs == 5) {
+      __m128i cdf_vec = _mm_loadl_epi64((const __m128i *)cdf);
+      const __m128i index = _mm_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8);
+      const __m128i sym_vec = _mm_set1_epi16(val);
+      const __m128i mask = _mm_cmpgt_epi16(index, sym_vec);
+      const __m128i a =
+          _mm_or_si128(mask, _mm_set1_epi16((int16_t)CDF_PROB_TOP));
+      const __m128i diff = _mm_sub_epi16(a, cdf_vec);
+      const __m128i cdf_offset = _mm_sub_epi16(cdf_vec, mask);
+      const __m128i delta = _mm_sra_epi16(diff, _mm_cvtsi32_si128(rate));
+      cdf_vec = _mm_add_epi16(cdf_offset, delta);
+      _mm_storel_epi64((__m128i *)cdf, cdf_vec);
+      cdf[nsymbs] = (aom_cdf_prob)(count + (count < 32));
+      return;
+    }
+    if (nsymbs >= 7 && nsymbs <= 9) {
+      __m128i cdf_vec = _mm_loadu_si128((const __m128i *)cdf);
+      const __m128i index = _mm_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8);
+      const __m128i sym_vec = _mm_set1_epi16(val);
+      const __m128i mask = _mm_cmpgt_epi16(index, sym_vec);
+      const __m128i a =
+          _mm_or_si128(mask, _mm_set1_epi16((int16_t)CDF_PROB_TOP));
+      const __m128i diff = _mm_sub_epi16(a, cdf_vec);
+      const __m128i cdf_offset = _mm_sub_epi16(cdf_vec, mask);
+      const __m128i delta = _mm_sra_epi16(diff, _mm_cvtsi32_si128(rate));
+      cdf_vec = _mm_add_epi16(cdf_offset, delta);
+      _mm_storeu_si128((__m128i *)cdf, cdf_vec);
+      cdf[nsymbs] = (aom_cdf_prob)(count + (count < 32));
+      return;
+    }
+#endif
+  }
+#endif
+
   int i = 0;
   do {
-    if (i < val) {
-      cdf[i] += (CDF_PROB_TOP - cdf[i]) >> rate;
-    } else {
-      cdf[i] -= cdf[i] >> rate;
-    }
+    const int c = cdf[i];
+    const int mask = (val - 1 - i) >> 31;
+    cdf[i] = (aom_cdf_prob)(c - mask + (((mask | CDF_PROB_TOP) - c) >> rate));
   } while (++i < nsymbs - 1);
-  cdf[nsymbs] += (count < 32);
+  cdf[nsymbs] = (aom_cdf_prob)(count + (count < 32));
 }
 
 #ifdef __cplusplus

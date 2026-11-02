@@ -59,10 +59,78 @@ void od_ec_enc_init(od_ec_enc *enc, uint32_t size) OD_ARG_NONNULL(1);
 void od_ec_enc_reset(od_ec_enc *enc) OD_ARG_NONNULL(1);
 void od_ec_enc_clear(od_ec_enc *enc) OD_ARG_NONNULL(1);
 
+void od_ec_enc_normalize_flush(od_ec_enc *enc, od_ec_enc_window low,
+                               unsigned rng, int d, int c, int s)
+    OD_ARG_NONNULL(1);
+
+#if OD_MEASURE_EC_OVERHEAD
 void od_ec_encode_bool_q15(od_ec_enc *enc, int val, unsigned f_q15)
     OD_ARG_NONNULL(1);
 void od_ec_encode_cdf_q15(od_ec_enc *enc, int s, const uint16_t *cdf, int nsyms)
     OD_ARG_NONNULL(1) OD_ARG_NONNULL(3);
+#else
+static inline void od_ec_enc_normalize(od_ec_enc *enc, od_ec_enc_window low,
+                                       unsigned rng) {
+  const int c = enc->cnt;
+  assert(rng <= 65535U);
+  const int d = 15 ^ get_msb(rng);
+  const int s = c + d;
+  if (UNLIKELY(s >= 40)) {
+    od_ec_enc_normalize_flush(enc, low, rng, d, c, s);
+    return;
+  }
+  enc->low = low << d;
+  enc->rng = rng << d;
+  enc->cnt = s;
+}
+
+static inline void od_ec_encode_bool_q15(od_ec_enc *enc, int val,
+                                         unsigned f_q15) {
+  assert(0 < f_q15);
+  assert(f_q15 < 32768U);
+  od_ec_enc_window l = enc->low;
+  unsigned r = enc->rng;
+  assert(32768U <= r);
+  unsigned v =
+      ((r >> 8) * (uint32_t)(f_q15 >> EC_PROB_SHIFT) >> (7 - EC_PROB_SHIFT)) +
+      EC_MIN_PROB;
+  if (val) l += r - v;
+  r = val ? v : r - v;
+  od_ec_enc_normalize(enc, l, r);
+}
+
+static inline void od_ec_encode_cdf_q15(od_ec_enc *enc, int s,
+                                        const uint16_t *icdf, int nsyms) {
+  assert(s >= 0);
+  assert(s < nsyms);
+  assert(icdf[nsyms - 1] == OD_ICDF(CDF_PROB_TOP));
+  od_ec_enc_window l = enc->low;
+  unsigned r = enc->rng;
+  assert(32768U <= r);
+  assert(7 - EC_PROB_SHIFT >= 0);
+  const int N = nsyms - 1;
+  const unsigned r_shifted = r >> 8;
+  const unsigned fh = icdf[s];
+  const unsigned min_prob_v = (unsigned)(EC_MIN_PROB * (N - s));
+  const unsigned v =
+      (r_shifted * (uint32_t)(fh >> EC_PROB_SHIFT) >> (7 - EC_PROB_SHIFT)) +
+      min_prob_v;
+  if (s > 0) {
+    const unsigned fl = icdf[s - 1];
+    assert(fh <= fl);
+    assert(fl <= 32768U);
+    if (LIKELY(fl < CDF_PROB_TOP)) {
+      const unsigned u =
+          (r_shifted * (uint32_t)(fl >> EC_PROB_SHIFT) >> (7 - EC_PROB_SHIFT)) +
+          min_prob_v + EC_MIN_PROB;
+      l += r - u;
+      r = u;
+    }
+  }
+  r -= v;
+  od_ec_enc_normalize(enc, l, r);
+}
+#endif  // OD_MEASURE_EC_OVERHEAD
 
 void od_ec_enc_bits(od_ec_enc *enc, uint32_t fl, unsigned ftb)
     OD_ARG_NONNULL(1);
