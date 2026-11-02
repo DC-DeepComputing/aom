@@ -602,6 +602,8 @@ static inline void free_thread_data(AV1_PRIMARY *ppi) {
     aom_free(td->dv_costs_alloc);
     td->dv_costs_alloc = NULL;
     aom_free(td->counts);
+    av1_free_pc_tree_recursive(td->pc_root, num_planes, 0, 0, SEARCH_PARTITION);
+    td->pc_root = NULL;
     av1_free_pmc(td->firstpass_ctx, num_planes);
     td->firstpass_ctx = NULL;
     av1_free_shared_coeff_buffer(&td->shared_coeff_buf);
@@ -627,8 +629,6 @@ static inline void free_thread_data(AV1_PRIMARY *ppi) {
     aom_free(td->mb.rdcost);
     td->mb.rdcost = NULL;
 #endif
-    av1_free_pc_tree_recursive(td->pc_root, num_planes, 0, 0, SEARCH_PARTITION);
-    td->pc_root = NULL;
     av1_dealloc_mb_wiener_var_pred_buf(td);
     aom_free(td);
     thread_data->td = NULL;
