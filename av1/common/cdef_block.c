@@ -424,3 +424,27 @@ void av1_cdef_filter_fb(uint8_t *dst8, uint16_t *dst16, int dstride,
     }
   }
 }
+
+#if HAVE_AVX2
+void av1_cdef_mse_calc_block_lvl4_luma_avx2(
+    const uint16_t *in, const uint8_t *ref_buffer, int ref_stride, int row,
+    int col, const cdef_list *dlist, int cdef_count,
+    int dir[CDEF_NBLOCKS][CDEF_NBLOCKS], int var[CDEF_NBLOCKS][CDEF_NBLOCKS],
+    int damping, int pli, int xdec, uint64_t mse[4]);
+
+void av1_cdef_mse_calc_block_lvl4_luma(
+    const uint16_t *in, const uint8_t *ref_buffer, int ref_stride, int row,
+    int col, const cdef_list *dlist, int cdef_count,
+    int dir[CDEF_NBLOCKS][CDEF_NBLOCKS], int var[CDEF_NBLOCKS][CDEF_NBLOCKS],
+    int damping, int pli, int xdec, uint64_t mse[4]);
+
+void av1_cdef_mse_calc_block_lvl4_luma(
+    const uint16_t *in, const uint8_t *ref_buffer, int ref_stride, int row,
+    int col, const cdef_list *dlist, int cdef_count,
+    int dir[CDEF_NBLOCKS][CDEF_NBLOCKS], int var[CDEF_NBLOCKS][CDEF_NBLOCKS],
+    int damping, int pli, int xdec, uint64_t mse[4]) {
+  av1_cdef_mse_calc_block_lvl4_luma_avx2(in, ref_buffer, ref_stride, row, col,
+                                         dlist, cdef_count, dir, var, damping,
+                                         pli, xdec, mse);
+}
+#endif
