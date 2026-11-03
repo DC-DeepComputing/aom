@@ -1,0 +1,40 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "0501c39e_68dc3717",
+        "filename": "av1/encoder/x86/error_intrin_avx2.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 217,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-03T19:24:04Z",
+      "side": 1,
+      "message": "Nit: Consider adding `assert(block_size % 8 \u003d\u003d 0);` (and `assert(bd \u003d\u003d 8 || bd \u003d\u003d 10 || bd \u003d\u003d 12);`) at the entry of `av1_block_error_qm_avx2`, matching `av1_block_error_lp_avx2` above, since the loop processes 8 coefficients per iteration without a scalar tail.",
+      "isAi": true,
+      "revId": "3caa2932820e2670797bf00f9b840449e6304cb8",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "c5cc3f51_d8c80df7",
+        "filename": "test/error_block_test.cc",
+        "patchSetId": 10
+      },
+      "lineNbr": 80,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-03T19:24:04Z",
+      "side": 1,
+      "message": "Nit: In `OperationCheck`, `dqcoeff[j]` is dense random so `_mm256_testz_si256(dqcoeff_reg, dqcoeff_reg)` is only reached in `ExtremeValues` (where all 8 `coeff` lanes share the same constant `±max_val`), and `BlockErrorQmWrapper` uses an identity `scan[i] \u003d i`. Consider zeroing `dqcoeff` on some 8-element chunks in `OperationCheck` and permuting `scan` in `BlockErrorQmWrapper` to better exercise the fast paths and gathered indexing.",
+      "isAi": true,
+      "revId": "3caa2932820e2670797bf00f9b840449e6304cb8",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
