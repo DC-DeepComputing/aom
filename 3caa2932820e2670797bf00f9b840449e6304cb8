@@ -19,6 +19,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "e7b3d03c_2822214c",
+        "filename": "av1/encoder/x86/error_intrin_avx2.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 217,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-11-03T21:04:47Z",
+      "side": 1,
+      "message": "Done in PS 11.",
+      "parentUuid": "0501c39e_68dc3717",
+      "revId": "3caa2932820e2670797bf00f9b840449e6304cb8",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "c5cc3f51_d8c80df7",
@@ -33,6 +51,24 @@
       "side": 1,
       "message": "Nit: In `OperationCheck`, `dqcoeff[j]` is dense random so `_mm256_testz_si256(dqcoeff_reg, dqcoeff_reg)` is only reached in `ExtremeValues` (where all 8 `coeff` lanes share the same constant `±max_val`), and `BlockErrorQmWrapper` uses an identity `scan[i] \u003d i`. Consider zeroing `dqcoeff` on some 8-element chunks in `OperationCheck` and permuting `scan` in `BlockErrorQmWrapper` to better exercise the fast paths and gathered indexing.",
       "isAi": true,
+      "revId": "3caa2932820e2670797bf00f9b840449e6304cb8",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "1d9b5a45_f264ae62",
+        "filename": "test/error_block_test.cc",
+        "patchSetId": 10
+      },
+      "lineNbr": 80,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-11-03T21:04:47Z",
+      "side": 1,
+      "message": "Done in PS 11 (permuted scan within each 16-element chunk in BlockErrorQmWrapper and zeroed 8-element chunks of dqcoeff and coeff/dqcoeff in OperationCheck).",
+      "parentUuid": "c5cc3f51_d8c80df7",
       "revId": "3caa2932820e2670797bf00f9b840449e6304cb8",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
