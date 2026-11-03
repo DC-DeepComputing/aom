@@ -23,6 +23,30 @@
       "isAi": true,
       "revId": "6a5457f9a8230308253c8e23c31270681777f653",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "872a1b46_2daee84f",
+        "filename": "test/quantize_func_test.cc",
+        "patchSetId": 12
+      },
+      "lineNbr": 708,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-11-03T21:05:54Z",
+      "side": 1,
+      "message": "Done in follow-up CL 219601 (added TX_4X4 and TX_8X8 test instantiations for both quan_b_qm_wrapper and quan_fp_qm_wrapper).",
+      "parentUuid": "3e574c20_aeaa16cf",
+      "range": {
+        "startLine": 698,
+        "startChar": 0,
+        "endLine": 708,
+        "endChar": 9999
+      },
+      "revId": "6a5457f9a8230308253c8e23c31270681777f653",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
