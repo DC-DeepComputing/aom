@@ -50,10 +50,176 @@
 #include "av1/encoder/pickrst.h"
 #include "av1/encoder/segmentation.h"
 #include "av1/encoder/tokenize.h"
+#if defined(__SSE2__)
+#include <emmintrin.h>
+#endif
 
 #define ENC_MISMATCH_DEBUG 0
 #define SETUP_TIME_OH_CONST 5     // Setup time overhead constant per worker
 #define JOB_DISP_TIME_OH_CONST 1  // Job dispatch time overhead per tile
+
+#if defined(__SSE2__)
+static AOM_FORCE_INLINE void update_cdf_10_sse2(aom_cdf_prob *cdf, int8_t val) {
+  const int count = cdf[10];
+  const int rate = 5 + (count >> 4);
+  const __m128i sym_vec = _mm_set1_epi16(val);
+  const __m128i top = _mm_set1_epi16((int16_t)CDF_PROB_TOP);
+  const __m128i r = _mm_cvtsi32_si128(rate);
+  __m128i cdf0 = _mm_loadu_si128((const __m128i *)cdf);
+  const __m128i idx0 = _mm_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8);
+  const __m128i mask0 = _mm_cmpgt_epi16(idx0, sym_vec);
+  const __m128i diff0 = _mm_sub_epi16(_mm_or_si128(mask0, top), cdf0);
+  cdf0 = _mm_add_epi16(_mm_sub_epi16(cdf0, mask0), _mm_sra_epi16(diff0, r));
+  _mm_storeu_si128((__m128i *)cdf, cdf0);
+  const int c8 = cdf[8];
+  const int m8 = (val - 9) >> 31;
+  cdf[8] = (aom_cdf_prob)(c8 - m8 + (((m8 | CDF_PROB_TOP) - c8) >> rate));
+  cdf[10] = (aom_cdf_prob)(count + (count < 32));
+}
+
+static AOM_FORCE_INLINE void update_cdf_13_sse2(aom_cdf_prob *cdf, int8_t val) {
+  const int count = cdf[13];
+  const int rate = 5 + (count >> 4);
+  const __m128i sym_vec = _mm_set1_epi16(val);
+  const __m128i top = _mm_set1_epi16((int16_t)CDF_PROB_TOP);
+  const __m128i r = _mm_cvtsi32_si128(rate);
+  __m128i cdf0 = _mm_loadu_si128((const __m128i *)cdf);
+  __m128i cdf1 = _mm_loadl_epi64((const __m128i *)(cdf + 8));
+  const __m128i idx0 = _mm_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8);
+  const __m128i idx1 = _mm_setr_epi16(9, 10, 11, 12, 13, 14, 15, 16);
+  const __m128i mask0 = _mm_cmpgt_epi16(idx0, sym_vec);
+  const __m128i mask1 = _mm_cmpgt_epi16(idx1, sym_vec);
+  const __m128i diff0 = _mm_sub_epi16(_mm_or_si128(mask0, top), cdf0);
+  const __m128i diff1 = _mm_sub_epi16(_mm_or_si128(mask1, top), cdf1);
+  cdf0 = _mm_add_epi16(_mm_sub_epi16(cdf0, mask0), _mm_sra_epi16(diff0, r));
+  cdf1 = _mm_add_epi16(_mm_sub_epi16(cdf1, mask1), _mm_sra_epi16(diff1, r));
+  _mm_storeu_si128((__m128i *)cdf, cdf0);
+  _mm_storel_epi64((__m128i *)(cdf + 8), cdf1);
+  cdf[13] = (aom_cdf_prob)(count + (count < 32));
+}
+
+static AOM_FORCE_INLINE void update_cdf_uv_sse2(aom_cdf_prob *cdf, int8_t val,
+                                                int nsymbs) {
+  const int count = cdf[nsymbs];
+  const int rate = 5 + (count >> 4);
+  const __m128i sym_vec = _mm_set1_epi16(val);
+  const __m128i top = _mm_set1_epi16((int16_t)CDF_PROB_TOP);
+  const __m128i r = _mm_cvtsi32_si128(rate);
+  __m128i cdf0 = _mm_loadu_si128((const __m128i *)cdf);
+  __m128i cdf1 = _mm_loadl_epi64((const __m128i *)(cdf + 8));
+  const __m128i idx0 = _mm_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8);
+  const __m128i idx1 = _mm_setr_epi16(9, 10, 11, 12, 13, 14, 15, 16);
+  const __m128i mask0 = _mm_cmpgt_epi16(idx0, sym_vec);
+  const __m128i mask1 = _mm_cmpgt_epi16(idx1, sym_vec);
+  const __m128i diff0 = _mm_sub_epi16(_mm_or_si128(mask0, top), cdf0);
+  const __m128i diff1 = _mm_sub_epi16(_mm_or_si128(mask1, top), cdf1);
+  cdf0 = _mm_add_epi16(_mm_sub_epi16(cdf0, mask0), _mm_sra_epi16(diff0, r));
+  cdf1 = _mm_add_epi16(_mm_sub_epi16(cdf1, mask1), _mm_sra_epi16(diff1, r));
+  _mm_storeu_si128((__m128i *)cdf, cdf0);
+  _mm_storel_epi64((__m128i *)(cdf + 8), cdf1);
+  if (nsymbs == 14) {
+    const int c12 = cdf[12];
+    const int m12 = (val - 13) >> 31;
+    cdf[12] =
+        (aom_cdf_prob)(c12 - m12 + (((m12 | CDF_PROB_TOP) - c12) >> rate));
+  }
+  cdf[nsymbs] = (aom_cdf_prob)(count + (count < 32));
+}
+
+static AOM_FORCE_INLINE void update_cdf_16_sse2(aom_cdf_prob *cdf, int8_t val) {
+  const int count = cdf[16];
+  const int rate = 5 + (count >> 4);
+  const __m128i sym_vec = _mm_set1_epi16(val);
+  const __m128i top = _mm_set1_epi16((int16_t)CDF_PROB_TOP);
+  const __m128i r = _mm_cvtsi32_si128(rate);
+  __m128i cdf0 = _mm_loadu_si128((const __m128i *)cdf);
+  __m128i cdf1 = _mm_loadu_si128((const __m128i *)(cdf + 8));
+  const __m128i idx0 = _mm_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8);
+  const __m128i idx1 = _mm_setr_epi16(9, 10, 11, 12, 13, 14, 15, 16);
+  const __m128i mask0 = _mm_cmpgt_epi16(idx0, sym_vec);
+  const __m128i mask1 = _mm_cmpgt_epi16(idx1, sym_vec);
+  const __m128i diff0 = _mm_sub_epi16(_mm_or_si128(mask0, top), cdf0);
+  const __m128i diff1 = _mm_sub_epi16(_mm_or_si128(mask1, top), cdf1);
+  cdf0 = _mm_add_epi16(_mm_sub_epi16(cdf0, mask0), _mm_sra_epi16(diff0, r));
+  cdf1 = _mm_add_epi16(_mm_sub_epi16(cdf1, mask1), _mm_sra_epi16(diff1, r));
+  _mm_storeu_si128((__m128i *)cdf, cdf0);
+  _mm_storeu_si128((__m128i *)(cdf + 8), cdf1);
+  cdf[16] = (aom_cdf_prob)(count + (count < 32));
+}
+
+static AOM_FORCE_INLINE void update_cdf_ext_tx_intra_sse2(aom_cdf_prob *cdf,
+                                                          int8_t val,
+                                                          int nsymbs) {
+  const int count = cdf[nsymbs];
+  const int rate = 5 + (count >> 4);
+  const __m128i sym_vec = _mm_set1_epi16(val);
+  const __m128i top = _mm_set1_epi16((int16_t)CDF_PROB_TOP);
+  const __m128i r = _mm_cvtsi32_si128(rate);
+  __m128i cdf0 = _mm_loadu_si128((const __m128i *)cdf);
+  const __m128i idx0 = _mm_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8);
+  const __m128i mask0 = _mm_cmpgt_epi16(idx0, sym_vec);
+  const __m128i diff0 = _mm_sub_epi16(_mm_or_si128(mask0, top), cdf0);
+  cdf0 = _mm_add_epi16(_mm_sub_epi16(cdf0, mask0), _mm_sra_epi16(diff0, r));
+  _mm_storeu_si128((__m128i *)cdf, cdf0);
+  cdf[nsymbs] = (aom_cdf_prob)(count + (count < 32));
+}
+
+static AOM_FORCE_INLINE void update_cdf_ext_tx_inter_sse2(aom_cdf_prob *cdf,
+                                                          int8_t val,
+                                                          int nsymbs) {
+  const int count = cdf[nsymbs];
+  if (nsymbs == 2) {
+    const int rate = 4 + (count >> 4);
+    const int mask = val - 1;
+    const int c = cdf[0];
+    cdf[0] = (aom_cdf_prob)(c - mask + (((mask | CDF_PROB_TOP) - c) >> rate));
+    cdf[2] = (aom_cdf_prob)(count + (count < 32));
+    return;
+  }
+  const int rate = 5 + (count >> 4);
+  const __m128i sym_vec = _mm_set1_epi16(val);
+  const __m128i top = _mm_set1_epi16((int16_t)CDF_PROB_TOP);
+  const __m128i r = _mm_cvtsi32_si128(rate);
+  __m128i cdf0 = _mm_loadu_si128((const __m128i *)cdf);
+  __m128i cdf1 = _mm_loadu_si128((const __m128i *)(cdf + 8));
+  const __m128i idx0 = _mm_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8);
+  const __m128i idx1 = _mm_setr_epi16(9, 10, 11, 12, 13, 14, 15, 16);
+  const __m128i mask0 = _mm_cmpgt_epi16(idx0, sym_vec);
+  const __m128i mask1 = _mm_cmpgt_epi16(idx1, sym_vec);
+  const __m128i diff0 = _mm_sub_epi16(_mm_or_si128(mask0, top), cdf0);
+  const __m128i diff1 = _mm_sub_epi16(_mm_or_si128(mask1, top), cdf1);
+  cdf0 = _mm_add_epi16(_mm_sub_epi16(cdf0, mask0), _mm_sra_epi16(diff0, r));
+  cdf1 = _mm_add_epi16(_mm_sub_epi16(cdf1, mask1), _mm_sra_epi16(diff1, r));
+  _mm_storeu_si128((__m128i *)cdf, cdf0);
+  _mm_storeu_si128((__m128i *)(cdf + 8), cdf1);
+  cdf[nsymbs] = (aom_cdf_prob)(count + (count < 32));
+}
+
+static AOM_FORCE_INLINE void write_symbol_10_sse2(aom_writer *w, int symb,
+                                                  aom_cdf_prob *cdf) {
+  aom_write_cdf(w, symb, cdf, 10);
+  if (w->allow_update_cdf) update_cdf_10_sse2(cdf, (int8_t)symb);
+}
+
+static AOM_FORCE_INLINE void write_symbol_13_sse2(aom_writer *w, int symb,
+                                                  aom_cdf_prob *cdf) {
+  aom_write_cdf(w, symb, cdf, 13);
+  if (w->allow_update_cdf) update_cdf_13_sse2(cdf, (int8_t)symb);
+}
+
+static AOM_FORCE_INLINE void write_symbol_uv_sse2(aom_writer *w, int symb,
+                                                  aom_cdf_prob *cdf,
+                                                  int nsymbs) {
+  aom_write_cdf(w, symb, cdf, nsymbs);
+  if (w->allow_update_cdf) update_cdf_uv_sse2(cdf, (int8_t)symb, nsymbs);
+}
+
+static AOM_FORCE_INLINE void write_symbol_16_sse2(aom_writer *w, int symb,
+                                                  aom_cdf_prob *cdf) {
+  aom_write_cdf(w, symb, cdf, 16);
+  if (w->allow_update_cdf) update_cdf_16_sse2(cdf, (int8_t)symb);
+}
+#endif
 
 static inline void write_uniform(aom_writer *w, int n, int v) {
   const int l = get_unsigned_bits(n);
@@ -68,7 +234,7 @@ static inline void write_uniform(aom_writer *w, int n, int v) {
 }
 
 #if !CONFIG_REALTIME_ONLY
-static inline void loop_restoration_write_sb_coeffs(
+static __attribute__((noinline)) void loop_restoration_write_sb_coeffs(
     const AV1_COMMON *const cm, MACROBLOCKD *xd, int runit_idx,
     aom_writer *const w, int plane, FRAME_COUNTS *counts);
 #endif
@@ -80,8 +246,12 @@ static inline void write_intra_y_mode_kf(FRAME_CONTEXT *frame_ctx,
                                          PREDICTION_MODE mode, aom_writer *w) {
   assert(!is_intrabc_block(mi));
   (void)mi;
+#if defined(__SSE2__)
+  write_symbol_13_sse2(w, mode, get_y_mode_cdf(frame_ctx, above_mi, left_mi));
+#else
   aom_write_symbol(w, mode, get_y_mode_cdf(frame_ctx, above_mi, left_mi),
                    INTRA_MODES);
+#endif
 }
 
 static inline void write_inter_mode(aom_writer *w, PREDICTION_MODE mode,
@@ -210,15 +380,18 @@ static inline void write_selected_tx_size(const MACROBLOCKD *xd,
     const TX_SIZE tx_size = mbmi->tx_size;
     const int tx_size_ctx = get_tx_size_context(xd);
     const int depth = tx_size_to_depth(tx_size, bsize);
-    const int max_depths = bsize_to_max_depth(bsize);
-    const int32_t tx_size_cat = bsize_to_tx_size_cat(bsize);
 
-    assert(depth >= 0 && depth <= max_depths);
+    assert(depth >= 0 && depth <= bsize_to_max_depth(bsize));
     assert(!is_inter_block(mbmi));
     assert(IMPLIES(is_rect_tx(tx_size), is_rect_tx_allowed(xd, mbmi)));
 
-    aom_write_symbol(w, depth, ec_ctx->tx_size_cdf[tx_size_cat][tx_size_ctx],
-                     max_depths + 1);
+    if (bsize <= BLOCK_8X8) {
+      aom_write_symbol(w, depth, ec_ctx->tx_size_cdf[0][tx_size_ctx], 2);
+    } else {
+      const int32_t tx_size_cat = bsize_to_tx_size_cat(bsize);
+      aom_write_symbol(w, depth, ec_ctx->tx_size_cdf[tx_size_cat][tx_size_ctx],
+                       3);
+    }
   }
 }
 
@@ -767,10 +940,9 @@ static inline void write_palette_colors_uv(const MACROBLOCKD *const xd,
   }
 }
 
-static inline void write_palette_mode_info(const AV1_COMMON *cm,
-                                           const MACROBLOCKD *xd,
-                                           const MB_MODE_INFO *const mbmi,
-                                           aom_writer *w) {
+static __attribute__((noinline)) void write_palette_mode_info(
+    const AV1_COMMON *cm, const MACROBLOCKD *xd, const MB_MODE_INFO *const mbmi,
+    aom_writer *w) {
   const int num_planes = av1_num_planes(cm);
   const BLOCK_SIZE bsize = mbmi->bsize;
   assert(av1_allow_palette(cm->features.allow_screen_content_tools, bsize));
@@ -812,25 +984,33 @@ void av1_write_tx_type(const AV1_COMMON *const cm, const MACROBLOCKD *xd,
   MB_MODE_INFO *mbmi = xd->mi[0];
   const FeatureFlags *const features = &cm->features;
   const int is_inter = is_inter_block(mbmi);
-  if (get_ext_tx_types(tx_size, is_inter, features->reduced_tx_set_used) > 1 &&
+  const TxSetType tx_set_type =
+      av1_get_ext_tx_set_type(tx_size, is_inter, features->reduced_tx_set_used);
+  if (tx_set_type > EXT_TX_SET_DCTONLY &&
       ((!cm->seg.enabled && cm->quant_params.base_qindex > 0) ||
        (cm->seg.enabled && xd->qindex[mbmi->segment_id] > 0)) &&
       !mbmi->skip_txfm &&
       !segfeature_active(&cm->seg, mbmi->segment_id, SEG_LVL_SKIP)) {
     FRAME_CONTEXT *ec_ctx = xd->tile_ctx;
     const TX_SIZE square_tx_size = txsize_sqr_map[tx_size];
-    const TxSetType tx_set_type = av1_get_ext_tx_set_type(
-        tx_size, is_inter, features->reduced_tx_set_used);
-    const int eset =
-        get_ext_tx_set(tx_size, is_inter, features->reduced_tx_set_used);
+    const int eset = ext_tx_set_index[is_inter][tx_set_type];
+    const int num_ext_tx = av1_num_ext_tx_set[tx_set_type];
     // eset == 0 should correspond to a set with only DCT_DCT and there
     // is no need to send the tx_type
     assert(eset > 0);
     assert(av1_ext_tx_used[tx_set_type][tx_type]);
+    const int symb = av1_ext_tx_ind[tx_set_type][tx_type];
     if (is_inter) {
-      aom_write_symbol(w, av1_ext_tx_ind[tx_set_type][tx_type],
-                       ec_ctx->inter_ext_tx_cdf[eset][square_tx_size],
-                       av1_num_ext_tx_set[tx_set_type]);
+#if defined(__SSE2__)
+      aom_cdf_prob *cdf = ec_ctx->inter_ext_tx_cdf[eset][square_tx_size];
+      aom_write_cdf(w, symb, cdf, num_ext_tx);
+      if (w->allow_update_cdf) {
+        update_cdf_ext_tx_inter_sse2(cdf, (int8_t)symb, num_ext_tx);
+      }
+#else
+      aom_write_symbol(w, symb, ec_ctx->inter_ext_tx_cdf[eset][square_tx_size],
+                       num_ext_tx);
+#endif
     } else {
       PREDICTION_MODE intra_dir;
       if (mbmi->filter_intra_mode_info.use_filter_intra)
@@ -838,10 +1018,18 @@ void av1_write_tx_type(const AV1_COMMON *const cm, const MACROBLOCKD *xd,
             fimode_to_intradir[mbmi->filter_intra_mode_info.filter_intra_mode];
       else
         intra_dir = mbmi->mode;
+#if defined(__SSE2__)
+      aom_cdf_prob *cdf =
+          ec_ctx->intra_ext_tx_cdf[eset][square_tx_size][intra_dir];
+      aom_write_cdf(w, symb, cdf, num_ext_tx);
+      if (w->allow_update_cdf) {
+        update_cdf_ext_tx_intra_sse2(cdf, (int8_t)symb, num_ext_tx);
+      }
+#else
       aom_write_symbol(
-          w, av1_ext_tx_ind[tx_set_type][tx_type],
-          ec_ctx->intra_ext_tx_cdf[eset][square_tx_size][intra_dir],
-          av1_num_ext_tx_set[tx_set_type]);
+          w, symb, ec_ctx->intra_ext_tx_cdf[eset][square_tx_size][intra_dir],
+          num_ext_tx);
+#endif
     }
   }
 }
@@ -850,8 +1038,13 @@ static inline void write_intra_y_mode_nonkf(FRAME_CONTEXT *frame_ctx,
                                             BLOCK_SIZE bsize,
                                             PREDICTION_MODE mode,
                                             aom_writer *w) {
+#if defined(__SSE2__)
+  write_symbol_13_sse2(w, mode,
+                       frame_ctx->y_mode_cdf[size_group_lookup[bsize]]);
+#else
   aom_write_symbol(w, mode, frame_ctx->y_mode_cdf[size_group_lookup[bsize]],
                    INTRA_MODES);
+#endif
 }
 
 static inline void write_intra_uv_mode(FRAME_CONTEXT *frame_ctx,
@@ -859,8 +1052,13 @@ static inline void write_intra_uv_mode(FRAME_CONTEXT *frame_ctx,
                                        PREDICTION_MODE y_mode,
                                        CFL_ALLOWED_TYPE cfl_allowed,
                                        aom_writer *w) {
+#if defined(__SSE2__)
+  write_symbol_uv_sse2(w, uv_mode, frame_ctx->uv_mode_cdf[cfl_allowed][y_mode],
+                       UV_INTRA_MODES - !cfl_allowed);
+#else
   aom_write_symbol(w, uv_mode, frame_ctx->uv_mode_cdf[cfl_allowed][y_mode],
                    UV_INTRA_MODES - !cfl_allowed);
+#endif
 }
 
 static inline void write_cfl_alphas(FRAME_CONTEXT *const ec_ctx, uint8_t idx,
@@ -869,11 +1067,19 @@ static inline void write_cfl_alphas(FRAME_CONTEXT *const ec_ctx, uint8_t idx,
   // Magnitudes are only signaled for nonzero codes.
   if (CFL_SIGN_U(joint_sign) != CFL_SIGN_ZERO) {
     aom_cdf_prob *cdf_u = ec_ctx->cfl_alpha_cdf[CFL_CONTEXT_U(joint_sign)];
+#if defined(__SSE2__)
+    write_symbol_16_sse2(w, CFL_IDX_U(idx), cdf_u);
+#else
     aom_write_symbol(w, CFL_IDX_U(idx), cdf_u, CFL_ALPHABET_SIZE);
+#endif
   }
   if (CFL_SIGN_V(joint_sign) != CFL_SIGN_ZERO) {
     aom_cdf_prob *cdf_v = ec_ctx->cfl_alpha_cdf[CFL_CONTEXT_V(joint_sign)];
+#if defined(__SSE2__)
+    write_symbol_16_sse2(w, CFL_IDX_V(idx), cdf_v);
+#else
     aom_write_symbol(w, CFL_IDX_V(idx), cdf_v, CFL_ALPHABET_SIZE);
+#endif
   }
 }
 
@@ -1029,12 +1235,14 @@ static inline void write_intra_prediction_modes(const AV1_COMMON *cm,
   if (!cm->seq_params->monochrome && xd->is_chroma_ref) {
     const UV_PREDICTION_MODE uv_mode = mbmi->uv_mode;
     write_intra_uv_mode(ec_ctx, uv_mode, mode, is_cfl_allowed(xd), w);
-    if (uv_mode == UV_CFL_PRED)
+    if (uv_mode == UV_CFL_PRED) {
       write_cfl_alphas(ec_ctx, mbmi->cfl_alpha_idx, mbmi->cfl_alpha_signs, w);
-    const PREDICTION_MODE intra_mode = get_uv_mode(uv_mode);
-    if (use_angle_delta && av1_is_directional_mode(intra_mode)) {
-      write_angle_delta(w, mbmi->angle_delta[PLANE_TYPE_UV],
-                        ec_ctx->angle_delta_cdf[intra_mode - V_PRED]);
+    } else if (use_angle_delta) {
+      const PREDICTION_MODE intra_mode = get_uv_mode(uv_mode);
+      if (av1_is_directional_mode(intra_mode)) {
+        write_angle_delta(w, mbmi->angle_delta[PLANE_TYPE_UV],
+                          ec_ctx->angle_delta_cdf[intra_mode - V_PRED]);
+      }
     }
   }
 
@@ -1183,8 +1391,13 @@ static inline void pack_inter_mode_mvs(AV1_COMP *cpi, ThreadData *const td,
           aom_write_symbol(w, mbmi->use_wedge_interintra,
                            ec_ctx->wedge_interintra_cdf[bsize], 2);
           if (mbmi->use_wedge_interintra) {
+#if defined(__SSE2__)
+            write_symbol_16_sse2(w, mbmi->interintra_wedge_index,
+                                 ec_ctx->wedge_idx_cdf[bsize]);
+#else
             aom_write_symbol(w, mbmi->interintra_wedge_index,
                              ec_ctx->wedge_idx_cdf[bsize], MAX_WEDGE_TYPES);
+#endif
           }
         }
       }
@@ -1234,8 +1447,13 @@ static inline void pack_inter_mode_mvs(AV1_COMP *cpi, ThreadData *const td,
 
         if (mbmi->interinter_comp.type == COMPOUND_WEDGE) {
           assert(is_interinter_compound_used(COMPOUND_WEDGE, bsize));
+#if defined(__SSE2__)
+          write_symbol_16_sse2(w, mbmi->interinter_comp.wedge_index,
+                               ec_ctx->wedge_idx_cdf[bsize]);
+#else
           aom_write_symbol(w, mbmi->interinter_comp.wedge_index,
                            ec_ctx->wedge_idx_cdf[bsize], MAX_WEDGE_TYPES);
+#endif
           aom_write_bit(w, mbmi->interinter_comp.wedge_sign);
         } else {
           assert(mbmi->interinter_comp.type == COMPOUND_DIFFWTD);
@@ -1588,8 +1806,18 @@ static inline void write_partition(const AV1_COMMON *const cm,
   }
 
   if (has_rows && has_cols) {
-    aom_write_symbol(w, p, ec_ctx->partition_cdf[ctx],
-                     partition_cdf_length(bsize));
+    if (bsize <= BLOCK_8X8) {
+      aom_write_symbol(w, p, ec_ctx->partition_cdf[ctx], PARTITION_TYPES);
+    } else if (bsize < BLOCK_128X128) {
+#if defined(__SSE2__)
+      write_symbol_10_sse2(w, p, ec_ctx->partition_cdf[ctx]);
+#else
+      aom_write_symbol(w, p, ec_ctx->partition_cdf[ctx], EXT_PARTITION_TYPES);
+#endif
+    } else {
+      aom_write_symbol(w, p, ec_ctx->partition_cdf[ctx],
+                       EXT_PARTITION_TYPES - 2);
+    }
   } else if (!has_rows && has_cols) {
     assert(p == PARTITION_SPLIT || p == PARTITION_HORZ);
     assert(bsize > BLOCK_8X8);
@@ -1624,21 +1852,23 @@ static inline void write_modes_sb(AV1_COMP *const cpi, ThreadData *const td,
   if (mi_row >= mi_params->mi_rows || mi_col >= mi_params->mi_cols) return;
 
 #if !CONFIG_REALTIME_ONLY
-  const int num_planes = av1_num_planes(cm);
-  for (int plane = 0; plane < num_planes; ++plane) {
-    int rcol0, rcol1, rrow0, rrow1;
+  if (bsize == cm->seq_params->sb_size) {
+    const int num_planes = av1_num_planes(cm);
+    for (int plane = 0; plane < num_planes; ++plane) {
+      int rcol0, rcol1, rrow0, rrow1;
 
-    // Skip some unnecessary work if loop restoration is disabled
-    if (cm->rst_info[plane].frame_restoration_type == RESTORE_NONE) continue;
+      // Skip some unnecessary work if loop restoration is disabled
+      if (cm->rst_info[plane].frame_restoration_type == RESTORE_NONE) continue;
 
-    if (av1_loop_restoration_corners_in_sb(cm, plane, mi_row, mi_col, bsize,
-                                           &rcol0, &rcol1, &rrow0, &rrow1)) {
-      const int rstride = cm->rst_info[plane].horz_units;
-      for (int rrow = rrow0; rrow < rrow1; ++rrow) {
-        for (int rcol = rcol0; rcol < rcol1; ++rcol) {
-          const int runit_idx = rcol + rrow * rstride;
-          loop_restoration_write_sb_coeffs(cm, xd, runit_idx, w, plane,
-                                           td->counts);
+      if (av1_loop_restoration_corners_in_sb(cm, plane, mi_row, mi_col, bsize,
+                                             &rcol0, &rcol1, &rrow0, &rrow1)) {
+        const int rstride = cm->rst_info[plane].horz_units;
+        for (int rrow = rrow0; rrow < rrow1; ++rrow) {
+          for (int rcol = rcol0; rcol < rcol1; ++rcol) {
+            const int runit_idx = rcol + rrow * rstride;
+            loop_restoration_write_sb_coeffs(cm, xd, runit_idx, w, plane,
+                                             td->counts);
+          }
         }
       }
     }
@@ -1920,7 +2150,7 @@ static inline void write_sgrproj_filter(const SgrprojInfo *sgrproj_info,
   *ref_sgrproj_info = *sgrproj_info;
 }
 
-static inline void loop_restoration_write_sb_coeffs(
+static __attribute__((noinline)) void loop_restoration_write_sb_coeffs(
     const AV1_COMMON *const cm, MACROBLOCKD *xd, int runit_idx,
     aom_writer *const w, int plane, FRAME_COUNTS *counts) {
   const RestorationUnitInfo *rui = &cm->rst_info[plane].unit_info[runit_idx];
