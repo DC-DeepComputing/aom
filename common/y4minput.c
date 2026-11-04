@@ -1160,10 +1160,10 @@ void y4m_input_close(y4m_input *_y4m) {
 
 int y4m_input_fetch_frame(y4m_input *_y4m, FILE *_fin, aom_image_t *_img) {
   char frame[6];
-  int pic_sz;
-  int c_w;
-  int c_h;
-  int c_sz;
+  size_t pic_sz;
+  size_t c_w;
+  size_t c_h;
+  size_t c_sz;
   int bytes_per_sample = _y4m->bit_depth > 8 ? 2 : 1;
   /*Read and skip the frame header.*/
   if (!file_read(frame, 6, _fin)) return 0;
