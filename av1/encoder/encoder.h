@@ -4297,9 +4297,9 @@ static inline int encode_show_existing_frame(const AV1_COMMON *cm) {
 static inline int get_mi_ext_idx(const int mi_row, const int mi_col,
                                  const BLOCK_SIZE mi_alloc_bsize,
                                  const int mbmi_ext_stride) {
-  const int mi_ext_size_1d = mi_size_wide[mi_alloc_bsize];
-  const int mi_ext_row = mi_row / mi_ext_size_1d;
-  const int mi_ext_col = mi_col / mi_ext_size_1d;
+  const int mi_ext_size_log2 = mi_size_wide_log2[mi_alloc_bsize];
+  const int mi_ext_row = mi_row >> mi_ext_size_log2;
+  const int mi_ext_col = mi_col >> mi_ext_size_log2;
   return mi_ext_row * mbmi_ext_stride + mi_ext_col;
 }
 
