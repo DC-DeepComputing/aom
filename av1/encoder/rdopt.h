@@ -207,10 +207,12 @@ static inline int av1_encoder_get_relative_dist(int a, int b) {
 
 // This function will return number of mi's in a superblock.
 static inline int av1_get_sb_mi_size(const AV1_COMMON *const cm) {
-  const int mi_alloc_size_1d = mi_size_wide[cm->mi_params.mi_alloc_bsize];
+  const int mi_alloc_size_log2 =
+      mi_size_wide_log2[cm->mi_params.mi_alloc_bsize];
+  const int mi_alloc_size_1d = 1 << mi_alloc_size_log2;
   int sb_mi_rows =
-      (mi_size_wide[cm->seq_params->sb_size] + mi_alloc_size_1d - 1) /
-      mi_alloc_size_1d;
+      (mi_size_wide[cm->seq_params->sb_size] + mi_alloc_size_1d - 1) >>
+      mi_alloc_size_log2;
   assert(mi_size_wide[cm->seq_params->sb_size] ==
          mi_size_high[cm->seq_params->sb_size]);
   int sb_mi_size = sb_mi_rows * sb_mi_rows;

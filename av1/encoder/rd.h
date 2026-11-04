@@ -314,14 +314,16 @@ void av1_set_mvcost(MACROBLOCK *x, int ref, int ref_mv_idx);
 
 static inline void copy_entropy_ctx(ENTROPY_CONTEXT *dst,
                                     const ENTROPY_CONTEXT *src, int n) {
-  switch (n) {
-    case 1: *dst = *src; break;
-    case 2: memcpy(dst, src, 2); break;
-    case 4: memcpy(dst, src, 4); break;
-    case 8: memcpy(dst, src, 8); break;
-    case 16: memcpy(dst, src, 16); break;
-    case 32: memcpy(dst, src, 32); break;
-    default: memcpy(dst, src, (size_t)n); break;
+  assert(n >= 1 && n <= 32 && (n & (n - 1)) == 0);
+  if (n <= 2) {
+    dst[0] = src[0];
+    dst[n - 1] = src[n - 1];
+  } else if (n <= 8) {
+    memcpy(dst, src, 4);
+    memcpy(dst + (n - 4), src + (n - 4), 4);
+  } else {
+    memcpy(dst, src, 16);
+    memcpy(dst + (n - 16), src + (n - 16), 16);
   }
 }
 
