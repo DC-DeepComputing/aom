@@ -32,10 +32,6 @@
 #include "av1/encoder/k_means_template.h"
 #undef AV1_K_MEANS_DIM
 
-static int int16_comparer(const void *a, const void *b) {
-  return (*(int16_t *)a - *(int16_t *)b);
-}
-
 /*!\brief Removes duplicated centroid indices.
  *
  * \ingroup palette_mode_search
@@ -51,7 +47,15 @@ static int int16_comparer(const void *a, const void *b) {
 static int remove_duplicates(int16_t *centroids, int num_centroids) {
   int num_unique;  // number of unique centroids
   int i;
-  qsort(centroids, num_centroids, sizeof(*centroids), int16_comparer);
+  for (i = 1; i < num_centroids; ++i) {
+    const int16_t val = centroids[i];
+    int j = i;
+    while (j > 0 && centroids[j - 1] > val) {
+      centroids[j] = centroids[j - 1];
+      --j;
+    }
+    centroids[j] = val;
+  }
   // Remove duplicates.
   num_unique = 1;
   for (i = 1; i < num_centroids; ++i) {
@@ -314,7 +318,7 @@ static inline void palette_rd_y(
     memcpy(best_palette_color_map, color_map,
            block_width * block_height * sizeof(color_map[0]));
     *best_mbmi = *mbmi;
-    av1_copy_array(tx_type_map, xd->tx_type_map, ctx->num_4x4_blk);
+    av1_copy_tx_type_map(tx_type_map, xd->tx_type_map, ctx->num_4x4_blk);
     if (rate) *rate = this_rate;
     if (rate_tokenonly) *rate_tokenonly = tokenonly_rd_stats.rate;
     if (distortion) *distortion = tokenonly_rd_stats.dist;
@@ -490,15 +494,6 @@ struct ColorCount {
   int count;
 };
 
-static int color_count_comp(const void *c1, const void *c2) {
-  const struct ColorCount *color_count1 = (const struct ColorCount *)c1;
-  const struct ColorCount *color_count2 = (const struct ColorCount *)c2;
-  if (color_count1->count > color_count2->count) return -1;
-  if (color_count1->count < color_count2->count) return 1;
-  if (color_count1->index < color_count2->index) return -1;
-  return 1;
-}
-
 static void find_top_colors(const int *const count_buf, int bit_depth,
                             int n_colors, int16_t *top_colors) {
   // Top color array, serving as a priority queue if more than n_colors are
@@ -506,28 +501,15 @@ static void find_top_colors(const int *const count_buf, int bit_depth,
   struct ColorCount top_color_counts[PALETTE_MAX_SIZE] = { { 0 } };
   int n_color_count = 0;
   for (int i = 0; i < (1 << bit_depth); ++i) {
-    if (count_buf[i] > 0) {
-      if (n_color_count < n_colors) {
-        // Keep adding to the top colors.
-        top_color_counts[n_color_count].index = i;
-        top_color_counts[n_color_count].count = count_buf[i];
-        ++n_color_count;
-        if (n_color_count == n_colors) {
-          qsort(top_color_counts, n_colors, sizeof(top_color_counts[0]),
-                color_count_comp);
-        }
-      } else {
-        // Check the worst in the sorted top.
-        if (count_buf[i] > top_color_counts[n_colors - 1].count) {
-          int j = n_colors - 1;
-          // Move up to the best one.
-          while (j >= 1 && count_buf[i] > top_color_counts[j - 1].count) --j;
-          memmove(top_color_counts + j + 1, top_color_counts + j,
-                  (n_colors - j - 1) * sizeof(top_color_counts[0]));
-          top_color_counts[j].index = i;
-          top_color_counts[j].count = count_buf[i];
-        }
+    const int count = count_buf[i];
+    if (count > top_color_counts[n_colors - 1].count) {
+      int j = n_color_count < n_colors ? n_color_count++ : n_colors - 1;
+      while (j >= 1 && count > top_color_counts[j - 1].count) {
+        top_color_counts[j] = top_color_counts[j - 1];
+        --j;
       }
+      top_color_counts[j].index = i;
+      top_color_counts[j].count = count;
     }
   }
   assert(n_color_count == n_colors);
@@ -799,9 +781,12 @@ void av1_rd_pick_palette_intra_sbuv(const AV1_COMP *cpi, MACROBLOCK *x,
                             seq_params->bit_depth, count_buf, count_buf_8bit,
                             &colors_threshold_v, &colors_v);
   } else {
-    int count_buf[1 << 8];
-    av1_count_colors(src_u, src_stride, rows, cols, count_buf, &colors_u);
-    av1_count_colors(src_v, src_stride, rows, cols, count_buf, &colors_v);
+    colors_v = 0;
+    if (av1_count_colors_with_threshold(src_u, src_stride, rows, cols, 64,
+                                        &colors_u)) {
+      av1_count_colors_with_threshold(src_v, src_stride, rows, cols, 64,
+                                      &colors_v);
+    }
     colors_threshold_u = colors_u;
     colors_threshold_v = colors_v;
   }

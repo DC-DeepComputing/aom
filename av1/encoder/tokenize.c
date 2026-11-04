@@ -62,17 +62,6 @@ static inline int av1_fast_palette_color_index_context_on_edge(
   return 0;
 }
 
-#define SWAP(i, j)                           \
-  do {                                       \
-    const uint8_t tmp_score = score_rank[i]; \
-    const uint8_t tmp_color = color_rank[i]; \
-    score_rank[i] = score_rank[j];           \
-    color_rank[i] = color_rank[j];           \
-    score_rank[j] = tmp_score;               \
-    color_rank[j] = tmp_color;               \
-  } while (0)
-#define INVALID_COLOR_IDX (UINT8_MAX)
-
 // A faster version of av1_get_palette_color_index_context used by the encoder
 // exploiting the fact that the encoder does not need to maintain a color order.
 static inline int av1_fast_palette_color_index_context(const uint8_t *color_map,
@@ -88,96 +77,38 @@ static inline int av1_fast_palette_color_index_context(const uint8_t *color_map,
                                                         color_idx);
   }
 
-  // This goes in the order of left, top, and top-left. This has the advantage
-  // that unless anything here are not distinct or invalid, this will already
-  // be in sorted order. Furthermore, if either of the first two is
-  // invalid, we know the last one is also invalid.
-  uint8_t color_neighbors[NUM_PALETTE_NEIGHBORS];
-  color_neighbors[0] = color_map[(r - 0) * stride + (c - 1)];
-  color_neighbors[1] = color_map[(r - 1) * stride + (c - 0)];
-  color_neighbors[2] = color_map[(r - 1) * stride + (c - 1)];
-
-  // Aggregate duplicated values.
-  // Since our array is so small, using a couple if statements is faster
-  uint8_t scores[NUM_PALETTE_NEIGHBORS] = { 2, 2, 1 };
-  uint8_t num_invalid_colors = 0;
-  if (color_neighbors[0] == color_neighbors[1]) {
-    scores[0] += scores[1];
-    color_neighbors[1] = INVALID_COLOR_IDX;
-    num_invalid_colors += 1;
-
-    if (color_neighbors[0] == color_neighbors[2]) {
-      scores[0] += scores[2];
-      num_invalid_colors += 1;
+  const uint8_t n0 = color_map[r * stride + (c - 1)];
+  const uint8_t n1 = color_map[(r - 1) * stride + c];
+  const uint8_t n2 = color_map[(r - 1) * stride + (c - 1)];
+  const uint8_t curr = color_map[r * stride + c];
+  if (n0 == n1) {
+    if (n0 == n2) {
+      *color_idx = (curr == n0) ? 0 : curr + (n0 > curr);
+      return 4;
     }
-  } else if (color_neighbors[0] == color_neighbors[2]) {
-    scores[0] += scores[2];
-    num_invalid_colors += 1;
-  } else if (color_neighbors[1] == color_neighbors[2]) {
-    scores[1] += scores[2];
-    num_invalid_colors += 1;
+    *color_idx = (curr == n0)   ? 0
+                 : (curr == n2) ? 1
+                                : curr + (n0 > curr) + (n2 > curr);
+    return 3;
   }
-
-  const uint8_t num_valid_colors = NUM_PALETTE_NEIGHBORS - num_invalid_colors;
-
-  uint8_t *color_rank = color_neighbors;
-  uint8_t *score_rank = scores;
-
-  // Sort everything
-  if (num_valid_colors > 1) {
-    if (color_neighbors[1] == INVALID_COLOR_IDX) {
-      scores[1] = scores[2];
-      color_neighbors[1] = color_neighbors[2];
-    }
-
-    // We need to swap the first two elements if they have the same score but
-    // the color indices are not in the right order
-    if (score_rank[0] < score_rank[1] ||
-        (score_rank[0] == score_rank[1] && color_rank[0] > color_rank[1])) {
-      SWAP(0, 1);
-    }
-    if (num_valid_colors > 2) {
-      if (score_rank[0] < score_rank[2]) {
-        SWAP(0, 2);
-      }
-      if (score_rank[1] < score_rank[2]) {
-        SWAP(1, 2);
-      }
-    }
+  if (n0 == n2) {
+    *color_idx = (curr == n0)   ? 0
+                 : (curr == n1) ? 1
+                                : curr + (n0 > curr) + (n1 > curr);
+    return 2;
   }
-
-  // If any of the neighbor colors has higher index than current color index,
-  // then we move up by 1 unless the current color is the same as one of the
-  // neighbors.
-  const uint8_t current_color = *color_idx = color_map[r * stride + c];
-  for (int idx = 0; idx < num_valid_colors; idx++) {
-    if (color_rank[idx] > current_color) {
-      (*color_idx)++;
-    } else if (color_rank[idx] == current_color) {
-      *color_idx = idx;
-      break;
-    }
+  if (n1 == n2) {
+    *color_idx = (curr == n1)   ? 0
+                 : (curr == n0) ? 1
+                                : curr + (n1 > curr) + (n0 > curr);
+    return 2;
   }
-
-  // Get hash value of context.
-  uint8_t color_index_ctx_hash = 0;
-  static const uint8_t hash_multipliers[NUM_PALETTE_NEIGHBORS] = { 1, 2, 2 };
-  for (int idx = 0; idx < num_valid_colors; ++idx) {
-    color_index_ctx_hash += score_rank[idx] * hash_multipliers[idx];
-  }
-  assert(color_index_ctx_hash > 0);
-  assert(color_index_ctx_hash <= MAX_COLOR_CONTEXT_HASH);
-
-  // Lookup context from hash.
-  const int color_index_ctx = 9 - color_index_ctx_hash;
-  assert(color_index_ctx ==
-         av1_palette_color_index_context_lookup[color_index_ctx_hash]);
-  assert(color_index_ctx >= 0);
-  assert(color_index_ctx < PALETTE_COLOR_INDEX_CONTEXTS);
-  return color_index_ctx;
+  *color_idx = (curr == n0)   ? (n0 > n1)
+               : (curr == n1) ? (n1 > n0)
+               : (curr == n2) ? 2
+                              : curr + (n0 > curr) + (n1 > curr) + (n2 > curr);
+  return 1;
 }
-#undef INVALID_COLOR_IDX
-#undef SWAP
 
 static int cost_and_tokenize_map(Av1ColorMapParam *param, TokenExtra **t,
                                  int plane, int calc_rate, int allow_update_cdf,
@@ -257,9 +188,67 @@ static void get_color_map_params(const MACROBLOCK *const x, int plane,
 int av1_cost_color_map(const MACROBLOCK *const x, int plane, BLOCK_SIZE bsize,
                        TX_SIZE tx_size, COLOR_MAP_TYPE type) {
   assert(plane == 0 || plane == 1);
-  Av1ColorMapParam color_map_params;
-  get_color_map_params(x, plane, bsize, tx_size, type, &color_map_params);
-  return cost_and_tokenize_map(&color_map_params, NULL, plane, 1, 0, NULL);
+  (void)tx_size;
+  (void)type;
+  const MACROBLOCKD *const xd = &x->e_mbd;
+  const uint8_t *const color_map = xd->plane[plane].color_index_map;
+  const int (*const cost_tab)[PALETTE_COLORS] =
+      (plane ? x->mode_costs.palette_uv_color_cost
+             : x->mode_costs.palette_y_color_cost)
+          [xd->mi[0]->palette_mode_info.palette_size[plane] - PALETTE_MIN_SIZE];
+  int stride, rows, cols;
+  av1_get_block_dimensions(bsize, plane, xd, &stride, NULL, &rows, &cols);
+  int this_rate = 0;
+  uint8_t n0 = color_map[0];
+  for (int c = 1; c < cols; ++c) {
+    const uint8_t curr = color_map[c];
+    this_rate += cost_tab[0][(curr == n0) ? 0 : curr + (n0 > curr)];
+    n0 = curr;
+  }
+  for (int r = 1; r < rows; ++r) {
+    const uint8_t *const row = color_map + r * stride;
+    const uint8_t *const above = row - stride;
+    uint8_t n2 = above[0];
+    n0 = row[0];
+    this_rate += cost_tab[0][(n0 == n2) ? 0 : n0 + (n2 > n0)];
+    for (int c = 1; c < cols; ++c) {
+      const uint8_t curr = row[c];
+      const uint8_t n1 = above[c];
+      int color_ctx, color_idx;
+      if (n0 == n1) {
+        if (n0 == n2) {
+          color_ctx = 4;
+          color_idx = (curr == n0) ? 0 : curr + (n0 > curr);
+        } else {
+          color_ctx = 3;
+          color_idx = (curr == n0)   ? 0
+                      : (curr == n2) ? 1
+                                     : curr + (n0 > curr) + (n2 > curr);
+        }
+      } else if (n0 == n2) {
+        color_ctx = 2;
+        color_idx = (curr == n0)   ? 0
+                    : (curr == n1) ? 1
+                                   : curr + (n0 > curr) + (n1 > curr);
+      } else if (n1 == n2) {
+        color_ctx = 2;
+        color_idx = (curr == n1)   ? 0
+                    : (curr == n0) ? 1
+                                   : curr + (n1 > curr) + (n0 > curr);
+      } else {
+        color_ctx = 1;
+        color_idx = (curr == n0)   ? (n0 > n1)
+                    : (curr == n1) ? (n1 > n0)
+                    : (curr == n2)
+                        ? 2
+                        : curr + (n0 > curr) + (n1 > curr) + (n2 > curr);
+      }
+      this_rate += cost_tab[color_ctx][color_idx];
+      n0 = curr;
+      n2 = n1;
+    }
+  }
+  return this_rate;
 }
 
 void av1_tokenize_color_map(const MACROBLOCK *const x, int plane,
