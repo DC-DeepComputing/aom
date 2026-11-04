@@ -1565,7 +1565,7 @@ AV1_COMP *av1_create_compressor(AV1_PRIMARY *ppi, const AV1EncoderConfig *oxcf,
   cm->current_frame_id = -1;
   cpi->tile_data = NULL;
   cpi->last_show_frame_buf = NULL;
-  realloc_segmentation_maps(cpi);
+  if (!cpi->enc_seg.map) realloc_segmentation_maps(cpi);
 
   cpi->refresh_frame.alt_ref_frame = false;
 
@@ -1651,7 +1651,9 @@ AV1_COMP *av1_create_compressor(AV1_PRIMARY *ppi, const AV1EncoderConfig *oxcf,
   cpi->palette_pixel_num = 0;
   cpi->scaled_last_source_available = 0;
 
-  alloc_rdmult_scaling_factors(cpi);
+  if (!cpi->ssim_rdmult_scaling_factors) {
+    alloc_rdmult_scaling_factors(cpi);
+  }
 
 #if CONFIG_TUNE_VMAF
   {
@@ -2081,6 +2083,10 @@ static void estimate_screen_content(AV1_COMP *cpi, FeatureFlags *features) {
                                   counts_2 * kBlockArea * 30 > area);
 }
 
+#if defined(__SSE2__)
+#include <emmintrin.h>
+#endif
+
 // Macro that helps debug the screen content mode 2 mechanism
 // #define OUTPUT_SCR_DET_MODE2_STATS
 
@@ -2096,14 +2102,14 @@ uint8_t av1_find_dominant_value(const uint8_t *src, int stride, int rows,
   uint8_t dominant_value = 0;
 
   for (int r = 0; r < rows; ++r) {
+    const uint8_t *row = src + r * (ptrdiff_t)stride;
     for (int c = 0; c < cols; ++c) {
-      const uint8_t value = src[r * (ptrdiff_t)stride + c];
+      const uint8_t value = row[c];
+      const uint32_t cnt = ++value_count[value];
 
-      value_count[value]++;
-
-      if (value_count[value] > dominant_value_count) {
+      if (cnt > dominant_value_count) {
         dominant_value = value;
-        dominant_value_count = value_count[value];
+        dominant_value_count = cnt;
       }
     }
   }
@@ -2133,6 +2139,72 @@ uint8_t av1_find_dominant_value(const uint8_t *src, int stride, int rows,
  */
 void av1_dilate_block(const uint8_t *src, int src_stride, uint8_t *dilated,
                       int dilated_stride, int rows, int cols) {
+#if defined(__SSE2__) && (defined(__GNUC__) || defined(__clang__))
+  if (LIKELY(rows == 16 && cols == 16)) {
+    DECLARE_ALIGNED(16, uint8_t, value_count[256]);
+    const __m128i zero = _mm_setzero_si128();
+    for (int i = 0; i < 256; i += 16) {
+      _mm_store_si128((__m128i *)(value_count + i), zero);
+    }
+    uint32_t dominant_value_count = 0;
+    uint8_t dominant_value = 0;
+    for (int r = 0; r < 16; ++r) {
+      const uint8_t *row = src + r * (ptrdiff_t)src_stride;
+      const __m128i v = _mm_loadu_si128((const __m128i *)row);
+      const uint8_t b0 = row[0];
+      const int m =
+          _mm_movemask_epi8(_mm_cmpeq_epi8(v, _mm_set1_epi8((char)b0)));
+      int c = __builtin_ctz(~(unsigned int)m);
+      uint32_t cnt = (value_count[b0] = (uint8_t)(value_count[b0] + c));
+      if (cnt > dominant_value_count) {
+        dominant_value = b0;
+        dominant_value_count = cnt;
+      }
+      for (; c < 16; ++c) {
+        const uint8_t val = row[c];
+        cnt = ++value_count[val];
+        if (cnt > dominant_value_count) {
+          dominant_value = val;
+          dominant_value_count = cnt;
+        }
+      }
+      if (dominant_value_count > 128) break;
+    }
+
+    const __m128i dom = _mm_set1_epi8((char)dominant_value);
+    const __m128i s0 = _mm_loadu_si128((const __m128i *)src);
+    const __m128i eq0 = _mm_cmpeq_epi8(s0, dom);
+    __m128i h_prev = _mm_or_si128(
+        eq0, _mm_or_si128(_mm_slli_si128(eq0, 1), _mm_srli_si128(eq0, 1)));
+    __m128i s_cur =
+        _mm_loadu_si128((const __m128i *)(src + (ptrdiff_t)src_stride));
+    const __m128i eq1 = _mm_cmpeq_epi8(s_cur, dom);
+    __m128i h_cur = _mm_or_si128(
+        eq1, _mm_or_si128(_mm_slli_si128(eq1, 1), _mm_srli_si128(eq1, 1)));
+    const __m128i m0 = _mm_or_si128(h_prev, h_cur);
+    _mm_storeu_si128((__m128i *)dilated, _mm_or_si128(_mm_andnot_si128(m0, s0),
+                                                      _mm_and_si128(m0, dom)));
+    for (int r = 1; r < 15; ++r) {
+      const __m128i s_next = _mm_loadu_si128(
+          (const __m128i *)(src + (r + 1) * (ptrdiff_t)src_stride));
+      const __m128i eq = _mm_cmpeq_epi8(s_next, dom);
+      const __m128i h_next = _mm_or_si128(
+          eq, _mm_or_si128(_mm_slli_si128(eq, 1), _mm_srli_si128(eq, 1)));
+      const __m128i m = _mm_or_si128(h_cur, _mm_or_si128(h_prev, h_next));
+      _mm_storeu_si128(
+          (__m128i *)(dilated + r * (ptrdiff_t)dilated_stride),
+          _mm_or_si128(_mm_andnot_si128(m, s_cur), _mm_and_si128(m, dom)));
+      s_cur = s_next;
+      h_prev = h_cur;
+      h_cur = h_next;
+    }
+    const __m128i m15 = _mm_or_si128(h_prev, h_cur);
+    _mm_storeu_si128(
+        (__m128i *)(dilated + 15 * (ptrdiff_t)dilated_stride),
+        _mm_or_si128(_mm_andnot_si128(m15, s_cur), _mm_and_si128(m15, dom)));
+    return;
+  }
+#endif
   uint8_t dominant_value = av1_find_dominant_value(src, src_stride, rows, cols);
 
   for (int r = 0; r < rows; ++r) {
@@ -2185,6 +2257,201 @@ void av1_dilate_block(const uint8_t *src, int src_stride, uint8_t *dilated,
   }
 }
 
+#ifndef OUTPUT_SCR_DET_MODE2_STATS
+// Per-strip worker of estimate_screen_content_antialiasing_aware(): classifies
+// the 16x16 luma blocks whose top row lies in [r_begin, r_end) and accumulates
+// the integer block counts. Strips are independent and the counts are summed,
+// so splitting the frame across threads is exactly equivalent to the serial
+// scan.
+/*!\cond */
+typedef struct {
+  const AV1_COMP *cpi;
+  const MACROBLOCKD *xd;
+  const uint8_t *src;
+  int stride;
+  int width;
+  int use_hbd;
+  int bd;
+  int fast_detection;
+  int r_begin;
+  int r_end;
+  int64_t count_palette;
+  int64_t count_intrabc;
+  int64_t count_photo;
+} ScreenContentStrip;
+/*!\endcond */
+
+static void screen_content_strip(ScreenContentStrip *job) {
+  enum {
+    kBlockWidth = 16,
+    kBlockHeight = 16,
+    kBlockArea = kBlockWidth * kBlockHeight
+  };
+  const int kSimpleColorThresh = 4;
+  const int kComplexInitialColorThresh = 40;
+  const int kComplexFinalColorThresh = 6;
+  const int kVarThresh = 5;
+  const AV1_COMP *const cpi = job->cpi;
+  const MACROBLOCKD *const xd = job->xd;
+  const uint8_t *const src = job->src;
+  const int stride = job->stride;
+  const int width = job->width;
+  const int use_hbd = job->use_hbd;
+  const int bd = job->bd;
+  const int fast_detection = job->fast_detection;
+  const int multiplier = fast_detection ? 2 : 1;
+  uint8_t downconv_blk[kBlockArea];
+  uint8_t dilated_blk[kBlockArea];
+  int64_t count_palette = 0, count_intrabc = 0, count_photo = 0;
+
+  for (int r = job->r_begin; r < job->r_end; r += kBlockHeight) {
+    const int initial_col =
+        (fast_detection && (r / kBlockHeight) % 2) ? kBlockWidth : 0;
+    for (int c = initial_col; c + kBlockWidth <= width;
+         c += kBlockWidth * multiplier) {
+      const uint8_t *blk_src = src + r * (ptrdiff_t)stride + c;
+      const uint8_t *blk = blk_src;
+      int blk_stride = stride;
+      if (use_hbd) {
+        const uint16_t *blk_src_hbd = CONVERT_TO_SHORTPTR(blk_src);
+        for (int blk_r = 0; blk_r < kBlockHeight; ++blk_r) {
+          for (int blk_c = 0; blk_c < kBlockWidth; ++blk_c) {
+            const int downconv_val =
+                (blk_src_hbd[blk_r * (ptrdiff_t)stride + blk_c]) >> (bd - 8);
+            assert(downconv_val < (1 << 8));
+            downconv_blk[blk_r * (ptrdiff_t)kBlockWidth + blk_c] = downconv_val;
+          }
+        }
+        blk = downconv_blk;
+        blk_stride = kBlockWidth;
+      }
+      int number_of_colors;
+      bool under_threshold = av1_count_colors_with_threshold(
+          blk, blk_stride, /*rows=*/kBlockHeight,
+          /*cols=*/kBlockWidth, kComplexInitialColorThresh, &number_of_colors);
+      if (number_of_colors > 1 && under_threshold) {
+        struct buf_2d buf;
+        buf.stride = stride;
+        buf.buf = (uint8_t *)blk_src;
+        if (number_of_colors <= kSimpleColorThresh) {
+          ++count_palette;
+          int var = av1_get_perpixel_variance(cpi, xd, &buf, BLOCK_16X16,
+                                              AOM_PLANE_Y, use_hbd);
+          if (var > kVarThresh) ++count_intrabc;
+        } else {
+          av1_dilate_block(blk, blk_stride, dilated_blk, kBlockWidth,
+                           /*rows=*/kBlockHeight, /*cols=*/kBlockWidth);
+          under_threshold = av1_count_colors_with_threshold(
+              dilated_blk, kBlockWidth, /*rows=*/kBlockHeight,
+              /*cols=*/kBlockWidth, kComplexFinalColorThresh,
+              &number_of_colors);
+          if (under_threshold) {
+            int var = av1_get_perpixel_variance(cpi, xd, &buf, BLOCK_16X16,
+                                                AOM_PLANE_Y, use_hbd);
+            if (var > kVarThresh) {
+              ++count_palette;
+              ++count_intrabc;
+            }
+          }
+        }
+      } else if (number_of_colors > kComplexInitialColorThresh) {
+        ++count_photo;
+      }
+    }
+  }
+  job->count_palette = count_palette;
+  job->count_intrabc = count_intrabc;
+  job->count_photo = count_photo;
+}
+
+#if CONFIG_MULTITHREAD
+static int screen_content_strip_worker_hook(void *arg1, void *arg2) {
+  (void)arg2;
+  screen_content_strip((ScreenContentStrip *)arg1);
+  return 1;
+}
+#endif  // CONFIG_MULTITHREAD
+
+static void estimate_screen_content_antialiasing_aware(AV1_COMP *cpi,
+                                                       FeatureFlags *features) {
+  enum { kBlockHeight = 16, kBlockArea = 16 * 16 };
+  const AV1_COMMON *const cm = &cpi->common;
+  const uint8_t *src = cpi->unfiltered_source->y_buffer;
+  assert(src != NULL);
+  const int height = cpi->unfiltered_source->y_height;
+  const int64_t area = (int64_t)cpi->unfiltered_source->y_width * height;
+  const int fast_detection =
+      cpi->sf.hl_sf.screen_detection_mode2_fast_detection;
+  const int multiplier = fast_detection ? 2 : 1;
+  const int num_block_rows = height / kBlockHeight;
+
+  enum { kMaxStrips = 16 };
+  ScreenContentStrip jobs[kMaxStrips];
+  int num_strips = 1;
+#if CONFIG_MULTITHREAD
+  if (cpi->mt_info.workers != NULL) {
+    num_strips = AOMMIN(AOMMIN(cpi->mt_info.num_workers, kMaxStrips),
+                        num_block_rows / 4);
+    if (num_strips < 1) num_strips = 1;
+  }
+#endif
+  for (int i = 0; i < num_strips; ++i) {
+    ScreenContentStrip *job = &jobs[i];
+    job->cpi = cpi;
+    job->xd = &cpi->td.mb.e_mbd;
+    job->src = src;
+    job->stride = cpi->unfiltered_source->y_stride;
+    job->width = cpi->unfiltered_source->y_width;
+    job->use_hbd = cpi->unfiltered_source->flags & YV12_FLAG_HIGHBITDEPTH;
+    job->bd = cm->seq_params->bit_depth;
+    job->fast_detection = fast_detection;
+    job->r_begin =
+        (int)((int64_t)num_block_rows * i / num_strips) * kBlockHeight;
+    job->r_end =
+        (int)((int64_t)num_block_rows * (i + 1) / num_strips) * kBlockHeight;
+  }
+#if CONFIG_MULTITHREAD
+  const AVxWorkerInterface *const winterface = aom_get_worker_interface();
+  for (int i = 1; i < num_strips; ++i) {
+    AVxWorker *const worker = &cpi->mt_info.workers[i];
+    worker->hook = screen_content_strip_worker_hook;
+    worker->data1 = &jobs[i];
+    worker->data2 = NULL;
+    worker->had_error = 0;
+    winterface->launch(worker);
+  }
+#endif
+  screen_content_strip(&jobs[0]);
+  int64_t count_palette = jobs[0].count_palette;
+  int64_t count_intrabc = jobs[0].count_intrabc;
+  int64_t count_photo = jobs[0].count_photo;
+  for (int i = 1; i < num_strips; ++i) {
+#if CONFIG_MULTITHREAD
+    winterface->sync(&cpi->mt_info.workers[i]);
+#else
+    screen_content_strip(&jobs[i]);
+#endif
+    count_palette += jobs[i].count_palette;
+    count_intrabc += jobs[i].count_intrabc;
+    count_photo += jobs[i].count_photo;
+  }
+
+  if (fast_detection) {
+    count_photo *= multiplier;
+    count_palette *= multiplier;
+    count_intrabc *= multiplier;
+  }
+  features->allow_screen_content_tools =
+      ((count_palette - count_photo / 16) * kBlockArea * 10 > area);
+  features->allow_intrabc =
+      features->allow_screen_content_tools &&
+      ((count_intrabc - count_photo / 16) * kBlockArea * 12 > area);
+  cpi->use_screen_content_tools = features->allow_screen_content_tools;
+  cpi->is_screen_content_type =
+      features->allow_intrabc || (count_palette * kBlockArea * 15 > area * 4 &&
+                                  count_intrabc * kBlockArea * 30 > area);
+}
+#else  // OUTPUT_SCR_DET_MODE2_STATS
 /*!\brief Estimates if the source frame is a candidate to enable palette mode
  * and intra block copy, with an accurate detection of anti-aliased text and
  * graphics.
@@ -2417,6 +2684,8 @@ static void estimate_screen_content_antialiasing_aware(AV1_COMP *cpi,
           features->allow_screen_content_tools, features->allow_intrabc);
 #endif
 }
+
+#endif  // OUTPUT_SCR_DET_MODE2_STATS
 
 void av1_set_screen_content_options(AV1_COMP *cpi, FeatureFlags *features) {
   const AV1_COMMON *const cm = &cpi->common;
