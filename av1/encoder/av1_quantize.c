@@ -649,84 +649,176 @@ static int get_qzbin_factor(int q, aom_bit_depth_t bit_depth) {
   }
 }
 
-void av1_build_quantizer(aom_bit_depth_t bit_depth, int y_dc_delta_q,
-                         int u_dc_delta_q, int u_ac_delta_q, int v_dc_delta_q,
-                         int v_ac_delta_q, QUANTS *const quants,
-                         Dequants *const deq, int sharpness) {
-  int i, q, quant_QTX;
+static void build_plane_quantizer(
+    aom_bit_depth_t bit_depth, int dc_delta_q, int ac_delta_q, int sharpness,
+    int16_t quant[QINDEX_RANGE][8], int16_t quant_shift[QINDEX_RANGE][8],
+    int16_t quant_fp[QINDEX_RANGE][8], int16_t round_fp[QINDEX_RANGE][8],
+    int16_t zbin[QINDEX_RANGE][8], int16_t round[QINDEX_RANGE][8],
+    int16_t dequant_QTX[QINDEX_RANGE][8]) {
   const int sharpness_adjustment = 16 * (7 - sharpness) / 7;
-
-  for (q = 0; q < QINDEX_RANGE; q++) {
+  for (int q = 0; q < QINDEX_RANGE; q++) {
     const int qzbin_factor = get_qzbin_factor(q, bit_depth);
     int qrounding_factor = q == 0 ? 64 : 48;
-
-    for (i = 0; i < 2; ++i) {
+    for (int i = 0; i < 2; ++i) {
       int qrounding_factor_fp = 64;
-
       if (sharpness != 0 && q != 0) {
         qrounding_factor = 64 - sharpness_adjustment;
         qrounding_factor_fp = 64 - sharpness_adjustment;
       }
-
-      // y quantizer with TX scale
-      quant_QTX = i == 0 ? av1_dc_quant_QTX(q, y_dc_delta_q, bit_depth)
-                         : av1_ac_quant_QTX(q, 0, bit_depth);
-      invert_quant(&quants->y_quant[q][i], &quants->y_quant_shift[q][i],
-                   quant_QTX);
-      quants->y_quant_fp[q][i] = (1 << 16) / quant_QTX;
-      quants->y_round_fp[q][i] = (qrounding_factor_fp * quant_QTX) >> 7;
-      quants->y_zbin[q][i] = ROUND_POWER_OF_TWO(qzbin_factor * quant_QTX, 7);
-      quants->y_round[q][i] = (qrounding_factor * quant_QTX) >> 7;
-      deq->y_dequant_QTX[q][i] = quant_QTX;
-
-      // u quantizer with TX scale
-      quant_QTX = i == 0 ? av1_dc_quant_QTX(q, u_dc_delta_q, bit_depth)
-                         : av1_ac_quant_QTX(q, u_ac_delta_q, bit_depth);
-      invert_quant(&quants->u_quant[q][i], &quants->u_quant_shift[q][i],
-                   quant_QTX);
-      quants->u_quant_fp[q][i] = (1 << 16) / quant_QTX;
-      quants->u_round_fp[q][i] = (qrounding_factor_fp * quant_QTX) >> 7;
-      quants->u_zbin[q][i] = ROUND_POWER_OF_TWO(qzbin_factor * quant_QTX, 7);
-      quants->u_round[q][i] = (qrounding_factor * quant_QTX) >> 7;
-      deq->u_dequant_QTX[q][i] = quant_QTX;
-
-      // v quantizer with TX scale
-      quant_QTX = i == 0 ? av1_dc_quant_QTX(q, v_dc_delta_q, bit_depth)
-                         : av1_ac_quant_QTX(q, v_ac_delta_q, bit_depth);
-      invert_quant(&quants->v_quant[q][i], &quants->v_quant_shift[q][i],
-                   quant_QTX);
-      quants->v_quant_fp[q][i] = (1 << 16) / quant_QTX;
-      quants->v_round_fp[q][i] = (qrounding_factor_fp * quant_QTX) >> 7;
-      quants->v_zbin[q][i] = ROUND_POWER_OF_TWO(qzbin_factor * quant_QTX, 7);
-      quants->v_round[q][i] = (qrounding_factor * quant_QTX) >> 7;
-      deq->v_dequant_QTX[q][i] = quant_QTX;
+      const int quant_QTX = i == 0 ? av1_dc_quant_QTX(q, dc_delta_q, bit_depth)
+                                   : av1_ac_quant_QTX(q, ac_delta_q, bit_depth);
+      invert_quant(&quant[q][i], &quant_shift[q][i], quant_QTX);
+      quant_fp[q][i] = (1 << 16) / quant_QTX;
+      round_fp[q][i] = (qrounding_factor_fp * quant_QTX) >> 7;
+      zbin[q][i] = ROUND_POWER_OF_TWO(qzbin_factor * quant_QTX, 7);
+      round[q][i] = (qrounding_factor * quant_QTX) >> 7;
+      dequant_QTX[q][i] = quant_QTX;
     }
-
-    for (i = 2; i < 8; i++) {  // 8: SIMD width
-      quants->y_quant[q][i] = quants->y_quant[q][1];
-      quants->y_quant_fp[q][i] = quants->y_quant_fp[q][1];
-      quants->y_round_fp[q][i] = quants->y_round_fp[q][1];
-      quants->y_quant_shift[q][i] = quants->y_quant_shift[q][1];
-      quants->y_zbin[q][i] = quants->y_zbin[q][1];
-      quants->y_round[q][i] = quants->y_round[q][1];
-      deq->y_dequant_QTX[q][i] = deq->y_dequant_QTX[q][1];
-
-      quants->u_quant[q][i] = quants->u_quant[q][1];
-      quants->u_quant_fp[q][i] = quants->u_quant_fp[q][1];
-      quants->u_round_fp[q][i] = quants->u_round_fp[q][1];
-      quants->u_quant_shift[q][i] = quants->u_quant_shift[q][1];
-      quants->u_zbin[q][i] = quants->u_zbin[q][1];
-      quants->u_round[q][i] = quants->u_round[q][1];
-      deq->u_dequant_QTX[q][i] = deq->u_dequant_QTX[q][1];
-
-      quants->v_quant[q][i] = quants->v_quant[q][1];
-      quants->v_quant_fp[q][i] = quants->v_quant_fp[q][1];
-      quants->v_round_fp[q][i] = quants->v_round_fp[q][1];
-      quants->v_quant_shift[q][i] = quants->v_quant_shift[q][1];
-      quants->v_zbin[q][i] = quants->v_zbin[q][1];
-      quants->v_round[q][i] = quants->v_round[q][1];
-      deq->v_dequant_QTX[q][i] = deq->v_dequant_QTX[q][1];
+    for (int i = 2; i < 8; i++) {
+      quant[q][i] = quant[q][1];
+      quant_fp[q][i] = quant_fp[q][1];
+      round_fp[q][i] = round_fp[q][1];
+      quant_shift[q][i] = quant_shift[q][1];
+      zbin[q][i] = zbin[q][1];
+      round[q][i] = round[q][1];
+      dequant_QTX[q][i] = dequant_QTX[q][1];
     }
+  }
+}
+
+static void derive_plane_quantizer_from_y(
+    aom_bit_depth_t bit_depth, int dc_delta_q, int ac_delta_q, int sharpness,
+    const QUANTS *const quants, const Dequants *const deq,
+    int16_t quant[QINDEX_RANGE][8], int16_t quant_shift[QINDEX_RANGE][8],
+    int16_t quant_fp[QINDEX_RANGE][8], int16_t round_fp[QINDEX_RANGE][8],
+    int16_t zbin[QINDEX_RANGE][8], int16_t round[QINDEX_RANGE][8],
+    int16_t dequant_QTX[QINDEX_RANGE][8]) {
+  const int sharpness_adjustment = 16 * (7 - sharpness) / 7;
+  for (int q = 0; q < QINDEX_RANGE; q++) {
+    const int qzbin_factor = get_qzbin_factor(q, bit_depth);
+    const int q_dc = clamp(q + dc_delta_q, 0, MAXQ);
+    const int q_ac = clamp(q + ac_delta_q, 0, MAXQ);
+    if (q > 0 && q_dc > 0 && q_ac > 0) {
+      const int dc_qtx = deq->y_dequant_QTX[q_dc][0];
+      const int ac_qtx = deq->y_dequant_QTX[q_ac][1];
+      quant[q][0] = quants->y_quant[q_dc][0];
+      quant_shift[q][0] = quants->y_quant_shift[q_dc][0];
+      quant_fp[q][0] = quants->y_quant_fp[q_dc][0];
+      round_fp[q][0] = quants->y_round_fp[q_dc][0];
+      zbin[q][0] = ROUND_POWER_OF_TWO(qzbin_factor * dc_qtx, 7);
+      round[q][0] = quants->y_round[q_dc][0];
+      dequant_QTX[q][0] = dc_qtx;
+
+      const int16_t ac_zbin = ROUND_POWER_OF_TWO(qzbin_factor * ac_qtx, 7);
+      for (int i = 1; i < 8; i++) {
+        quant[q][i] = quants->y_quant[q_ac][1];
+        quant_shift[q][i] = quants->y_quant_shift[q_ac][1];
+        quant_fp[q][i] = quants->y_quant_fp[q_ac][1];
+        round_fp[q][i] = quants->y_round_fp[q_ac][1];
+        zbin[q][i] = ac_zbin;
+        round[q][i] = quants->y_round[q_ac][1];
+        dequant_QTX[q][i] = ac_qtx;
+      }
+    } else {
+      int qrounding_factor = q == 0 ? 64 : 48;
+      for (int i = 0; i < 2; ++i) {
+        int qrounding_factor_fp = 64;
+        if (sharpness != 0 && q != 0) {
+          qrounding_factor = 64 - sharpness_adjustment;
+          qrounding_factor_fp = 64 - sharpness_adjustment;
+        }
+        const int quant_QTX = i == 0
+                                  ? av1_dc_quant_QTX(q, dc_delta_q, bit_depth)
+                                  : av1_ac_quant_QTX(q, ac_delta_q, bit_depth);
+        invert_quant(&quant[q][i], &quant_shift[q][i], quant_QTX);
+        quant_fp[q][i] = (1 << 16) / quant_QTX;
+        round_fp[q][i] = (qrounding_factor_fp * quant_QTX) >> 7;
+        zbin[q][i] = ROUND_POWER_OF_TWO(qzbin_factor * quant_QTX, 7);
+        round[q][i] = (qrounding_factor * quant_QTX) >> 7;
+        dequant_QTX[q][i] = quant_QTX;
+      }
+      for (int i = 2; i < 8; i++) {
+        quant[q][i] = quant[q][1];
+        quant_fp[q][i] = quant_fp[q][1];
+        round_fp[q][i] = round_fp[q][1];
+        quant_shift[q][i] = quant_shift[q][1];
+        zbin[q][i] = zbin[q][1];
+        round[q][i] = round[q][1];
+        dequant_QTX[q][i] = dequant_QTX[q][1];
+      }
+    }
+  }
+}
+
+static void copy_plane_quantizer(
+    int16_t dst_quant[QINDEX_RANGE][8],
+    int16_t dst_quant_shift[QINDEX_RANGE][8],
+    int16_t dst_quant_fp[QINDEX_RANGE][8],
+    int16_t dst_round_fp[QINDEX_RANGE][8], int16_t dst_zbin[QINDEX_RANGE][8],
+    int16_t dst_round[QINDEX_RANGE][8],
+    int16_t dst_dequant_QTX[QINDEX_RANGE][8],
+    const int16_t src_quant[QINDEX_RANGE][8],
+    const int16_t src_quant_shift[QINDEX_RANGE][8],
+    const int16_t src_quant_fp[QINDEX_RANGE][8],
+    const int16_t src_round_fp[QINDEX_RANGE][8],
+    const int16_t src_zbin[QINDEX_RANGE][8],
+    const int16_t src_round[QINDEX_RANGE][8],
+    const int16_t src_dequant_QTX[QINDEX_RANGE][8]) {
+  const size_t sz = sizeof(int16_t) * QINDEX_RANGE * 8;
+  memcpy(dst_quant, src_quant, sz);
+  memcpy(dst_quant_shift, src_quant_shift, sz);
+  memcpy(dst_quant_fp, src_quant_fp, sz);
+  memcpy(dst_round_fp, src_round_fp, sz);
+  memcpy(dst_zbin, src_zbin, sz);
+  memcpy(dst_round, src_round, sz);
+  memcpy(dst_dequant_QTX, src_dequant_QTX, sz);
+}
+
+void av1_build_quantizer(aom_bit_depth_t bit_depth, int y_dc_delta_q,
+                         int u_dc_delta_q, int u_ac_delta_q, int v_dc_delta_q,
+                         int v_ac_delta_q, QUANTS *const quants,
+                         Dequants *const deq, int sharpness) {
+  build_plane_quantizer(bit_depth, y_dc_delta_q, 0, sharpness, quants->y_quant,
+                        quants->y_quant_shift, quants->y_quant_fp,
+                        quants->y_round_fp, quants->y_zbin, quants->y_round,
+                        deq->y_dequant_QTX);
+  if (u_dc_delta_q == y_dc_delta_q && u_ac_delta_q == 0) {
+    copy_plane_quantizer(quants->u_quant, quants->u_quant_shift,
+                         quants->u_quant_fp, quants->u_round_fp, quants->u_zbin,
+                         quants->u_round, deq->u_dequant_QTX, quants->y_quant,
+                         quants->y_quant_shift, quants->y_quant_fp,
+                         quants->y_round_fp, quants->y_zbin, quants->y_round,
+                         deq->y_dequant_QTX);
+  } else if (y_dc_delta_q == 0) {
+    derive_plane_quantizer_from_y(bit_depth, u_dc_delta_q, u_ac_delta_q,
+                                  sharpness, quants, deq, quants->u_quant,
+                                  quants->u_quant_shift, quants->u_quant_fp,
+                                  quants->u_round_fp, quants->u_zbin,
+                                  quants->u_round, deq->u_dequant_QTX);
+  } else {
+    build_plane_quantizer(bit_depth, u_dc_delta_q, u_ac_delta_q, sharpness,
+                          quants->u_quant, quants->u_quant_shift,
+                          quants->u_quant_fp, quants->u_round_fp,
+                          quants->u_zbin, quants->u_round, deq->u_dequant_QTX);
+  }
+  if (v_dc_delta_q == u_dc_delta_q && v_ac_delta_q == u_ac_delta_q) {
+    copy_plane_quantizer(quants->v_quant, quants->v_quant_shift,
+                         quants->v_quant_fp, quants->v_round_fp, quants->v_zbin,
+                         quants->v_round, deq->v_dequant_QTX, quants->u_quant,
+                         quants->u_quant_shift, quants->u_quant_fp,
+                         quants->u_round_fp, quants->u_zbin, quants->u_round,
+                         deq->u_dequant_QTX);
+  } else if (y_dc_delta_q == 0) {
+    derive_plane_quantizer_from_y(bit_depth, v_dc_delta_q, v_ac_delta_q,
+                                  sharpness, quants, deq, quants->v_quant,
+                                  quants->v_quant_shift, quants->v_quant_fp,
+                                  quants->v_round_fp, quants->v_zbin,
+                                  quants->v_round, deq->v_dequant_QTX);
+  } else {
+    build_plane_quantizer(bit_depth, v_dc_delta_q, v_ac_delta_q, sharpness,
+                          quants->v_quant, quants->v_quant_shift,
+                          quants->v_quant_fp, quants->v_round_fp,
+                          quants->v_zbin, quants->v_round, deq->v_dequant_QTX);
   }
 }
 
@@ -753,10 +845,69 @@ void av1_init_quantizer(EncQuantDequantParams *const enc_quant_dequant_params,
   if (!deltaq_params_have_changed(prev_deltaq_params, quant_params)) return;
   QUANTS *const quants = &enc_quant_dequant_params->quants;
   Dequants *const dequants = &enc_quant_dequant_params->dequants;
-  av1_build_quantizer(bit_depth, quant_params->y_dc_delta_q,
-                      quant_params->u_dc_delta_q, quant_params->u_ac_delta_q,
-                      quant_params->v_dc_delta_q, quant_params->v_ac_delta_q,
-                      quants, dequants, sharpness);
+  const bool y_changed =
+      prev_deltaq_params->y_dc_delta_q != quant_params->y_dc_delta_q ||
+      prev_deltaq_params->sharpness != sharpness;
+  const bool u_changed =
+      prev_deltaq_params->u_dc_delta_q != quant_params->u_dc_delta_q ||
+      prev_deltaq_params->u_ac_delta_q != quant_params->u_ac_delta_q ||
+      prev_deltaq_params->sharpness != sharpness;
+  const bool v_changed =
+      prev_deltaq_params->v_dc_delta_q != quant_params->v_dc_delta_q ||
+      prev_deltaq_params->v_ac_delta_q != quant_params->v_ac_delta_q ||
+      prev_deltaq_params->sharpness != sharpness;
+  if (y_changed) {
+    build_plane_quantizer(
+        bit_depth, quant_params->y_dc_delta_q, 0, sharpness, quants->y_quant,
+        quants->y_quant_shift, quants->y_quant_fp, quants->y_round_fp,
+        quants->y_zbin, quants->y_round, dequants->y_dequant_QTX);
+  }
+  if (u_changed) {
+    if (quant_params->u_dc_delta_q == quant_params->y_dc_delta_q &&
+        quant_params->u_ac_delta_q == 0) {
+      copy_plane_quantizer(
+          quants->u_quant, quants->u_quant_shift, quants->u_quant_fp,
+          quants->u_round_fp, quants->u_zbin, quants->u_round,
+          dequants->u_dequant_QTX, quants->y_quant, quants->y_quant_shift,
+          quants->y_quant_fp, quants->y_round_fp, quants->y_zbin,
+          quants->y_round, dequants->y_dequant_QTX);
+    } else if (quant_params->y_dc_delta_q == 0) {
+      derive_plane_quantizer_from_y(
+          bit_depth, quant_params->u_dc_delta_q, quant_params->u_ac_delta_q,
+          sharpness, quants, dequants, quants->u_quant, quants->u_quant_shift,
+          quants->u_quant_fp, quants->u_round_fp, quants->u_zbin,
+          quants->u_round, dequants->u_dequant_QTX);
+    } else {
+      build_plane_quantizer(
+          bit_depth, quant_params->u_dc_delta_q, quant_params->u_ac_delta_q,
+          sharpness, quants->u_quant, quants->u_quant_shift, quants->u_quant_fp,
+          quants->u_round_fp, quants->u_zbin, quants->u_round,
+          dequants->u_dequant_QTX);
+    }
+  }
+  if (v_changed) {
+    if (quant_params->v_dc_delta_q == quant_params->u_dc_delta_q &&
+        quant_params->v_ac_delta_q == quant_params->u_ac_delta_q) {
+      copy_plane_quantizer(
+          quants->v_quant, quants->v_quant_shift, quants->v_quant_fp,
+          quants->v_round_fp, quants->v_zbin, quants->v_round,
+          dequants->v_dequant_QTX, quants->u_quant, quants->u_quant_shift,
+          quants->u_quant_fp, quants->u_round_fp, quants->u_zbin,
+          quants->u_round, dequants->u_dequant_QTX);
+    } else if (quant_params->y_dc_delta_q == 0) {
+      derive_plane_quantizer_from_y(
+          bit_depth, quant_params->v_dc_delta_q, quant_params->v_ac_delta_q,
+          sharpness, quants, dequants, quants->v_quant, quants->v_quant_shift,
+          quants->v_quant_fp, quants->v_round_fp, quants->v_zbin,
+          quants->v_round, dequants->v_dequant_QTX);
+    } else {
+      build_plane_quantizer(
+          bit_depth, quant_params->v_dc_delta_q, quant_params->v_ac_delta_q,
+          sharpness, quants->v_quant, quants->v_quant_shift, quants->v_quant_fp,
+          quants->v_round_fp, quants->v_zbin, quants->v_round,
+          dequants->v_dequant_QTX);
+    }
+  }
 
   // Record the state of deltaq parameters.
   prev_deltaq_params->y_dc_delta_q = quant_params->y_dc_delta_q;

@@ -23,8 +23,7 @@ static inline void read_coeff(const tran_low_t *coeff, intptr_t offset,
   if (sizeof(tran_low_t) == 4) {
     const __m256i x0 = _mm256_loadu_si256((const __m256i *)addr);
     const __m256i x1 = _mm256_loadu_si256((const __m256i *)addr + 1);
-    const __m256i y = _mm256_packs_epi32(x0, x1);
-    *c = _mm256_permute4x64_epi64(y, 0xD8);
+    *c = _mm256_packs_epi32(x0, x1);
   } else {
     *c = _mm256_loadu_si256((const __m256i *)addr);
   }
@@ -210,9 +209,94 @@ int64_t av1_block_error_avx2(const tran_low_t *coeff, const tran_low_t *dqcoeff,
   return sse;
 }
 
-// Gather 8 quantization matrix weights indexed by scan_ptr[0..7] into a
-// 64-bit integer and zero-extend to 8 32-bit lanes with a single vmovq +
-// vpmovzxbd sequence.
+int64_t av1_block_error_dist_avx2(const tran_low_t *coeff,
+                                  const tran_low_t *dqcoeff,
+                                  intptr_t block_size);
+
+int64_t av1_block_error_dist_avx2(const tran_low_t *coeff,
+                                  const tran_low_t *dqcoeff,
+                                  intptr_t block_size) {
+  __m256i sse_reg = _mm256_setzero_si256();
+  const __m256i zero_reg = _mm256_setzero_si256();
+  intptr_t i = 0;
+  do {
+    __m256i coeff_reg, dqcoeff_reg;
+    read_coeff(coeff, i, &coeff_reg);
+    read_coeff(dqcoeff, i, &dqcoeff_reg);
+    dqcoeff_reg = _mm256_sub_epi16(dqcoeff_reg, coeff_reg);
+    dqcoeff_reg = _mm256_madd_epi16(dqcoeff_reg, dqcoeff_reg);
+    sse_reg =
+        _mm256_add_epi64(sse_reg, _mm256_unpacklo_epi32(dqcoeff_reg, zero_reg));
+    sse_reg =
+        _mm256_add_epi64(sse_reg, _mm256_unpackhi_epi32(dqcoeff_reg, zero_reg));
+    i += 16;
+  } while (i < block_size);
+  sse_reg = _mm256_add_epi64(sse_reg, _mm256_srli_si256(sse_reg, 8));
+  const __m128i sse_reg128 = _mm_add_epi64(
+      _mm256_castsi256_si128(sse_reg), _mm256_extractf128_si256(sse_reg, 1));
+  int64_t sse;
+  _mm_storel_epi64((__m128i *)&sse, sse_reg128);
+  return sse;
+}
+
+int64_t av1_block_error_qm_dist_avx2(const tran_low_t *coeff,
+                                     const tran_low_t *dqcoeff,
+                                     intptr_t block_size,
+                                     const qm_val_t *qmatrix_scan);
+
+int64_t av1_block_error_qm_dist_avx2(const tran_low_t *coeff,
+                                     const tran_low_t *dqcoeff,
+                                     intptr_t block_size,
+                                     const qm_val_t *qmatrix_scan) {
+  assert(block_size >= 16 && block_size % 16 == 0);
+  __m256i v_error = _mm256_setzero_si256();
+  const __m256i v_round_qm = _mm256_set1_epi64x(1 << (2 * AOM_QM_BITS - 1));
+
+  intptr_t i = 0;
+  do {
+    const __m256i v_diff0 =
+        _mm256_sub_epi32(_mm256_loadu_si256((const __m256i *)(coeff + i)),
+                         _mm256_loadu_si256((const __m256i *)(dqcoeff + i)));
+    const __m256i v_wt0 = _mm256_cvtepu8_epi32(
+        _mm_loadl_epi64((const __m128i *)(qmatrix_scan + i)));
+    const __m256i v_dd0 = _mm256_madd_epi16(v_diff0, v_wt0);
+    const __m256i v_dd0_hi = _mm256_srli_epi64(v_dd0, 32);
+
+    const __m256i v_diff1 = _mm256_sub_epi32(
+        _mm256_loadu_si256((const __m256i *)(coeff + i + 8)),
+        _mm256_loadu_si256((const __m256i *)(dqcoeff + i + 8)));
+    const __m256i v_wt1 = _mm256_cvtepu8_epi32(
+        _mm_loadl_epi64((const __m128i *)(qmatrix_scan + i + 8)));
+    const __m256i v_dd1 = _mm256_madd_epi16(v_diff1, v_wt1);
+    const __m256i v_dd1_hi = _mm256_srli_epi64(v_dd1, 32);
+
+    const __m256i v_err0_even = _mm256_srli_epi64(
+        _mm256_add_epi64(_mm256_mul_epi32(v_dd0, v_dd0), v_round_qm),
+        2 * AOM_QM_BITS);
+    const __m256i v_err0_odd = _mm256_srli_epi64(
+        _mm256_add_epi64(_mm256_mul_epi32(v_dd0_hi, v_dd0_hi), v_round_qm),
+        2 * AOM_QM_BITS);
+    const __m256i v_err1_even = _mm256_srli_epi64(
+        _mm256_add_epi64(_mm256_mul_epi32(v_dd1, v_dd1), v_round_qm),
+        2 * AOM_QM_BITS);
+    const __m256i v_err1_odd = _mm256_srli_epi64(
+        _mm256_add_epi64(_mm256_mul_epi32(v_dd1_hi, v_dd1_hi), v_round_qm),
+        2 * AOM_QM_BITS);
+
+    v_error = _mm256_add_epi64(
+        v_error, _mm256_add_epi64(_mm256_add_epi64(v_err0_even, v_err0_odd),
+                                  _mm256_add_epi64(v_err1_even, v_err1_odd)));
+    i += 16;
+  } while (i < block_size);
+
+  __m128i v_error_128 = _mm_add_epi64(_mm256_castsi256_si128(v_error),
+                                      _mm256_extracti128_si256(v_error, 1));
+  v_error_128 = _mm_add_epi64(v_error_128, _mm_srli_si128(v_error_128, 8));
+  int64_t err;
+  _mm_storel_epi64((__m128i *)&err, v_error_128);
+  return err;
+}
+
 static inline __m256i load_qm_weights_avx2(const qm_val_t *qmatrix,
                                            const int16_t *scan_ptr) {
   const uint32_t w01 =
