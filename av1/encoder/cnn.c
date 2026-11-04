@@ -42,24 +42,47 @@ typedef struct {
   float *buf[CNN_MAX_CHANNELS];
 } TENSOR;
 
-static void init_tensor(TENSOR *tensor) { memset(tensor, 0, sizeof(*tensor)); }
+typedef struct {
+  float *base;
+  int cap;
+  int used;
+} CNN_ARENA;
 
-static void free_tensor(TENSOR *tensor) {
+static void init_tensor(TENSOR *tensor) {
+  tensor->allocsize = 0;
+  tensor->channels = 0;
+  tensor->width = 0;
+  tensor->height = 0;
+  tensor->stride = 0;
+  tensor->buf[0] = NULL;
+}
+
+static void free_tensor(TENSOR *tensor, const CNN_ARENA *arena) {
   if (tensor->allocsize) {
-    aom_free(tensor->buf[0]);
+    const uintptr_t ptr = (uintptr_t)tensor->buf[0];
+    const uintptr_t base = arena ? (uintptr_t)arena->base : 0;
+    const uintptr_t end = arena ? (uintptr_t)(arena->base + arena->cap) : 0;
+    if (!arena || ptr < base || ptr >= end) {
+      aom_free(tensor->buf[0]);
+    }
     tensor->buf[0] = NULL;
     tensor->allocsize = 0;
   }
 }
 
-static bool realloc_tensor(TENSOR *tensor, int channels, int width,
-                           int height) {
+static bool realloc_tensor(TENSOR *tensor, int channels, int width, int height,
+                           CNN_ARENA *arena) {
   const int newallocsize = channels * width * height;
   if (tensor->allocsize < newallocsize) {
-    free_tensor(tensor);
-    tensor->buf[0] =
-        (float *)aom_malloc(sizeof(*tensor->buf[0]) * newallocsize);
-    if (!tensor->buf[0]) return false;
+    free_tensor(tensor, arena);
+    if (arena && arena->used + newallocsize <= arena->cap) {
+      tensor->buf[0] = arena->base + arena->used;
+      arena->used += newallocsize;
+    } else {
+      tensor->buf[0] =
+          (float *)aom_malloc(sizeof(*tensor->buf[0]) * newallocsize);
+      if (!tensor->buf[0]) return false;
+    }
     tensor->allocsize = newallocsize;
   }
   tensor->width = width;
@@ -107,14 +130,32 @@ static void assign_tensor(TENSOR *tensor, float *buf[CNN_MAX_CHANNELS],
 }
 
 static void swap_tensor(TENSOR *t1, TENSOR *t2) {
-  TENSOR t = *t1;
-  *t1 = *t2;
-  *t2 = t;
+  const int max_ch = AOMMAX(t1->channels, t2->channels);
+  int tmp = t1->allocsize;
+  t1->allocsize = t2->allocsize;
+  t2->allocsize = tmp;
+  tmp = t1->channels;
+  t1->channels = t2->channels;
+  t2->channels = tmp;
+  tmp = t1->width;
+  t1->width = t2->width;
+  t2->width = tmp;
+  tmp = t1->height;
+  t1->height = t2->height;
+  t2->height = tmp;
+  tmp = t1->stride;
+  t1->stride = t2->stride;
+  t2->stride = tmp;
+  for (int c = 0; c < max_ch; ++c) {
+    float *p = t1->buf[c];
+    t1->buf[c] = t2->buf[c];
+    t2->buf[c] = p;
+  }
 }
 
 // The concatenated tensor goes into dst with first the channels in
 // original dst followed by the channels in the src
-static bool concat_tensor(const TENSOR *src, TENSOR *dst) {
+static bool concat_tensor(const TENSOR *src, TENSOR *dst, CNN_ARENA *arena) {
   assert(src->width == dst->width);
   assert(src->height == dst->height);
 
@@ -125,11 +166,12 @@ static bool concat_tensor(const TENSOR *src, TENSOR *dst) {
     TENSOR t;
     init_tensor(&t);
     // allocate new buffers and copy first the dst channels
-    if (!realloc_tensor(&t, channels, dst->width, dst->height)) return false;
+    if (!realloc_tensor(&t, channels, dst->width, dst->height, arena))
+      return false;
     copy_tensor(dst, dst->channels, 0, &t);
     // Swap the tensors and free the old buffers
     swap_tensor(dst, &t);
-    free_tensor(&t);
+    free_tensor(&t, arena);
   }
   for (int c = 1; c < channels; ++c)
     dst->buf[c] = &dst->buf[0][c * dst->width * dst->height];
@@ -309,6 +351,31 @@ void av1_cnn_add_c(float **output, int channels, int width, int height,
 void av1_cnn_activate_c(float **output, int channels, int width, int height,
                         int stride, ACTIVATION layer_activation) {
   if (layer_activation == RELU) {
+    if (stride == width && channels > 0) {
+      const int ch_size = width * height;
+      bool contiguous = true;
+      for (int c = 1; c < channels; ++c) {
+        if (output[c] != output[0] + c * ch_size) {
+          contiguous = false;
+          break;
+        }
+      }
+      if (contiguous) {
+        float *const ptr = output[0];
+        const int total = channels * ch_size;
+        for (int idx = 0; idx < total; ++idx) {
+          ptr[idx] = relu(ptr[idx]);
+        }
+        return;
+      }
+      for (int c = 0; c < channels; ++c) {
+        float *const ptr = output[c];
+        for (int idx = 0; idx < ch_size; ++idx) {
+          ptr[idx] = relu(ptr[idx]);
+        }
+      }
+      return;
+    }
     for (int c = 0; c < channels; ++c) {
       for (int i = 0; i < height; ++i)
         for (int j = 0; j < width; ++j)
@@ -329,7 +396,8 @@ void av1_cnn_activate_c(float **output, int channels, int width, int height,
 
 static bool copy_active_tensor_to_branches(const TENSOR *layer_active_tensor,
                                            const CNN_LAYER_CONFIG *layer_config,
-                                           int branch, TENSOR branch_output[]) {
+                                           int branch, TENSOR branch_output[],
+                                           CNN_ARENA *arena) {
   const CNN_BRANCH_CONFIG *branch_config = &layer_config->branch_config;
   for (int b = 0; b < CNN_MAX_BRANCHES; ++b) {
     if ((branch_config->input_to_branches & (1 << b)) && b != branch) {
@@ -341,7 +409,7 @@ static bool copy_active_tensor_to_branches(const TENSOR *layer_active_tensor,
                               : layer_active_tensor->channels;
       if (!realloc_tensor(&branch_output[b], copy_channels,
                           layer_active_tensor->width,
-                          layer_active_tensor->height)) {
+                          layer_active_tensor->height, arena)) {
         return false;
       }
       copy_tensor(layer_active_tensor, copy_channels, 0, &branch_output[b]);
@@ -902,8 +970,10 @@ bool av1_cnn_predict_c(const float **input, int in_width, int in_height,
                        const CNN_THREAD_DATA *thread_data,
                        CNN_MULTI_OUT *output_struct) {
   bool success = false;
-  TENSOR tensor1[CNN_MAX_BRANCHES] = { { 0 } };
-  TENSOR tensor2[CNN_MAX_BRANCHES] = { { 0 } };
+  TENSOR tensor1[CNN_MAX_BRANCHES];
+  TENSOR tensor2[CNN_MAX_BRANCHES];
+  float stack_buf[8192];
+  CNN_ARENA arena = { stack_buf, (int)(sizeof(stack_buf) / sizeof(float)), 0 };
 
   float **output[CNN_MAX_BRANCHES];
   const int *out_chs = output_struct->output_channels;
@@ -945,11 +1015,11 @@ bool av1_cnn_predict_c(const float **input, int in_width, int in_height,
     const int output_num = layer_config->output_num;
     if (output_num == -1) {  // Non-output layer
       if (!realloc_tensor(&tensor2[branch], layer_config->out_channels, o_width,
-                          o_height)) {
+                          o_height, &arena)) {
         goto Error;
       }
     } else {  // Output layer
-      free_tensor(&tensor2[branch]);
+      free_tensor(&tensor2[branch], &arena);
       assign_tensor(&tensor2[branch], output[output_num],
                     layer_config->out_channels, o_width, o_height,
                     out_stride[output_num]);
@@ -962,7 +1032,7 @@ bool av1_cnn_predict_c(const float **input, int in_width, int in_height,
 
     if (layer_config->branch_copy_type == BRANCH_INPUT) {
       if (!copy_active_tensor_to_branches(&tensor1[branch], layer_config,
-                                          branch, tensor2)) {
+                                          branch, tensor2, &arena)) {
         goto Error;
       }
     }
@@ -992,7 +1062,7 @@ bool av1_cnn_predict_c(const float **input, int in_width, int in_height,
 
     if (layer_config->branch_copy_type == BRANCH_OUTPUT) {
       if (!copy_active_tensor_to_branches(&tensor2[branch], layer_config,
-                                          branch, tensor2)) {
+                                          branch, tensor2, &arena)) {
         goto Error;
       }
     }
@@ -1010,9 +1080,11 @@ bool av1_cnn_predict_c(const float **input, int in_width, int in_height,
     }
 
     // Non-linearity
-    av1_cnn_activate(tensor2[branch].buf, tensor2[branch].channels,
-                     tensor2[branch].width, tensor2[branch].height,
-                     tensor2[branch].stride, layer_config->activation);
+    if (layer_config->activation != NONE) {
+      av1_cnn_activate(tensor2[branch].buf, tensor2[branch].channels,
+                       tensor2[branch].width, tensor2[branch].height,
+                       tensor2[branch].stride, layer_config->activation);
+    }
 
     if (layer_config->bn_params.bn_gamma) {
       av1_cnn_batchnorm(
@@ -1029,7 +1101,8 @@ bool av1_cnn_predict_c(const float **input, int in_width, int in_height,
           if ((branch_config->branches_to_combine & (1 << b)) && b != branch) {
             assert(check_tensor_equal_dims(&tensor2[b], &tensor2[branch]));
             assert(tensor2[b].channels > 0);
-            if (!concat_tensor(&tensor2[b], &tensor2[branch])) goto Error;
+            if (!concat_tensor(&tensor2[b], &tensor2[branch], &arena))
+              goto Error;
           }
         }
       } else {  // Output layer
@@ -1060,7 +1133,7 @@ bool av1_cnn_predict_c(const float **input, int in_width, int in_height,
 
     if (layer_config->branch_copy_type == BRANCH_COMBINED) {
       if (!copy_active_tensor_to_branches(&tensor2[branch], layer_config,
-                                          branch, tensor2)) {
+                                          branch, tensor2, &arena)) {
         goto Error;
       }
     }
@@ -1069,8 +1142,8 @@ bool av1_cnn_predict_c(const float **input, int in_width, int in_height,
   success = true;
 Error:
   for (int b = 0; b < CNN_MAX_BRANCHES; ++b) {
-    free_tensor(&tensor1[b]);
-    free_tensor(&tensor2[b]);
+    free_tensor(&tensor1[b], &arena);
+    free_tensor(&tensor2[b], &arena);
   }
   return success;
 }
@@ -1081,7 +1154,6 @@ bool av1_cnn_predict_img_multi_out(uint8_t **dgd, int width, int height,
                                    int stride, const CNN_CONFIG *cnn_config,
                                    const CNN_THREAD_DATA *thread_data,
                                    CNN_MULTI_OUT *output) {
-  // Precomputed lookup table for 8-bit pixel normalization (x / 255.0f).
 #define INV255_ROW(b)                                                \
   ((b) + 0) / 255.0f, ((b) + 1) / 255.0f, ((b) + 2) / 255.0f,        \
       ((b) + 3) / 255.0f, ((b) + 4) / 255.0f, ((b) + 5) / 255.0f,    \
@@ -1089,7 +1161,7 @@ bool av1_cnn_predict_img_multi_out(uint8_t **dgd, int width, int height,
       ((b) + 9) / 255.0f, ((b) + 10) / 255.0f, ((b) + 11) / 255.0f,  \
       ((b) + 12) / 255.0f, ((b) + 13) / 255.0f, ((b) + 14) / 255.0f, \
       ((b) + 15) / 255.0f
-  static const float inv_255_lut[256] = {
+  static const float kInv255Lut[256] = {
     INV255_ROW(0),   INV255_ROW(16),  INV255_ROW(32),  INV255_ROW(48),
     INV255_ROW(64),  INV255_ROW(80),  INV255_ROW(96),  INV255_ROW(112),
     INV255_ROW(128), INV255_ROW(144), INV255_ROW(160), INV255_ROW(176),
@@ -1117,7 +1189,7 @@ bool av1_cnn_predict_img_multi_out(uint8_t **dgd, int width, int height,
     if (cnn_config->strict_bounds) {
       for (int i = 0; i < height; ++i)
         for (int j = 0; j < width; ++j)
-          input[i * in_stride + j] = inv_255_lut[dgd[c][i * stride + j]];
+          input[i * in_stride + j] = kInv255Lut[dgd[c][i * stride + j]];
       // extend left and right
       for (int i = 0; i < height; ++i) {
         for (int j = -cnn_config->ext_width; j < 0; ++j)
@@ -1134,11 +1206,15 @@ bool av1_cnn_predict_img_multi_out(uint8_t **dgd, int width, int height,
                &input[(height - 1) * in_stride - cnn_config->ext_width],
                in_width * sizeof(*input));
     } else {
+      const uint8_t *const dgd_c = dgd[c];
       for (int i = -cnn_config->ext_height; i < height + cnn_config->ext_height;
-           ++i)
+           ++i) {
+        const uint8_t *const src_row = &dgd_c[i * stride];
+        float *const restrict dst_row = &input[i * in_stride];
         for (int j = -cnn_config->ext_width; j < width + cnn_config->ext_width;
              ++j)
-          input[i * in_stride + j] = inv_255_lut[dgd[c][i * stride + j]];
+          dst_row[j] = kInv255Lut[src_row[j]];
+      }
     }
   }
   bool success = av1_cnn_predict((const float **)inputs, in_width, in_height,

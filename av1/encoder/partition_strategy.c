@@ -228,15 +228,7 @@ static void intra_mode_cnn_partition(const AV1_COMMON *const cm, MACROBLOCK *x,
     return;
   }
 
-  const NN_CONFIG *dnn_configs[5] = {
-    NULL,
-    &av1_intra_mode_cnn_partition_branch_0_dnn_config,
-    &av1_intra_mode_cnn_partition_branch_1_dnn_config,
-    &av1_intra_mode_cnn_partition_branch_2_dnn_config,
-    &av1_intra_mode_cnn_partition_branch_3_dnn_config,
-  };
-
-  const NN_CONFIG *dnn_config = dnn_configs[bsize_idx];
+  const NN_CONFIG *dnn_config = NULL;
 
   float dnn_features[100];
   float logits[4] = { 0.0f };
@@ -247,6 +239,7 @@ static void intra_mode_cnn_partition(const AV1_COMMON *const cm, MACROBLOCK *x,
   const float *branch_3 = branch_2 + CNN_BRANCH_2_OUT_SIZE;
 
   if (bsize == BLOCK_64X64) {
+    dnn_config = &av1_intra_mode_cnn_partition_branch_0_dnn_config;
     int f_idx = 0;
     for (int ch_idx = 0; ch_idx < CNN_BRANCH_0_OUT_CH; ch_idx++) {
       dnn_features[f_idx++] = branch_0[ch_idx];
@@ -260,6 +253,7 @@ static void intra_mode_cnn_partition(const AV1_COMMON *const cm, MACROBLOCK *x,
     }
     dnn_features[f_idx++] = part_info->log_q;
   } else if (bsize == BLOCK_32X32) {
+    dnn_config = &av1_intra_mode_cnn_partition_branch_1_dnn_config;
     int f_idx = 0;
     for (int idx = 0; idx < CNN_BRANCH_0_OUT_CH; idx++) {
       dnn_features[f_idx++] = branch_0[idx];
@@ -272,35 +266,51 @@ static void intra_mode_cnn_partition(const AV1_COMMON *const cm, MACROBLOCK *x,
     }
     dnn_features[f_idx++] = part_info->log_q;
   } else if (bsize == BLOCK_16X16) {
-    int f_idx = 0;
-    const int prev_quad_idx = (quad_tree_idx - 1) / 4;
+    dnn_config = &av1_intra_mode_cnn_partition_branch_2_dnn_config;
+    const int prev_quad_idx = (quad_tree_idx - 1) >> 2;
     const int prev_lin_idx = quad_to_linear_1[prev_quad_idx - 1];
     const int prev_spa_stride = 2 * 2;
     for (int ch_idx = 0; ch_idx < CNN_BRANCH_1_OUT_CH; ch_idx++) {
-      dnn_features[f_idx++] = branch_1[prev_lin_idx + ch_idx * prev_spa_stride];
+      dnn_features[ch_idx] = branch_1[prev_lin_idx + ch_idx * prev_spa_stride];
     }
 
-    const int curr_lin_idx = quad_to_linear_2[quad_tree_idx - 5];
-    const int spa_stride = 4 * 4;
-    for (int ch_idx = 0; ch_idx < CNN_BRANCH_2_OUT_CH; ch_idx++) {
-      dnn_features[f_idx++] = branch_2[curr_lin_idx + ch_idx * spa_stride];
+    const float *b2 = branch_2 + quad_to_linear_2[quad_tree_idx - 5];
+    float *dst = dnn_features + CNN_BRANCH_1_OUT_CH;
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC unroll 1
+#endif
+    for (int i = 0; i < 5; i++) {
+      dst[0] = b2[0];
+      dst[1] = b2[16];
+      dst[2] = b2[32];
+      dst[3] = b2[48];
+      b2 += 64;
+      dst += 4;
     }
-    dnn_features[f_idx++] = part_info->log_q;
+    dnn_features[CNN_BRANCH_1_OUT_CH + CNN_BRANCH_2_OUT_CH] = part_info->log_q;
   } else if (bsize == BLOCK_8X8) {
-    int f_idx = 0;
-    const int prev_quad_idx = (quad_tree_idx - 1) / 4;
-    const int prev_lin_idx = quad_to_linear_2[prev_quad_idx - 5];
-    const int prev_spa_stride = 4 * 4;
-    for (int ch_idx = 0; ch_idx < CNN_BRANCH_2_OUT_CH; ch_idx++) {
-      dnn_features[f_idx++] = branch_2[prev_lin_idx + ch_idx * prev_spa_stride];
+    dnn_config = &av1_intra_mode_cnn_partition_branch_3_dnn_config;
+    const int prev_quad_idx = (quad_tree_idx - 1) >> 2;
+    const float *b2 = branch_2 + quad_to_linear_2[prev_quad_idx - 5];
+    const float *b3 = branch_3 + quad_to_linear_3[quad_tree_idx - 21];
+    float *dst = dnn_features;
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC unroll 1
+#endif
+    for (int i = 0; i < 5; i++) {
+      dst[0] = b2[0];
+      dst[1] = b2[16];
+      dst[2] = b2[32];
+      dst[3] = b2[48];
+      dst[20] = b3[0];
+      dst[21] = b3[64];
+      dst[22] = b3[128];
+      dst[23] = b3[192];
+      b2 += 64;
+      b3 += 256;
+      dst += 4;
     }
-
-    const int curr_lin_idx = quad_to_linear_3[quad_tree_idx - 21];
-    const int spa_stride = 8 * 8;
-    for (int ch_idx = 0; ch_idx < CNN_BRANCH_3_OUT_CH; ch_idx++) {
-      dnn_features[f_idx++] = branch_3[curr_lin_idx + ch_idx * spa_stride];
-    }
-    dnn_features[f_idx++] = part_info->log_q;
+    dnn_features[CNN_BRANCH_2_OUT_CH + CNN_BRANCH_3_OUT_CH] = part_info->log_q;
   } else {
     assert(0 && "Invalid bsize in intra_cnn partition");
   }
@@ -1649,10 +1659,10 @@ void av1_prune_partitions_before_search(AV1_COMP *const cpi,
                                         MACROBLOCK *const x,
                                         SIMPLE_MOTION_DATA_TREE *const sms_tree,
                                         PartitionSearchState *part_state) {
+  const PartitionBlkParams *blk_params = &part_state->part_blk_params;
+  if (!blk_params->bsize_at_least_8x8) return;
   const AV1_COMMON *const cm = &cpi->common;
   const CommonModeInfoParams *const mi_params = &cm->mi_params;
-
-  const PartitionBlkParams *blk_params = &part_state->part_blk_params;
   const BLOCK_SIZE bsize = blk_params->bsize;
 
 #if CONFIG_THREE_PASS
