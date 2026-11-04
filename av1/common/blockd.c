@@ -29,15 +29,58 @@ PREDICTION_MODE av1_above_block_mode(const MB_MODE_INFO *above_mi) {
 void av1_reset_entropy_context(MACROBLOCKD *xd, BLOCK_SIZE bsize,
                                const int num_planes) {
   assert(bsize < BLOCK_SIZES_ALL);
-  const int nplanes = 1 + (num_planes - 1) * xd->is_chroma_ref;
-  for (int i = 0; i < nplanes; i++) {
-    struct macroblockd_plane *const pd = &xd->plane[i];
+  av1_fill_entropy_ctx_pow2(xd->plane[0].above_entropy_context, 0,
+                            mi_size_wide[bsize]);
+  av1_fill_entropy_ctx_pow2(xd->plane[0].left_entropy_context, 0,
+                            mi_size_high[bsize]);
+  if (xd->is_chroma_ref && num_planes > 1) {
+    const struct macroblockd_plane *const pd1 = &xd->plane[1];
     const BLOCK_SIZE plane_bsize =
-        get_plane_block_size(bsize, pd->subsampling_x, pd->subsampling_y);
+        get_plane_block_size(bsize, pd1->subsampling_x, pd1->subsampling_y);
     const int txs_wide = mi_size_wide[plane_bsize];
     const int txs_high = mi_size_high[plane_bsize];
-    av1_fill_entropy_ctx_pow2(pd->above_entropy_context, 0, txs_wide);
-    av1_fill_entropy_ctx_pow2(pd->left_entropy_context, 0, txs_high);
+    ENTROPY_CONTEXT *const a1 = pd1->above_entropy_context;
+    ENTROPY_CONTEXT *const a2 = xd->plane[2].above_entropy_context;
+    if (txs_wide <= 2) {
+      a1[0] = 0;
+      a1[txs_wide - 1] = 0;
+      a2[0] = 0;
+      a2[txs_wide - 1] = 0;
+    } else if (txs_wide == 4) {
+      const uint32_t z4 = 0;
+      memcpy(a1, &z4, 4);
+      memcpy(a2, &z4, 4);
+    } else if (txs_wide <= 16) {
+      const uint64_t z8 = 0;
+      memcpy(a1, &z8, 8);
+      memcpy(a1 + (txs_wide - 8), &z8, 8);
+      memcpy(a2, &z8, 8);
+      memcpy(a2 + (txs_wide - 8), &z8, 8);
+    } else {
+      memset(a1, 0, txs_wide * sizeof(*a1));
+      memset(a2, 0, txs_wide * sizeof(*a2));
+    }
+    ENTROPY_CONTEXT *const l1 = pd1->left_entropy_context;
+    ENTROPY_CONTEXT *const l2 = xd->plane[2].left_entropy_context;
+    if (txs_high <= 2) {
+      l1[0] = 0;
+      l1[txs_high - 1] = 0;
+      l2[0] = 0;
+      l2[txs_high - 1] = 0;
+    } else if (txs_high == 4) {
+      const uint32_t z4 = 0;
+      memcpy(l1, &z4, 4);
+      memcpy(l2, &z4, 4);
+    } else if (txs_high <= 16) {
+      const uint64_t z8 = 0;
+      memcpy(l1, &z8, 8);
+      memcpy(l1 + (txs_high - 8), &z8, 8);
+      memcpy(l2, &z8, 8);
+      memcpy(l2 + (txs_high - 8), &z8, 8);
+    } else {
+      memset(l1, 0, txs_high * sizeof(*l1));
+      memset(l2, 0, txs_high * sizeof(*l2));
+    }
   }
 }
 
