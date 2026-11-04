@@ -239,13 +239,12 @@ static int obudec_read_one_obu(struct AvxInputContext *input_ctx,
   size_t available_buffer_capacity = *obu_buffer_capacity - obu_bytes_buffered;
 
   if (available_buffer_capacity < OBU_MAX_HEADER_SIZE) {
-    if (obudec_grow_buffer(AOMMAX(*obu_buffer_capacity, OBU_MAX_HEADER_SIZE),
-                           obu_buffer, obu_buffer_capacity) != 0) {
+    const size_t growth = AOMMAX(*obu_buffer_capacity, OBU_MAX_HEADER_SIZE);
+    if (obudec_grow_buffer(growth, obu_buffer, obu_buffer_capacity) != 0) {
       *obu_length = bytes_read;
       return -1;
     }
-    available_buffer_capacity +=
-        AOMMAX(*obu_buffer_capacity, OBU_MAX_HEADER_SIZE);
+    available_buffer_capacity += growth;
   }
 
   const int status = obudec_read_obu_header_and_size(
