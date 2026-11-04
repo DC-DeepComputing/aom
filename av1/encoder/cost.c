@@ -15,8 +15,8 @@
 #include "av1/common/entropy.h"
 
 // round(-log2(i/256.) * (1 << AV1_PROB_COST_SHIFT)); i = 128~255 (plus 128th
-// duplicate for 256).
-const uint16_t av1_prob_cost[129] = {
+// duplicate for 256, padded to 130 for 32-bit AVX2 gather).
+const uint16_t av1_prob_cost[130] = {
   512, 506, 501, 495, 489, 484, 478, 473, 467, 462, 456, 451, 446, 441, 435,
   430, 425, 420, 415, 410, 405, 400, 395, 390, 385, 380, 375, 371, 366, 361,
   356, 352, 347, 343, 338, 333, 329, 324, 320, 316, 311, 307, 302, 298, 294,
@@ -25,29 +25,5 @@ const uint16_t av1_prob_cost[129] = {
   171, 168, 164, 161, 157, 153, 150, 146, 143, 139, 136, 132, 129, 125, 122,
   119, 115, 112, 109, 105, 102, 99,  95,  92,  89,  86,  82,  79,  76,  73,
   70,  66,  63,  60,  57,  54,  51,  48,  45,  42,  38,  35,  32,  29,  26,
-  23,  20,  18,  15,  12,  9,   6,   3,   3,
+  23,  20,  18,  15,  12,  9,   6,   3,   3,   0,
 };
-
-void av1_cost_tokens_from_cdf(int *costs, const aom_cdf_prob *cdf,
-                              const int *inv_map) {
-  int prev_icdf = CDF_PROB_TOP;
-  if (inv_map) {
-    for (int i = 0;; ++i) {
-      const int cur_icdf = cdf[i];
-      const int p15 =
-          clamp(prev_icdf - cur_icdf, EC_MIN_PROB, CDF_PROB_TOP - 1);
-      prev_icdf = cur_icdf;
-      costs[inv_map[i]] = av1_cost_symbol_clamped(p15);
-      if (cur_icdf == 0) break;
-    }
-  } else {
-    for (int i = 0;; ++i) {
-      const int cur_icdf = cdf[i];
-      const int p15 =
-          clamp(prev_icdf - cur_icdf, EC_MIN_PROB, CDF_PROB_TOP - 1);
-      prev_icdf = cur_icdf;
-      costs[i] = av1_cost_symbol_clamped(p15);
-      if (cur_icdf == 0) break;
-    }
-  }
-}
