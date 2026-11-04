@@ -83,6 +83,9 @@ static inline void get_cdef_filter_strengths(CDEF_PICK_METHOD pick_method,
 
 /* Search for the best strength to add as an option, knowing we
    already selected nb_strengths options. */
+#if defined(__GNUC__) && !defined(__clang__)
+__attribute__((noinline))
+#endif
 static uint64_t search_one(int *lev, int nb_strengths,
                            uint64_t mse[][TOTAL_STRENGTHS], int sb_count,
                            CDEF_PICK_METHOD pick_method) {
@@ -120,15 +123,43 @@ static uint64_t search_one(int *lev, int nb_strengths,
 
 /* Search for the best luma+chroma strength to add as an option, knowing we
    already selected nb_strengths options. */
+#if defined(__GNUC__) && !defined(__clang__)
+__attribute__((noinline))
+#endif
 static uint64_t search_one_dual(int *lev0, int *lev1, int nb_strengths,
                                 uint64_t (**mse)[TOTAL_STRENGTHS], int sb_count,
                                 CDEF_PICK_METHOD pick_method) {
-  uint64_t tot_mse[TOTAL_STRENGTHS][TOTAL_STRENGTHS];
   int i, j;
   uint64_t best_tot_mse = (uint64_t)1 << 63;
   int best_id0 = 0;
   int best_id1 = 0;
   const int total_strengths = nb_cdef_strengths[pick_method];
+  if (nb_strengths == 0) {
+    uint64_t tot_mse0[TOTAL_STRENGTHS] = { 0 };
+    uint64_t tot_mse1[TOTAL_STRENGTHS] = { 0 };
+    for (i = 0; i < sb_count; i++) {
+      for (j = 0; j < total_strengths; j++) {
+        tot_mse0[j] += mse[0][i][j];
+        tot_mse1[j] += mse[1][i][j];
+      }
+    }
+    uint64_t best0 = (uint64_t)1 << 63, best1 = (uint64_t)1 << 63;
+    for (j = 0; j < total_strengths; j++) {
+      if (tot_mse0[j] < best0) {
+        best0 = tot_mse0[j];
+        best_id0 = j;
+      }
+      if (tot_mse1[j] < best1) {
+        best1 = tot_mse1[j];
+        best_id1 = j;
+      }
+    }
+    lev0[0] = best_id0;
+    lev1[0] = best_id1;
+    return best0 + best1;
+  }
+  uint64_t tot_mse[TOTAL_STRENGTHS][TOTAL_STRENGTHS];
+  uint64_t row_offset[TOTAL_STRENGTHS] = { 0 };
   memset(tot_mse, 0, sizeof(tot_mse));
   for (i = 0; i < sb_count; i++) {
     int gi;
@@ -141,23 +172,33 @@ static uint64_t search_one_dual(int *lev0, int *lev1, int nb_strengths,
         best_mse = curr;
       }
     }
+    uint64_t min_mse1 = mse[1][i][0];
+    for (int k = 1; k < total_strengths; k++) {
+      if (mse[1][i][k] < min_mse1) min_mse1 = mse[1][i][k];
+    }
+    const uint64_t thresh0 = best_mse - min_mse1;
     /* Find best mse when adding each possible new option. */
     for (j = 0; j < total_strengths; j++) {
-      int k;
-      for (k = 0; k < total_strengths; k++) {
-        uint64_t best = best_mse;
-        uint64_t curr = mse[0][i][j];
-        curr += mse[1][i][k];
-        if (curr < best) best = curr;
-        tot_mse[j][k] += best;
+      const uint64_t mse0 = mse[0][i][j];
+      if (mse0 >= thresh0) {
+        row_offset[j] += best_mse;
+      } else {
+        for (int k = 0; k < total_strengths; k++) {
+          uint64_t best = best_mse;
+          uint64_t curr = mse0 + mse[1][i][k];
+          if (curr < best) best = curr;
+          tot_mse[j][k] += best;
+        }
       }
     }
   }
   for (j = 0; j < total_strengths; j++) {
+    const uint64_t off = row_offset[j];
     int k;
     for (k = 0; k < total_strengths; k++) {
-      if (tot_mse[j][k] < best_tot_mse) {
-        best_tot_mse = tot_mse[j][k];
+      const uint64_t val = tot_mse[j][k] + off;
+      if (val < best_tot_mse) {
+        best_tot_mse = val;
         best_id0 = j;
         best_id1 = k;
       }
@@ -172,10 +213,9 @@ static uint64_t search_one_dual(int *lev0, int *lev1, int nb_strengths,
 static uint64_t joint_strength_search(int *best_lev, int nb_strengths,
                                       uint64_t mse[][TOTAL_STRENGTHS],
                                       int sb_count,
-                                      CDEF_PICK_METHOD pick_method) {
+                                      CDEF_PICK_METHOD pick_method,
+                                      int refine) {
   uint64_t best_tot_mse;
-  int fast = (pick_method >= CDEF_FAST_SEARCH_LVL1 &&
-              pick_method <= CDEF_FAST_SEARCH_LVL5);
   int i;
   best_tot_mse = (uint64_t)1 << 63;
   /* Greedy search: add one strength options at a time. */
@@ -184,12 +224,19 @@ static uint64_t joint_strength_search(int *best_lev, int nb_strengths,
   }
   /* Trying to refine the greedy search by reconsidering each
      already-selected option. */
-  if (!fast) {
+  if (refine && nb_strengths > 1) {
+    int unchanged = 1;
     for (i = 0; i < 4 * nb_strengths; i++) {
+      const int prev = best_lev[0];
       int j;
       for (j = 0; j < nb_strengths - 1; j++) best_lev[j] = best_lev[j + 1];
       best_tot_mse =
           search_one(best_lev, nb_strengths - 1, mse, sb_count, pick_method);
+      if (best_lev[nb_strengths - 1] == prev) {
+        if (++unchanged >= nb_strengths && (i + 1) % nb_strengths == 0) break;
+      } else {
+        unchanged = 1;
+      }
     }
   }
   return best_tot_mse;
@@ -200,10 +247,16 @@ static uint64_t joint_strength_search_dual(int *best_lev0, int *best_lev1,
                                            int nb_strengths,
                                            uint64_t (**mse)[TOTAL_STRENGTHS],
                                            int sb_count,
-                                           CDEF_PICK_METHOD pick_method) {
+                                           CDEF_PICK_METHOD pick_method,
+                                           int adaptive_cdef_mode) {
   uint64_t best_tot_mse;
   int i;
   best_tot_mse = (uint64_t)1 << 63;
+  if (adaptive_cdef_mode > 0) {
+    memset(best_lev1, 0, nb_strengths * sizeof(best_lev1[0]));
+    return joint_strength_search(best_lev0, nb_strengths, mse[0], sb_count,
+                                 pick_method, /*refine=*/1);
+  }
   /* Greedy search: add one strength options at a time. */
   for (i = 0; i < nb_strengths; i++) {
     best_tot_mse =
@@ -211,14 +264,25 @@ static uint64_t joint_strength_search_dual(int *best_lev0, int *best_lev1,
   }
   /* Trying to refine the greedy search by reconsidering each
      already-selected option. */
-  for (i = 0; i < 4 * nb_strengths; i++) {
-    int j;
-    for (j = 0; j < nb_strengths - 1; j++) {
-      best_lev0[j] = best_lev0[j + 1];
-      best_lev1[j] = best_lev1[j + 1];
+  if (nb_strengths > 1) {
+    int unchanged = 1;
+    for (i = 0; i < 4 * nb_strengths; i++) {
+      const int prev0 = best_lev0[0];
+      const int prev1 = best_lev1[0];
+      int j;
+      for (j = 0; j < nb_strengths - 1; j++) {
+        best_lev0[j] = best_lev0[j + 1];
+        best_lev1[j] = best_lev1[j + 1];
+      }
+      best_tot_mse = search_one_dual(best_lev0, best_lev1, nb_strengths - 1,
+                                     mse, sb_count, pick_method);
+      if (best_lev0[nb_strengths - 1] == prev0 &&
+          best_lev1[nb_strengths - 1] == prev1) {
+        if (++unchanged >= nb_strengths && (i + 1) % nb_strengths == 0) break;
+      } else {
+        unchanged = 1;
+      }
     }
-    best_tot_mse = search_one_dual(best_lev0, best_lev1, nb_strengths - 1, mse,
-                                   sb_count, pick_method);
   }
   return best_tot_mse;
 }
@@ -312,15 +376,13 @@ static uint64_t compute_cdef_dist(void *dst, int dstride, uint16_t *src,
   return sum >> 2 * coeff_shift;
 }
 
-// Fill the boundary regions of the block with CDEF_VERY_LARGE, only if the
-// region is outside frame boundary
-static inline void fill_borders_for_fbs_on_frame_boundary(
+#if defined(__GNUC__) && !defined(__clang__)
+__attribute__((noinline))
+#endif
+static void fill_borders_for_fbs_on_frame_boundary_slow(
     uint16_t *inbuf, int hfilt_size, int vfilt_size,
     bool is_fb_on_frm_left_boundary, bool is_fb_on_frm_right_boundary,
     bool is_fb_on_frm_top_boundary, bool is_fb_on_frm_bottom_boundary) {
-  if (!is_fb_on_frm_left_boundary && !is_fb_on_frm_right_boundary &&
-      !is_fb_on_frm_top_boundary && !is_fb_on_frm_bottom_boundary)
-    return;
   if (is_fb_on_frm_bottom_boundary) {
     // Fill bottom region of the block
     const int buf_offset =
@@ -370,6 +432,19 @@ static inline void fill_borders_for_fbs_on_frame_boundary(
   }
 }
 
+static inline void fill_borders_for_fbs_on_frame_boundary(
+    uint16_t *inbuf, int hfilt_size, int vfilt_size,
+    bool is_fb_on_frm_left_boundary, bool is_fb_on_frm_right_boundary,
+    bool is_fb_on_frm_top_boundary, bool is_fb_on_frm_bottom_boundary) {
+  if (!is_fb_on_frm_left_boundary && !is_fb_on_frm_right_boundary &&
+      !is_fb_on_frm_top_boundary && !is_fb_on_frm_bottom_boundary)
+    return;
+  fill_borders_for_fbs_on_frame_boundary_slow(
+      inbuf, hfilt_size, vfilt_size, is_fb_on_frm_left_boundary,
+      is_fb_on_frm_right_boundary, is_fb_on_frm_top_boundary,
+      is_fb_on_frm_bottom_boundary);
+}
+
 // Calculate the number of 8x8/4x4 filter units for which SSE can be calculated
 // after CDEF filtering in single function call
 static AOM_FORCE_INLINE int get_error_calc_width_in_filt_units(
@@ -396,6 +471,14 @@ static AOM_FORCE_INLINE int get_error_calc_width_in_filt_units(
   }
   return 1;
 }
+
+#if HAVE_AVX2
+void av1_cdef_mse_calc_block_lvl4_luma(
+    const uint16_t *in, const uint8_t *ref_buffer, int ref_stride, int row,
+    int col, const cdef_list *dlist, int cdef_count,
+    int dir[CDEF_NBLOCKS][CDEF_NBLOCKS], int var[CDEF_NBLOCKS][CDEF_NBLOCKS],
+    int damping, int pli, int xdec, uint64_t mse[4]);
+#endif
 
 // Returns the block error after CDEF filtering for a given strength
 static inline uint64_t get_filt_error(
@@ -514,6 +597,9 @@ static inline uint64_t get_filt_error(
 //   adaptive_cdef_mode: Speed feature to control CDEF adaptively.
 // Returns:
 //   Nothing will be returned. Contents of cdef_search_ctx will be modified.
+#if defined(__GNUC__) && !defined(__clang__)
+__attribute__((noinline))
+#endif
 void av1_cdef_mse_calc_block(CdefSearchCtx *cdef_search_ctx,
                              struct aom_internal_error_info *error_info,
                              int fbr, int fbc, int sb_count,
@@ -574,6 +660,9 @@ void av1_cdef_mse_calc_block(CdefSearchCtx *cdef_search_ctx,
   const int yoff = CDEF_VBORDER * (!is_fb_on_frm_top_boundary);
   const int xoff = CDEF_HBORDER * (!is_fb_on_frm_left_boundary);
   int dirinit = 0;
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC unroll 1
+#endif
   for (int pli = 0; pli < cdef_search_ctx->num_planes; pli++) {
     // To disable CDEF filter of chroma, set MSE of chroma strength index 0 to
     // zero and all non-zero strength indices to 1, such that the joint
@@ -605,6 +694,23 @@ void av1_cdef_mse_calc_block(CdefSearchCtx *cdef_search_ctx,
         inbuf, hfilt_size, vfilt_size, is_fb_on_frm_left_boundary,
         is_fb_on_frm_right_boundary, is_fb_on_frm_top_boundary,
         is_fb_on_frm_bottom_boundary);
+#if HAVE_AVX2
+#if CONFIG_RUNTIME_CPU_DETECT
+    const int use_avx2_find_dir = (cdef_find_dir == cdef_find_dir_avx2);
+#else
+    const int use_avx2_find_dir = 1;
+#endif
+    if (cdef_search_ctx->pick_method == CDEF_FAST_SEARCH_LVL4 &&
+        !cdef_search_ctx->use_highbitdepth &&
+        mi_wide_l2[pli] == mi_high_l2[pli] && use_avx2_find_dir) {
+      dirinit = 1;
+      av1_cdef_mse_calc_block_lvl4_luma(
+          in, ref_buffer[pli], ref_stride[pli], row, col, dlist, cdef_count,
+          dir, var, cdef_search_ctx->damping, pli, mi_wide_l2[pli],
+          cdef_search_ctx->mse[pli > 0][sb_count]);
+      continue;
+    }
+#endif
     for (int gi = 0; gi < cdef_search_ctx->total_strengths; gi++) {
       int pri_strength, sec_strength;
       get_cdef_filter_strengths(cdef_search_ctx->pick_method, &pri_strength,
@@ -693,11 +799,13 @@ void av1_cdef_dealloc_data(CdefSearchCtx *cdef_search_ctx) {
 //   pick_method: Search method used to select CDEF parameters
 // Returns:
 //   Nothing will be returned. Contents of cdef_search_ctx will be modified.
-static inline void cdef_params_init(const YV12_BUFFER_CONFIG *frame,
-                                    const YV12_BUFFER_CONFIG *ref,
-                                    AV1_COMMON *cm, MACROBLOCKD *xd,
-                                    CdefSearchCtx *cdef_search_ctx,
-                                    CDEF_PICK_METHOD pick_method) {
+#if defined(__GNUC__) && !defined(__clang__)
+__attribute__((noinline))
+#endif
+static void cdef_params_init(const YV12_BUFFER_CONFIG *frame,
+                             const YV12_BUFFER_CONFIG *ref, AV1_COMMON *cm,
+                             MACROBLOCKD *xd, CdefSearchCtx *cdef_search_ctx,
+                             CDEF_PICK_METHOD pick_method) {
   const CommonModeInfoParams *const mi_params = &cm->mi_params;
   const int num_planes = av1_num_planes(cm);
   cdef_search_ctx->mi_params = &cm->mi_params;
@@ -950,11 +1058,12 @@ void av1_cdef_search(AV1_COMP *cpi) {
     const int nb_strengths = 1 << i;
     uint64_t tot_mse;
     if (num_planes > 1) {
-      tot_mse = joint_strength_search_dual(best_lev0, best_lev1, nb_strengths,
-                                           mse, sb_count, pick_method);
+      tot_mse =
+          joint_strength_search_dual(best_lev0, best_lev1, nb_strengths, mse,
+                                     sb_count, pick_method, adaptive_cdef_mode);
     } else {
       tot_mse = joint_strength_search(best_lev0, nb_strengths, mse[0], sb_count,
-                                      pick_method);
+                                      pick_method, !fast);
     }
 
     const int total_bits = sb_count * i + nb_strengths * CDEF_STRENGTH_BITS *

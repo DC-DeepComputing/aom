@@ -26,16 +26,11 @@
 #include "av1/common/reconinter.h"
 #include "av1/common/thread_common.h"
 
-static int is_8x8_block_skip(MB_MODE_INFO **grid, int mi_row, int mi_col,
-                             int mi_stride) {
+static inline int is_8x8_block_skip(MB_MODE_INFO **grid, int mi_row, int mi_col,
+                                    int mi_stride) {
   MB_MODE_INFO **mbmi = grid + mi_row * mi_stride + mi_col;
-  for (int r = 0; r < mi_size_high[BLOCK_8X8]; ++r, mbmi += mi_stride) {
-    for (int c = 0; c < mi_size_wide[BLOCK_8X8]; ++c) {
-      if (!mbmi[c]->skip_txfm) return 0;
-    }
-  }
-
-  return 1;
+  return mbmi[0]->skip_txfm && mbmi[1]->skip_txfm &&
+         mbmi[mi_stride]->skip_txfm && mbmi[mi_stride + 1]->skip_txfm;
 }
 
 int av1_cdef_compute_sb_list(const CommonModeInfoParams *const mi_params,
