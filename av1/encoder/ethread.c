@@ -118,15 +118,20 @@ void av1_row_mt_sync_write_dummy(AV1EncRowMultiThreadSync *row_mt_sync, int r,
 
 void av1_row_mt_sync_read(AV1EncRowMultiThreadSync *row_mt_sync, int r, int c) {
 #if CONFIG_MULTITHREAD
-  const int nsync = row_mt_sync->sync_range;
-
   if (r) {
+    const int min_finished = c + row_mt_sync->sync_range +
+                             row_mt_sync->intrabc_extra_top_right_sb_delay;
+    const int *const finished_col = &row_mt_sync->num_finished_cols[r - 1];
+    if (LIKELY(__atomic_load_n(finished_col, __ATOMIC_ACQUIRE) >=
+               min_finished)) {
+      return;
+    }
     pthread_mutex_t *const mutex = &row_mt_sync->mutex_[r - 1];
+    pthread_cond_t *const cond = &row_mt_sync->cond_[r - 1];
     pthread_mutex_lock(mutex);
 
-    while (c > row_mt_sync->num_finished_cols[r - 1] - nsync -
-                   row_mt_sync->intrabc_extra_top_right_sb_delay) {
-      pthread_cond_wait(&row_mt_sync->cond_[r - 1], mutex);
+    while (*finished_col < min_finished) {
+      pthread_cond_wait(cond, mutex);
     }
     pthread_mutex_unlock(mutex);
   }
@@ -147,24 +152,26 @@ void av1_row_mt_sync_write(AV1EncRowMultiThreadSync *row_mt_sync, int r, int c,
 
   if (c < cols - 1) {
     cur = c;
-    if (c % nsync) sig = 0;
+    if (nsync > 1 && (c % nsync)) sig = 0;
   } else {
     cur = cols + nsync + row_mt_sync->intrabc_extra_top_right_sb_delay;
   }
 
   if (sig) {
-    pthread_mutex_lock(&row_mt_sync->mutex_[r]);
+    pthread_mutex_t *const mutex = &row_mt_sync->mutex_[r];
+    pthread_mutex_lock(mutex);
 
     // When a thread encounters an error, num_finished_cols[r] is set to maximum
     // column number. In this case, the AOMMAX operation here ensures that
     // num_finished_cols[r] is not overwritten with a smaller value thus
     // preventing the infinite waiting of threads in the relevant sync_read()
     // function.
-    row_mt_sync->num_finished_cols[r] =
-        AOMMAX(row_mt_sync->num_finished_cols[r], cur);
+    const int next_cols = AOMMAX(row_mt_sync->num_finished_cols[r], cur);
+    __atomic_store_n(&row_mt_sync->num_finished_cols[r], next_cols,
+                     __ATOMIC_RELEASE);
 
     pthread_cond_signal(&row_mt_sync->cond_[r]);
-    pthread_mutex_unlock(&row_mt_sync->mutex_[r]);
+    pthread_mutex_unlock(mutex);
   }
 #else
   (void)row_mt_sync;

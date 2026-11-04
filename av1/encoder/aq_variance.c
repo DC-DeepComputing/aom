@@ -23,6 +23,10 @@
 #include "av1/encoder/segmentation.h"
 #include "av1/encoder/dwt.h"
 #include "config/aom_config.h"
+#if HAVE_AVX2 && (defined(__GNUC__) || defined(__clang__)) && \
+    (defined(__x86_64__) || defined(__i386__))
+#include <immintrin.h>
+#endif
 
 #if !CONFIG_REALTIME_ONLY
 static const double rate_ratio[MAX_SEGMENTS] = { 2.2, 1.7, 1.3, 1.0,
@@ -172,79 +176,121 @@ int av1_compute_q_from_energy_level_deltaq_mode(const AV1_COMP *const cpi,
   return base_qindex + qindex_delta;
 }
 
-// Comparer used by qsort() to order an array of unsigned int from smallest to
-// largest.
-static int comp_unsigned_int(const void *a, const void *b) {
-  unsigned int arg1 = *(const unsigned int *)a;
-  unsigned int arg2 = *(const unsigned int *)b;
-
-  return (arg1 > arg2) - (arg1 < arg2);
-}
-
-unsigned int av1_get_variance_boost_block_variance(const AV1_COMP *cpi,
-                                                   const MACROBLOCK *x) {
 #define SUPERBLOCK_SIZE 64
 #define SUBBLOCK_SIZE 8
 #define SUBBLOCKS_IN_SB_DIM (SUPERBLOCK_SIZE / SUBBLOCK_SIZE)
 #define SUBBLOCKS_IN_SB (SUBBLOCKS_IN_SB_DIM * SUBBLOCKS_IN_SB_DIM)
 #define SUBBLOCKS_IN_OCTILE (SUBBLOCKS_IN_SB / 8)
-  DECLARE_ALIGNED(16, static const uint16_t,
-                  av1_highbd_all_zeros[SUBBLOCK_SIZE]) = { 0 };
-  DECLARE_ALIGNED(16, static const uint8_t,
-                  av1_all_zeros[SUBBLOCK_SIZE]) = { 0 };
 
-  const MACROBLOCKD *xd = &x->e_mbd;
+static unsigned int get_variance_boost_fallback(const AV1_COMP *cpi,
+                                                const MACROBLOCK *x,
+                                                const uint8_t *all_zeros) {
   unsigned int sse;
-  // Octile is currently hard-coded and optimized for still pictures. In the
-  // future, we might want to expose this as a parameter that can be fine-tuned
-  // by the caller.
-  // An octile of 5 was chosen because it was found to strike the best balance
-  // between quality and consistency. Lower octiles tend to score lower in
-  // SSIMU2, while higher octiles tend to harm subjective quality consistency,
-  // especially in <1 MP images.
-  const int octile = 5;
-  const uint8_t *all_zeros = is_cur_buf_hbd(xd)
-                                 ? CONVERT_TO_BYTEPTR(av1_highbd_all_zeros)
-                                 : av1_all_zeros;
   unsigned int variances[SUBBLOCKS_IN_SB];
-
-  // Calculate subblock variances.
   aom_variance_fn_t vf = cpi->ppi->fn_ptr[BLOCK_8X8].vf;
   for (int subb_i = 0; subb_i < SUBBLOCKS_IN_SB_DIM; subb_i++) {
     int i = subb_i * SUBBLOCK_SIZE;
     for (int subb_j = 0; subb_j < SUBBLOCKS_IN_SB_DIM; subb_j++) {
       int j = subb_j * SUBBLOCK_SIZE;
-      // Truncating values to integers (i.e. the 64 term) was found to perform
-      // better than rounding, or returning them as doubles.
       variances[subb_i * SUBBLOCKS_IN_SB_DIM + subb_j] =
           vf(x->plane[0].src.buf + i * x->plane[0].src.stride + j,
              x->plane[0].src.stride, all_zeros, 0, &sse) /
           64;
     }
   }
+  for (int i = 1; i < SUBBLOCKS_IN_SB; i++) {
+    unsigned int v = variances[i];
+    int j = i;
+    while (j > 0 && variances[j - 1] > v) {
+      variances[j] = variances[j - 1];
+      j--;
+    }
+    variances[j] = v;
+  }
+  return (variances[31] + (variances[39] * 2) + variances[47] + 2) / 4;
+}
 
-  // Order the 8x8 SB values from smallest to largest variance.
-  qsort(variances, SUBBLOCKS_IN_SB, sizeof(unsigned int), comp_unsigned_int);
+#if HAVE_AVX2 && (defined(__GNUC__) || defined(__clang__)) && \
+    (defined(__x86_64__) || defined(__i386__))
+__attribute__((target("avx2"))) static unsigned int get_variance_boost_avx2(
+    const MACROBLOCK *x) {
+  unsigned int variances[SUBBLOCKS_IN_SB];
+  const int stride = x->plane[0].src.stride;
+  const uint8_t *src = x->plane[0].src.buf;
+  const __m256i zero = _mm256_setzero_si256();
 
-  // Sample three 8x8 variance values: at the specified octile, previous octile,
-  // and next octile. Make sure we use the last subblock in each octile as the
-  // representative of the octile.
-  assert(octile >= 1 && octile <= 8);
-  const int middle_index = octile * SUBBLOCKS_IN_OCTILE - 1;
-  const int lower_index =
-      AOMMAX(SUBBLOCKS_IN_OCTILE - 1, middle_index - SUBBLOCKS_IN_OCTILE);
-  const int upper_index =
-      AOMMIN(SUBBLOCKS_IN_SB - 1, middle_index + SUBBLOCKS_IN_OCTILE);
+  for (int idx = 0; idx < SUBBLOCKS_IN_SB; idx += 4) {
+    const uint8_t *p = src + (idx & ~7) * stride + ((idx & 7) << 3);
+    __m256i vsum = zero;
+    __m256i sse0 = zero;
+    __m256i sse1 = zero;
+    for (int r = 0; r < 8; r++, p += stride) {
+      const __m256i row = _mm256_loadu_si256((const __m256i *)p);
+      vsum = _mm256_add_epi32(vsum, _mm256_sad_epu8(row, zero));
+      const __m256i lo = _mm256_unpacklo_epi8(row, zero);
+      const __m256i hi = _mm256_unpackhi_epi8(row, zero);
+      sse0 = _mm256_add_epi32(sse0, _mm256_madd_epi16(lo, lo));
+      sse1 = _mm256_add_epi32(sse1, _mm256_madd_epi16(hi, hi));
+    }
+    __m256i sse_pair = _mm256_add_epi32(_mm256_unpacklo_epi64(sse0, sse1),
+                                        _mm256_unpackhi_epi64(sse0, sse1));
+    sse_pair = _mm256_add_epi32(sse_pair, _mm256_srli_epi64(sse_pair, 32));
+    const __m256i sq = _mm256_srli_epi64(_mm256_mul_epu32(vsum, vsum), 6);
+    const __m256i vp = _mm256_srli_epi32(_mm256_sub_epi32(sse_pair, sq), 6);
+    const __m128i lo128 = _mm256_castsi256_si128(vp);
+    const __m128i hi128 = _mm256_extracti128_si256(vp, 1);
+    const __m128i v4 = _mm_castps_si128(
+        _mm_shuffle_ps(_mm_castsi128_ps(lo128), _mm_castsi128_ps(hi128),
+                       _MM_SHUFFLE(2, 0, 2, 0)));
+    _mm_storeu_si128((__m128i *)&variances[idx], v4);
+  }
 
-  // Weigh the three variances in a 1:2:1 ratio, with rounding (the +2 term).
-  // This allows for smoother delta-q transitions among superblocks with
-  // mixed-variance features.
-  const unsigned int variance =
-      (variances[lower_index] + (variances[middle_index] * 2) +
-       variances[upper_index] + 2) /
-      4;
+  for (int gap = 32; gap >= 8; gap >>= 1) {
+    for (int i = 0; i < SUBBLOCKS_IN_SB - gap; i += 8) {
+      const __m256i a = _mm256_loadu_si256((const __m256i *)&variances[i]);
+      const __m256i b =
+          _mm256_loadu_si256((const __m256i *)&variances[i + gap]);
+      _mm256_storeu_si256((__m256i *)&variances[i], _mm256_min_epu32(a, b));
+      _mm256_storeu_si256((__m256i *)&variances[i + gap],
+                          _mm256_max_epu32(a, b));
+    }
+  }
 
-  return variance;
+  for (int i = 1; i < SUBBLOCKS_IN_SB; i++) {
+    unsigned int v = variances[i];
+    int j = i;
+    while (j > 0 && variances[j - 1] > v) {
+      variances[j] = variances[j - 1];
+      j--;
+    }
+    variances[j] = v;
+  }
+
+  return (variances[31] + (variances[39] * 2) + variances[47] + 2) / 4;
+}
+#endif
+
+unsigned int av1_get_variance_boost_block_variance(const AV1_COMP *cpi,
+                                                   const MACROBLOCK *x) {
+  DECLARE_ALIGNED(16, static const uint16_t,
+                  av1_highbd_all_zeros[SUBBLOCK_SIZE]) = { 0 };
+  DECLARE_ALIGNED(16, static const uint8_t,
+                  av1_all_zeros[SUBBLOCK_SIZE]) = { 0 };
+
+  const MACROBLOCKD *xd = &x->e_mbd;
+#if HAVE_AVX2 && (defined(__GNUC__) || defined(__clang__)) && \
+    (defined(__x86_64__) || defined(__i386__))
+  if (LIKELY(!is_cur_buf_hbd(xd) &&
+             cpi->ppi->fn_ptr[BLOCK_16X16].vf == aom_variance16x16_avx2)) {
+    (void)av1_all_zeros;
+    (void)av1_highbd_all_zeros;
+    return get_variance_boost_avx2(x);
+  }
+#endif
+  const uint8_t *all_zeros = is_cur_buf_hbd(xd)
+                                 ? CONVERT_TO_BYTEPTR(av1_highbd_all_zeros)
+                                 : av1_all_zeros;
+  return get_variance_boost_fallback(cpi, x, all_zeros);
 }
 #endif  // !CONFIG_REALTIME_ONLY
 

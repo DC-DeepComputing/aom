@@ -172,6 +172,11 @@ static inline void copy_mbmi_ext_frame_to_mbmi_ext(
          sizeof(mbmi_ext->global_mvs));
 }
 
+void av1_update_state_segmentation(const AV1_COMP *const cpi, ThreadData *td,
+                                   const PICK_MODE_CONTEXT *const ctx,
+                                   int mi_row, int mi_col, BLOCK_SIZE bsize,
+                                   RUN_TYPE dry_run);
+
 void av1_update_state(const AV1_COMP *const cpi, ThreadData *td,
                       const PICK_MODE_CONTEXT *const ctx, int mi_row,
                       int mi_col, BLOCK_SIZE bsize, RUN_TYPE dry_run) {
@@ -184,13 +189,13 @@ void av1_update_state(const AV1_COMP *const cpi, ThreadData *td,
   struct macroblock_plane *const p = x->plane;
   struct macroblockd_plane *const pd = xd->plane;
   const MB_MODE_INFO *const mi = &ctx->mic;
-  if (ctx == NULL) {
+  if (UNLIKELY(ctx == NULL)) {
     aom_internal_error(cm->error, AOM_CODEC_ERROR,
                        "ctx is NULL in av1_update_state: %d %d %d %d %d %d \n",
                        cm->current_frame.frame_type, cm->width, cm->height,
                        mi_col, mi_row, bsize);
   }
-  if (mi == NULL) {
+  if (UNLIKELY(mi == NULL)) {
     aom_internal_error(cm->error, AOM_CODEC_ERROR,
                        "mi is NULL in av1_update_state: %d %d %d %d %d %d \n",
                        cm->current_frame.frame_type, cm->width, cm->height,
@@ -203,12 +208,12 @@ void av1_update_state(const AV1_COMP *const cpi, ThreadData *td,
   const int bw = mi_size_wide[bsize];
   const int bh = mi_size_high[bsize];
   const int mis = mi_params->mi_stride;
-  const int mi_width = mi_size_wide[bsize];
-  const int mi_height = mi_size_high[bsize];
+  const int mi_width = bw;
+  const int mi_height = bh;
   TxfmSearchInfo *txfm_info = &x->txfm_search_info;
 
   *mi_addr = *mi;
-  if (!frame_is_intra_only(cm) || av1_allow_intrabc(cm)) {
+  if (UNLIKELY(!frame_is_intra_only(cm) || av1_allow_intrabc(cm))) {
     copy_mbmi_ext_frame_to_mbmi_ext(&x->mbmi_ext, &ctx->mbmi_ext_best,
                                     av1_ref_frame_type(ctx->mic.ref_frame));
   }
@@ -216,69 +221,46 @@ void av1_update_state(const AV1_COMP *const cpi, ThreadData *td,
   txfm_info->skip_txfm = ctx->rd_stats.skip_txfm;
 
   xd->tx_type_map = ctx->tx_type_map;
-  xd->tx_type_map_stride = mi_size_wide[bsize];
+  xd->tx_type_map_stride = bw;
   // If not dry_run, copy the transform type data into the frame level buffer.
   // Encoder will fetch tx types when writing bitstream.
   if (!dry_run) {
     const int grid_idx = get_mi_grid_idx(mi_params, mi_row, mi_col);
     uint8_t *const tx_type_map = mi_params->tx_type_map + grid_idx;
-    const int mi_stride = mi_params->mi_stride;
-    for (int blk_row = 0; blk_row < bh; ++blk_row) {
-      av1_copy_array(tx_type_map + blk_row * mi_stride,
-                     xd->tx_type_map + blk_row * xd->tx_type_map_stride, bw);
+    const uint8_t *src_map = ctx->tx_type_map;
+    uint8_t *dst_map = tx_type_map;
+    if (bw == 1) {
+      for (int blk_row = 0; blk_row < bh; ++blk_row) {
+        dst_map[blk_row * mis] = src_map[blk_row];
+      }
+    } else if (bw == 2) {
+      for (int blk_row = 0; blk_row < bh; ++blk_row) {
+        memcpy(dst_map + blk_row * mis, src_map + blk_row * 2, 2);
+      }
+    } else if (bw == 4) {
+      for (int blk_row = 0; blk_row < bh; ++blk_row) {
+        memcpy(dst_map + blk_row * mis, src_map + blk_row * 4, 4);
+      }
+    } else if (bw == 8) {
+      for (int blk_row = 0; blk_row < bh; ++blk_row) {
+        memcpy(dst_map + blk_row * mis, src_map + blk_row * 8, 8);
+      }
+    } else {
+      for (int blk_row = 0; blk_row < bh; ++blk_row) {
+        memcpy(dst_map + blk_row * mis, src_map + blk_row * bw, bw);
+      }
     }
     xd->tx_type_map = tx_type_map;
-    xd->tx_type_map_stride = mi_stride;
+    xd->tx_type_map_stride = mis;
   }
 
   // If segmentation in use
-  if (seg->enabled) {
-    // For in frame complexity AQ or ROI copy the segment id from the
-    // segment map.
-    if (cpi->oxcf.q_cfg.aq_mode == COMPLEXITY_AQ || cpi->roi.enabled) {
-      const uint8_t *const map =
-          seg->update_map ? cpi->enc_seg.map : cm->last_frame_seg_map;
-      mi_addr->segment_id =
-          map ? get_segment_id(mi_params, map, bsize, mi_row, mi_col) : 0;
-    }
-    // Else for cyclic refresh mode update the segment map, set the segment id
-    // and then update the quantizer.
-    if (cpi->oxcf.q_cfg.aq_mode == CYCLIC_REFRESH_AQ && !cpi->roi.enabled &&
-        mi_addr->segment_id != AM_SEGMENT_ID_INACTIVE &&
-        !cpi->rc.rtc_external_ratectrl) {
-      av1_cyclic_refresh_update_segment(cpi, x, mi_row, mi_col, bsize,
-                                        ctx->rd_stats.rate, ctx->rd_stats.dist,
-                                        txfm_info->skip_txfm, dry_run);
-    }
-    if (mi_addr->uv_mode == UV_CFL_PRED && !is_cfl_allowed(xd))
-      mi_addr->uv_mode = UV_DC_PRED;
-
-    if (!dry_run && !mi_addr->skip_txfm) {
-      int cdf_num;
-      const uint8_t spatial_pred = av1_get_spatial_seg_pred(
-          cm, xd, &cdf_num, cpi->cyclic_refresh->skip_over4x4);
-      const uint8_t coded_id = av1_neg_interleave(
-          mi_addr->segment_id, spatial_pred, seg->last_active_segid + 1);
-      int64_t spatial_cost = x->mode_costs.spatial_pred_cost[cdf_num][coded_id];
-      td->rd_counts.seg_tmp_pred_cost[0] += spatial_cost;
-
-      const int pred_segment_id =
-          cm->last_frame_seg_map
-              ? get_segment_id(mi_params, cm->last_frame_seg_map, bsize, mi_row,
-                               mi_col)
-              : 0;
-      const int use_tmp_pred = pred_segment_id == mi_addr->segment_id;
-      const uint8_t tmp_pred_ctx = av1_get_pred_context_seg_id(xd);
-      td->rd_counts.seg_tmp_pred_cost[1] +=
-          x->mode_costs.tmp_pred_cost[tmp_pred_ctx][use_tmp_pred];
-      if (!use_tmp_pred) {
-        td->rd_counts.seg_tmp_pred_cost[1] += spatial_cost;
-      }
-    }
+  if (UNLIKELY(seg->enabled)) {
+    av1_update_state_segmentation(cpi, td, ctx, mi_row, mi_col, bsize, dry_run);
   }
 
   // Count zero motion vector.
-  if (!dry_run && !frame_is_intra_only(cm)) {
+  if (UNLIKELY(!dry_run && !frame_is_intra_only(cm))) {
     const MV mv = mi->mv[0].as_mv;
     if (is_inter_block(mi) && mi->ref_frame[0] == LAST_FRAME &&
         abs(mv.row) < 8 && abs(mv.col) < 8) {
@@ -303,12 +285,22 @@ void av1_update_state(const AV1_COMP *const cpi, ThreadData *td,
       AOMMIN((xd->mb_to_right_edge >> (3 + MI_SIZE_LOG2)) + mi_width, mi_width);
   const int rows = AOMMIN(
       (xd->mb_to_bottom_edge >> (3 + MI_SIZE_LOG2)) + mi_height, mi_height);
-  for (y = 0; y < rows; y++) {
-    for (x_idx = 0; x_idx < cols; x_idx++) xd->mi[x_idx + y * mis] = mi_addr;
+  MB_MODE_INFO **mi_ptr = xd->mi;
+  if (cols == 1) {
+    for (y = 0; y < rows; y++, mi_ptr += mis) mi_ptr[0] = mi_addr;
+  } else if (cols == 2) {
+    for (y = 0; y < rows; y++, mi_ptr += mis) {
+      mi_ptr[0] = mi_addr;
+      mi_ptr[1] = mi_addr;
+    }
+  } else {
+    for (y = 0; y < rows; y++, mi_ptr += mis) {
+      for (x_idx = 0; x_idx < cols; x_idx++) mi_ptr[x_idx] = mi_addr;
+    }
   }
 
-  if (cpi->oxcf.q_cfg.aq_mode ||
-      (cpi->roi.enabled && cpi->roi.delta_qp_enabled))
+  if (UNLIKELY(cpi->oxcf.q_cfg.aq_mode ||
+               (cpi->roi.enabled && cpi->roi.delta_qp_enabled)))
     av1_init_plane_quantizers(cpi, x, mi_addr->segment_id, 0);
 
   if (dry_run) return;
@@ -340,7 +332,7 @@ void av1_update_state(const AV1_COMP *const cpi, ThreadData *td,
     }
   }
 #endif
-  if (!frame_is_intra_only(cm)) {
+  if (UNLIKELY(!frame_is_intra_only(cm))) {
     if (is_inter_block(mi) && cm->features.interp_filter == SWITCHABLE) {
       // When the frame interp filter is SWITCHABLE, several cases that always
       // use the default type (EIGHTTAP_REGULAR) are described in
@@ -351,10 +343,11 @@ void av1_update_state(const AV1_COMP *const cpi, ThreadData *td,
     }
   }
 
-  const int x_mis = AOMMIN(bw, mi_params->mi_cols - mi_col);
-  const int y_mis = AOMMIN(bh, mi_params->mi_rows - mi_row);
-  if (cm->seq_params->order_hint_info.enable_ref_frame_mvs)
+  if (UNLIKELY(cm->seq_params->order_hint_info.enable_ref_frame_mvs)) {
+    const int x_mis = AOMMIN(bw, mi_params->mi_cols - mi_col);
+    const int y_mis = AOMMIN(bh, mi_params->mi_rows - mi_row);
     av1_copy_frame_mvs(cm, mi, mi_row, mi_col, x_mis, y_mis);
+  }
 }
 
 void av1_update_inter_mode_stats(FRAME_CONTEXT *fc, FRAME_COUNTS *counts,
@@ -442,6 +435,92 @@ static void update_palette_cdf(MACROBLOCKD *xd, const MB_MODE_INFO *const mbmi,
   }
 }
 
+#if defined(__SSE2__)
+static inline void update_cdf_13_sse2(aom_cdf_prob *cdf, int8_t val) {
+  const int count = cdf[13];
+  const __m128i rate = _mm_cvtsi32_si128(5 + (count >> 4));
+  const __m128i sym_vec = _mm_set1_epi16(val);
+  const __m128i top = _mm_set1_epi16((int16_t)CDF_PROB_TOP);
+
+  __m128i c0 = _mm_loadu_si128((const __m128i *)cdf);
+  const __m128i m0 =
+      _mm_cmpgt_epi16(_mm_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8), sym_vec);
+  c0 = _mm_add_epi16(
+      _mm_sub_epi16(c0, m0),
+      _mm_sra_epi16(_mm_sub_epi16(_mm_or_si128(m0, top), c0), rate));
+  _mm_storeu_si128((__m128i *)cdf, c0);
+
+  __m128i c1 = _mm_loadl_epi64((const __m128i *)(cdf + 8));
+  const __m128i m1 =
+      _mm_cmpgt_epi16(_mm_setr_epi16(9, 10, 11, 12, 13, 14, 15, 16), sym_vec);
+  c1 = _mm_add_epi16(
+      _mm_sub_epi16(c1, m1),
+      _mm_sra_epi16(_mm_sub_epi16(_mm_or_si128(m1, top), c1), rate));
+  _mm_storel_epi64((__m128i *)(cdf + 8), c1);
+
+  cdf[13] = (aom_cdf_prob)(count + (count < 32));
+}
+
+static inline void update_cdf_uv_sse2(aom_cdf_prob *cdf, int8_t val,
+                                      int cfl_allowed) {
+  const int nsymbs = 13 + cfl_allowed;
+  const int count = cdf[nsymbs];
+  const int rate_scalar = 5 + (count >> 4);
+  const __m128i rate = _mm_cvtsi32_si128(rate_scalar);
+  const __m128i sym_vec = _mm_set1_epi16(val);
+  const __m128i top = _mm_set1_epi16((int16_t)CDF_PROB_TOP);
+
+  __m128i c0 = _mm_loadu_si128((const __m128i *)cdf);
+  const __m128i m0 =
+      _mm_cmpgt_epi16(_mm_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8), sym_vec);
+  c0 = _mm_add_epi16(
+      _mm_sub_epi16(c0, m0),
+      _mm_sra_epi16(_mm_sub_epi16(_mm_or_si128(m0, top), c0), rate));
+  _mm_storeu_si128((__m128i *)cdf, c0);
+
+  __m128i c1 = _mm_loadl_epi64((const __m128i *)(cdf + 8));
+  const __m128i m1 =
+      _mm_cmpgt_epi16(_mm_setr_epi16(9, 10, 11, 12, 13, 14, 15, 16), sym_vec);
+  c1 = _mm_add_epi16(
+      _mm_sub_epi16(c1, m1),
+      _mm_sra_epi16(_mm_sub_epi16(_mm_or_si128(m1, top), c1), rate));
+  _mm_storel_epi64((__m128i *)(cdf + 8), c1);
+
+  if (cfl_allowed) {
+    const int c = cdf[12];
+    const int mask = (val - 13) >> 31;
+    cdf[12] =
+        (aom_cdf_prob)(c - mask + (((mask | CDF_PROB_TOP) - c) >> rate_scalar));
+  }
+  cdf[nsymbs] = (aom_cdf_prob)(count + (count < 32));
+}
+
+static inline void update_cdf_16_sse2(aom_cdf_prob *cdf, int8_t val) {
+  const int count = cdf[16];
+  const __m128i rate = _mm_cvtsi32_si128(5 + (count >> 4));
+  const __m128i sym_vec = _mm_set1_epi16(val);
+  const __m128i top = _mm_set1_epi16((int16_t)CDF_PROB_TOP);
+
+  __m128i c0 = _mm_loadu_si128((const __m128i *)cdf);
+  const __m128i m0 =
+      _mm_cmpgt_epi16(_mm_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8), sym_vec);
+  c0 = _mm_add_epi16(
+      _mm_sub_epi16(c0, m0),
+      _mm_sra_epi16(_mm_sub_epi16(_mm_or_si128(m0, top), c0), rate));
+  _mm_storeu_si128((__m128i *)cdf, c0);
+
+  __m128i c1 = _mm_loadu_si128((const __m128i *)(cdf + 8));
+  const __m128i m1 =
+      _mm_cmpgt_epi16(_mm_setr_epi16(9, 10, 11, 12, 13, 14, 15, 16), sym_vec);
+  c1 = _mm_add_epi16(
+      _mm_sub_epi16(c1, m1),
+      _mm_sra_epi16(_mm_sub_epi16(_mm_or_si128(m1, top), c1), rate));
+  _mm_storeu_si128((__m128i *)(cdf + 8), c1);
+
+  cdf[16] = (aom_cdf_prob)(count + (count < 32));
+}
+#endif
+
 void av1_sum_intra_stats(const AV1_COMMON *const cm, FRAME_COUNTS *counts,
                          MACROBLOCKD *xd, const MB_MODE_INFO *const mbmi,
                          const MB_MODE_INFO *above_mi,
@@ -451,45 +530,49 @@ void av1_sum_intra_stats(const AV1_COMMON *const cm, FRAME_COUNTS *counts,
   (void)counts;
   const BLOCK_SIZE bsize = mbmi->bsize;
 
-  if (intraonly) {
 #if CONFIG_ENTROPY_STATS
+  if (intraonly) {
     const PREDICTION_MODE above = av1_above_block_mode(above_mi);
     const PREDICTION_MODE left = av1_left_block_mode(left_mi);
     const int above_ctx = intra_mode_context[above];
     const int left_ctx = intra_mode_context[left];
     ++counts->kf_y_mode[above_ctx][left_ctx][y_mode];
-#endif  // CONFIG_ENTROPY_STATS
-    update_cdf(get_y_mode_cdf(fc, above_mi, left_mi), y_mode, INTRA_MODES);
   } else {
-#if CONFIG_ENTROPY_STATS
     ++counts->y_mode[size_group_lookup[bsize]][y_mode];
-#endif  // CONFIG_ENTROPY_STATS
-    update_cdf(fc->y_mode_cdf[size_group_lookup[bsize]], y_mode, INTRA_MODES);
   }
+#endif  // CONFIG_ENTROPY_STATS
+  aom_cdf_prob *const y_mode_cdf =
+      intraonly ? get_y_mode_cdf(fc, above_mi, left_mi)
+                : fc->y_mode_cdf[size_group_lookup[bsize]];
+#if defined(__SSE2__)
+  update_cdf_13_sse2(y_mode_cdf, y_mode);
+#else
+  update_cdf(y_mode_cdf, y_mode, INTRA_MODES);
+#endif
 
   if (av1_filter_intra_allowed(cm, mbmi)) {
     const int use_filter_intra_mode =
         mbmi->filter_intra_mode_info.use_filter_intra;
 #if CONFIG_ENTROPY_STATS
-    ++counts->filter_intra[mbmi->bsize][use_filter_intra_mode];
+    ++counts->filter_intra[bsize][use_filter_intra_mode];
     if (use_filter_intra_mode) {
       ++counts
             ->filter_intra_mode[mbmi->filter_intra_mode_info.filter_intra_mode];
     }
 #endif  // CONFIG_ENTROPY_STATS
-    update_cdf(fc->filter_intra_cdfs[mbmi->bsize], use_filter_intra_mode, 2);
+    update_cdf(fc->filter_intra_cdfs[bsize], use_filter_intra_mode, 2);
     if (use_filter_intra_mode) {
       update_cdf(fc->filter_intra_mode_cdf,
                  mbmi->filter_intra_mode_info.filter_intra_mode,
                  FILTER_INTRA_MODES);
     }
   }
-  if (av1_is_directional_mode(mbmi->mode) && av1_use_angle_delta(bsize)) {
+  if (av1_is_directional_mode(y_mode) && av1_use_angle_delta(bsize)) {
 #if CONFIG_ENTROPY_STATS
-    ++counts->angle_delta[mbmi->mode - V_PRED]
+    ++counts->angle_delta[y_mode - V_PRED]
                          [mbmi->angle_delta[PLANE_TYPE_Y] + MAX_ANGLE_DELTA];
 #endif
-    update_cdf(fc->angle_delta_cdf[mbmi->mode - V_PRED],
+    update_cdf(fc->angle_delta_cdf[y_mode - V_PRED],
                mbmi->angle_delta[PLANE_TYPE_Y] + MAX_ANGLE_DELTA,
                2 * MAX_ANGLE_DELTA + 1);
   }
@@ -501,8 +584,13 @@ void av1_sum_intra_stats(const AV1_COMMON *const cm, FRAME_COUNTS *counts,
 #if CONFIG_ENTROPY_STATS
   ++counts->uv_mode[cfl_allowed][y_mode][uv_mode];
 #endif  // CONFIG_ENTROPY_STATS
+#if defined(__SSE2__)
+  update_cdf_uv_sse2(fc->uv_mode_cdf[cfl_allowed][y_mode], uv_mode,
+                     cfl_allowed);
+#else
   update_cdf(fc->uv_mode_cdf[cfl_allowed][y_mode], uv_mode,
              UV_INTRA_MODES - !cfl_allowed);
+#endif
   if (uv_mode == UV_CFL_PRED) {
     const int8_t joint_sign = mbmi->cfl_alpha_signs;
     const uint8_t idx = mbmi->cfl_alpha_idx;
@@ -517,7 +605,11 @@ void av1_sum_intra_stats(const AV1_COMMON *const cm, FRAME_COUNTS *counts,
 #if CONFIG_ENTROPY_STATS
       ++counts->cfl_alpha[CFL_CONTEXT_U(joint_sign)][CFL_IDX_U(idx)];
 #endif
+#if defined(__SSE2__)
+      update_cdf_16_sse2(cdf_u, CFL_IDX_U(idx));
+#else
       update_cdf(cdf_u, CFL_IDX_U(idx), CFL_ALPHABET_SIZE);
+#endif
     }
     if (CFL_SIGN_V(joint_sign) != CFL_SIGN_ZERO) {
       aom_cdf_prob *cdf_v = fc->cfl_alpha_cdf[CFL_CONTEXT_V(joint_sign)];
@@ -525,86 +617,166 @@ void av1_sum_intra_stats(const AV1_COMMON *const cm, FRAME_COUNTS *counts,
 #if CONFIG_ENTROPY_STATS
       ++counts->cfl_alpha[CFL_CONTEXT_V(joint_sign)][CFL_IDX_V(idx)];
 #endif
+#if defined(__SSE2__)
+      update_cdf_16_sse2(cdf_v, CFL_IDX_V(idx));
+#else
       update_cdf(cdf_v, CFL_IDX_V(idx), CFL_ALPHABET_SIZE);
+#endif
+    }
+  } else {
+    const PREDICTION_MODE intra_mode = get_uv_mode(uv_mode);
+    if (av1_is_directional_mode(intra_mode) && av1_use_angle_delta(bsize)) {
+#if CONFIG_ENTROPY_STATS
+      ++counts->angle_delta[intra_mode - V_PRED]
+                           [mbmi->angle_delta[PLANE_TYPE_UV] + MAX_ANGLE_DELTA];
+#endif
+      update_cdf(fc->angle_delta_cdf[intra_mode - V_PRED],
+                 mbmi->angle_delta[PLANE_TYPE_UV] + MAX_ANGLE_DELTA,
+                 2 * MAX_ANGLE_DELTA + 1);
     }
   }
-  const PREDICTION_MODE intra_mode = get_uv_mode(uv_mode);
-  if (av1_is_directional_mode(intra_mode) && av1_use_angle_delta(bsize)) {
-#if CONFIG_ENTROPY_STATS
-    ++counts->angle_delta[intra_mode - V_PRED]
-                         [mbmi->angle_delta[PLANE_TYPE_UV] + MAX_ANGLE_DELTA];
-#endif
-    update_cdf(fc->angle_delta_cdf[intra_mode - V_PRED],
-               mbmi->angle_delta[PLANE_TYPE_UV] + MAX_ANGLE_DELTA,
-               2 * MAX_ANGLE_DELTA + 1);
-  }
-  if (av1_allow_palette(cm->features.allow_screen_content_tools, bsize)) {
+  if (UNLIKELY(
+          av1_allow_palette(cm->features.allow_screen_content_tools, bsize))) {
     update_palette_cdf(xd, mbmi, counts);
   }
 }
 
-void av1_restore_context(MACROBLOCK *x, const RD_SEARCH_MACROBLOCK_CONTEXT *ctx,
-                         int mi_row, int mi_col, BLOCK_SIZE bsize,
-                         const int num_planes) {
-  MACROBLOCKD *xd = &x->e_mbd;
-  int p;
-  const int num_4x4_blocks_wide = mi_size_wide[bsize];
-  const int num_4x4_blocks_high = mi_size_high[bsize];
-  int mi_width = mi_size_wide[bsize];
-  int mi_height = mi_size_high[bsize];
-  for (p = 0; p < num_planes; p++) {
-    int tx_col = mi_col;
-    int tx_row = mi_row & MAX_MIB_MASK;
-    memcpy(
-        xd->above_entropy_context[p] + (tx_col >> xd->plane[p].subsampling_x),
-        ctx->a + num_4x4_blocks_wide * p,
-        (sizeof(ENTROPY_CONTEXT) * num_4x4_blocks_wide) >>
-            xd->plane[p].subsampling_x);
-    memcpy(xd->left_entropy_context[p] + (tx_row >> xd->plane[p].subsampling_y),
-           ctx->l + num_4x4_blocks_high * p,
-           (sizeof(ENTROPY_CONTEXT) * num_4x4_blocks_high) >>
-               xd->plane[p].subsampling_y);
+static inline void copy_ctx_6(void *d0, const void *s0, void *d1,
+                              const void *s1, void *d2, const void *s2,
+                              void *d3, const void *s3, void *d4,
+                              const void *s4, void *d5, const void *s5,
+                              int len) {
+  if (len <= 4) {
+    if (len == 1) {
+      *(uint8_t *)d0 = *(const uint8_t *)s0;
+      *(uint8_t *)d1 = *(const uint8_t *)s1;
+      *(uint8_t *)d2 = *(const uint8_t *)s2;
+      *(uint8_t *)d3 = *(const uint8_t *)s3;
+      *(uint8_t *)d4 = *(const uint8_t *)s4;
+      *(uint8_t *)d5 = *(const uint8_t *)s5;
+    } else if (len == 2) {
+      memcpy(d0, s0, 2);
+      memcpy(d1, s1, 2);
+      memcpy(d2, s2, 2);
+      memcpy(d3, s3, 2);
+      memcpy(d4, s4, 2);
+      memcpy(d5, s5, 2);
+    } else {
+      memcpy(d0, s0, 4);
+      memcpy(d1, s1, 4);
+      memcpy(d2, s2, 4);
+      memcpy(d3, s3, 4);
+      memcpy(d4, s4, 4);
+      memcpy(d5, s5, 4);
+    }
+  } else if (len == 8) {
+    memcpy(d0, s0, 8);
+    memcpy(d1, s1, 8);
+    memcpy(d2, s2, 8);
+    memcpy(d3, s3, 8);
+    memcpy(d4, s4, 8);
+    memcpy(d5, s5, 8);
+  } else {
+    memcpy(d0, s0, 16);
+    memcpy(d1, s1, 16);
+    memcpy(d2, s2, 16);
+    memcpy(d3, s3, 16);
+    memcpy(d4, s4, 16);
+    memcpy(d5, s5, 16);
+    if (UNLIKELY(len > 16)) {
+      memcpy((uint8_t *)d0 + 16, (const uint8_t *)s0 + 16, 16);
+      memcpy((uint8_t *)d1 + 16, (const uint8_t *)s1 + 16, 16);
+      memcpy((uint8_t *)d2 + 16, (const uint8_t *)s2 + 16, 16);
+      memcpy((uint8_t *)d3 + 16, (const uint8_t *)s3 + 16, 16);
+      memcpy((uint8_t *)d4 + 16, (const uint8_t *)s4 + 16, 16);
+      memcpy((uint8_t *)d5 + 16, (const uint8_t *)s5 + 16, 16);
+    }
   }
-  memcpy(xd->above_partition_context + mi_col, ctx->sa,
-         sizeof(*xd->above_partition_context) * mi_width);
-  memcpy(xd->left_partition_context + (mi_row & MAX_MIB_MASK), ctx->sl,
-         sizeof(xd->left_partition_context[0]) * mi_height);
-  xd->above_txfm_context = ctx->p_ta;
-  xd->left_txfm_context = ctx->p_tl;
-  memcpy(xd->above_txfm_context, ctx->ta,
-         sizeof(*xd->above_txfm_context) * mi_width);
-  memcpy(xd->left_txfm_context, ctx->tl,
-         sizeof(*xd->left_txfm_context) * mi_height);
 }
 
-void av1_save_context(const MACROBLOCK *x, RD_SEARCH_MACROBLOCK_CONTEXT *ctx,
-                      int mi_row, int mi_col, BLOCK_SIZE bsize,
-                      const int num_planes) {
-  const MACROBLOCKD *xd = &x->e_mbd;
-  int p;
-  int mi_width = mi_size_wide[bsize];
-  int mi_height = mi_size_high[bsize];
-
-  // buffer the above/left context information of the block in search.
-  for (p = 0; p < num_planes; ++p) {
-    int tx_col = mi_col;
-    int tx_row = mi_row & MAX_MIB_MASK;
-    memcpy(
-        ctx->a + mi_width * p,
-        xd->above_entropy_context[p] + (tx_col >> xd->plane[p].subsampling_x),
-        (sizeof(ENTROPY_CONTEXT) * mi_width) >> xd->plane[p].subsampling_x);
-    memcpy(ctx->l + mi_height * p,
-           xd->left_entropy_context[p] + (tx_row >> xd->plane[p].subsampling_y),
-           (sizeof(ENTROPY_CONTEXT) * mi_height) >> xd->plane[p].subsampling_y);
+static inline void copy_ctx_2(void *d0, const void *s0, void *d1,
+                              const void *s1, int len) {
+  if (len <= 2) {
+    if (len == 1) {
+      *(uint8_t *)d0 = *(const uint8_t *)s0;
+      *(uint8_t *)d1 = *(const uint8_t *)s1;
+    } else if (len == 2) {
+      memcpy(d0, s0, 2);
+      memcpy(d1, s1, 2);
+    }
+  } else if (len == 4) {
+    memcpy(d0, s0, 4);
+    memcpy(d1, s1, 4);
+  } else if (len == 8) {
+    memcpy(d0, s0, 8);
+    memcpy(d1, s1, 8);
+  } else {
+    memcpy(d0, s0, 16);
+    memcpy(d1, s1, 16);
+    if (UNLIKELY(len > 16)) {
+      memcpy((uint8_t *)d0 + 16, (const uint8_t *)s0 + 16, 16);
+      memcpy((uint8_t *)d1 + 16, (const uint8_t *)s1 + 16, 16);
+    }
   }
-  memcpy(ctx->sa, xd->above_partition_context + mi_col,
-         sizeof(*xd->above_partition_context) * mi_width);
-  memcpy(ctx->sl, xd->left_partition_context + (mi_row & MAX_MIB_MASK),
-         sizeof(xd->left_partition_context[0]) * mi_height);
-  memcpy(ctx->ta, xd->above_txfm_context,
-         sizeof(*xd->above_txfm_context) * mi_width);
-  memcpy(ctx->tl, xd->left_txfm_context,
-         sizeof(*xd->left_txfm_context) * mi_height);
+}
+
+__attribute__((noinline)) void av1_restore_context(
+    MACROBLOCK *x, const RD_SEARCH_MACROBLOCK_CONTEXT *ctx, int mi_row,
+    int mi_col, BLOCK_SIZE bsize, const int num_planes) {
+  MACROBLOCKD *xd = &x->e_mbd;
+  const int mi_width = mi_size_wide[bsize];
+  assert(mi_width == mi_size_high[bsize]);
+  const int tx_row = mi_row & MAX_MIB_MASK;
+
+  xd->above_txfm_context = ctx->p_ta;
+  xd->left_txfm_context = ctx->p_tl;
+  copy_ctx_6(xd->above_entropy_context[0] + mi_col, ctx->a,
+             xd->left_entropy_context[0] + tx_row, ctx->l,
+             xd->above_partition_context + mi_col, ctx->sa,
+             xd->left_partition_context + tx_row, ctx->sl,
+             xd->above_txfm_context, ctx->ta, xd->left_txfm_context, ctx->tl,
+             mi_width);
+
+  if (num_planes > 1) {
+    const int ss_x = xd->plane[1].subsampling_x;
+    const int ss_y = xd->plane[1].subsampling_y;
+    const int c_col = mi_col >> ss_x;
+    const int c_row = tx_row >> ss_y;
+    copy_ctx_2(xd->above_entropy_context[1] + c_col, ctx->a + mi_width,
+               xd->above_entropy_context[2] + c_col, ctx->a + 2 * mi_width,
+               mi_width >> ss_x);
+    copy_ctx_2(xd->left_entropy_context[1] + c_row, ctx->l + mi_width,
+               xd->left_entropy_context[2] + c_row, ctx->l + 2 * mi_width,
+               mi_width >> ss_y);
+  }
+}
+
+__attribute__((noinline)) void av1_save_context(
+    const MACROBLOCK *x, RD_SEARCH_MACROBLOCK_CONTEXT *ctx, int mi_row,
+    int mi_col, BLOCK_SIZE bsize, const int num_planes) {
+  const MACROBLOCKD *xd = &x->e_mbd;
+  const int mi_width = mi_size_wide[bsize];
+  assert(mi_width == mi_size_high[bsize]);
+  const int tx_row = mi_row & MAX_MIB_MASK;
+
+  copy_ctx_6(ctx->a, xd->above_entropy_context[0] + mi_col, ctx->l,
+             xd->left_entropy_context[0] + tx_row, ctx->sa,
+             xd->above_partition_context + mi_col, ctx->sl,
+             xd->left_partition_context + tx_row, ctx->ta,
+             xd->above_txfm_context, ctx->tl, xd->left_txfm_context, mi_width);
+
+  if (num_planes > 1) {
+    const int ss_x = xd->plane[1].subsampling_x;
+    const int ss_y = xd->plane[1].subsampling_y;
+    const int c_col = mi_col >> ss_x;
+    const int c_row = tx_row >> ss_y;
+    copy_ctx_2(ctx->a + mi_width, xd->above_entropy_context[1] + c_col,
+               ctx->a + 2 * mi_width, xd->above_entropy_context[2] + c_col,
+               mi_width >> ss_x);
+    copy_ctx_2(ctx->l + mi_width, xd->left_entropy_context[1] + c_row,
+               ctx->l + 2 * mi_width, xd->left_entropy_context[2] + c_row,
+               mi_width >> ss_y);
+  }
   ctx->p_ta = xd->above_txfm_context;
   ctx->p_tl = xd->left_txfm_context;
 }
@@ -1097,9 +1269,6 @@ static inline void avg_cdf_symbol(aom_cdf_prob *restrict cdf_ptr_left,
                                   const aom_cdf_prob *restrict cdf_ptr_tr,
                                   int num_cdfs, int cdf_stride, int nsymbs,
                                   int wt_left, int wt_tr) {
-  // Fast path for the common 3:1 row-mt CDF weighting:
-  // (3 * a + b + 2) >> 2 == (a + ((a + b) >> 1) + 1) >> 1, which compilers
-  // auto-vectorize using unsigned 16-bit average instructions.
   if (wt_left == 3 && wt_tr == 1) {
     if (cdf_stride == nsymbs + 1) {
       const int total = num_cdfs * cdf_stride;
@@ -1481,15 +1650,17 @@ void av1_reset_mbmi(CommonModeInfoParams *const mi_params, BLOCK_SIZE sb_size,
                     int mi_row, int mi_col) {
   // size of sb in unit of mi (BLOCK_4X4)
   const int sb_size_mi = mi_size_wide[sb_size];
-  const int mi_alloc_size_1d = mi_size_wide[mi_params->mi_alloc_bsize];
+  const int mi_alloc_size_log2 = mi_size_wide_log2[mi_params->mi_alloc_bsize];
+  const int mi_alloc_size_1d = 1 << mi_alloc_size_log2;
   // size of sb in unit of allocated mi size
-  const int sb_size_alloc_mi = mi_size_wide[sb_size] / mi_alloc_size_1d;
+  const int sb_size_alloc_mi = sb_size_mi >> mi_alloc_size_log2;
   assert(mi_params->mi_alloc_stride % sb_size_alloc_mi == 0 &&
          "mi is not allocated as a multiple of sb!");
   assert(mi_params->mi_stride % sb_size_mi == 0 &&
          "mi_grid_base is not allocated as a multiple of sb!");
 
   const int mi_rows = mi_size_high[sb_size];
+  const int mi_alloc_mask = mi_alloc_size_1d - 1;
   for (int cur_mi_row = 0; cur_mi_row < mi_rows; cur_mi_row++) {
     assert(get_mi_grid_idx(mi_params, 0, mi_col + mi_alloc_size_1d) <
            mi_params->mi_stride);
@@ -1501,7 +1672,7 @@ void av1_reset_mbmi(CommonModeInfoParams *const mi_params, BLOCK_SIZE sb_size,
            sb_size_mi * sizeof(*mi_params->mi_grid_base));
     memset(&mi_params->tx_type_map[mi_grid_idx], 0,
            sb_size_mi * sizeof(*mi_params->tx_type_map));
-    if (cur_mi_row % mi_alloc_size_1d == 0) {
+    if ((cur_mi_row & mi_alloc_mask) == 0) {
       memset(&mi_params->mi_alloc[alloc_mi_idx], 0,
              sb_size_alloc_mi * sizeof(*mi_params->mi_alloc));
     }
@@ -1750,5 +1921,58 @@ void av1_alloc_src_diff_buf(const struct AV1Common *cm, struct macroblock *mb) {
     CHECK_MEM_ERROR(cm, mb->plane[plane].src_diff,
                     (int16_t *)aom_memalign(
                         32, sizeof(*mb->plane[plane].src_diff) * sb_size));
+  }
+}
+
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
+void av1_update_state_segmentation(const AV1_COMP *const cpi, ThreadData *td,
+                                   const PICK_MODE_CONTEXT *const ctx,
+                                   int mi_row, int mi_col, BLOCK_SIZE bsize,
+                                   RUN_TYPE dry_run) {
+  const AV1_COMMON *const cm = &cpi->common;
+  const CommonModeInfoParams *const mi_params = &cm->mi_params;
+  MACROBLOCK *const x = &td->mb;
+  MACROBLOCKD *const xd = &x->e_mbd;
+  MB_MODE_INFO *const mi_addr = xd->mi[0];
+  const struct segmentation *const seg = &cm->seg;
+  if (cpi->oxcf.q_cfg.aq_mode == COMPLEXITY_AQ || cpi->roi.enabled) {
+    const uint8_t *const map =
+        seg->update_map ? cpi->enc_seg.map : cm->last_frame_seg_map;
+    mi_addr->segment_id =
+        map ? get_segment_id(mi_params, map, bsize, mi_row, mi_col) : 0;
+  }
+  if (cpi->oxcf.q_cfg.aq_mode == CYCLIC_REFRESH_AQ && !cpi->roi.enabled &&
+      mi_addr->segment_id != AM_SEGMENT_ID_INACTIVE &&
+      !cpi->rc.rtc_external_ratectrl) {
+    av1_cyclic_refresh_update_segment(cpi, x, mi_row, mi_col, bsize,
+                                      ctx->rd_stats.rate, ctx->rd_stats.dist,
+                                      x->txfm_search_info.skip_txfm, dry_run);
+  }
+  if (mi_addr->uv_mode == UV_CFL_PRED && !is_cfl_allowed(xd))
+    mi_addr->uv_mode = UV_DC_PRED;
+
+  if (!dry_run && !mi_addr->skip_txfm) {
+    int cdf_num;
+    const uint8_t spatial_pred = av1_get_spatial_seg_pred(
+        cm, xd, &cdf_num, cpi->cyclic_refresh->skip_over4x4);
+    const uint8_t coded_id = av1_neg_interleave(
+        mi_addr->segment_id, spatial_pred, seg->last_active_segid + 1);
+    int64_t spatial_cost = x->mode_costs.spatial_pred_cost[cdf_num][coded_id];
+    td->rd_counts.seg_tmp_pred_cost[0] += spatial_cost;
+
+    const int pred_segment_id =
+        cm->last_frame_seg_map
+            ? get_segment_id(mi_params, cm->last_frame_seg_map, bsize, mi_row,
+                             mi_col)
+            : 0;
+    const int use_tmp_pred = pred_segment_id == mi_addr->segment_id;
+    const uint8_t tmp_pred_ctx = av1_get_pred_context_seg_id(xd);
+    td->rd_counts.seg_tmp_pred_cost[1] +=
+        x->mode_costs.tmp_pred_cost[tmp_pred_ctx][use_tmp_pred];
+    if (!use_tmp_pred) {
+      td->rd_counts.seg_tmp_pred_cost[1] += spatial_cost;
+    }
   }
 }

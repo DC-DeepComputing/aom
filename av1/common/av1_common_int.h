@@ -1318,23 +1318,22 @@ static inline void av1_init_macroblockd(AV1_COMMON *cm, MACROBLOCKD *xd) {
 
 static inline void set_entropy_context(MACROBLOCKD *xd, int mi_row, int mi_col,
                                        const int num_planes) {
-  int i;
-  int row_offset = mi_row;
-  int col_offset = mi_col;
-  for (i = 0; i < num_planes; ++i) {
-    struct macroblockd_plane *const pd = &xd->plane[i];
-    // Offset the buffer pointer
-    const BLOCK_SIZE bsize = xd->mi[0]->bsize;
-    if (pd->subsampling_y && (mi_row & 0x01) && (mi_size_high[bsize] == 1))
-      row_offset = mi_row - 1;
-    if (pd->subsampling_x && (mi_col & 0x01) && (mi_size_wide[bsize] == 1))
-      col_offset = mi_col - 1;
-    int above_idx = col_offset;
-    int left_idx = row_offset & MAX_MIB_MASK;
-    pd->above_entropy_context =
-        &xd->above_entropy_context[i][above_idx >> pd->subsampling_x];
-    pd->left_entropy_context =
-        &xd->left_entropy_context[i][left_idx >> pd->subsampling_y];
+  const int left_idx = mi_row & MAX_MIB_MASK;
+  xd->plane[0].above_entropy_context = &xd->above_entropy_context[0][mi_col];
+  xd->plane[0].left_entropy_context = &xd->left_entropy_context[0][left_idx];
+  if (num_planes > 1) {
+    const int ss_x = xd->plane[1].subsampling_x;
+    const int ss_y = xd->plane[1].subsampling_y;
+    const int chroma_above = mi_col >> ss_x;
+    const int chroma_left = left_idx >> ss_y;
+    xd->plane[1].above_entropy_context =
+        &xd->above_entropy_context[1][chroma_above];
+    xd->plane[1].left_entropy_context =
+        &xd->left_entropy_context[1][chroma_left];
+    xd->plane[2].above_entropy_context =
+        &xd->above_entropy_context[2][chroma_above];
+    xd->plane[2].left_entropy_context =
+        &xd->left_entropy_context[2][chroma_left];
   }
 }
 
@@ -1634,9 +1633,9 @@ static inline int get_mi_grid_idx(const CommonModeInfoParams *const mi_params,
 
 static inline int get_alloc_mi_idx(const CommonModeInfoParams *const mi_params,
                                    int mi_row, int mi_col) {
-  const int mi_alloc_size_1d = mi_size_wide[mi_params->mi_alloc_bsize];
-  const int mi_alloc_row = mi_row / mi_alloc_size_1d;
-  const int mi_alloc_col = mi_col / mi_alloc_size_1d;
+  const int mi_alloc_size_log2 = mi_size_wide_log2[mi_params->mi_alloc_bsize];
+  const int mi_alloc_row = mi_row >> mi_alloc_size_log2;
+  const int mi_alloc_col = mi_col >> mi_alloc_size_log2;
 
   return mi_alloc_row * mi_params->mi_alloc_stride + mi_alloc_col;
 }
@@ -1659,14 +1658,10 @@ static inline void set_mi_offsets(const CommonModeInfoParams *const mi_params,
 static inline void txfm_partition_update(TXFM_CONTEXT *above_ctx,
                                          TXFM_CONTEXT *left_ctx,
                                          TX_SIZE tx_size, TX_SIZE txb_size) {
-  BLOCK_SIZE bsize = txsize_to_bsize[txb_size];
-  int bh = mi_size_high[bsize];
-  int bw = mi_size_wide[bsize];
-  uint8_t txw = tx_size_wide[tx_size];
-  uint8_t txh = tx_size_high[tx_size];
-  int i;
-  for (i = 0; i < bh; ++i) left_ctx[i] = txh;
-  for (i = 0; i < bw; ++i) above_ctx[i] = txw;
+  av1_fill_entropy_ctx_pow2((ENTROPY_CONTEXT *)left_ctx, tx_size_high[tx_size],
+                            tx_size_high_unit[txb_size]);
+  av1_fill_entropy_ctx_pow2((ENTROPY_CONTEXT *)above_ctx, tx_size_wide[tx_size],
+                            tx_size_wide_unit[txb_size]);
 }
 
 static inline TX_SIZE get_sqr_tx_size(int tx_dim) {
