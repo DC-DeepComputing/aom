@@ -16,6 +16,24 @@
       "message": "Add Bug: 576320193",
       "revId": "5d237f00dbb8ac1a93bfc2ad0fd10ef550acd828",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "b6137154_d862b5fe",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 1
+      },
+      "lineNbr": 36,
+      "author": {
+        "id": 5220824
+      },
+      "writtenOn": "2026-11-04T09:47:00Z",
+      "side": 1,
+      "message": "Marked as resolved.",
+      "parentUuid": "c1b23fe8_91f3323b",
+      "revId": "5d237f00dbb8ac1a93bfc2ad0fd10ef550acd828",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
