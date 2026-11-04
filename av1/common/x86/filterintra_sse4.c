@@ -36,21 +36,15 @@ static inline void filter_4x2_sse4_1(uint8_t *dst, const ptrdiff_t stride,
                                      const __m128i *taps_6_7) {
   const __m128i mul_0_01 = _mm_maddubs_epi16(*pixels, *taps_0_1);
   const __m128i mul_0_23 = _mm_maddubs_epi16(*pixels, *taps_2_3);
-  // |output_half| contains 8 partial sums.
-  __m128i output_half = _mm_hadd_epi16(mul_0_01, mul_0_23);
-  __m128i output = _mm_hadd_epi16(output_half, output_half);
-  const __m128i output_row0 =
-      _mm_packus_epi16(xx_roundn_epi16_unsigned(output, 4),
-                       /* arbitrary pack arg */ output);
-  xx_storel_32(dst, output_row0);
   const __m128i mul_1_01 = _mm_maddubs_epi16(*pixels, *taps_4_5);
   const __m128i mul_1_23 = _mm_maddubs_epi16(*pixels, *taps_6_7);
-  output_half = _mm_hadd_epi16(mul_1_01, mul_1_23);
-  output = _mm_hadd_epi16(output_half, output_half);
-  const __m128i output_row1 =
-      _mm_packus_epi16(xx_roundn_epi16_unsigned(output, 4),
-                       /* arbitrary pack arg */ output);
-  xx_storel_32(dst + stride, output_row1);
+  const __m128i output_half_0 = _mm_hadd_epi16(mul_0_01, mul_0_23);
+  const __m128i output_half_1 = _mm_hadd_epi16(mul_1_01, mul_1_23);
+  const __m128i output = _mm_hadd_epi16(output_half_0, output_half_1);
+  const __m128i rounded = xx_roundn_epi16_unsigned(output, 4);
+  const __m128i packed = _mm_packus_epi16(rounded, rounded);
+  xx_storel_32(dst, packed);
+  xx_storel_32(dst + stride, _mm_srli_si128(packed, 4));
 }
 
 // 4xH transform sizes are given special treatment because xx_loadl_64 goes out
