@@ -14,18 +14,14 @@
 
 #include "av1/common/av1_common_int.h"
 
-#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
-#pragma GCC visibility push(hidden)
+#ifdef __cplusplus
+extern "C" {
 #endif
 
 extern const int16_t av1_eob_group_start[12];
 extern const int16_t av1_eob_offset_bits[12];
 
 extern const int8_t *const av1_nz_map_ctx_offset[TX_SIZES_ALL];
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 typedef struct txb_ctx {
   int txb_skip_ctx;
@@ -127,22 +123,20 @@ static AOM_FORCE_INLINE int get_br_ctx_stride(const uint8_t *const levels,
       mag += lvs[1];
       mag = AOMMIN((mag + 1) >> 1, 6);
       if (c == 0) return mag;
-      const int row = c & ((int)stride - (TX_PAD_HOR + 1));
-      if ((row | (int)col) < 2) return mag + 7;
+      if ((c & ~((int)stride - (TX_PAD_HOR - 1))) == 0) return mag + 7;
       break;
     }
     case TX_CLASS_HORIZ:
       mag += lvs[stride];
       mag = AOMMIN((mag + 1) >> 1, 6);
       if (c == 0) return mag;
-      if (col == 0) return mag + 7;
+      if (c < ((int)stride - TX_PAD_HOR)) return mag + 7;
       break;
     case TX_CLASS_VERT: {
       mag += lv[2];
       mag = AOMMIN((mag + 1) >> 1, 6);
       if (c == 0) return mag;
-      const int row = c & ((int)stride - (TX_PAD_HOR + 1));
-      if (row == 0) return mag + 7;
+      if ((c & ((int)stride - (TX_PAD_HOR + 1))) == 0) return mag + 7;
       break;
     }
     default: break;
@@ -169,20 +163,18 @@ static AOM_FORCE_INLINE int get_br_ctx_simple_stride(
   int mag = lv[1] + lvs[0];
   switch (tx_class) {
     case TX_CLASS_2D: {
-      const int row = c & ((int)stride - (TX_PAD_HOR + 1));
       mag += lvs[1];
       mag = AOMMIN((mag + 1) >> 1, 6);
-      return mag + (((row | (int)col) < 2) ? 7 : 14);
+      return mag + (((c & ~((int)stride - (TX_PAD_HOR - 1))) == 0) ? 7 : 14);
     }
     case TX_CLASS_HORIZ:
       mag += lvs[stride];
       mag = AOMMIN((mag + 1) >> 1, 6);
-      return mag + ((col == 0) ? 7 : 14);
+      return mag + ((c < ((int)stride - TX_PAD_HOR)) ? 7 : 14);
     case TX_CLASS_VERT: {
-      const int row = c & ((int)stride - (TX_PAD_HOR + 1));
       mag += lv[2];
       mag = AOMMIN((mag + 1) >> 1, 6);
-      return mag + ((row == 0) ? 7 : 14);
+      return mag + (((c & ((int)stride - (TX_PAD_HOR + 1))) == 0) ? 7 : 14);
     }
     default: return mag + 14;
   }
@@ -348,8 +340,6 @@ static AOM_FORCE_INLINE int get_lower_levels_ctx_fast(
   }
 }
 
-// Specialized variant for AC coefficients (coeff_idx > 0), skipping the
-// redundant (tx_class | coeff_idx) == 0 check.
 static AOM_FORCE_INLINE int get_lower_levels_ctx_simple_fast(
     const uint8_t *levels, int coeff_idx, int bhl, intptr_t stride,
     const int8_t *nz_map_ctx_offset, TX_CLASS tx_class) {
@@ -410,37 +400,35 @@ static inline uint8_t av1_get_txb_entropy_context(const tran_low_t *qcoeff,
   return (uint8_t)(cul_level | dc_sign);
 }
 
-#ifdef __cplusplus
-}  // extern "C"
-#endif
-
 #define MAX_TX_SIZE_UNIT 16
-static const int8_t kTxbCtxSigns[3] = { 0, -1, 1 };
-static const int8_t kTxbCtxDcSignContexts[4 * MAX_TX_SIZE_UNIT + 1] = {
-  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-  2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2
+static const uint8_t kTxbCtxSkipCat[3][3] = {
+  { 1, 2, 3 },
+  { 2, 4, 5 },
+  { 3, 5, 6 },
 };
 
-// This is the algorithm to generate table kTxbCtxSkipContexts[top][left].
-//    const int max = AOMMIN(top | left, 4);
-//    const int min = AOMMIN(AOMMIN(top, left), 4);
-//    if (!max)
-//      txb_skip_ctx = 1;
-//    else if (!min)
-//      txb_skip_ctx = 2 + (max > 3);
-//    else if (max <= 3)
-//      txb_skip_ctx = 4;
-//    else if (min <= 3)
-//      txb_skip_ctx = 5;
-//    else
-//      txb_skip_ctx = 6;
-static const uint8_t kTxbCtxSkipContexts[5][5] = { { 1, 2, 2, 2, 3 },
-                                                   { 2, 4, 4, 4, 5 },
-                                                   { 2, 4, 4, 4, 5 },
-                                                   { 2, 4, 4, 4, 5 },
-                                                   { 3, 5, 5, 5, 6 } };
+static inline uint64_t load_entropy_ctx_u64(const ENTROPY_CONTEXT *p,
+                                            int unit) {
+  uint64_t v;
+  if (unit == 1) {
+    v = (uint8_t)p[0];
+  } else if (unit == 2) {
+    uint16_t v2;
+    memcpy(&v2, p, 2);
+    v = v2;
+  } else if (unit == 4) {
+    uint32_t v4;
+    memcpy(&v4, p, 4);
+    v = v4;
+  } else {
+    memcpy(&v, p, 8);
+  }
+  return v;
+}
 
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
 static void get_txb_ctx_general(const BLOCK_SIZE plane_bsize,
                                 const TX_SIZE tx_size, const int plane,
                                 const ENTROPY_CONTEXT *const a,
@@ -448,54 +436,40 @@ static void get_txb_ctx_general(const BLOCK_SIZE plane_bsize,
                                 TXB_CTX *const txb_ctx) {
   const int txb_w_unit = tx_size_wide_unit[tx_size];
   const int txb_h_unit = tx_size_high_unit[tx_size];
-  int dc_sign = 0;
-  int k = 0;
+  const uint64_t va0 = (txb_w_unit == 16) ? load_entropy_ctx_u64(a, 8)
+                                          : load_entropy_ctx_u64(a, txb_w_unit);
+  const uint64_t va1 = (txb_w_unit == 16) ? load_entropy_ctx_u64(a + 8, 8) : 0;
+  const uint64_t vl0 = (txb_h_unit == 16) ? load_entropy_ctx_u64(l, 8)
+                                          : load_entropy_ctx_u64(l, txb_h_unit);
+  const uint64_t vl1 = (txb_h_unit == 16) ? load_entropy_ctx_u64(l + 8, 8) : 0;
 
-  do {
-    const unsigned int sign = ((uint8_t)a[k]) >> COEFF_CONTEXT_BITS;
-    assert(sign <= 2);
-    dc_sign += kTxbCtxSigns[sign];
-  } while (++k < txb_w_unit);
+  const uint64_t pos = ((va0 >> 4) & 0x0101010101010101ULL) +
+                       ((va1 >> 4) & 0x0101010101010101ULL) +
+                       ((vl0 >> 4) & 0x0101010101010101ULL) +
+                       ((vl1 >> 4) & 0x0101010101010101ULL);
+  const uint64_t neg = ((va0 >> 3) & 0x0101010101010101ULL) +
+                       ((va1 >> 3) & 0x0101010101010101ULL) +
+                       ((vl0 >> 3) & 0x0101010101010101ULL) +
+                       ((vl1 >> 3) & 0x0101010101010101ULL);
+  const uint64_t diff = (pos + 0x0404040404040404ULL) - neg;
+  const uint64_t d32 = (diff + (diff >> 32)) & 0xffffffffULL;
+  const int dc_sign = (int)(((d32 * 0x01010101ULL) >> 24) & 0xff) - 32;
+  txb_ctx->dc_sign_ctx = (dc_sign < 0) + ((dc_sign > 0) << 1);
 
-  k = 0;
-  do {
-    const unsigned int sign = ((uint8_t)l[k]) >> COEFF_CONTEXT_BITS;
-    assert(sign <= 2);
-    dc_sign += kTxbCtxSigns[sign];
-  } while (++k < txb_h_unit);
-
-  txb_ctx->dc_sign_ctx = kTxbCtxDcSignContexts[dc_sign + 2 * MAX_TX_SIZE_UNIT];
-
+  const uint64_t va_or = va0 | va1;
+  const uint64_t vl_or = vl0 | vl1;
   if (plane == 0) {
     if (plane_bsize == txsize_to_bsize[tx_size]) {
       txb_ctx->txb_skip_ctx = 0;
     } else {
-      // For top and left, we only care about which of the following three
-      // categories they belong to: { 0 }, { 1, 2, 3 }, or { 4, 5, ... }. The
-      // spec calculates top and left with the Max() function. We can calculate
-      // an approximate max with bitwise OR because the real max and the
-      // approximate max belong to the same category.
-      int top = 0;
-      int left = 0;
-
-      k = 0;
-      do {
-        top |= a[k];
-      } while (++k < txb_w_unit);
-      top &= COEFF_CONTEXT_MASK;
-      top = AOMMIN(top, 4);
-
-      k = 0;
-      do {
-        left |= l[k];
-      } while (++k < txb_h_unit);
-      left &= COEFF_CONTEXT_MASK;
-      left = AOMMIN(left, 4);
-
-      txb_ctx->txb_skip_ctx = kTxbCtxSkipContexts[top][left];
+      const int top_cat =
+          (va_or != 0) + (((va_or >> 2) & 0x0101010101010101ULL) != 0);
+      const int left_cat =
+          (vl_or != 0) + (((vl_or >> 2) & 0x0101010101010101ULL) != 0);
+      txb_ctx->txb_skip_ctx = kTxbCtxSkipCat[top_cat][left_cat];
     }
   } else {
-    const int ctx_base = get_entropy_context(tx_size, a, l);
+    const int ctx_base = (va_or != 0) + (vl_or != 0);
     const int ctx_offset = (num_pels_log2_lookup[plane_bsize] >
                             num_pels_log2_lookup[txsize_to_bsize[tx_size]])
                                ? 10
@@ -504,92 +478,67 @@ static void get_txb_ctx_general(const BLOCK_SIZE plane_bsize,
   }
 }
 
-#define SPECIALIZE_GET_TXB_CTX(w, h)                                          \
-  static void get_txb_ctx_##w##x##h(                                          \
-      const BLOCK_SIZE plane_bsize, const int plane,                          \
-      const ENTROPY_CONTEXT *const a, const ENTROPY_CONTEXT *const l,         \
-      TXB_CTX *const txb_ctx) {                                               \
-    const TX_SIZE tx_size = TX_##w##X##h;                                     \
-    const int txb_w_unit = tx_size_wide_unit[tx_size];                        \
-    const int txb_h_unit = tx_size_high_unit[tx_size];                        \
-    int dc_sign = 0;                                                          \
-    int k = 0;                                                                \
-                                                                              \
-    do {                                                                      \
-      const unsigned int sign = ((uint8_t)a[k]) >> COEFF_CONTEXT_BITS;        \
-      assert(sign <= 2);                                                      \
-      dc_sign += kTxbCtxSigns[sign];                                          \
-    } while (++k < txb_w_unit);                                               \
-                                                                              \
-    k = 0;                                                                    \
-    do {                                                                      \
-      const unsigned int sign = ((uint8_t)l[k]) >> COEFF_CONTEXT_BITS;        \
-      assert(sign <= 2);                                                      \
-      dc_sign += kTxbCtxSigns[sign];                                          \
-    } while (++k < txb_h_unit);                                               \
-                                                                              \
-    txb_ctx->dc_sign_ctx =                                                    \
-        kTxbCtxDcSignContexts[dc_sign + 2 * MAX_TX_SIZE_UNIT];                \
-                                                                              \
-    if (plane == 0) {                                                         \
-      if (plane_bsize == txsize_to_bsize[tx_size]) {                          \
-        txb_ctx->txb_skip_ctx = 0;                                            \
-      } else {                                                                \
-        int top = 0;                                                          \
-        int left = 0;                                                         \
-                                                                              \
-        k = 0;                                                                \
-        do {                                                                  \
-          top |= a[k];                                                        \
-        } while (++k < txb_w_unit);                                           \
-        top &= COEFF_CONTEXT_MASK;                                            \
-        top = AOMMIN(top, 4);                                                 \
-                                                                              \
-        k = 0;                                                                \
-        do {                                                                  \
-          left |= l[k];                                                       \
-        } while (++k < txb_h_unit);                                           \
-        left &= COEFF_CONTEXT_MASK;                                           \
-        left = AOMMIN(left, 4);                                               \
-                                                                              \
-        txb_ctx->txb_skip_ctx = kTxbCtxSkipContexts[top][left];               \
-      }                                                                       \
-    } else {                                                                  \
-      const int ctx_base = get_entropy_context(tx_size, a, l);                \
-      const int ctx_offset = (num_pels_log2_lookup[plane_bsize] >             \
-                              num_pels_log2_lookup[txsize_to_bsize[tx_size]]) \
-                                 ? 10                                         \
-                                 : 7;                                         \
-      txb_ctx->txb_skip_ctx = ctx_base + ctx_offset;                          \
-    }                                                                         \
-  }
-
-SPECIALIZE_GET_TXB_CTX(4, 4)
-SPECIALIZE_GET_TXB_CTX(8, 8)
-SPECIALIZE_GET_TXB_CTX(16, 16)
-SPECIALIZE_GET_TXB_CTX(32, 32)
-
-// Wrapper for get_txb_ctx that calls the specialized version of get_txb_ctc_*
-// so that the compiler can compile away the while loops.
 static inline void get_txb_ctx(const BLOCK_SIZE plane_bsize,
                                const TX_SIZE tx_size, const int plane,
                                const ENTROPY_CONTEXT *const a,
                                const ENTROPY_CONTEXT *const l,
                                TXB_CTX *const txb_ctx) {
-  switch (tx_size) {
-    case TX_4X4: get_txb_ctx_4x4(plane_bsize, plane, a, l, txb_ctx); break;
-    case TX_8X8: get_txb_ctx_8x8(plane_bsize, plane, a, l, txb_ctx); break;
-    case TX_16X16: get_txb_ctx_16x16(plane_bsize, plane, a, l, txb_ctx); break;
-    case TX_32X32: get_txb_ctx_32x32(plane_bsize, plane, a, l, txb_ctx); break;
-    default:
-      get_txb_ctx_general(plane_bsize, tx_size, plane, a, l, txb_ctx);
-      break;
+  uint64_t va, vl;
+  if (tx_size == TX_4X4) {
+    va = (uint8_t)a[0];
+    vl = (uint8_t)l[0];
+  } else if (tx_size == TX_8X8) {
+    uint16_t va2, vl2;
+    memcpy(&va2, a, 2);
+    memcpy(&vl2, l, 2);
+    va = va2;
+    vl = vl2;
+  } else if (tx_size == TX_16X16) {
+    uint32_t va4, vl4;
+    memcpy(&va4, a, 4);
+    memcpy(&vl4, l, 4);
+    va = va4;
+    vl = vl4;
+  } else if (LIKELY(tx_size == TX_32X32)) {
+    memcpy(&va, a, 8);
+    memcpy(&vl, l, 8);
+  } else {
+    get_txb_ctx_general(plane_bsize, tx_size, plane, a, l, txb_ctx);
+    return;
+  }
+
+  const uint64_t pos =
+      ((va >> 4) & 0x0101010101010101ULL) + ((vl >> 4) & 0x0101010101010101ULL);
+  const uint64_t neg =
+      ((va >> 3) & 0x0101010101010101ULL) + ((vl >> 3) & 0x0101010101010101ULL);
+  const uint64_t diff = (pos + 0x0202020202020202ULL) - neg;
+  const uint64_t d32 = (diff + (diff >> 32)) & 0xffffffffULL;
+  const int dc_sign = (int)(((d32 * 0x01010101ULL) >> 24) & 0xff) - 16;
+  txb_ctx->dc_sign_ctx = (dc_sign < 0) + ((dc_sign > 0) << 1);
+
+  if (plane == 0) {
+    if (plane_bsize == txsize_to_bsize[tx_size]) {
+      txb_ctx->txb_skip_ctx = 0;
+    } else {
+      const int top_cat =
+          (va != 0) + (((va >> 2) & 0x0101010101010101ULL) != 0);
+      const int left_cat =
+          (vl != 0) + (((vl >> 2) & 0x0101010101010101ULL) != 0);
+      txb_ctx->txb_skip_ctx = kTxbCtxSkipCat[top_cat][left_cat];
+    }
+  } else {
+    const int ctx_base = (va != 0) + (vl != 0);
+    const int ctx_offset = (num_pels_log2_lookup[plane_bsize] >
+                            num_pels_log2_lookup[txsize_to_bsize[tx_size]])
+                               ? 10
+                               : 7;
+    txb_ctx->txb_skip_ctx = ctx_base + ctx_offset;
   }
 }
 #undef MAX_TX_SIZE_UNIT
 
-#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
-#pragma GCC visibility pop
+#ifdef __cplusplus
+}  // extern "C"
 #endif
 
 #endif  // AOM_AV1_COMMON_TXB_COMMON_H_
