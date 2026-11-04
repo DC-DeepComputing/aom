@@ -12,6 +12,7 @@
 #include "config/aom_config.h"
 
 #include "aom/aom_frame_buffer.h"
+#include "aom_ports/aom_once.h"
 #include "aom_scale/yv12config.h"
 #include "av1/common/av1_common_int.h"
 #include "av1/common/blockd.h"
@@ -19,6 +20,7 @@
 #include "av1/common/entropy.h"
 #include "av1/common/filter.h"
 #include "av1/common/quant_common.h"
+#include "av1/common/scan.h"
 #include "av1/common/seg_common.h"
 
 static const int16_t dc_qlookup_QTX[QINDEX_RANGE] = {
@@ -261,15 +263,35 @@ const qm_val_t *av1_get_qmatrix(const CommonQuantParams *quant_params,
 }
 
 #if CONFIG_QUANT_MATRIX || CONFIG_AV1_DECODER
-#define QM_TOTAL_SIZE 3344
-// We only use wt_matrix_ref[q] and iwt_matrix_ref[q]
+// We only use av1_wt_matrix_ref[q] and iwt_matrix_ref[q]
 // for q = 0, ..., NUM_QM_LEVELS - 2.
-static const qm_val_t wt_matrix_ref[NUM_QM_LEVELS - 1][2][QM_TOTAL_SIZE];
+const qm_val_t av1_wt_matrix_ref[NUM_QM_LEVELS - 1][2][QM_TOTAL_SIZE];
+qm_val_t av1_wt_matrix_scan_ref[NUM_QM_LEVELS - 1][2][QM_TOTAL_SIZE];
 static const qm_val_t iwt_matrix_ref[NUM_QM_LEVELS - 1][2][QM_TOTAL_SIZE];
+
+static void init_wt_matrix_scan_ref(void) {
+  for (int q = 0; q < NUM_QM_LEVELS - 1; ++q) {
+    for (int c = 0; c < 2; ++c) {
+      int current = 0;
+      for (int t = 0; t < TX_SIZES_ALL; ++t) {
+        if (t != av1_get_adjusted_tx_size(t)) continue;
+        const int size = tx_size_2d[t];
+        const int16_t *const scan = av1_scan_orders[t][0].scan;
+        const qm_val_t *const src = &av1_wt_matrix_ref[q][c][current];
+        qm_val_t *const dst = &av1_wt_matrix_scan_ref[q][c][current];
+        for (int i = 0; i < size; ++i) {
+          dst[i] = src[scan[i]];
+        }
+        current += size;
+      }
+    }
+  }
+}
 #endif
 
 void av1_qm_init(CommonQuantParams *quant_params, int num_planes) {
 #if CONFIG_QUANT_MATRIX || CONFIG_AV1_DECODER
+  aom_once(init_wt_matrix_scan_ref);
   for (int q = 0; q < NUM_QM_LEVELS; ++q) {
     for (int c = 0; c < num_planes; ++c) {
       int current = 0;
@@ -287,7 +309,8 @@ void av1_qm_init(CommonQuantParams *quant_params, int num_planes) {
               quant_params->giqmatrix[q][c][qm_tx_size];
         } else {
           assert(current + size <= QM_TOTAL_SIZE);
-          quant_params->gqmatrix[q][c][t] = &wt_matrix_ref[q][c >= 1][current];
+          quant_params->gqmatrix[q][c][t] =
+              &av1_wt_matrix_ref[q][c >= 1][current];
           quant_params->giqmatrix[q][c][t] =
               &iwt_matrix_ref[q][c >= 1][current];
           current += size;
@@ -6663,7 +6686,7 @@ static const qm_val_t iwt_matrix_ref[NUM_QM_LEVELS - 1][2][QM_TOTAL_SIZE] = {
   },
 };
 
-static const qm_val_t wt_matrix_ref[NUM_QM_LEVELS - 1][2][QM_TOTAL_SIZE] = {
+const qm_val_t av1_wt_matrix_ref[NUM_QM_LEVELS - 1][2][QM_TOTAL_SIZE] = {
   {
       { /* Luma */
         /* Size 4x4 */
