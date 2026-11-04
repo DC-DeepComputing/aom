@@ -1,0 +1,49 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "db11b530_cd746b3d",
+        "filename": "av1/encoder/encodeframe_utils.h",
+        "patchSetId": 7
+      },
+      "lineNbr": 527,
+      "author": {
+        "id": 5185
+      },
+      "writtenOn": "2026-11-04T00:49:21Z",
+      "side": 1,
+      "message": "Could this part be added as a speed feature under cpi-\u003esf.inter_sf? This can be done in a separate CL.",
+      "fixSuggestions": [
+        {
+          "fixId": "29436f89_152b4bb7",
+          "description": "prompt_to_edit API",
+          "replacements": [
+            {
+              "path": "av1/encoder/encodeframe_utils.h",
+              "range": {
+                "startLine": 525,
+                "startChar": 0,
+                "endLine": 526,
+                "endChar": 0
+              },
+              "replacement": "        // Retain LAST2_FRAME on mixed static/high-motion frames\n"
+            },
+            {
+              "path": "av1/encoder/encodeframe_utils.h",
+              "range": {
+                "startLine": 528,
+                "startChar": 0,
+                "endLine": 529,
+                "endChar": 0
+              },
+              "replacement": "            cpi-\u003esf.inter_sf.retain_last2_in_partial_high_motion \u0026\u0026\n"
+            }
+          ]
+        }
+      ],
+      "revId": "5a1445b687da0454587b648e6a4263b00622209c",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
