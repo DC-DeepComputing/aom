@@ -1,0 +1,28 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "f58c7f17_68087662",
+        "filename": "av1/encoder/hash_motion.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 258,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-04T19:38:19Z",
+      "side": 1,
+      "message": "Nit (optional): Two small cleanups for the `hash_4x4 \u003d\u003d NULL` vs. `hash_4x4 !\u003d NULL` cases:\n- Line 255: When `hash_4x4 \u003d\u003d NULL` and `width \u003c 8 || height \u003c 8`, no `8x8` hashes are written, so checking `min_size \u003d hash_4x4 !\u003d NULL ? 4 : 8` here avoids computing unused `2x2`/`4x4` rows.\n- Lines 257-258: When `hash_4x4 !\u003d NULL`, `rows_4x4` writes directly to `hash_4x4`, so `ring` only needs `kRingRows2x2` rows instead of `kRingRows2x2 + kRingRows4x4`.",
+      "range": {
+        "startLine": 255,
+        "startChar": 0,
+        "endLine": 258,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "4e97d90a9fdf3b3a27cbd6f8d20c8fb652e7a558",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
