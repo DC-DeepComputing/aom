@@ -12,6 +12,7 @@
 #ifndef AOM_AV1_ENCODER_COST_H_
 #define AOM_AV1_ENCODER_COST_H_
 
+#include "aom_dsp/entcode.h"
 #include "aom_dsp/prob.h"
 #include "aom/aom_integer.h"
 
@@ -19,11 +20,7 @@
 extern "C" {
 #endif
 
-#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
-#pragma GCC visibility push(hidden)
-#endif
-
-extern const uint16_t av1_prob_cost[129];
+extern const uint16_t av1_prob_cost[130];
 
 // The factor to scale from cost in bits to cost in av1_prob_cost units.
 #define AV1_PROB_COST_SHIFT 9
@@ -34,10 +31,12 @@ extern const uint16_t av1_prob_cost[129];
 
 static inline int av1_cost_symbol_clamped(int p15) {
   assert(0 < p15 && p15 < CDF_PROB_TOP);
-  // Since CDF_PROB_TOP == 32768 and av1_prob_cost has 129 entries (including a
-  // duplicate 128th entry for prob_idx == 128), get_prob(p15 << shift, 32768) -
-  // 128 simplifies to ((p15 << shift) - 16320) >> 7.
+#if defined(__LZCNT__) && (defined(__GNUC__) || defined(__clang__))
+  const unsigned int shift =
+      (unsigned int)(__builtin_clz((unsigned int)p15) - 17);
+#else
   const unsigned int shift = (unsigned int)(CDF_PROB_BITS - 1 - get_msb(p15));
+#endif
   const unsigned int prob_idx = ((unsigned int)(p15 << shift) - 16320U) >> 7;
   return av1_prob_cost[prob_idx] + (int)av1_cost_literal(shift);
 }
@@ -51,12 +50,29 @@ static inline int av1_cost_symbol(aom_cdf_prob p15) {
   return av1_cost_symbol_clamped(clamped);
 }
 
-void av1_cost_tokens_from_cdf(int *costs, const aom_cdf_prob *cdf,
-                              const int *inv_map);
-
-#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
-#pragma GCC visibility pop
-#endif
+static inline void av1_cost_tokens_from_cdf(int *costs, const aom_cdf_prob *cdf,
+                                            const int *inv_map) {
+  int prev_icdf = CDF_PROB_TOP;
+  if (inv_map) {
+    for (int i = 0;; ++i) {
+      const int cur_icdf = cdf[i];
+      const int p15 =
+          clamp(prev_icdf - cur_icdf, EC_MIN_PROB, CDF_PROB_TOP - 1);
+      prev_icdf = cur_icdf;
+      costs[inv_map[i]] = av1_cost_symbol_clamped(p15);
+      if (cur_icdf == 0) break;
+    }
+  } else {
+    for (int i = 0;; ++i) {
+      const int cur_icdf = cdf[i];
+      const int p15 =
+          clamp(prev_icdf - cur_icdf, EC_MIN_PROB, CDF_PROB_TOP - 1);
+      prev_icdf = cur_icdf;
+      costs[i] = av1_cost_symbol_clamped(p15);
+      if (cur_icdf == 0) break;
+    }
+  }
+}
 
 #ifdef __cplusplus
 }  // extern "C"

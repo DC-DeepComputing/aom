@@ -84,139 +84,161 @@ void av1_get_horver_correlation_full_avx2(const int16_t *diff, int stride,
       horver_correlation_4x4(&diff[i * stride + j], stride, &xy_sum_32,
                              &xz_sum_32, &x_sum_32, &x2_sum_32);
     }
-    const __m256i hadd_xy_xz = _mm256_hadd_epi32(xy_sum_32, xz_sum_32);
-    // hadd_xy_xz = [ae+bf+cg ei+fj+gk ab+bc+cd ef+fg+gh]
-    //              [im+jn+ko mm+nn+oo ij+jk+kl mn+no+op] as i32
-    yy_storeu_256(xy_xz_tmp, hadd_xy_xz);
-    xy_sum += (int64_t)xy_xz_tmp[5] + xy_xz_tmp[4] + xy_xz_tmp[1];
-    xz_sum += (int64_t)xy_xz_tmp[7] + xy_xz_tmp[6] + xy_xz_tmp[3];
-
-    const __m256i hadd_x_x2 = _mm256_hadd_epi32(x_sum_32, x2_sum_32);
-    // hadd_x_x2 = [aa+bb+cc ee+ff+gg a+b+c e+f+g]
-    //             [ii+jj+kk mm+nn+oo i+j+k m+n+o] as i32
-    yy_storeu_256(x_x2_tmp, hadd_x_x2);
-    x_sum += (int64_t)x_x2_tmp[5] + x_x2_tmp[4] + x_x2_tmp[1];
-    x2_sum += (int64_t)x_x2_tmp[7] + x_x2_tmp[6] + x_x2_tmp[3];
-
-    xy_sum_32 = _mm256_setzero_si256();
-    xz_sum_32 = _mm256_setzero_si256();
-    x_sum_32 = _mm256_setzero_si256();
-    x2_sum_32 = _mm256_setzero_si256();
   }
+  const __m256i hadd_xy_xz = _mm256_hadd_epi32(xy_sum_32, xz_sum_32);
+  // hadd_xy_xz = [ae+bf+cg ei+fj+gk ab+bc+cd ef+fg+gh]
+  //              [im+jn+ko mm+nn+oo ij+jk+kl mn+no+op] as i32
+  yy_storeu_256(xy_xz_tmp, hadd_xy_xz);
+  xy_sum += (int64_t)xy_xz_tmp[5] + xy_xz_tmp[4] + xy_xz_tmp[1];
+  xz_sum += (int64_t)xy_xz_tmp[7] + xy_xz_tmp[6] + xy_xz_tmp[3];
+
+  const __m256i hadd_x_x2 = _mm256_hadd_epi32(x_sum_32, x2_sum_32);
+  // hadd_x_x2 = [aa+bb+cc ee+ff+gg a+b+c e+f+g]
+  //             [ii+jj+kk mm+nn+oo i+j+k m+n+o] as i32
+  yy_storeu_256(x_x2_tmp, hadd_x_x2);
+  x_sum += (int64_t)x_x2_tmp[5] + x_x2_tmp[4] + x_x2_tmp[1];
+  x2_sum += (int64_t)x_x2_tmp[7] + x_x2_tmp[6] + x_x2_tmp[3];
 
   // x_sum now covers every pixel except the final 1-2 rows and 1-2 cols
   int64_t x_finalrow = 0, x_finalcol = 0, x2_finalrow = 0, x2_finalcol = 0;
+  const int h_mod3_is_1 = (height % 3 == 1);
 
   // Do we have 2 rows remaining or just the one?  Note that width and height
   // are powers of 2, so each modulo 3 must be 1 or 2.
-  if (height % 3 == 1) {  // Just horiz corrs on the final row
-    const int16_t x0 = diff[(height - 1) * stride];
-    x_sum += x0;
-    x_finalrow += x0;
-    x2_sum += x0 * x0;
-    x2_finalrow += x0 * x0;
+  if (h_mod3_is_1) {  // Just horiz corrs on the final row
+    const int16_t *const row = &diff[(height - 1) * stride];
+    const int32_t x0 = row[0];
+    int32_t xy_row = 0, x_row = x0, x2_row = x0 * x0;
     for (int j = 0; j < width - 1; ++j) {
-      const int16_t x = diff[(height - 1) * stride + j];
-      const int16_t y = diff[(height - 1) * stride + j + 1];
-      xy_sum += x * y;
-      x_sum += y;
-      x2_sum += y * y;
-      x_finalrow += y;
-      x2_finalrow += y * y;
+      const int32_t x = row[j];
+      const int32_t y = row[j + 1];
+      xy_row += x * y;
+      x_row += y;
+      x2_row += y * y;
     }
+    xy_sum += xy_row;
+    x_finalrow = x_row;
+    x2_finalrow = x2_row;
+    x_sum += x_row;
+    x2_sum += x2_row;
   } else {  // Two rows remaining to do
-    const int16_t x0 = diff[(height - 2) * stride];
-    const int16_t z0 = diff[(height - 1) * stride];
-    x_sum += x0 + z0;
-    x2_sum += x0 * x0 + z0 * z0;
-    x_finalrow += z0;
-    x2_finalrow += z0 * z0;
+    const int16_t *const row0 = &diff[(height - 2) * stride];
+    const int16_t *const row1 = &diff[(height - 1) * stride];
+    const int32_t x0 = row0[0];
+    const int32_t z0 = row1[0];
+    int32_t xy_row = 0, xz_row = 0;
+    int32_t x_pen = x0, x2_pen = x0 * x0;
+    int32_t x_fin = z0, x2_fin = z0 * z0;
     for (int j = 0; j < width - 1; ++j) {
-      const int16_t x = diff[(height - 2) * stride + j];
-      const int16_t y = diff[(height - 2) * stride + j + 1];
-      const int16_t z = diff[(height - 1) * stride + j];
-      const int16_t w = diff[(height - 1) * stride + j + 1];
+      const int32_t x = row0[j];
+      const int32_t y = row0[j + 1];
+      const int32_t z = row1[j];
+      const int32_t w = row1[j + 1];
 
       // Horizontal and vertical correlations for the penultimate row:
-      xy_sum += x * y;
-      xz_sum += x * z;
+      xy_row += x * y + z * w;
+      xz_row += x * z;
 
-      // Now just horizontal correlations for the final row:
-      xy_sum += z * w;
-
-      x_sum += y + w;
-      x2_sum += y * y + w * w;
-      x_finalrow += w;
-      x2_finalrow += w * w;
+      x_pen += y;
+      x2_pen += y * y;
+      x_fin += w;
+      x2_fin += w * w;
     }
+    xy_sum += xy_row;
+    xz_sum += xz_row;
+    x_finalrow = x_fin;
+    x2_finalrow = x2_fin;
+    x_sum += (int64_t)x_pen + x_fin;
+    x2_sum += (int64_t)x2_pen + x2_fin;
   }
 
   // Do we have 2 columns remaining or just the one?
+  const int i_sum_limit = height - (h_mod3_is_1 ? 2 : 3);
   if (width % 3 == 1) {  // Just vert corrs on the final col
-    const int16_t x0 = diff[width - 1];
-    x_sum += x0;
-    x_finalcol += x0;
-    x2_sum += x0 * x0;
-    x2_finalcol += x0 * x0;
-    for (int i = 0; i < height - 1; ++i) {
-      const int16_t x = diff[i * stride + width - 1];
-      const int16_t z = diff[(i + 1) * stride + width - 1];
-      xz_sum += x * z;
-      x_finalcol += z;
-      x2_finalcol += z * z;
-      // So the bottom-right elements don't get counted twice:
-      if (i < height - (height % 3 == 1 ? 2 : 3)) {
-        x_sum += z;
-        x2_sum += z * z;
-      }
+    const int16_t *col = &diff[width - 1];
+    const int32_t x0 = col[0];
+    int32_t xz_col = 0, x_col = x0, x2_col = x0 * x0;
+    int i = 0;
+    for (; i < i_sum_limit; ++i) {
+      const int32_t x = col[0];
+      const int32_t z = col[stride];
+      col += stride;
+      xz_col += x * z;
+      x_col += z;
+      x2_col += z * z;
     }
+    x_sum += x_col;
+    x2_sum += x2_col;
+    for (; i < height - 1; ++i) {
+      const int32_t x = col[0];
+      const int32_t z = col[stride];
+      col += stride;
+      xz_col += x * z;
+      x_col += z;
+      x2_col += z * z;
+    }
+    xz_sum += xz_col;
+    x_finalcol = x_col;
+    x2_finalcol = x2_col;
   } else {  // Two cols remaining
-    const int16_t x0 = diff[width - 2];
-    const int16_t y0 = diff[width - 1];
-    x_sum += x0 + y0;
-    x2_sum += x0 * x0 + y0 * y0;
-    x_finalcol += y0;
-    x2_finalcol += y0 * y0;
-    for (int i = 0; i < height - 1; ++i) {
-      const int16_t x = diff[i * stride + width - 2];
-      const int16_t y = diff[i * stride + width - 1];
-      const int16_t z = diff[(i + 1) * stride + width - 2];
-      const int16_t w = diff[(i + 1) * stride + width - 1];
-
-      // Horizontal and vertical correlations for the penultimate col:
-      // Skip these on the last iteration of this loop if we also had two
-      // rows remaining, otherwise the final horizontal and vertical correlation
-      // get erroneously processed twice
-      if (i < height - 2 || height % 3 == 1) {
-        xy_sum += x * y;
-        xz_sum += x * z;
-      }
-
-      x_finalcol += w;
-      x2_finalcol += w * w;
-      // So the bottom-right elements don't get counted twice:
-      if (i < height - (height % 3 == 1 ? 2 : 3)) {
-        x_sum += z + w;
-        x2_sum += z * z + w * w;
-      }
-
-      // Now just vertical correlations for the final column:
-      xz_sum += y * w;
+    const int16_t *col = &diff[width - 2];
+    const int32_t x0 = col[0];
+    const int32_t y0 = col[1];
+    int32_t xy_col = 0, xz_col = 0;
+    int32_t x_all = x0 + y0, x2_all = x0 * x0 + y0 * y0;
+    int32_t x_fin = y0, x2_fin = y0 * y0;
+    int i = 0;
+    for (; i < i_sum_limit; ++i) {
+      const int32_t x = col[0];
+      const int32_t y = col[1];
+      const int32_t z = col[stride];
+      const int32_t w = col[stride + 1];
+      col += stride;
+      xy_col += x * y;
+      xz_col += x * z + y * w;
+      x_fin += w;
+      x2_fin += w * w;
+      x_all += z + w;
+      x2_all += z * z + w * w;
     }
+    x_sum += x_all;
+    x2_sum += x2_all;
+    for (; i < height - 1; ++i) {
+      const int32_t x = col[0];
+      const int32_t y = col[1];
+      const int32_t z = col[stride];
+      const int32_t w = col[stride + 1];
+      col += stride;
+      if (i < height - 2 || h_mod3_is_1) {
+        xy_col += x * y;
+        xz_col += x * z;
+      }
+      x_fin += w;
+      x2_fin += w * w;
+      xz_col += y * w;
+    }
+    xy_sum += xy_col;
+    xz_sum += xz_col;
+    x_finalcol = x_fin;
+    x2_finalcol = x2_fin;
   }
 
   // Calculate the simple sums and squared-sums
-  int64_t x_firstrow = 0, x_firstcol = 0;
-  int64_t x2_firstrow = 0, x2_firstcol = 0;
+  int32_t x_firstrow32 = 0, x_firstcol32 = 0;
+  int32_t x2_firstrow32 = 0, x2_firstcol32 = 0;
 
   for (int j = 0; j < width; ++j) {
-    x_firstrow += diff[j];
-    x2_firstrow += diff[j] * diff[j];
+    const int32_t v = diff[j];
+    x_firstrow32 += v;
+    x2_firstrow32 += v * v;
   }
   for (int i = 0; i < height; ++i) {
-    x_firstcol += diff[i * stride];
-    x2_firstcol += diff[i * stride] * diff[i * stride];
+    const int32_t v = diff[i * stride];
+    x_firstcol32 += v;
+    x2_firstcol32 += v * v;
   }
+  const int64_t x_firstrow = x_firstrow32, x_firstcol = x_firstcol32;
+  const int64_t x2_firstrow = x2_firstrow32, x2_firstcol = x2_firstcol32;
 
   int64_t xhor_sum = x_sum - x_finalcol;
   int64_t xver_sum = x_sum - x_finalrow;
