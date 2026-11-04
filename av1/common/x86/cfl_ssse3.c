@@ -318,24 +318,34 @@ static inline void cfl_predict_lbd_ssse3(const int16_t *pred_buf_q3,
   const __m128i dc_q0 = _mm_set1_epi16(*dst);
   __m128i *row = (__m128i *)pred_buf_q3;
   const __m128i *row_end = row + height * CFL_BUF_LINE_I128;
+  if (width < 16) {
+    do {
+      __m128i res0 = predict_unclipped(row, alpha_q12, alpha_sign, dc_q0);
+      __m128i res1 = predict_unclipped(row + CFL_BUF_LINE_I128, alpha_q12,
+                                       alpha_sign, dc_q0);
+      __m128i res = _mm_packus_epi16(res0, res1);
+      __m128i res_hi = _mm_unpackhi_epi64(res, res);
+      if (width == 4) {
+        _mm_storeh_epi32((__m128i *)dst, res);
+        _mm_storeh_epi32((__m128i *)(dst + dst_stride), res_hi);
+      } else {
+        _mm_storel_epi64((__m128i *)dst, res);
+        _mm_storel_epi64((__m128i *)(dst + dst_stride), res_hi);
+      }
+      dst += dst_stride << 1;
+    } while ((row += CFL_BUF_LINE_I128 << 1) < row_end);
+    return;
+  }
   do {
     __m128i res = predict_unclipped(row, alpha_q12, alpha_sign, dc_q0);
-    if (width < 16) {
-      res = _mm_packus_epi16(res, res);
-      if (width == 4)
-        _mm_storeh_epi32((__m128i *)dst, res);
-      else
-        _mm_storel_epi64((__m128i *)dst, res);
-    } else {
-      __m128i next = predict_unclipped(row + 1, alpha_q12, alpha_sign, dc_q0);
+    __m128i next = predict_unclipped(row + 1, alpha_q12, alpha_sign, dc_q0);
+    res = _mm_packus_epi16(res, next);
+    _mm_storeu_si128((__m128i *)dst, res);
+    if (width == 32) {
+      res = predict_unclipped(row + 2, alpha_q12, alpha_sign, dc_q0);
+      next = predict_unclipped(row + 3, alpha_q12, alpha_sign, dc_q0);
       res = _mm_packus_epi16(res, next);
-      _mm_storeu_si128((__m128i *)dst, res);
-      if (width == 32) {
-        res = predict_unclipped(row + 2, alpha_q12, alpha_sign, dc_q0);
-        next = predict_unclipped(row + 3, alpha_q12, alpha_sign, dc_q0);
-        res = _mm_packus_epi16(res, next);
-        _mm_storeu_si128((__m128i *)(dst + 16), res);
-      }
+      _mm_storeu_si128((__m128i *)(dst + 16), res);
     }
     dst += dst_stride;
   } while ((row += CFL_BUF_LINE_I128) < row_end);
