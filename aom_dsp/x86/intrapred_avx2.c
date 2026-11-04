@@ -10,12 +10,13 @@
  */
 
 #include <immintrin.h>
-#include <string.h>
 
 #include "config/av1_rtcd.h"
 #include "aom_dsp/x86/intrapred_x86.h"
 #include "aom_dsp/x86/intrapred_utils.h"
 #include "aom_dsp/x86/lpf_common_sse2.h"
+#include "aom_dsp/x86/mem_sse2.h"
+#include "aom_dsp/x86/synonyms.h"
 
 static inline __m256i dc_sum_64(const uint8_t *ref) {
   const __m256i x0 = _mm256_loadu_si256((const __m256i *)ref);
@@ -724,45 +725,33 @@ void aom_v_predictor_64x16_avx2(uint8_t *dst, ptrdiff_t stride,
 // -----------------------------------------------------------------------------
 // PAETH_PRED
 
-// Return 16 16-bit pixels in one row (__m256i)
-static inline __m256i paeth_pred(const __m256i *left, const __m256i *top,
-                                 const __m256i *topleft) {
-  const __m256i base =
-      _mm256_sub_epi16(_mm256_add_epi16(*top, *left), *topleft);
-
-  __m256i pl = _mm256_abs_epi16(_mm256_sub_epi16(base, *left));
-  __m256i pt = _mm256_abs_epi16(_mm256_sub_epi16(base, *top));
-  __m256i ptl = _mm256_abs_epi16(_mm256_sub_epi16(base, *topleft));
-
-  __m256i mask1 = _mm256_cmpgt_epi16(pl, pt);
-  mask1 = _mm256_or_si256(mask1, _mm256_cmpgt_epi16(pl, ptl));
-  __m256i mask2 = _mm256_cmpgt_epi16(pt, ptl);
-
-  pl = _mm256_andnot_si256(mask1, *left);
-
-  ptl = _mm256_and_si256(mask2, *topleft);
-  pt = _mm256_andnot_si256(mask2, *top);
-  pt = _mm256_or_si256(pt, ptl);
-  pt = _mm256_and_si256(mask1, pt);
-
-  return _mm256_or_si256(pt, pl);
+// Return 16 16-bit pixels in one row (__m256i) using precomputed dt/pl/dl/pt
+static AOM_FORCE_INLINE __m256i paeth_pred_pre(
+    const __m256i left, const __m256i top, const __m256i topleft,
+    const __m256i dt, const __m256i pl, const __m256i dl, const __m256i pt) {
+  const __m256i ptl = _mm256_abs_epi16(_mm256_add_epi16(dt, dl));
+  const __m256i mask1 = _mm256_cmpgt_epi16(pl, _mm256_min_epi16(pt, ptl));
+  const __m256i mask2 = _mm256_cmpgt_epi16(pt, ptl);
+  const __m256i pt_tl = _mm256_blendv_epi8(top, topleft, mask2);
+  return _mm256_blendv_epi8(left, pt_tl, mask1);
 }
 
 // Return 16 8-bit pixels in one row (__m128i)
-static inline __m128i paeth_16x1_pred(const __m256i *left, const __m256i *top,
-                                      const __m256i *topleft) {
-  const __m256i p0 = paeth_pred(left, top, topleft);
+static AOM_FORCE_INLINE __m128i paeth_16x1_pred_pre(const __m256i left,
+                                                    const __m256i top,
+                                                    const __m256i topleft,
+                                                    const __m256i dt,
+                                                    const __m256i pl) {
+  const __m256i dl = _mm256_sub_epi16(left, topleft);
+  const __m256i pt = _mm256_abs_epi16(dl);
+  const __m256i p0 = paeth_pred_pre(left, top, topleft, dt, pl, dl, pt);
   const __m256i p1 = _mm256_permute4x64_epi64(p0, 0xe);
   const __m256i p = _mm256_packus_epi16(p0, p1);
   return _mm256_castsi256_si128(p);
 }
 
 static inline __m256i get_top_vector(const uint8_t *above) {
-  const __m128i x = _mm_load_si128((const __m128i *)above);
-  const __m128i zero = _mm_setzero_si128();
-  const __m128i t0 = _mm_unpacklo_epi8(x, zero);
-  const __m128i t1 = _mm_unpackhi_epi8(x, zero);
-  return _mm256_inserti128_si256(_mm256_castsi128_si256(t0), t1, 1);
+  return _mm256_cvtepu8_epi16(_mm_loadu_si128((const __m128i *)above));
 }
 
 void aom_paeth_predictor_16x8_avx2(uint8_t *dst, ptrdiff_t stride,
@@ -773,11 +762,12 @@ void aom_paeth_predictor_16x8_avx2(uint8_t *dst, ptrdiff_t stride,
   __m256i rep = _mm256_set1_epi16((short)0x8000);
   const __m256i one = _mm256_set1_epi16(1);
   const __m256i top = get_top_vector(above);
+  const __m256i dt = _mm256_sub_epi16(top, tl16);
+  const __m256i pl = _mm256_abs_epi16(dt);
 
-  int i;
-  for (i = 0; i < 8; ++i) {
+  for (int i = 0; i < 8; ++i) {
     const __m256i l16 = _mm256_shuffle_epi8(l, rep);
-    const __m128i row = paeth_16x1_pred(&l16, &top, &tl16);
+    const __m128i row = paeth_16x1_pred_pre(l16, top, tl16, dt, pl);
 
     _mm_store_si128((__m128i *)dst, row);
     dst += stride;
@@ -797,11 +787,15 @@ void aom_paeth_predictor_16x16_avx2(uint8_t *dst, ptrdiff_t stride,
   __m256i rep = _mm256_set1_epi16((short)0x8000);
   const __m256i one = _mm256_set1_epi16(1);
   const __m256i top = get_top_vector(above);
+  const __m256i dt = _mm256_sub_epi16(top, tl16);
+  const __m256i pl = _mm256_abs_epi16(dt);
 
-  int i;
-  for (i = 0; i < 16; ++i) {
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC unroll 1
+#endif
+  for (int i = 0; i < 16; ++i) {
     const __m256i l16 = _mm256_shuffle_epi8(l, rep);
-    const __m128i row = paeth_16x1_pred(&l16, &top, &tl16);
+    const __m128i row = paeth_16x1_pred_pre(l16, top, tl16, dt, pl);
 
     _mm_store_si128((__m128i *)dst, row);
     dst += stride;
@@ -816,11 +810,16 @@ void aom_paeth_predictor_16x32_avx2(uint8_t *dst, ptrdiff_t stride,
   __m256i rep = _mm256_set1_epi16((short)0x8000);
   const __m256i one = _mm256_set1_epi16(1);
   const __m256i top = get_top_vector(above);
+  const __m256i dt = _mm256_sub_epi16(top, tl16);
+  const __m256i pl = _mm256_abs_epi16(dt);
 
   int i;
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC unroll 1
+#endif
   for (i = 0; i < 16; ++i) {
     const __m256i l16 = _mm256_shuffle_epi8(l, rep);
-    const __m128i row = paeth_16x1_pred(&l16, &top, &tl16);
+    const __m128i row = paeth_16x1_pred_pre(l16, top, tl16, dt, pl);
 
     _mm_store_si128((__m128i *)dst, row);
     dst += stride;
@@ -829,9 +828,12 @@ void aom_paeth_predictor_16x32_avx2(uint8_t *dst, ptrdiff_t stride,
 
   l = get_left_vector(left + 16);
   rep = _mm256_set1_epi16((short)0x8000);
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC unroll 1
+#endif
   for (i = 0; i < 16; ++i) {
     const __m256i l16 = _mm256_shuffle_epi8(l, rep);
-    const __m128i row = paeth_16x1_pred(&l16, &top, &tl16);
+    const __m128i row = paeth_16x1_pred_pre(l16, top, tl16, dt, pl);
 
     _mm_store_si128((__m128i *)dst, row);
     dst += stride;
@@ -845,13 +847,18 @@ void aom_paeth_predictor_16x64_avx2(uint8_t *dst, ptrdiff_t stride,
   const __m256i tl16 = _mm256_set1_epi16((int16_t)above[-1]);
   const __m256i one = _mm256_set1_epi16(1);
   const __m256i top = get_top_vector(above);
+  const __m256i dt = _mm256_sub_epi16(top, tl16);
+  const __m256i pl = _mm256_abs_epi16(dt);
 
   for (int j = 0; j < 4; ++j) {
     const __m256i l = get_left_vector(left + j * 16);
     __m256i rep = _mm256_set1_epi16((short)0x8000);
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC unroll 1
+#endif
     for (int i = 0; i < 16; ++i) {
       const __m256i l16 = _mm256_shuffle_epi8(l, rep);
-      const __m128i row = paeth_16x1_pred(&l16, &top, &tl16);
+      const __m128i row = paeth_16x1_pred_pre(l16, top, tl16, dt, pl);
 
       _mm_store_si128((__m128i *)dst, row);
       dst += stride;
@@ -862,18 +869,13 @@ void aom_paeth_predictor_16x64_avx2(uint8_t *dst, ptrdiff_t stride,
 #endif  // !CONFIG_REALTIME_ONLY || CONFIG_AV1_DECODER
 
 // Return 32 8-bit pixels in one row (__m256i)
-static inline __m256i paeth_32x1_pred(const __m256i *left, const __m256i *top0,
-                                      const __m256i *top1,
-                                      const __m256i *topleft) {
-  __m256i p0 = paeth_pred(left, top0, topleft);
-  __m256i p1 = _mm256_permute4x64_epi64(p0, 0xe);
-  const __m256i x0 = _mm256_packus_epi16(p0, p1);
-
-  p0 = paeth_pred(left, top1, topleft);
-  p1 = _mm256_permute4x64_epi64(p0, 0xe);
-  const __m256i x1 = _mm256_packus_epi16(p0, p1);
-
-  return _mm256_permute2x128_si256(x0, x1, 0x20);
+static AOM_FORCE_INLINE __m256i paeth_32x1_pred_pre(
+    const __m256i left, const __m256i top0, const __m256i top1,
+    const __m256i topleft, const __m256i dt0, const __m256i pl0,
+    const __m256i dt1, const __m256i pl1, const __m256i dl, const __m256i pt) {
+  const __m256i p0 = paeth_pred_pre(left, top0, topleft, dt0, pl0, dl, pt);
+  const __m256i p1 = paeth_pred_pre(left, top1, topleft, dt1, pl1, dl, pt);
+  return _mm256_permute4x64_epi64(_mm256_packus_epi16(p0, p1), 0xd8);
 }
 
 void aom_paeth_predictor_32x16_avx2(uint8_t *dst, ptrdiff_t stride,
@@ -882,14 +884,19 @@ void aom_paeth_predictor_32x16_avx2(uint8_t *dst, ptrdiff_t stride,
   const __m256i t0 = get_top_vector(above);
   const __m256i t1 = get_top_vector(above + 16);
   const __m256i tl = _mm256_set1_epi16((int16_t)above[-1]);
+  const __m256i dt0 = _mm256_sub_epi16(t0, tl);
+  const __m256i pl0 = _mm256_abs_epi16(dt0);
+  const __m256i dt1 = _mm256_sub_epi16(t1, tl);
+  const __m256i pl1 = _mm256_abs_epi16(dt1);
   __m256i rep = _mm256_set1_epi16((short)0x8000);
   const __m256i one = _mm256_set1_epi16(1);
 
-  int i;
-  for (i = 0; i < 16; ++i) {
+  for (int i = 0; i < 16; ++i) {
     const __m256i l16 = _mm256_shuffle_epi8(l, rep);
-
-    const __m256i r = paeth_32x1_pred(&l16, &t0, &t1, &tl);
+    const __m256i dl = _mm256_sub_epi16(l16, tl);
+    const __m256i pt = _mm256_abs_epi16(dl);
+    const __m256i r =
+        paeth_32x1_pred_pre(l16, t0, t1, tl, dt0, pl0, dt1, pl1, dl, pt);
 
     _mm256_storeu_si256((__m256i *)dst, r);
 
@@ -904,18 +911,22 @@ void aom_paeth_predictor_32x32_avx2(uint8_t *dst, ptrdiff_t stride,
   const __m256i t0 = get_top_vector(above);
   const __m256i t1 = get_top_vector(above + 16);
   const __m256i tl = _mm256_set1_epi16((int16_t)above[-1]);
+  const __m256i dt0 = _mm256_sub_epi16(t0, tl);
+  const __m256i pl0 = _mm256_abs_epi16(dt0);
+  const __m256i dt1 = _mm256_sub_epi16(t1, tl);
+  const __m256i pl1 = _mm256_abs_epi16(dt1);
   __m256i rep = _mm256_set1_epi16((short)0x8000);
   const __m256i one = _mm256_set1_epi16(1);
 
   int i;
   for (i = 0; i < 16; ++i) {
     const __m256i l16 = _mm256_shuffle_epi8(l, rep);
+    const __m256i dl = _mm256_sub_epi16(l16, tl);
+    const __m256i pt = _mm256_abs_epi16(dl);
+    const __m256i r =
+        paeth_32x1_pred_pre(l16, t0, t1, tl, dt0, pl0, dt1, pl1, dl, pt);
 
-    const __m128i r0 = paeth_16x1_pred(&l16, &t0, &tl);
-    const __m128i r1 = paeth_16x1_pred(&l16, &t1, &tl);
-
-    _mm_store_si128((__m128i *)dst, r0);
-    _mm_store_si128((__m128i *)(dst + 16), r1);
+    _mm256_storeu_si256((__m256i *)dst, r);
 
     dst += stride;
     rep = _mm256_add_epi16(rep, one);
@@ -925,12 +936,12 @@ void aom_paeth_predictor_32x32_avx2(uint8_t *dst, ptrdiff_t stride,
   rep = _mm256_set1_epi16((short)0x8000);
   for (i = 0; i < 16; ++i) {
     const __m256i l16 = _mm256_shuffle_epi8(l, rep);
+    const __m256i dl = _mm256_sub_epi16(l16, tl);
+    const __m256i pt = _mm256_abs_epi16(dl);
+    const __m256i r =
+        paeth_32x1_pred_pre(l16, t0, t1, tl, dt0, pl0, dt1, pl1, dl, pt);
 
-    const __m128i r0 = paeth_16x1_pred(&l16, &t0, &tl);
-    const __m128i r1 = paeth_16x1_pred(&l16, &t1, &tl);
-
-    _mm_store_si128((__m128i *)dst, r0);
-    _mm_store_si128((__m128i *)(dst + 16), r1);
+    _mm256_storeu_si256((__m256i *)dst, r);
 
     dst += stride;
     rep = _mm256_add_epi16(rep, one);
@@ -942,20 +953,23 @@ void aom_paeth_predictor_32x64_avx2(uint8_t *dst, ptrdiff_t stride,
   const __m256i t0 = get_top_vector(above);
   const __m256i t1 = get_top_vector(above + 16);
   const __m256i tl = _mm256_set1_epi16((int16_t)above[-1]);
+  const __m256i dt0 = _mm256_sub_epi16(t0, tl);
+  const __m256i pl0 = _mm256_abs_epi16(dt0);
+  const __m256i dt1 = _mm256_sub_epi16(t1, tl);
+  const __m256i pl1 = _mm256_abs_epi16(dt1);
   const __m256i one = _mm256_set1_epi16(1);
 
-  int i, j;
-  for (j = 0; j < 4; ++j) {
+  for (int j = 0; j < 4; ++j) {
     const __m256i l = get_left_vector(left + j * 16);
     __m256i rep = _mm256_set1_epi16((short)0x8000);
-    for (i = 0; i < 16; ++i) {
+    for (int i = 0; i < 16; ++i) {
       const __m256i l16 = _mm256_shuffle_epi8(l, rep);
+      const __m256i dl = _mm256_sub_epi16(l16, tl);
+      const __m256i pt = _mm256_abs_epi16(dl);
+      const __m256i r =
+          paeth_32x1_pred_pre(l16, t0, t1, tl, dt0, pl0, dt1, pl1, dl, pt);
 
-      const __m128i r0 = paeth_16x1_pred(&l16, &t0, &tl);
-      const __m128i r1 = paeth_16x1_pred(&l16, &t1, &tl);
-
-      _mm_store_si128((__m128i *)dst, r0);
-      _mm_store_si128((__m128i *)(dst + 16), r1);
+      _mm256_storeu_si256((__m256i *)dst, r);
 
       dst += stride;
       rep = _mm256_add_epi16(rep, one);
@@ -970,24 +984,30 @@ void aom_paeth_predictor_64x32_avx2(uint8_t *dst, ptrdiff_t stride,
   const __m256i t2 = get_top_vector(above + 32);
   const __m256i t3 = get_top_vector(above + 48);
   const __m256i tl = _mm256_set1_epi16((int16_t)above[-1]);
+  const __m256i dt0 = _mm256_sub_epi16(t0, tl);
+  const __m256i pl0 = _mm256_abs_epi16(dt0);
+  const __m256i dt1 = _mm256_sub_epi16(t1, tl);
+  const __m256i pl1 = _mm256_abs_epi16(dt1);
+  const __m256i dt2 = _mm256_sub_epi16(t2, tl);
+  const __m256i pl2 = _mm256_abs_epi16(dt2);
+  const __m256i dt3 = _mm256_sub_epi16(t3, tl);
+  const __m256i pl3 = _mm256_abs_epi16(dt3);
   const __m256i one = _mm256_set1_epi16(1);
 
-  int i, j;
-  for (j = 0; j < 2; ++j) {
+  for (int j = 0; j < 2; ++j) {
     const __m256i l = get_left_vector(left + j * 16);
     __m256i rep = _mm256_set1_epi16((short)0x8000);
-    for (i = 0; i < 16; ++i) {
+    for (int i = 0; i < 16; ++i) {
       const __m256i l16 = _mm256_shuffle_epi8(l, rep);
+      const __m256i dl = _mm256_sub_epi16(l16, tl);
+      const __m256i pt = _mm256_abs_epi16(dl);
+      const __m256i r01 =
+          paeth_32x1_pred_pre(l16, t0, t1, tl, dt0, pl0, dt1, pl1, dl, pt);
+      const __m256i r23 =
+          paeth_32x1_pred_pre(l16, t2, t3, tl, dt2, pl2, dt3, pl3, dl, pt);
 
-      const __m128i r0 = paeth_16x1_pred(&l16, &t0, &tl);
-      const __m128i r1 = paeth_16x1_pred(&l16, &t1, &tl);
-      const __m128i r2 = paeth_16x1_pred(&l16, &t2, &tl);
-      const __m128i r3 = paeth_16x1_pred(&l16, &t3, &tl);
-
-      _mm_store_si128((__m128i *)dst, r0);
-      _mm_store_si128((__m128i *)(dst + 16), r1);
-      _mm_store_si128((__m128i *)(dst + 32), r2);
-      _mm_store_si128((__m128i *)(dst + 48), r3);
+      _mm256_storeu_si256((__m256i *)dst, r01);
+      _mm256_storeu_si256((__m256i *)(dst + 32), r23);
 
       dst += stride;
       rep = _mm256_add_epi16(rep, one);
@@ -1002,24 +1022,30 @@ void aom_paeth_predictor_64x64_avx2(uint8_t *dst, ptrdiff_t stride,
   const __m256i t2 = get_top_vector(above + 32);
   const __m256i t3 = get_top_vector(above + 48);
   const __m256i tl = _mm256_set1_epi16((int16_t)above[-1]);
+  const __m256i dt0 = _mm256_sub_epi16(t0, tl);
+  const __m256i pl0 = _mm256_abs_epi16(dt0);
+  const __m256i dt1 = _mm256_sub_epi16(t1, tl);
+  const __m256i pl1 = _mm256_abs_epi16(dt1);
+  const __m256i dt2 = _mm256_sub_epi16(t2, tl);
+  const __m256i pl2 = _mm256_abs_epi16(dt2);
+  const __m256i dt3 = _mm256_sub_epi16(t3, tl);
+  const __m256i pl3 = _mm256_abs_epi16(dt3);
   const __m256i one = _mm256_set1_epi16(1);
 
-  int i, j;
-  for (j = 0; j < 4; ++j) {
+  for (int j = 0; j < 4; ++j) {
     const __m256i l = get_left_vector(left + j * 16);
     __m256i rep = _mm256_set1_epi16((short)0x8000);
-    for (i = 0; i < 16; ++i) {
+    for (int i = 0; i < 16; ++i) {
       const __m256i l16 = _mm256_shuffle_epi8(l, rep);
+      const __m256i dl = _mm256_sub_epi16(l16, tl);
+      const __m256i pt = _mm256_abs_epi16(dl);
+      const __m256i r01 =
+          paeth_32x1_pred_pre(l16, t0, t1, tl, dt0, pl0, dt1, pl1, dl, pt);
+      const __m256i r23 =
+          paeth_32x1_pred_pre(l16, t2, t3, tl, dt2, pl2, dt3, pl3, dl, pt);
 
-      const __m128i r0 = paeth_16x1_pred(&l16, &t0, &tl);
-      const __m128i r1 = paeth_16x1_pred(&l16, &t1, &tl);
-      const __m128i r2 = paeth_16x1_pred(&l16, &t2, &tl);
-      const __m128i r3 = paeth_16x1_pred(&l16, &t3, &tl);
-
-      _mm_store_si128((__m128i *)dst, r0);
-      _mm_store_si128((__m128i *)(dst + 16), r1);
-      _mm_store_si128((__m128i *)(dst + 32), r2);
-      _mm_store_si128((__m128i *)(dst + 48), r3);
+      _mm256_storeu_si256((__m256i *)dst, r01);
+      _mm256_storeu_si256((__m256i *)(dst + 32), r23);
 
       dst += stride;
       rep = _mm256_add_epi16(rep, one);
@@ -1035,23 +1061,29 @@ void aom_paeth_predictor_64x16_avx2(uint8_t *dst, ptrdiff_t stride,
   const __m256i t2 = get_top_vector(above + 32);
   const __m256i t3 = get_top_vector(above + 48);
   const __m256i tl = _mm256_set1_epi16((int16_t)above[-1]);
+  const __m256i dt0 = _mm256_sub_epi16(t0, tl);
+  const __m256i pl0 = _mm256_abs_epi16(dt0);
+  const __m256i dt1 = _mm256_sub_epi16(t1, tl);
+  const __m256i pl1 = _mm256_abs_epi16(dt1);
+  const __m256i dt2 = _mm256_sub_epi16(t2, tl);
+  const __m256i pl2 = _mm256_abs_epi16(dt2);
+  const __m256i dt3 = _mm256_sub_epi16(t3, tl);
+  const __m256i pl3 = _mm256_abs_epi16(dt3);
   const __m256i one = _mm256_set1_epi16(1);
 
-  int i;
   const __m256i l = get_left_vector(left);
   __m256i rep = _mm256_set1_epi16((short)0x8000);
-  for (i = 0; i < 16; ++i) {
+  for (int i = 0; i < 16; ++i) {
     const __m256i l16 = _mm256_shuffle_epi8(l, rep);
+    const __m256i dl = _mm256_sub_epi16(l16, tl);
+    const __m256i pt = _mm256_abs_epi16(dl);
+    const __m256i r01 =
+        paeth_32x1_pred_pre(l16, t0, t1, tl, dt0, pl0, dt1, pl1, dl, pt);
+    const __m256i r23 =
+        paeth_32x1_pred_pre(l16, t2, t3, tl, dt2, pl2, dt3, pl3, dl, pt);
 
-    const __m128i r0 = paeth_16x1_pred(&l16, &t0, &tl);
-    const __m128i r1 = paeth_16x1_pred(&l16, &t1, &tl);
-    const __m128i r2 = paeth_16x1_pred(&l16, &t2, &tl);
-    const __m128i r3 = paeth_16x1_pred(&l16, &t3, &tl);
-
-    _mm_store_si128((__m128i *)dst, r0);
-    _mm_store_si128((__m128i *)(dst + 16), r1);
-    _mm_store_si128((__m128i *)(dst + 32), r2);
-    _mm_store_si128((__m128i *)(dst + 48), r3);
+    _mm256_storeu_si256((__m256i *)dst, r01);
+    _mm256_storeu_si256((__m256i *)(dst + 32), r23);
 
     dst += stride;
     rep = _mm256_add_epi16(rep, one);
@@ -2818,7 +2850,7 @@ static void highbd_dr_prediction_z2_HxW_avx2(
       // y calc
       resy = _mm256_setzero_si256();
       __m256i a0_y, a1_y, shifty;
-      if ((base_x < min_base_x)) {
+      if (base_min_diff > 0) {
         __m256i c256, y_c256, base_y_c256, mask256, mul16;
         r6 = _mm256_set1_epi16(r << 6);
         c256 = _mm256_add_epi16(j256, c1234);
@@ -3546,70 +3578,99 @@ static DECLARE_ALIGNED(32, uint8_t, BaseMask[33][32]) = {
 };
 
 /* clang-format on */
-static AOM_FORCE_INLINE void dr_prediction_z1_HxW_internal_avx2(
+static AOM_FORCE_INLINE void dr_prediction_z1_HxW_low8_internal_avx2(
     int H, int W, __m128i *dst, const uint8_t *above, int upsample_above,
     int dx) {
   const int frac_bits = 6 - upsample_above;
   const int max_base_x = ((W + H) - 1) << upsample_above;
-
-  assert(dx > 0);
-  // pre-filter above pixels
-  // store in temp buffers:
-  //   above[x] * 32 + 16
-  //   above[x+1] - above[x]
-  // final pixels will be calculated as:
-  //   (above[x] * 32 + 16 + (above[x+1] - above[x]) * shift) >> 5
-  __m256i a0, a1, a32, a16;
-  __m256i diff, c3f;
-  __m128i a_mbase_x;
-
-  a16 = _mm256_set1_epi16(16);
-  a_mbase_x = _mm_set1_epi8((int8_t)above[max_base_x]);
-  c3f = _mm256_set1_epi16(0x3f);
+  const __m128i a16 = _mm_set1_epi16(16);
+  const __m128i a_mbase_x = _mm_set1_epi8((int8_t)above[max_base_x]);
+  const __m128i eo_mask = *(__m128i *)EvenOddMaskx[0];
 
   int x = dx;
   for (int r = 0; r < W; r++) {
-    __m256i b, res, shift;
-    __m128i res1, a0_128, a1_128;
-
-    int base = x >> frac_bits;
+    const int base = x >> frac_bits;
     int base_max_diff = (max_base_x - base) >> upsample_above;
     if (base_max_diff <= 0) {
       for (int i = r; i < W; ++i) {
-        dst[i] = a_mbase_x;  // save 4 values
+        dst[i] = a_mbase_x;
       }
       return;
     }
     if (base_max_diff > H) base_max_diff = H;
-    a0_128 = _mm_loadu_si128((__m128i *)(above + base));
-    a1_128 = _mm_loadu_si128((__m128i *)(above + base + 1));
+    __m128i raw = _mm_loadu_si128((const __m128i *)(above + base));
+    __m128i a1_raw;
+    __m128i shift;
+    if (upsample_above) {
+      raw = _mm_shuffle_epi8(raw, eo_mask);
+      a1_raw = _mm_srli_si128(raw, 8);
+      shift = _mm_set1_epi16((int16_t)(x & 0x1f));
+    } else {
+      a1_raw = _mm_srli_si128(raw, 1);
+      shift = _mm_set1_epi16((int16_t)((x >> 1) & 0x1f));
+    }
+    const __m128i a0 = _mm_cvtepu8_epi16(raw);
+    const __m128i a1 = _mm_cvtepu8_epi16(a1_raw);
+    const __m128i diff = _mm_sub_epi16(a1, a0);
+    const __m128i a32 = _mm_add_epi16(_mm_slli_epi16(a0, 5), a16);
+    const __m128i res =
+        _mm_srli_epi16(_mm_add_epi16(a32, _mm_mullo_epi16(diff, shift)), 5);
+    const __m128i res8 = _mm_packus_epi16(res, res);
+    dst[r] =
+        _mm_blendv_epi8(a_mbase_x, res8, *(__m128i *)BaseMask[base_max_diff]);
+    x += dx;
+  }
+}
+
+static AOM_FORCE_INLINE void dr_prediction_z1_HxW_internal_avx2(
+    int H, int W, __m128i *dst, const uint8_t *above, int upsample_above,
+    int dx) {
+  if (H <= 8) {
+    dr_prediction_z1_HxW_low8_internal_avx2(H, W, dst, above, upsample_above,
+                                            dx);
+    return;
+  }
+  const int frac_bits = 6 - upsample_above;
+  const int max_base_x = ((W + H) - 1) << upsample_above;
+
+  assert(dx > 0);
+  const __m256i a16 = _mm256_set1_epi16(16);
+  const __m128i a_mbase_x = _mm_set1_epi8((int8_t)above[max_base_x]);
+
+  int x = dx;
+  for (int r = 0; r < W; r++) {
+    int base = x >> frac_bits;
+    int base_max_diff = (max_base_x - base) >> upsample_above;
+    if (base_max_diff <= 0) {
+      for (int i = r; i < W; ++i) {
+        dst[i] = a_mbase_x;
+      }
+      return;
+    }
+    if (base_max_diff > H) base_max_diff = H;
+    __m128i a0_128 = _mm_loadu_si128((const __m128i *)(above + base));
+    __m128i a1_128;
+    __m256i shift;
 
     if (upsample_above) {
       a0_128 = _mm_shuffle_epi8(a0_128, *(__m128i *)EvenOddMaskx[0]);
       a1_128 = _mm_srli_si128(a0_128, 8);
-
-      shift = _mm256_srli_epi16(
-          _mm256_and_si256(
-              _mm256_slli_epi16(_mm256_set1_epi16(x), upsample_above), c3f),
-          1);
+      shift = _mm256_set1_epi16((int16_t)(x & 0x1f));
     } else {
-      shift = _mm256_srli_epi16(_mm256_and_si256(_mm256_set1_epi16(x), c3f), 1);
+      a1_128 = _mm_loadu_si128((const __m128i *)(above + base + 1));
+      shift = _mm256_set1_epi16((int16_t)((x >> 1) & 0x1f));
     }
-    a0 = _mm256_cvtepu8_epi16(a0_128);
-    a1 = _mm256_cvtepu8_epi16(a1_128);
+    const __m256i a0 = _mm256_cvtepu8_epi16(a0_128);
+    const __m256i a1 = _mm256_cvtepu8_epi16(a1_128);
 
-    diff = _mm256_sub_epi16(a1, a0);   // a[x+1] - a[x]
-    a32 = _mm256_slli_epi16(a0, 5);    // a[x] * 32
-    a32 = _mm256_add_epi16(a32, a16);  // a[x] * 32 + 16
-
-    b = _mm256_mullo_epi16(diff, shift);
-    res = _mm256_add_epi16(a32, b);
-    res = _mm256_srli_epi16(res, 5);
+    const __m256i diff = _mm256_sub_epi16(a1, a0);
+    const __m256i a32 = _mm256_add_epi16(_mm256_slli_epi16(a0, 5), a16);
+    const __m256i b = _mm256_mullo_epi16(diff, shift);
+    __m256i res = _mm256_srli_epi16(_mm256_add_epi16(a32, b), 5);
 
     res = _mm256_packus_epi16(
-        res, _mm256_castsi128_si256(
-                 _mm256_extracti128_si256(res, 1)));  // goto 8 bit
-    res1 = _mm256_castsi256_si128(res);               // 16 8bit values
+        res, _mm256_castsi128_si256(_mm256_extracti128_si256(res, 1)));
+    const __m128i res1 = _mm256_castsi256_si128(res);
 
     dst[r] =
         _mm_blendv_epi8(a_mbase_x, res1, *(__m128i *)BaseMask[base_max_diff]);
@@ -3620,102 +3681,188 @@ static AOM_FORCE_INLINE void dr_prediction_z1_HxW_internal_avx2(
 static void dr_prediction_z1_4xN_avx2(int N, uint8_t *dst, ptrdiff_t stride,
                                       const uint8_t *above, int upsample_above,
                                       int dx) {
-  __m128i dstvec[16];
+  const int frac_bits = 6 - upsample_above;
+  const int max_base_x = ((N + 4) - 1) << upsample_above;
+  const __m128i a16 = _mm_set1_epi16(16);
+  const __m128i a_mbase_x = _mm_set1_epi8((int8_t)above[max_base_x]);
+  const int mbase_x32 = _mm_cvtsi128_si32(a_mbase_x);
+  const __m128i eo_mask = *(__m128i *)EvenOddMaskx[0];
 
-  dr_prediction_z1_HxW_internal_avx2(4, N, dstvec, above, upsample_above, dx);
-  for (int i = 0; i < N; i++) {
-    *(int *)(dst + stride * i) = _mm_cvtsi128_si32(dstvec[i]);
+  int x = dx;
+  for (int r = 0; r < N; r++, dst += stride) {
+    const int base = x >> frac_bits;
+    int base_max_diff = (max_base_x - base) >> upsample_above;
+    if (base_max_diff <= 0) {
+      for (int i = r; i < N; ++i, dst += stride) {
+        memcpy(dst, &mbase_x32, sizeof(mbase_x32));
+      }
+      return;
+    }
+    if (base_max_diff > 4) base_max_diff = 4;
+    __m128i raw = _mm_loadu_si128((const __m128i *)(above + base));
+    __m128i a1_raw;
+    __m128i shift;
+    if (upsample_above) {
+      raw = _mm_shuffle_epi8(raw, eo_mask);
+      a1_raw = _mm_srli_si128(raw, 8);
+      shift = _mm_set1_epi16((int16_t)(x & 0x1f));
+    } else {
+      a1_raw = _mm_srli_si128(raw, 1);
+      shift = _mm_set1_epi16((int16_t)((x >> 1) & 0x1f));
+    }
+    const __m128i a0 = _mm_cvtepu8_epi16(raw);
+    const __m128i a1 = _mm_cvtepu8_epi16(a1_raw);
+    const __m128i diff = _mm_sub_epi16(a1, a0);
+    const __m128i a32 = _mm_add_epi16(_mm_slli_epi16(a0, 5), a16);
+    const __m128i res =
+        _mm_srli_epi16(_mm_add_epi16(a32, _mm_mullo_epi16(diff, shift)), 5);
+    const __m128i res8 = _mm_packus_epi16(res, res);
+    xx_storel_32(dst, _mm_blendv_epi8(a_mbase_x, res8,
+                                      *(__m128i *)BaseMask[base_max_diff]));
+    x += dx;
   }
 }
 
 static void dr_prediction_z1_8xN_avx2(int N, uint8_t *dst, ptrdiff_t stride,
                                       const uint8_t *above, int upsample_above,
                                       int dx) {
-  __m128i dstvec[32];
+  const int frac_bits = 6 - upsample_above;
+  const int max_base_x = ((N + 8) - 1) << upsample_above;
+  const __m128i a16 = _mm_set1_epi16(16);
+  const __m128i a_mbase_x = _mm_set1_epi8((int8_t)above[max_base_x]);
+  const __m128i eo_mask = *(__m128i *)EvenOddMaskx[0];
 
-  dr_prediction_z1_HxW_internal_avx2(8, N, dstvec, above, upsample_above, dx);
-  for (int i = 0; i < N; i++) {
-    _mm_storel_epi64((__m128i *)(dst + stride * i), dstvec[i]);
+  int x = dx;
+  for (int r = 0; r < N; r++, dst += stride) {
+    const int base = x >> frac_bits;
+    int base_max_diff = (max_base_x - base) >> upsample_above;
+    if (base_max_diff <= 0) {
+      for (int i = r; i < N; ++i, dst += stride) {
+        _mm_storel_epi64((__m128i *)dst, a_mbase_x);
+      }
+      return;
+    }
+    if (base_max_diff > 8) base_max_diff = 8;
+    __m128i raw = _mm_loadu_si128((const __m128i *)(above + base));
+    __m128i a1_raw;
+    __m128i shift;
+    if (upsample_above) {
+      raw = _mm_shuffle_epi8(raw, eo_mask);
+      a1_raw = _mm_srli_si128(raw, 8);
+      shift = _mm_set1_epi16((int16_t)(x & 0x1f));
+    } else {
+      a1_raw = _mm_srli_si128(raw, 1);
+      shift = _mm_set1_epi16((int16_t)((x >> 1) & 0x1f));
+    }
+    const __m128i a0 = _mm_cvtepu8_epi16(raw);
+    const __m128i a1 = _mm_cvtepu8_epi16(a1_raw);
+    const __m128i diff = _mm_sub_epi16(a1, a0);
+    const __m128i a32 = _mm_add_epi16(_mm_slli_epi16(a0, 5), a16);
+    const __m128i res =
+        _mm_srli_epi16(_mm_add_epi16(a32, _mm_mullo_epi16(diff, shift)), 5);
+    const __m128i res8 = _mm_packus_epi16(res, res);
+    _mm_storel_epi64(
+        (__m128i *)dst,
+        _mm_blendv_epi8(a_mbase_x, res8, *(__m128i *)BaseMask[base_max_diff]));
+    x += dx;
   }
 }
 
 static void dr_prediction_z1_16xN_avx2(int N, uint8_t *dst, ptrdiff_t stride,
                                        const uint8_t *above, int upsample_above,
                                        int dx) {
-  __m128i dstvec[64];
+  const int frac_bits = 6 - upsample_above;
+  const int max_base_x = ((N + 16) - 1) << upsample_above;
+  const __m256i a16 = _mm256_set1_epi16(16);
+  const __m128i a_mbase_x = _mm_set1_epi8((int8_t)above[max_base_x]);
 
-  dr_prediction_z1_HxW_internal_avx2(16, N, dstvec, above, upsample_above, dx);
-  for (int i = 0; i < N; i++) {
-    _mm_storeu_si128((__m128i *)(dst + stride * i), dstvec[i]);
+  int x = dx;
+  for (int r = 0; r < N; r++, dst += stride) {
+    const int base = x >> frac_bits;
+    int base_max_diff = (max_base_x - base) >> upsample_above;
+    if (base_max_diff <= 0) {
+      for (int i = r; i < N; ++i, dst += stride) {
+        _mm_storeu_si128((__m128i *)dst, a_mbase_x);
+      }
+      return;
+    }
+    if (base_max_diff > 16) base_max_diff = 16;
+    __m128i a0_128 = _mm_loadu_si128((const __m128i *)(above + base));
+    __m128i a1_128;
+    __m256i shift;
+
+    if (upsample_above) {
+      a0_128 = _mm_shuffle_epi8(a0_128, *(__m128i *)EvenOddMaskx[0]);
+      a1_128 = _mm_srli_si128(a0_128, 8);
+      shift = _mm256_set1_epi16((int16_t)(x & 0x1f));
+    } else {
+      a1_128 = _mm_loadu_si128((const __m128i *)(above + base + 1));
+      shift = _mm256_set1_epi16((int16_t)((x >> 1) & 0x1f));
+    }
+    const __m256i a0 = _mm256_cvtepu8_epi16(a0_128);
+    const __m256i a1 = _mm256_cvtepu8_epi16(a1_128);
+    const __m256i diff = _mm256_sub_epi16(a1, a0);
+    const __m256i a32 = _mm256_add_epi16(_mm256_slli_epi16(a0, 5), a16);
+    const __m256i b = _mm256_mullo_epi16(diff, shift);
+    __m256i res = _mm256_srli_epi16(_mm256_add_epi16(a32, b), 5);
+    res = _mm256_packus_epi16(
+        res, _mm256_castsi128_si256(_mm256_extracti128_si256(res, 1)));
+    const __m128i res1 = _mm256_castsi256_si128(res);
+    _mm_storeu_si128(
+        (__m128i *)dst,
+        _mm_blendv_epi8(a_mbase_x, res1, *(__m128i *)BaseMask[base_max_diff]));
+    x += dx;
   }
 }
 
 static AOM_FORCE_INLINE void dr_prediction_z1_32xN_internal_avx2(
     int N, __m256i *dstvec, const uint8_t *above, int upsample_above, int dx) {
-  // here upsample_above is 0 by design of av1_use_intra_edge_upsample
   (void)upsample_above;
   const int frac_bits = 6;
   const int max_base_x = ((32 + N) - 1);
 
-  // pre-filter above pixels
-  // store in temp buffers:
-  //   above[x] * 32 + 16
-  //   above[x+1] - above[x]
-  // final pixels will be calculated as:
-  //   (above[x] * 32 + 16 + (above[x+1] - above[x]) * shift) >> 5
-  __m256i a0, a1, a32, a16;
-  __m256i a_mbase_x, diff, c3f;
-
-  a16 = _mm256_set1_epi16(16);
-  a_mbase_x = _mm256_set1_epi8((int8_t)above[max_base_x]);
-  c3f = _mm256_set1_epi16(0x3f);
+  const __m256i a16 = _mm256_set1_epi16(16);
+  const __m256i a_mbase_x = _mm256_set1_epi8((int8_t)above[max_base_x]);
 
   int x = dx;
   for (int r = 0; r < N; r++) {
-    __m256i b, res, res16[2];
-    __m128i a0_128, a1_128;
-
+    __m256i res16[2];
     int base = x >> frac_bits;
     int base_max_diff = (max_base_x - base);
     if (base_max_diff <= 0) {
       for (int i = r; i < N; ++i) {
-        dstvec[i] = a_mbase_x;  // save 32 values
+        dstvec[i] = a_mbase_x;
       }
       return;
     }
     if (base_max_diff > 32) base_max_diff = 32;
-    __m256i shift =
-        _mm256_srli_epi16(_mm256_and_si256(_mm256_set1_epi16(x), c3f), 1);
+    const __m256i shift = _mm256_set1_epi16((int16_t)((x >> 1) & 0x1f));
 
     for (int j = 0, jj = 0; j < 32; j += 16, jj++) {
       int mdiff = base_max_diff - j;
       if (mdiff <= 0) {
         res16[jj] = a_mbase_x;
       } else {
-        a0_128 = _mm_loadu_si128((__m128i *)(above + base + j));
-        a1_128 = _mm_loadu_si128((__m128i *)(above + base + j + 1));
-        a0 = _mm256_cvtepu8_epi16(a0_128);
-        a1 = _mm256_cvtepu8_epi16(a1_128);
+        const __m128i a0_128 =
+            _mm_loadu_si128((const __m128i *)(above + base + j));
+        const __m128i a1_128 =
+            _mm_loadu_si128((const __m128i *)(above + base + j + 1));
+        const __m256i a0 = _mm256_cvtepu8_epi16(a0_128);
+        const __m256i a1 = _mm256_cvtepu8_epi16(a1_128);
 
-        diff = _mm256_sub_epi16(a1, a0);   // a[x+1] - a[x]
-        a32 = _mm256_slli_epi16(a0, 5);    // a[x] * 32
-        a32 = _mm256_add_epi16(a32, a16);  // a[x] * 32 + 16
-        b = _mm256_mullo_epi16(diff, shift);
-
-        res = _mm256_add_epi16(a32, b);
-        res = _mm256_srli_epi16(res, 5);
+        const __m256i diff = _mm256_sub_epi16(a1, a0);
+        const __m256i a32 = _mm256_add_epi16(_mm256_slli_epi16(a0, 5), a16);
+        const __m256i b = _mm256_mullo_epi16(diff, shift);
+        const __m256i res = _mm256_srli_epi16(_mm256_add_epi16(a32, b), 5);
         res16[jj] = _mm256_packus_epi16(
-            res, _mm256_castsi128_si256(
-                     _mm256_extracti128_si256(res, 1)));  // 16 8bit values
+            res, _mm256_castsi128_si256(_mm256_extracti128_si256(res, 1)));
       }
     }
     res16[1] =
-        _mm256_inserti128_si256(res16[0], _mm256_castsi256_si128(res16[1]),
-                                1);  // 32 8bit values
+        _mm256_inserti128_si256(res16[0], _mm256_castsi256_si128(res16[1]), 1);
 
-    dstvec[r] = _mm256_blendv_epi8(
-        a_mbase_x, res16[1],
-        *(__m256i *)BaseMask[base_max_diff]);  // 32 8bit values
+    dstvec[r] = _mm256_blendv_epi8(a_mbase_x, res16[1],
+                                   *(__m256i *)BaseMask[base_max_diff]);
     x += dx;
   }
 }
@@ -3723,89 +3870,104 @@ static AOM_FORCE_INLINE void dr_prediction_z1_32xN_internal_avx2(
 static void dr_prediction_z1_32xN_avx2(int N, uint8_t *dst, ptrdiff_t stride,
                                        const uint8_t *above, int upsample_above,
                                        int dx) {
-  __m256i dstvec[64];
-  dr_prediction_z1_32xN_internal_avx2(N, dstvec, above, upsample_above, dx);
-  for (int i = 0; i < N; i++) {
-    _mm256_storeu_si256((__m256i *)(dst + stride * i), dstvec[i]);
+  (void)upsample_above;
+  const int frac_bits = 6;
+  const int max_base_x = ((32 + N) - 1);
+  const __m256i a16 = _mm256_set1_epi16(16);
+  const __m256i a_mbase_x = _mm256_set1_epi8((int8_t)above[max_base_x]);
+
+  int x = dx;
+  for (int r = 0; r < N; r++, dst += stride) {
+    __m256i res16[2];
+    const int base = x >> frac_bits;
+    int base_max_diff = (max_base_x - base);
+    if (base_max_diff <= 0) {
+      for (int i = r; i < N; ++i, dst += stride) {
+        _mm256_storeu_si256((__m256i *)dst, a_mbase_x);
+      }
+      return;
+    }
+    if (base_max_diff > 32) base_max_diff = 32;
+    const __m256i shift = _mm256_set1_epi16((int16_t)((x >> 1) & 0x1f));
+
+    for (int j = 0, jj = 0; j < 32; j += 16, jj++) {
+      const int mdiff = base_max_diff - j;
+      if (mdiff <= 0) {
+        res16[jj] = a_mbase_x;
+      } else {
+        const __m128i a0_128 =
+            _mm_loadu_si128((const __m128i *)(above + base + j));
+        const __m128i a1_128 =
+            _mm_loadu_si128((const __m128i *)(above + base + j + 1));
+        const __m256i a0 = _mm256_cvtepu8_epi16(a0_128);
+        const __m256i a1 = _mm256_cvtepu8_epi16(a1_128);
+
+        const __m256i diff = _mm256_sub_epi16(a1, a0);
+        const __m256i a32 = _mm256_add_epi16(_mm256_slli_epi16(a0, 5), a16);
+        const __m256i b = _mm256_mullo_epi16(diff, shift);
+        const __m256i res = _mm256_srli_epi16(_mm256_add_epi16(a32, b), 5);
+        res16[jj] = _mm256_packus_epi16(
+            res, _mm256_castsi128_si256(_mm256_extracti128_si256(res, 1)));
+      }
+    }
+    res16[1] =
+        _mm256_inserti128_si256(res16[0], _mm256_castsi256_si128(res16[1]), 1);
+    _mm256_storeu_si256(
+        (__m256i *)dst,
+        _mm256_blendv_epi8(a_mbase_x, res16[1],
+                           *(__m256i *)BaseMask[base_max_diff]));
+    x += dx;
   }
 }
 
 static void dr_prediction_z1_64xN_avx2(int N, uint8_t *dst, ptrdiff_t stride,
                                        const uint8_t *above, int upsample_above,
                                        int dx) {
-  // here upsample_above is 0 by design of av1_use_intra_edge_upsample
   (void)upsample_above;
   const int frac_bits = 6;
   const int max_base_x = ((64 + N) - 1);
 
-  // pre-filter above pixels
-  // store in temp buffers:
-  //   above[x] * 32 + 16
-  //   above[x+1] - above[x]
-  // final pixels will be calculated as:
-  //   (above[x] * 32 + 16 + (above[x+1] - above[x]) * shift) >> 5
-  __m256i a0, a1, a32, a16;
-  __m256i a_mbase_x, diff, c3f;
-  __m128i max_base_x128, base_inc128, mask128;
-
-  a16 = _mm256_set1_epi16(16);
-  a_mbase_x = _mm256_set1_epi8((int8_t)above[max_base_x]);
-  max_base_x128 = _mm_set1_epi8(max_base_x);
-  c3f = _mm256_set1_epi16(0x3f);
+  const __m256i a16 = _mm256_set1_epi16(16);
+  const __m256i a_mbase_x = _mm256_set1_epi8((int8_t)above[max_base_x]);
 
   int x = dx;
   for (int r = 0; r < N; r++, dst += stride) {
-    __m256i b, res;
     int base = x >> frac_bits;
     if (base >= max_base_x) {
       for (int i = r; i < N; ++i) {
-        _mm256_storeu_si256((__m256i *)dst, a_mbase_x);  // save 32 values
+        _mm256_storeu_si256((__m256i *)dst, a_mbase_x);
         _mm256_storeu_si256((__m256i *)(dst + 32), a_mbase_x);
         dst += stride;
       }
       return;
     }
 
-    __m256i shift =
-        _mm256_srli_epi16(_mm256_and_si256(_mm256_set1_epi16(x), c3f), 1);
+    const __m256i shift = _mm256_set1_epi16((int16_t)((x >> 1) & 0x1f));
 
-    __m128i a0_128, a1_128, res128;
     for (int j = 0; j < 64; j += 16) {
       int mdif = max_base_x - (base + j);
       if (mdif <= 0) {
         _mm_storeu_si128((__m128i *)(dst + j),
                          _mm256_castsi256_si128(a_mbase_x));
       } else {
-        a0_128 = _mm_loadu_si128((__m128i *)(above + base + j));
-        a1_128 = _mm_loadu_si128((__m128i *)(above + base + 1 + j));
-        a0 = _mm256_cvtepu8_epi16(a0_128);
-        a1 = _mm256_cvtepu8_epi16(a1_128);
+        const __m128i a0_128 =
+            _mm_loadu_si128((const __m128i *)(above + base + j));
+        const __m128i a1_128 =
+            _mm_loadu_si128((const __m128i *)(above + base + 1 + j));
+        const __m256i a0 = _mm256_cvtepu8_epi16(a0_128);
+        const __m256i a1 = _mm256_cvtepu8_epi16(a1_128);
 
-        diff = _mm256_sub_epi16(a1, a0);   // a[x+1] - a[x]
-        a32 = _mm256_slli_epi16(a0, 5);    // a[x] * 32
-        a32 = _mm256_add_epi16(a32, a16);  // a[x] * 32 + 16
-        b = _mm256_mullo_epi16(diff, shift);
-
-        res = _mm256_add_epi16(a32, b);
-        res = _mm256_srli_epi16(res, 5);
+        const __m256i diff = _mm256_sub_epi16(a1, a0);
+        const __m256i a32 = _mm256_add_epi16(_mm256_slli_epi16(a0, 5), a16);
+        const __m256i b = _mm256_mullo_epi16(diff, shift);
+        __m256i res = _mm256_srli_epi16(_mm256_add_epi16(a32, b), 5);
         res = _mm256_packus_epi16(
-            res, _mm256_castsi128_si256(
-                     _mm256_extracti128_si256(res, 1)));  // 16 8bit values
-
-        base_inc128 =
-            _mm_setr_epi8((int8_t)(base + j), (int8_t)(base + j + 1),
-                          (int8_t)(base + j + 2), (int8_t)(base + j + 3),
-                          (int8_t)(base + j + 4), (int8_t)(base + j + 5),
-                          (int8_t)(base + j + 6), (int8_t)(base + j + 7),
-                          (int8_t)(base + j + 8), (int8_t)(base + j + 9),
-                          (int8_t)(base + j + 10), (int8_t)(base + j + 11),
-                          (int8_t)(base + j + 12), (int8_t)(base + j + 13),
-                          (int8_t)(base + j + 14), (int8_t)(base + j + 15));
-
-        mask128 = _mm_cmpgt_epi8(_mm_subs_epu8(max_base_x128, base_inc128),
-                                 _mm_setzero_si128());
-        res128 = _mm_blendv_epi8(_mm256_castsi256_si128(a_mbase_x),
-                                 _mm256_castsi256_si128(res), mask128);
+            res, _mm256_castsi128_si256(_mm256_extracti128_si256(res, 1)));
+        __m128i res128 = _mm256_castsi256_si128(res);
+        if (mdif < 16) {
+          res128 = _mm_blendv_epi8(_mm256_castsi256_si128(a_mbase_x), res128,
+                                   *(__m128i *)BaseMask[mdif]);
+        }
         _mm_storeu_si128((__m128i *)(dst + j), res128);
       }
     }
@@ -3840,14 +4002,6 @@ void av1_dr_prediction_z1_avx2(uint8_t *dst, ptrdiff_t stride, int bw, int bh,
   return;
 }
 
-// Load two adjacent 8-bit reference samples (left[y] and left[y + 1]) as a
-// single 16-bit value.
-static inline int16_t load_u16_unaligned(const uint8_t *p) {
-  int16_t val;
-  memcpy(&val, p, sizeof(val));
-  return val;
-}
-
 #if defined(__GNUC__) || defined(__clang__)
 __attribute__((noinline))
 #endif
@@ -3873,94 +4027,100 @@ static void dr_prediction_z2_Nx4_avx2(int N, uint8_t *dst, ptrdiff_t stride,
   a16 = _mm_set1_epi16(16);
   c3f = _mm_set1_epi16(0x3f);
   min_base_y128 = _mm_set1_epi16(min_base_y);
-  c1234 = _mm_setr_epi16(0, 1, 2, 3, 4, 0, 0, 0);
+  c1234 = _mm_setr_epi16(1, 2, 3, 4, 0, 0, 0, 0);
   dy128 = _mm_set1_epi16(dy);
+  const __m128i mul_y128 = _mm_mullo_epi16(c1234, dy128);
+  const __m128i neg_mul_y128 = _mm_sub_epi16(_mm_setzero_si128(), mul_y128);
+  const __m128i shifty =
+      upsample_left
+          ? _mm_srli_epi16(
+                _mm_and_si128(_mm_slli_epi16(neg_mul_y128, upsample_left), c3f),
+                1)
+          : _mm_srli_epi16(_mm_and_si128(neg_mul_y128, c3f), 1);
+  __m128i running_base_y = _mm_srai_epi16(neg_mul_y128, frac_bits_y);
+  const __m128i step_y128 = _mm_set1_epi16(1 << upsample_left);
 
-  for (int r = 0; r < N; r++) {
-    __m128i b, res, shift, r6;
-    __m128i resx, resy, resxy;
+  for (int r = 0; r < N;
+       r++, running_base_y = _mm_add_epi16(running_base_y, step_y128)) {
+    __m128i b, res, shift;
+    __m128i resx, resy;
     __m128i a0_x128, a1_x128;
     int y = r + 1;
     int base_x = (-y * dx) >> frac_bits_x;
-    int base_shift = 0;
-    if (base_x < (min_base_x - 1)) {
-      base_shift = (min_base_x - base_x - 1) >> upsample_above;
-    }
     int base_min_diff =
         (min_base_x - base_x + upsample_above) >> upsample_above;
-    if (base_min_diff > 4) {
-      base_min_diff = 4;
-    } else {
-      if (base_min_diff < 0) base_min_diff = 0;
-    }
 
-    if (base_shift > 3) {
-      a0_x = _mm_setzero_si128();
-      a1_x = _mm_setzero_si128();
-      shift = _mm_setzero_si128();
-    } else {
-      a0_x128 = _mm_loadu_si128((__m128i *)(above + base_x + base_shift));
+    if (base_min_diff <= 0) {
+      a0_x128 = _mm_loadu_si128((const __m128i *)(above + base_x));
       const int shift_val = (((-y * dx) * (1 << upsample_above)) & 0x3f) >> 1;
       shift = _mm_set1_epi16(shift_val);
-
       if (upsample_above) {
-        a0_x128 =
-            _mm_shuffle_epi8(a0_x128, *(__m128i *)EvenOddMaskx[base_shift]);
+        a0_x128 = _mm_shuffle_epi8(a0_x128, *(__m128i *)EvenOddMaskx[0]);
         a1_x128 = _mm_srli_si128(a0_x128, 8);
       } else {
-        a0_x128 = _mm_shuffle_epi8(a0_x128, *(__m128i *)LoadMaskx[base_shift]);
         a1_x128 = _mm_srli_si128(a0_x128, 1);
       }
       a0_x = _mm_cvtepu8_epi16(a0_x128);
       a1_x = _mm_cvtepu8_epi16(a1_x128);
-    }
-    // y calc
-    __m128i a0_y, a1_y, shifty;
-    if (base_x < min_base_x) {
-      __m128i y_c128, base_y_c128, c1234_;
-      c1234_ = _mm_srli_si128(c1234, 2);
-      r6 = _mm_set1_epi16(r << 6);
-      y_c128 = _mm_sub_epi16(r6, _mm_mullo_epi16(c1234_, dy128));
-      base_y_c128 = _mm_srai_epi16(y_c128, frac_bits_y);
-      base_y_c128 = _mm_max_epi16(base_y_c128, min_base_y128);
+    } else {
+      if (base_min_diff < 4) {
+        int base_shift = 0;
+        if (base_x < (min_base_x - 1)) {
+          base_shift = (min_base_x - base_x - 1) >> upsample_above;
+        }
+        a0_x128 = _mm_loadu_si128((__m128i *)(above + base_x + base_shift));
+        const int shift_val = (((-y * dx) * (1 << upsample_above)) & 0x3f) >> 1;
+        shift = _mm_set1_epi16(shift_val);
+
+        if (upsample_above) {
+          a0_x128 =
+              _mm_shuffle_epi8(a0_x128, *(__m128i *)EvenOddMaskx[base_shift]);
+          a1_x128 = _mm_srli_si128(a0_x128, 8);
+        } else {
+          a0_x128 =
+              _mm_shuffle_epi8(a0_x128, *(__m128i *)LoadMaskx[base_shift]);
+          a1_x128 = _mm_srli_si128(a0_x128, 1);
+        }
+        a0_x = _mm_cvtepu8_epi16(a0_x128);
+        a1_x = _mm_cvtepu8_epi16(a1_x128);
+      }
+
+      // y calc
+      __m128i a0_y, a1_y, base_y_c128;
+      base_y_c128 = _mm_max_epi16(running_base_y, min_base_y128);
       const int min_y = (int16_t)_mm_extract_epi16(base_y_c128, 3);
       const int max_y = (int16_t)_mm_extract_epi16(base_y_c128, 0);
       const int offset_diff = max_y - min_y;
-      // When the vertical span fits within a 16-byte window, use masked vector
-      // load and _mm_shuffle_epi8 instead of scalar extracts.
-      if (offset_diff < 16) {
+      if (offset_diff < 15) {
         const __m128i min_y128 = _mm_set1_epi16((int16_t)min_y);
         const __m128i base_y_offset = _mm_sub_epi16(base_y_c128, min_y128);
         const __m128i base_y_offset128 =
             _mm_packus_epi16(base_y_offset, base_y_offset);
-        const __m128i mask = *(__m128i *)LoadMaskz2[offset_diff >> 2];
+        const __m128i mask = *(__m128i *)LoadMaskz2[(offset_diff + 1) >> 2];
         const __m128i a0_y128 =
             _mm_maskload_epi32((const int *)(left + min_y), mask);
-        const __m128i a1_y128 =
-            _mm_maskload_epi32((const int *)(left + min_y + 1), mask);
+        const __m128i a1_y128 = _mm_srli_si128(a0_y128, 1);
         a0_y = _mm_cvtepu8_epi16(_mm_shuffle_epi8(a0_y128, base_y_offset128));
         a1_y = _mm_cvtepu8_epi16(_mm_shuffle_epi8(a1_y128, base_y_offset128));
       } else {
-        const __m128i pairs =
-            _mm_setr_epi16(load_u16_unaligned(left + max_y),
-                           load_u16_unaligned(left + (int16_t)_mm_extract_epi16(
-                                                         base_y_c128, 1)),
-                           load_u16_unaligned(left + (int16_t)_mm_extract_epi16(
-                                                         base_y_c128, 2)),
-                           load_u16_unaligned(left + min_y), 0, 0, 0, 0);
+        const __m128i pairs = _mm_setr_epi16(
+            loadu_int16(left + max_y),
+            loadu_int16(left + (int16_t)_mm_extract_epi16(base_y_c128, 1)),
+            loadu_int16(left + (int16_t)_mm_extract_epi16(base_y_c128, 2)),
+            loadu_int16(left + min_y), 0, 0, 0, 0);
         a0_y = _mm_and_si128(pairs, _mm_set1_epi16(0x00ff));
         a1_y = _mm_srli_epi16(pairs, 8);
       }
 
-      if (upsample_left) {
-        shifty = _mm_srli_epi16(
-            _mm_and_si128(_mm_slli_epi16(y_c128, upsample_left), c3f), 1);
+      if (base_min_diff < 4) {
+        a0_x = _mm_unpacklo_epi64(a0_x, a0_y);
+        a1_x = _mm_unpacklo_epi64(a1_x, a1_y);
+        shift = _mm_unpacklo_epi64(shift, shifty);
       } else {
-        shifty = _mm_srli_epi16(_mm_and_si128(y_c128, c3f), 1);
+        a0_x = a0_y;
+        a1_x = a1_y;
+        shift = shifty;
       }
-      a0_x = _mm_unpacklo_epi64(a0_x, a0_y);
-      a1_x = _mm_unpacklo_epi64(a1_x, a1_y);
-      shift = _mm_unpacklo_epi64(shift, shifty);
     }
 
     diff = _mm_sub_epi16(a1_x, a0_x);  // a[x+1] - a[x]
@@ -3972,10 +4132,11 @@ static void dr_prediction_z2_Nx4_avx2(int N, uint8_t *dst, ptrdiff_t stride,
     res = _mm_srli_epi16(res, 5);
 
     resx = _mm_packus_epi16(res, res);
-    resy = _mm_srli_si128(resx, 4);
-
-    resxy = _mm_blendv_epi8(resx, resy, *(__m128i *)BaseMask[base_min_diff]);
-    *(int *)(dst) = _mm_cvtsi128_si32(resxy);
+    if (base_min_diff > 0 && base_min_diff < 4) {
+      resy = _mm_srli_si128(resx, 4);
+      resx = _mm_blendv_epi8(resx, resy, *(__m128i *)BaseMask[base_min_diff]);
+    }
+    xx_storel_32(dst, resx);
     dst += stride;
   }
 }
@@ -4004,106 +4165,114 @@ static void dr_prediction_z2_Nx8_avx2(int N, uint8_t *dst, ptrdiff_t stride,
   __m128i c1234, dy128;
 
   a16 = _mm256_set1_epi16(16);
+  const __m128i a16_128 = _mm256_castsi256_si128(a16);
   c3f = _mm_set1_epi16(0x3f);
   min_base_y128 = _mm_set1_epi16(min_base_y);
   dy128 = _mm_set1_epi16(dy);
   c1234 = _mm_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8);
+  const __m128i mul_y128 = _mm_mullo_epi16(c1234, dy128);
+  const __m128i neg_mul_y128 = _mm_sub_epi16(_mm_setzero_si128(), mul_y128);
+  const __m128i shifty =
+      upsample_left
+          ? _mm_srli_epi16(
+                _mm_and_si128(_mm_slli_epi16(neg_mul_y128, upsample_left), c3f),
+                1)
+          : _mm_srli_epi16(_mm_and_si128(neg_mul_y128, c3f), 1);
+  __m128i running_base_y = _mm_srai_epi16(neg_mul_y128, frac_bits_y);
+  const __m128i step_y128 = _mm_set1_epi16(1 << upsample_left);
 
-  for (int r = 0; r < N; r++) {
+  for (int r = 0; r < N;
+       r++, running_base_y = _mm_add_epi16(running_base_y, step_y128)) {
     __m256i b, res, shift;
-    __m128i resx, resy, resxy, r6;
+    __m128i resx, resy, resxy;
 
     int y = r + 1;
     int base_x = (-y * dx) >> frac_bits_x;
+    int base_min_diff =
+        (min_base_x - base_x + upsample_above) >> upsample_above;
+
+    if (base_min_diff <= 0) {
+      a0_x128 = _mm_loadu_si128((const __m128i *)(above + base_x));
+      const int shift_val = (((-y * dx) * (1 << upsample_above)) & 0x3f) >> 1;
+      const __m128i shift128 = _mm_set1_epi16(shift_val);
+      if (upsample_above) {
+        a0_x128 = _mm_shuffle_epi8(a0_x128, *(__m128i *)EvenOddMaskx[0]);
+        a1_x128 = _mm_srli_si128(a0_x128, 8);
+      } else {
+        a1_x128 = _mm_srli_si128(a0_x128, 1);
+      }
+      const __m128i a0_128 = _mm_cvtepu8_epi16(a0_x128);
+      const __m128i a1_128 = _mm_cvtepu8_epi16(a1_x128);
+      const __m128i diff128 = _mm_sub_epi16(a1_128, a0_128);
+      const __m128i a32_128 = _mm_add_epi16(_mm_slli_epi16(a0_128, 5), a16_128);
+      const __m128i res128 = _mm_srli_epi16(
+          _mm_add_epi16(a32_128, _mm_mullo_epi16(diff128, shift128)), 5);
+      _mm_storel_epi64((__m128i *)dst, _mm_packus_epi16(res128, res128));
+      dst += stride;
+      continue;
+    }
+
+    // y calc (base_min_diff > 0 guarantees base_x < min_base_x)
+    __m128i a0_y, a1_y, base_y_c128;
+    base_y_c128 = _mm_max_epi16(running_base_y, min_base_y128);
+    const int min_y = (int16_t)_mm_extract_epi16(base_y_c128, 7);
+    const int max_y = (int16_t)_mm_extract_epi16(base_y_c128, 0);
+    const int offset_diff = max_y - min_y;
+    if (offset_diff < 15) {
+      const __m128i min_y128 = _mm_set1_epi16((int16_t)min_y);
+      const __m128i base_y_offset = _mm_sub_epi16(base_y_c128, min_y128);
+      const __m128i base_y_offset128 =
+          _mm_packus_epi16(base_y_offset, base_y_offset);
+      const __m128i mask = *(__m128i *)LoadMaskz2[(offset_diff + 1) >> 2];
+      const __m128i a0_y128 =
+          _mm_maskload_epi32((const int *)(left + min_y), mask);
+      const __m128i a1_y128 = _mm_srli_si128(a0_y128, 1);
+      a0_y = _mm_cvtepu8_epi16(_mm_shuffle_epi8(a0_y128, base_y_offset128));
+      a1_y = _mm_cvtepu8_epi16(_mm_shuffle_epi8(a1_y128, base_y_offset128));
+    } else {
+      const __m128i pairs = _mm_setr_epi16(
+          loadu_int16(left + max_y),
+          loadu_int16(left + (int16_t)_mm_extract_epi16(base_y_c128, 1)),
+          loadu_int16(left + (int16_t)_mm_extract_epi16(base_y_c128, 2)),
+          loadu_int16(left + (int16_t)_mm_extract_epi16(base_y_c128, 3)),
+          loadu_int16(left + (int16_t)_mm_extract_epi16(base_y_c128, 4)),
+          loadu_int16(left + (int16_t)_mm_extract_epi16(base_y_c128, 5)),
+          loadu_int16(left + (int16_t)_mm_extract_epi16(base_y_c128, 6)),
+          loadu_int16(left + min_y));
+      a0_y = _mm_and_si128(pairs, _mm_set1_epi16(0x00ff));
+      a1_y = _mm_srli_epi16(pairs, 8);
+    }
+
+    if (base_min_diff >= 8) {
+      const __m128i diff128 = _mm_sub_epi16(a1_y, a0_y);
+      const __m128i a32_128 = _mm_add_epi16(_mm_slli_epi16(a0_y, 5), a16_128);
+      const __m128i res128 = _mm_srli_epi16(
+          _mm_add_epi16(a32_128, _mm_mullo_epi16(diff128, shifty)), 5);
+      _mm_storel_epi64((__m128i *)dst, _mm_packus_epi16(res128, res128));
+      dst += stride;
+      continue;
+    }
+
     int base_shift = 0;
     if (base_x < (min_base_x - 1)) {
       base_shift = (min_base_x - base_x - 1) >> upsample_above;
     }
-    int base_min_diff =
-        (min_base_x - base_x + upsample_above) >> upsample_above;
-    if (base_min_diff > 8) {
-      base_min_diff = 8;
+    a0_x128 = _mm_loadu_si128((__m128i *)(above + base_x + base_shift));
+    const int shift_val = (((-y * dx) * (1 << upsample_above)) & 0x3f) >> 1;
+    shift = _mm256_inserti128_si256(
+        _mm256_castsi128_si256(_mm_set1_epi16(shift_val)), shifty, 1);
+    if (upsample_above) {
+      a0_x128 = _mm_shuffle_epi8(a0_x128, *(__m128i *)EvenOddMaskx[base_shift]);
+      a1_x128 = _mm_srli_si128(a0_x128, 8);
     } else {
-      if (base_min_diff < 0) base_min_diff = 0;
+      a1_x128 = _mm_srli_si128(a0_x128, 1);
+      a0_x128 = _mm_shuffle_epi8(a0_x128, *(__m128i *)LoadMaskx[base_shift]);
+      a1_x128 = _mm_shuffle_epi8(a1_x128, *(__m128i *)LoadMaskx[base_shift]);
     }
-
-    if (base_shift > 7) {
-      a0_x = _mm256_setzero_si256();
-      a1_x = _mm256_setzero_si256();
-      shift = _mm256_setzero_si256();
-    } else {
-      a0_x128 = _mm_loadu_si128((__m128i *)(above + base_x + base_shift));
-      const int shift_val = (((-y * dx) * (1 << upsample_above)) & 0x3f) >> 1;
-      shift = _mm256_castsi128_si256(_mm_set1_epi16(shift_val));
-      if (upsample_above) {
-        a0_x128 =
-            _mm_shuffle_epi8(a0_x128, *(__m128i *)EvenOddMaskx[base_shift]);
-        a1_x128 = _mm_srli_si128(a0_x128, 8);
-      } else {
-        a1_x128 = _mm_srli_si128(a0_x128, 1);
-        a0_x128 = _mm_shuffle_epi8(a0_x128, *(__m128i *)LoadMaskx[base_shift]);
-        a1_x128 = _mm_shuffle_epi8(a1_x128, *(__m128i *)LoadMaskx[base_shift]);
-      }
-      a0_x = _mm256_castsi128_si256(_mm_cvtepu8_epi16(a0_x128));
-      a1_x = _mm256_castsi128_si256(_mm_cvtepu8_epi16(a1_x128));
-    }
-
-    // y calc
-    __m128i a0_y, a1_y, shifty;
-    if (base_x < min_base_x) {
-      __m128i y_c128, base_y_c128;
-      r6 = _mm_set1_epi16(r << 6);
-      y_c128 = _mm_sub_epi16(r6, _mm_mullo_epi16(c1234, dy128));
-      base_y_c128 = _mm_srai_epi16(y_c128, frac_bits_y);
-      base_y_c128 = _mm_max_epi16(base_y_c128, min_base_y128);
-      const int min_y = (int16_t)_mm_extract_epi16(base_y_c128, 7);
-      const int max_y = (int16_t)_mm_extract_epi16(base_y_c128, 0);
-      const int offset_diff = max_y - min_y;
-      // When the vertical span fits within a 16-byte window, use masked vector
-      // load and _mm_shuffle_epi8 instead of scalar extracts.
-      if (offset_diff < 16) {
-        const __m128i min_y128 = _mm_set1_epi16((int16_t)min_y);
-        const __m128i base_y_offset = _mm_sub_epi16(base_y_c128, min_y128);
-        const __m128i base_y_offset128 =
-            _mm_packus_epi16(base_y_offset, base_y_offset);
-        const __m128i mask = *(__m128i *)LoadMaskz2[offset_diff >> 2];
-        const __m128i a0_y128 =
-            _mm_maskload_epi32((const int *)(left + min_y), mask);
-        const __m128i a1_y128 =
-            _mm_maskload_epi32((const int *)(left + min_y + 1), mask);
-        a0_y = _mm_cvtepu8_epi16(_mm_shuffle_epi8(a0_y128, base_y_offset128));
-        a1_y = _mm_cvtepu8_epi16(_mm_shuffle_epi8(a1_y128, base_y_offset128));
-      } else {
-        const __m128i pairs = _mm_setr_epi16(
-            load_u16_unaligned(left + max_y),
-            load_u16_unaligned(left +
-                               (int16_t)_mm_extract_epi16(base_y_c128, 1)),
-            load_u16_unaligned(left +
-                               (int16_t)_mm_extract_epi16(base_y_c128, 2)),
-            load_u16_unaligned(left +
-                               (int16_t)_mm_extract_epi16(base_y_c128, 3)),
-            load_u16_unaligned(left +
-                               (int16_t)_mm_extract_epi16(base_y_c128, 4)),
-            load_u16_unaligned(left +
-                               (int16_t)_mm_extract_epi16(base_y_c128, 5)),
-            load_u16_unaligned(left +
-                               (int16_t)_mm_extract_epi16(base_y_c128, 6)),
-            load_u16_unaligned(left + min_y));
-        a0_y = _mm_and_si128(pairs, _mm_set1_epi16(0x00ff));
-        a1_y = _mm_srli_epi16(pairs, 8);
-      }
-
-      if (upsample_left) {
-        shifty = _mm_srli_epi16(
-            _mm_and_si128(_mm_slli_epi16(y_c128, upsample_left), c3f), 1);
-      } else {
-        shifty = _mm_srli_epi16(_mm_and_si128(y_c128, c3f), 1);
-      }
-
-      a0_x = _mm256_inserti128_si256(a0_x, a0_y, 1);
-      a1_x = _mm256_inserti128_si256(a1_x, a1_y, 1);
-      shift = _mm256_inserti128_si256(shift, shifty, 1);
-    }
+    a0_x = _mm256_inserti128_si256(
+        _mm256_castsi128_si256(_mm_cvtepu8_epi16(a0_x128)), a0_y, 1);
+    a1_x = _mm256_inserti128_si256(
+        _mm256_castsi128_si256(_mm_cvtepu8_epi16(a1_x128)), a1_y, 1);
 
     diff = _mm256_sub_epi16(a1_x, a0_x);  // a[x+1] - a[x]
     a32 = _mm256_slli_epi16(a0_x, 5);     // a[x] * 32
@@ -4153,6 +4322,12 @@ static void dr_prediction_z2_HxW_avx2(int H, int W, uint8_t *dst,
   c0123 =
       _mm256_setr_epi16(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
   c1234 = _mm256_add_epi16(c0123, c1);
+  const __m256i max_muly = _mm256_srli_epi16(min_base_y256, 1);
+  const __m256i mul16_0 =
+      _mm256_min_epu16(_mm256_mullo_epi16(c1234, dy256), max_muly);
+  const __m256i shifty_0 = _mm256_srli_epi16(
+      _mm256_and_si256(_mm256_sub_epi16(_mm256_setzero_si256(), mul16_0), c3f),
+      1);
 
   for (int r = 0; r < H; r++) {
     __m256i b, res, shift, j256, r6;
@@ -4161,22 +4336,33 @@ static void dr_prediction_z2_HxW_avx2(int H, int W, uint8_t *dst,
     int y = r + 1;
     const int shift_val = ((-y * dx) & 0x3f) >> 1;
     shift = _mm256_set1_epi16((int16_t)shift_val);
+    r6 = _mm256_set1_epi16(r << 6);
 
     int base_x = (-y * dx) >> frac_bits_x;
     for (int j = 0; j < W; j += 16) {
-      j256 = _mm256_set1_epi16(j);
-      int base_shift = 0;
-      if ((base_x + j) < (min_base_x - 1)) {
-        base_shift = (min_base_x - (base_x + j) - 1);
-      }
       int base_min_diff = (min_base_x - base_x - j);
-      if (base_min_diff > 16) {
-        base_min_diff = 16;
-      } else {
-        if (base_min_diff < 0) base_min_diff = 0;
+      if (base_min_diff <= 0) {
+        for (; j < W; j += 16) {
+          a0_x128 = _mm_loadu_si128((const __m128i *)(above + base_x + j));
+          a1_x128 = _mm_loadu_si128((const __m128i *)(above + base_x + 1 + j));
+          a0_x = _mm256_cvtepu8_epi16(a0_x128);
+          a1_x = _mm256_cvtepu8_epi16(a1_x128);
+          diff = _mm256_sub_epi16(a1_x, a0_x);
+          a32 = _mm256_add_epi16(_mm256_slli_epi16(a0_x, 5), a16);
+          b = _mm256_mullo_epi16(diff, shift);
+          res = _mm256_srli_epi16(_mm256_add_epi16(a32, b), 5);
+          resx = _mm_packus_epi16(_mm256_castsi256_si128(res),
+                                  _mm256_extracti128_si256(res, 1));
+          _mm_storeu_si128((__m128i *)(dst + j), resx);
+        }
+        break;
       }
 
-      if (base_shift < 16) {
+      if (base_min_diff < 16) {
+        int base_shift = 0;
+        if ((base_x + j) < (min_base_x - 1)) {
+          base_shift = (min_base_x - (base_x + j) - 1);
+        }
         a0_x128 = _mm_loadu_si128((__m128i *)(above + base_x + base_shift + j));
         a1_x128 =
             _mm_loadu_si128((__m128i *)(above + base_x + base_shift + 1 + j));
@@ -4193,20 +4379,27 @@ static void dr_prediction_z2_HxW_avx2(int H, int W, uint8_t *dst,
         b = _mm256_mullo_epi16(diff, shift);
         res = _mm256_add_epi16(a32, b);
         res = _mm256_srli_epi16(res, 5);  // 16 16-bit values
-        resx = _mm256_castsi256_si128(_mm256_packus_epi16(
-            res, _mm256_castsi128_si256(_mm256_extracti128_si256(res, 1))));
+        resx = _mm_packus_epi16(_mm256_castsi256_si128(res),
+                                _mm256_extracti128_si256(res, 1));
       } else {
         resx = _mm_setzero_si128();
       }
 
-      // y calc
-      if (base_x < min_base_x) {
-        __m256i c256, y_c256, base_y_c256, mask256, mul16;
-        r6 = _mm256_set1_epi16(r << 6);
-        c256 = _mm256_add_epi16(j256, c1234);
-        mul16 = _mm256_min_epu16(_mm256_mullo_epi16(c256, dy256),
-                                 _mm256_srli_epi16(min_base_y256, 1));
+      // y calc (base_min_diff > 0 guarantees base_x + j < min_base_x)
+      {
+        __m256i y_c256, base_y_c256, mask256, mul16;
+        if (j == 0) {
+          mul16 = mul16_0;
+          shifty = shifty_0;
+        } else {
+          j256 = _mm256_set1_epi16(j);
+          const __m256i c256 = _mm256_add_epi16(j256, c1234);
+          mul16 = _mm256_min_epu16(_mm256_mullo_epi16(c256, dy256), max_muly);
+        }
         y_c256 = _mm256_sub_epi16(r6, mul16);
+        if (j != 0) {
+          shifty = _mm256_srli_epi16(_mm256_and_si256(y_c256, c3f), 1);
+        }
 
         base_y_c256 = _mm256_srai_epi16(y_c256, frac_bits_y);
         mask256 = _mm256_cmpgt_epi16(min_base_y256, base_y_c256);
@@ -4218,10 +4411,7 @@ static void dr_prediction_z2_HxW_avx2(int H, int W, uint8_t *dst,
             (int16_t)_mm_extract_epi16(_mm256_castsi256_si128(base_y_c256), 0);
         int16_t offset_diff = max_y - min_y;
 
-        // When the vertical span fits within a 16-byte window, use masked
-        // vector
-        // load and _mm_shuffle_epi8 instead of scalar extracts.
-        if (offset_diff < 16) {
+        if (offset_diff < 15) {
           __m256i min_y256 = _mm256_set1_epi16(min_y);
 
           __m256i base_y_offset = _mm256_sub_epi16(base_y_c256, min_y256);
@@ -4230,10 +4420,9 @@ static void dr_prediction_z2_HxW_avx2(int H, int W, uint8_t *dst,
                               _mm256_extracti128_si256(base_y_offset, 1));
 
           __m128i a0_y128 = _mm_maskload_epi32(
-              (int *)(left + min_y), *(__m128i *)LoadMaskz2[offset_diff / 4]);
-          __m128i a1_y128 =
-              _mm_maskload_epi32((int *)(left + min_y + 1),
-                                 *(__m128i *)LoadMaskz2[offset_diff / 4]);
+              (int *)(left + min_y),
+              *(__m128i *)LoadMaskz2[(offset_diff + 1) >> 2]);
+          __m128i a1_y128 = _mm_srli_si128(a0_y128, 1);
           a0_y128 = _mm_shuffle_epi8(a0_y128, base_y_offset128);
           a1_y128 = _mm_shuffle_epi8(a1_y128, base_y_offset128);
           a0_y = _mm256_cvtepu8_epi16(a0_y128);
@@ -4241,27 +4430,21 @@ static void dr_prediction_z2_HxW_avx2(int H, int W, uint8_t *dst,
         } else {
           base_y_c256 = _mm256_andnot_si256(mask256, base_y_c256);
           _mm256_store_si256((__m256i *)base_y_c, base_y_c256);
-          const __m256i pairs =
-              _mm256_setr_epi16(load_u16_unaligned(left + base_y_c[0]),
-                                load_u16_unaligned(left + base_y_c[1]),
-                                load_u16_unaligned(left + base_y_c[2]),
-                                load_u16_unaligned(left + base_y_c[3]),
-                                load_u16_unaligned(left + base_y_c[4]),
-                                load_u16_unaligned(left + base_y_c[5]),
-                                load_u16_unaligned(left + base_y_c[6]),
-                                load_u16_unaligned(left + base_y_c[7]),
-                                load_u16_unaligned(left + base_y_c[8]),
-                                load_u16_unaligned(left + base_y_c[9]),
-                                load_u16_unaligned(left + base_y_c[10]),
-                                load_u16_unaligned(left + base_y_c[11]),
-                                load_u16_unaligned(left + base_y_c[12]),
-                                load_u16_unaligned(left + base_y_c[13]),
-                                load_u16_unaligned(left + base_y_c[14]),
-                                load_u16_unaligned(left + base_y_c[15]));
+          const __m256i pairs = _mm256_setr_epi16(
+              loadu_int16(left + base_y_c[0]), loadu_int16(left + base_y_c[1]),
+              loadu_int16(left + base_y_c[2]), loadu_int16(left + base_y_c[3]),
+              loadu_int16(left + base_y_c[4]), loadu_int16(left + base_y_c[5]),
+              loadu_int16(left + base_y_c[6]), loadu_int16(left + base_y_c[7]),
+              loadu_int16(left + base_y_c[8]), loadu_int16(left + base_y_c[9]),
+              loadu_int16(left + base_y_c[10]),
+              loadu_int16(left + base_y_c[11]),
+              loadu_int16(left + base_y_c[12]),
+              loadu_int16(left + base_y_c[13]),
+              loadu_int16(left + base_y_c[14]),
+              loadu_int16(left + base_y_c[15]));
           a0_y = _mm256_and_si256(pairs, _mm256_set1_epi16(0x00ff));
           a1_y = _mm256_srli_epi16(pairs, 8);
         }
-        shifty = _mm256_srli_epi16(_mm256_and_si256(y_c256, c3f), 1);
 
         diff = _mm256_sub_epi16(a1_y, a0_y);  // a[x+1] - a[x]
         a32 = _mm256_slli_epi16(a0_y, 5);     // a[x] * 32
@@ -4270,12 +4453,13 @@ static void dr_prediction_z2_HxW_avx2(int H, int W, uint8_t *dst,
         b = _mm256_mullo_epi16(diff, shifty);
         res = _mm256_add_epi16(a32, b);
         res = _mm256_srli_epi16(res, 5);  // 16 16-bit values
-        resy = _mm256_castsi256_si128(_mm256_packus_epi16(
-            res, _mm256_castsi128_si256(_mm256_extracti128_si256(res, 1))));
-      } else {
-        resy = _mm_setzero_si128();
+        resy = _mm_packus_epi16(_mm256_castsi256_si128(res),
+                                _mm256_extracti128_si256(res, 1));
       }
-      resxy = _mm_blendv_epi8(resx, resy, *(__m128i *)BaseMask[base_min_diff]);
+      resxy =
+          (base_min_diff < 16)
+              ? _mm_blendv_epi8(resx, resy, *(__m128i *)BaseMask[base_min_diff])
+              : resy;
       _mm_storeu_si128((__m128i *)(dst + j), resxy);
     }  // for j
     dst += stride;
