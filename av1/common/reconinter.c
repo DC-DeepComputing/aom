@@ -586,14 +586,51 @@ void av1_dist_wtd_comp_weight_assign(const AV1_COMMON *cm,
 void av1_setup_dst_planes(struct macroblockd_plane *planes, BLOCK_SIZE bsize,
                           const YV12_BUFFER_CONFIG *src, int mi_row, int mi_col,
                           const int plane_start, const int plane_end) {
-  // We use AOMMIN(num_planes, MAX_MB_PLANE) instead of num_planes to quiet
-  // the static analysis warnings.
-  for (int i = plane_start; i < AOMMIN(plane_end, MAX_MB_PLANE); ++i) {
-    struct macroblockd_plane *const pd = &planes[i];
-    const int is_uv = i > 0;
-    setup_pred_plane(&pd->dst, bsize, src->buffers[i], src->crop_widths[is_uv],
-                     src->crop_heights[is_uv], src->strides[is_uv], mi_row,
-                     mi_col, NULL, pd->subsampling_x, pd->subsampling_y);
+  const int end = AOMMIN(plane_end, MAX_MB_PLANE);
+  if (plane_start == 0 && end > 0) {
+    struct buf_2d *const dst0 = &planes[0].dst;
+    uint8_t *const buf0 = src->buffers[0];
+    const int stride0 = src->strides[0];
+    dst0->buf =
+        buf0 + (int64_t)(MI_SIZE * mi_row) * stride0 + (MI_SIZE * mi_col);
+    dst0->buf0 = buf0;
+    dst0->width = src->crop_widths[0];
+    dst0->height = src->crop_heights[0];
+    dst0->stride = stride0;
+  }
+  if (end > 1 && plane_start <= 2) {
+    const int ss_x = planes[1].subsampling_x;
+    const int ss_y = planes[1].subsampling_y;
+    const int uv_row = (ss_y && (mi_row & 0x01) && (mi_size_high[bsize] == 1))
+                           ? mi_row - 1
+                           : mi_row;
+    const int uv_col = (ss_x && (mi_col & 0x01) && (mi_size_wide[bsize] == 1))
+                           ? mi_col - 1
+                           : mi_col;
+    const int uv_stride = src->strides[1];
+    const int uv_width = src->crop_widths[1];
+    const int uv_height = src->crop_heights[1];
+    const int64_t uv_offset =
+        (int64_t)((MI_SIZE * uv_row) >> ss_y) * uv_stride +
+        ((MI_SIZE * uv_col) >> ss_x);
+    if (plane_start <= 1) {
+      struct buf_2d *const dst1 = &planes[1].dst;
+      uint8_t *const buf1 = src->buffers[1];
+      dst1->buf = buf1 + uv_offset;
+      dst1->buf0 = buf1;
+      dst1->width = uv_width;
+      dst1->height = uv_height;
+      dst1->stride = uv_stride;
+    }
+    if (end > 2) {
+      struct buf_2d *const dst2 = &planes[2].dst;
+      uint8_t *const buf2 = src->buffers[2];
+      dst2->buf = buf2 + uv_offset;
+      dst2->buf0 = buf2;
+      dst2->width = uv_width;
+      dst2->height = uv_height;
+      dst2->stride = uv_stride;
+    }
   }
 }
 
