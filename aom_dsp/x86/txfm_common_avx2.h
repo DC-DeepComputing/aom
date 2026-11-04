@@ -114,6 +114,20 @@ static inline void load_buffer_32bit_to_16bit_w16_avx2(const int32_t *in,
   }
 }
 
+static inline __m256i load_32bit_to_16bit_w8_avx2(const int32_t *a) {
+  const __m128i a0 = _mm_loadu_si128((const __m128i *)a);
+  const __m128i a1 = _mm_loadu_si128((const __m128i *)(a + 4));
+  return _mm256_castsi128_si256(_mm_packs_epi32(a0, a1));
+}
+
+static inline void load_buffer_32bit_to_16bit_w8_avx2(const int32_t *in,
+                                                      int stride, __m256i *out,
+                                                      int out_size) {
+  for (int i = 0; i < out_size; ++i) {
+    out[i] = load_32bit_to_16bit_w8_avx2(in + i * stride);
+  }
+}
+
 static inline void transpose2_8x8_avx2(const __m256i *const in,
                                        __m256i *const out) {
   __m256i t[16], u[16];

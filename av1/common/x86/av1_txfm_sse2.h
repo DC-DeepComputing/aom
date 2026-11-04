@@ -12,6 +12,12 @@
 #define AOM_AV1_COMMON_X86_AV1_TXFM_SSE2_H_
 
 #include <emmintrin.h>  // SSE2
+#ifdef __SSE4_1__
+#include <smmintrin.h>  // SSE4.1
+#endif
+#ifdef __AVX2__
+#include <immintrin.h>  // AVX2
+#endif
 
 #include "config/aom_config.h"
 #include "config/av1_rtcd.h"
@@ -23,6 +29,16 @@
 
 #ifdef __cplusplus
 extern "C" {
+#endif
+
+#ifndef AOM_NOINLINE
+#if defined(__GNUC__) || defined(__clang__)
+#define AOM_NOINLINE __attribute__((noinline))
+#elif defined(_MSC_VER)
+#define AOM_NOINLINE __declspec(noinline)
+#else
+#define AOM_NOINLINE
+#endif
 #endif
 
 static inline void btf_16_w4_sse2(
@@ -41,6 +57,63 @@ static inline void btf_16_w4_sse2(
   *out1 = _mm_packs_epi32(d0, c0);
 }
 
+#define btf_16_lat9_sse2(w0, w1, in0, in1, out0, out1)  \
+  do {                                                  \
+    const __m128i _t0 = _mm_unpacklo_epi16(in0, in1);   \
+    const __m128i _t1 = _mm_unpackhi_epi16(in0, in1);   \
+    const __m128i _u0 = _mm_madd_epi16(_t0, w0);        \
+    const __m128i _u1 = _mm_madd_epi16(_t1, w0);        \
+    const __m128i _v0 = _mm_madd_epi16(_t0, w1);        \
+    const __m128i _v1 = _mm_madd_epi16(_t1, w1);        \
+    const __m128i _a0 = _mm_add_epi32(_u0, __rounding); \
+    const __m128i _a1 = _mm_add_epi32(_u1, __rounding); \
+    const __m128i _b0 = _mm_add_epi32(_v0, __rounding); \
+    const __m128i _b1 = _mm_add_epi32(_v1, __rounding); \
+    const __m128i _c0 = _mm_srai_epi32(_a0, cos_bit);   \
+    const __m128i _c1 = _mm_srai_epi32(_a1, cos_bit);   \
+    const __m128i _d0 = _mm_srai_epi32(_b0, cos_bit);   \
+    const __m128i _d1 = _mm_srai_epi32(_b1, cos_bit);   \
+    out0 = _mm_packs_epi32(_c0, _c1);                   \
+    out1 = _mm_packs_epi32(_d0, _d1);                   \
+  } while (0)
+
+#ifdef __AVX2__
+#define btf_16_dual_avx2(wA0, wA1, wB0, wB1, inA0, inA1, inB0, inB1, outA0,    \
+                         outA1, outB0, outB1)                                  \
+  do {                                                                         \
+    const __m256i _in0 = _mm256_set_m128i(inB0, inA0);                         \
+    const __m256i _in1 = _mm256_set_m128i(inB1, inA1);                         \
+    const __m256i _w0 = _mm256_set_m128i(_mm_unpacklo_epi64(wB0, wB0),         \
+                                         _mm_unpacklo_epi64(wA0, wA0));        \
+    const __m256i _w1 = _mm256_set_m128i(_mm_unpacklo_epi64(wB1, wB1),         \
+                                         _mm_unpacklo_epi64(wA1, wA1));        \
+    const __m256i _r = _mm256_set1_epi32(1 << (cos_bit - 1));                  \
+    const __m256i _t0 = _mm256_unpacklo_epi16(_in0, _in1);                     \
+    const __m256i _t1 = _mm256_unpackhi_epi16(_in0, _in1);                     \
+    const __m256i _u0 = _mm256_madd_epi16(_t0, _w0);                           \
+    const __m256i _u1 = _mm256_madd_epi16(_t1, _w0);                           \
+    const __m256i _v0 = _mm256_madd_epi16(_t0, _w1);                           \
+    const __m256i _v1 = _mm256_madd_epi16(_t1, _w1);                           \
+    const __m256i _c0 = _mm256_srai_epi32(_mm256_add_epi32(_u0, _r), cos_bit); \
+    const __m256i _c1 = _mm256_srai_epi32(_mm256_add_epi32(_u1, _r), cos_bit); \
+    const __m256i _d0 = _mm256_srai_epi32(_mm256_add_epi32(_v0, _r), cos_bit); \
+    const __m256i _d1 = _mm256_srai_epi32(_mm256_add_epi32(_v1, _r), cos_bit); \
+    const __m256i _p0 = _mm256_packs_epi32(_c0, _c1);                          \
+    const __m256i _p1 = _mm256_packs_epi32(_d0, _d1);                          \
+    outA0 = _mm256_castsi256_si128(_p0);                                       \
+    outB0 = _mm256_extracti128_si256(_p0, 1);                                  \
+    outA1 = _mm256_castsi256_si128(_p1);                                       \
+    outB1 = _mm256_extracti128_si256(_p1, 1);                                  \
+  } while (0)
+#else
+#define btf_16_dual_avx2(wA0, wA1, wB0, wB1, inA0, inA1, inB0, inB1, outA0, \
+                         outA1, outB0, outB1)                               \
+  do {                                                                      \
+    btf_16_sse2(wA0, wA1, inA0, inA1, outA0, outA1);                        \
+    btf_16_sse2(wB0, wB1, inB0, inB1, outB0, outB1);                        \
+  } while (0)
+#endif
+
 #define btf_16_4p_sse2(w0, w1, in0, in1, out0, out1) \
   do {                                               \
     __m128i t0 = _mm_unpacklo_epi16(in0, in1);       \
@@ -57,6 +130,27 @@ static inline void btf_16_w4_sse2(
     out1 = _mm_packs_epi32(d0, d0);                  \
   } while (0)
 
+#ifdef __AVX2__
+#define btf_16_sse2(w0, w1, in0, in1, out0, out1)                            \
+  do {                                                                       \
+    const __m128i _t0 = _mm_unpacklo_epi16(in0, in1);                        \
+    const __m128i _t1 = _mm_unpackhi_epi16(in0, in1);                        \
+    const __m256i _w = _mm256_set_m128i(_mm_unpacklo_epi64(w1, w1),          \
+                                        _mm_unpacklo_epi64(w0, w0));         \
+    const __m256i _r = _mm256_broadcastq_epi64(__rounding);                  \
+    const __m256i _t0_256 =                                                  \
+        _mm256_permute4x64_epi64(_mm256_castsi128_si256(_t0), 0x44);         \
+    const __m256i _t1_256 =                                                  \
+        _mm256_permute4x64_epi64(_mm256_castsi128_si256(_t1), 0x44);         \
+    const __m256i _u = _mm256_madd_epi16(_t0_256, _w);                       \
+    const __m256i _v = _mm256_madd_epi16(_t1_256, _w);                       \
+    const __m256i _c = _mm256_srai_epi32(_mm256_add_epi32(_u, _r), cos_bit); \
+    const __m256i _d = _mm256_srai_epi32(_mm256_add_epi32(_v, _r), cos_bit); \
+    const __m256i _p = _mm256_packs_epi32(_c, _d);                           \
+    out0 = _mm256_castsi256_si128(_p);                                       \
+    out1 = _mm256_extracti128_si256(_p, 1);                                  \
+  } while (0)
+#else
 #define btf_16_sse2(w0, w1, in0, in1, out0, out1) \
   do {                                            \
     __m128i t0 = _mm_unpacklo_epi16(in0, in1);    \
@@ -79,6 +173,7 @@ static inline void btf_16_w4_sse2(
     out0 = _mm_packs_epi32(c0, c1);               \
     out1 = _mm_packs_epi32(d0, d1);               \
   } while (0)
+#endif
 
 static inline __m128i load_16bit_to_16bit(const int16_t *a) {
   return _mm_load_si128((const __m128i *)a);
@@ -96,19 +191,31 @@ static inline __m128i load_32bit_to_16bit_w4(const int32_t *a) {
 
 // Store 4 16 bit values. Sign extend the values.
 static inline void store_16bit_to_32bit_w4(const __m128i a, int32_t *const b) {
+#ifdef __SSE4_1__
+  _mm_store_si128((__m128i *)b, _mm_cvtepi16_epi32(a));
+#else
   const __m128i a_lo = _mm_unpacklo_epi16(a, a);
   const __m128i a_1 = _mm_srai_epi32(a_lo, 16);
   _mm_store_si128((__m128i *)b, a_1);
+#endif
 }
 
 // Store 8 16 bit values. Sign extend the values.
 static inline void store_16bit_to_32bit(__m128i a, int32_t *b) {
+#ifdef __SSE4_1__
+  const __m128i a_1 = _mm_cvtepi16_epi32(a);
+  const __m128i a_hi = _mm_unpackhi_epi16(a, a);
+  const __m128i a_2 = _mm_srai_epi32(a_hi, 16);
+  _mm_store_si128((__m128i *)b, a_1);
+  _mm_store_si128((__m128i *)(b + 4), a_2);
+#else
   const __m128i a_lo = _mm_unpacklo_epi16(a, a);
   const __m128i a_hi = _mm_unpackhi_epi16(a, a);
   const __m128i a_1 = _mm_srai_epi32(a_lo, 16);
   const __m128i a_2 = _mm_srai_epi32(a_hi, 16);
   _mm_store_si128((__m128i *)b, a_1);
   _mm_store_si128((__m128i *)(b + 4), a_2);
+#endif
 }
 
 static inline __m128i scale_round_sse2(const __m128i a, const int scale) {
