@@ -16,6 +16,24 @@
       "message": "How does this affect other clips - such as causing encoding slowdowns - aside from the ones that benefit from the change?",
       "revId": "2a0a52a53891847cf01dc0ac388cf605057acfe5",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "14ef517e_76d9830e",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 5
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-04T00:57:40Z",
+      "side": 1,
+      "message": "This condition is pretty tight, and it doesn\u0027t affect other clips.",
+      "parentUuid": "ec8b709e_23fad6e4",
+      "revId": "2a0a52a53891847cf01dc0ac388cf605057acfe5",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
