@@ -13,11 +13,30 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include "config/aom_config.h"
 #include "config/av1_rtcd.h"
+#if HAVE_SSE4_2 && defined(__x86_64__) && \
+    (defined(__GNUC__) || defined(__clang__))
+#include <nmmintrin.h>
+#define USE_INLINE_CRC32C_SSE42 1
+#else
+#define USE_INLINE_CRC32C_SSE42 0
+#endif
 
 #include "av1/encoder/block.h"
 #include "av1/encoder/hash.h"
 #include "av1/encoder/hash_motion.h"
+
+#if USE_INLINE_CRC32C_SSE42
+__attribute__((target("sse4.2"))) static inline uint32_t crc32c_4x32(
+    uint32_t p0, uint32_t p1, uint32_t p2, uint32_t p3) {
+  uint64_t v0 = (uint64_t)p0 | ((uint64_t)p1 << 32);
+  uint64_t v1 = (uint64_t)p2 | ((uint64_t)p3 << 32);
+  uint64_t crc = _mm_crc32_u64(0xFFFFFFFFu, v0);
+  crc = _mm_crc32_u64(crc, v1);
+  return (uint32_t)crc ^ 0xFFFFFFFFu;
+}
+#endif
 
 #define kSrcBits 16
 // kMaxAddr is the number of hash table buckets. They form 6 hash tables of
@@ -26,19 +45,6 @@
 // hash_block_size_to_index().
 #define kMaxAddr (6 << kSrcBits)
 #define kMaxCandidatesPerHashBucket 256
-
-static void get_pixels_in_1D_char_array_by_block_2x2(const uint8_t *y_src,
-                                                     int stride,
-                                                     uint8_t *p_pixels_in1D) {
-  const uint8_t *p_pel = y_src;
-  int index = 0;
-  for (int i = 0; i < 2; i++) {
-    for (int j = 0; j < 2; j++) {
-      p_pixels_in1D[index++] = p_pel[j];
-    }
-    p_pel += stride;
-  }
-}
 
 static void get_pixels_in_1D_short_array_by_block_2x2(const uint16_t *y_src,
                                                       int stride,
@@ -179,18 +185,17 @@ void av1_generate_block_2x2_hash_value(const YV12_BUFFER_CONFIG *picture,
       pos += width - 1;
     }
   } else {
-    uint8_t p[4];
     int pos = 0;
     for (int y_pos = 0; y_pos < y_end; y_pos++) {
+      const uint8_t *row0 = picture->y_buffer + y_pos * picture->y_stride;
+      const uint8_t *row1 = row0 + picture->y_stride;
       for (int x_pos = 0; x_pos < x_end; x_pos++) {
-        get_pixels_in_1D_char_array_by_block_2x2(
-            picture->y_buffer + y_pos * picture->y_stride + x_pos,
-            picture->y_stride, p);
         // This 2x2 hash isn't used directly as a "key" for the hash table, so
         // we can afford to just copy the 4 8-bit pixel values as a single
         // 32-bit value directly. (i.e. there are no concerns of a lack of
         // uniform distribution)
-        pic_block_hash[pos] = get_identity_hash_value(p[0], p[1], p[2], p[3]);
+        pic_block_hash[pos] = get_identity_hash_value(
+            row0[x_pos], row0[x_pos + 1], row1[x_pos], row1[x_pos + 1]);
         pos++;
       }
       pos += width - 1;
@@ -198,18 +203,48 @@ void av1_generate_block_2x2_hash_value(const YV12_BUFFER_CONFIG *picture,
   }
 }
 
+#if USE_INLINE_CRC32C_SSE42
+__attribute__((target("sse4.2"))) static void generate_block_hash_value_sse42(
+    const YV12_BUFFER_CONFIG *picture, int block_size,
+    const uint32_t *src_pic_block_hash, uint32_t *dst_pic_block_hash) {
+  const int pic_width = picture->y_crop_width;
+  const int x_end = picture->y_crop_width - block_size + 1;
+  const int y_end = picture->y_crop_height - block_size + 1;
+  const int src_size = block_size >> 1;
+  const int row_offset = src_size * pic_width;
+  for (int y_pos = 0; y_pos < y_end; y_pos++) {
+    const int row_base = y_pos * pic_width;
+    const uint32_t *src0 = src_pic_block_hash + row_base;
+    const uint32_t *src1 = src0 + row_offset;
+    uint32_t *dst = dst_pic_block_hash + row_base;
+    for (int x_pos = 0; x_pos < x_end; x_pos++) {
+      dst[x_pos] = crc32c_4x32(src0[x_pos], src0[x_pos + src_size], src1[x_pos],
+                               src1[x_pos + src_size]);
+    }
+  }
+}
+#endif
+
 void av1_generate_block_hash_value(IntraBCHashInfo *intrabc_hash_info,
                                    const YV12_BUFFER_CONFIG *picture,
                                    int block_size,
                                    const uint32_t *src_pic_block_hash,
                                    uint32_t *dst_pic_block_hash) {
-  CRC32C *calc = &intrabc_hash_info->crc_calculator;
-
+#if USE_INLINE_CRC32C_SSE42
+#if CONFIG_RUNTIME_CPU_DETECT
+  if (av1_get_crc32c_value == av1_get_crc32c_value_sse4_2)
+#endif
+  {
+    generate_block_hash_value_sse42(picture, block_size, src_pic_block_hash,
+                                    dst_pic_block_hash);
+    return;
+  }
+#endif
   const int pic_width = picture->y_crop_width;
   const int x_end = picture->y_crop_width - block_size + 1;
   const int y_end = picture->y_crop_height - block_size + 1;
   const int src_size = block_size >> 1;
-
+  CRC32C *calc = &intrabc_hash_info->crc_calculator;
   uint32_t p[4];
   const int length = sizeof(p);
 
@@ -286,9 +321,12 @@ bool av1_add_to_hash_map_by_row_with_precal_data(hash_table *p_hash_table,
   // track how far each bucket is filled.
   uint32_t num_block_hashes = 0;
   for (int i = 0; i <= crc_mask; i++) {
-    bucket_start[i] = num_block_hashes;
-    num_block_hashes += bucket_count[i];
-    bucket_count[i] = 0;
+    const uint16_t c = bucket_count[i];
+    if (c) {
+      bucket_start[i] = num_block_hashes;
+      num_block_hashes += c;
+      bucket_count[i] = 0;
+    }
   }
   if (!hash_table_reserve_block_hashes(p_hash_table, size_index,
                                        num_block_hashes)) {
@@ -429,6 +467,36 @@ int av1_hash_is_vertical_perfect(const YV12_BUFFER_CONFIG *picture,
   return 1;
 }
 
+#if USE_INLINE_CRC32C_SSE42
+__attribute__((target("sse4.2"))) static int reduce_block_hash_sse42(
+    uint32_t *const *buf, int block_size, int src_sub_block_in_width,
+    int sub_block_in_width) {
+  int src_idx = 0;
+  int dst_idx = !src_idx;
+  for (int sub_width = 4; sub_width <= block_size;
+       sub_width *= 2, src_idx = !src_idx) {
+    dst_idx = !src_idx;
+
+    int dst_pos = 0;
+    const uint32_t *src_buf = buf[src_idx];
+    uint32_t *dst_buf = buf[dst_idx];
+    for (int y_pos = 0; y_pos < sub_block_in_width; y_pos++) {
+      const uint32_t *src0 = src_buf + (y_pos << 1) * src_sub_block_in_width;
+      const uint32_t *src1 = src0 + src_sub_block_in_width;
+      for (int x_pos = 0; x_pos < sub_block_in_width; x_pos++) {
+        const int x2 = x_pos << 1;
+        dst_buf[dst_pos++] =
+            crc32c_4x32(src0[x2], src0[x2 + 1], src1[x2], src1[x2 + 1]);
+      }
+    }
+
+    src_sub_block_in_width = sub_block_in_width;
+    sub_block_in_width >>= 1;
+  }
+  return dst_idx;
+}
+#endif
+
 void av1_get_block_hash_value(IntraBCHashInfo *intra_bc_hash_info,
                               const uint8_t *y_src, int stride, int block_size,
                               uint32_t *hash_value1, uint32_t *hash_value2,
@@ -461,20 +529,17 @@ void av1_get_block_hash_value(IntraBCHashInfo *intra_bc_hash_info,
       }
     }
   } else {
-    uint8_t pixel_to_hash[4];
     for (int y_pos = 0; y_pos < block_size; y_pos += 2) {
+      const uint8_t *row0 = y_src + y_pos * stride;
+      const uint8_t *row1 = row0 + stride;
+      uint32_t *dst_row = buf[0] + (y_pos >> 1) * sub_block_in_width;
       for (int x_pos = 0; x_pos < block_size; x_pos += 2) {
-        int pos = (y_pos >> 1) * sub_block_in_width + (x_pos >> 1);
-        get_pixels_in_1D_char_array_by_block_2x2(y_src + y_pos * stride + x_pos,
-                                                 stride, pixel_to_hash);
-        assert(pos < AOM_BUFFER_SIZE_FOR_BLOCK_HASH);
         // This 2x2 hash isn't used directly as a "key" for the hash table, so
         // we can afford to just copy the 4 8-bit pixel values as a single
         // 32-bit value directly. (i.e. there are no concerns of a lack of
         // uniform distribution)
-        buf[0][pos] =
-            get_identity_hash_value(pixel_to_hash[0], pixel_to_hash[1],
-                                    pixel_to_hash[2], pixel_to_hash[3]);
+        dst_row[x_pos >> 1] = get_identity_hash_value(
+            row0[x_pos], row0[x_pos + 1], row1[x_pos], row1[x_pos + 1]);
       }
     }
   }
@@ -486,36 +551,50 @@ void av1_get_block_hash_value(IntraBCHashInfo *intra_bc_hash_info,
   int dst_idx = !src_idx;
 
   // 4x4 subblock hash values to current block hash values
-  uint32_t to_hash[4];
-  for (int sub_width = 4; sub_width <= block_size;
-       sub_width *= 2, src_idx = !src_idx) {
-    dst_idx = !src_idx;
+#if USE_INLINE_CRC32C_SSE42
+#if CONFIG_RUNTIME_CPU_DETECT
+  const int has_sse42_crc =
+      (av1_get_crc32c_value == av1_get_crc32c_value_sse4_2);
+#else
+  const int has_sse42_crc = 1;
+#endif
+  if (has_sse42_crc) {
+    dst_idx = reduce_block_hash_sse42(buf, block_size, src_sub_block_in_width,
+                                      sub_block_in_width);
+  } else
+#endif
+  {
+    uint32_t to_hash[4];
+    for (int sub_width = 4; sub_width <= block_size;
+         sub_width *= 2, src_idx = !src_idx) {
+      dst_idx = !src_idx;
 
-    int dst_pos = 0;
-    for (int y_pos = 0; y_pos < sub_block_in_width; y_pos++) {
-      for (int x_pos = 0; x_pos < sub_block_in_width; x_pos++) {
-        int srcPos = (y_pos << 1) * src_sub_block_in_width + (x_pos << 1);
+      int dst_pos = 0;
+      for (int y_pos = 0; y_pos < sub_block_in_width; y_pos++) {
+        for (int x_pos = 0; x_pos < sub_block_in_width; x_pos++) {
+          int srcPos = (y_pos << 1) * src_sub_block_in_width + (x_pos << 1);
 
-        assert(srcPos + 1 < AOM_BUFFER_SIZE_FOR_BLOCK_HASH);
-        assert(srcPos + src_sub_block_in_width + 1 <
-               AOM_BUFFER_SIZE_FOR_BLOCK_HASH);
-        assert(dst_pos < AOM_BUFFER_SIZE_FOR_BLOCK_HASH);
+          assert(srcPos + 1 < AOM_BUFFER_SIZE_FOR_BLOCK_HASH);
+          assert(srcPos + src_sub_block_in_width + 1 <
+                 AOM_BUFFER_SIZE_FOR_BLOCK_HASH);
+          assert(dst_pos < AOM_BUFFER_SIZE_FOR_BLOCK_HASH);
 
-        to_hash[0] = buf[src_idx][srcPos];
-        to_hash[1] = buf[src_idx][srcPos + 1];
-        to_hash[2] = buf[src_idx][srcPos + src_sub_block_in_width];
-        to_hash[3] = buf[src_idx][srcPos + src_sub_block_in_width + 1];
+          to_hash[0] = buf[src_idx][srcPos];
+          to_hash[1] = buf[src_idx][srcPos + 1];
+          to_hash[2] = buf[src_idx][srcPos + src_sub_block_in_width];
+          to_hash[3] = buf[src_idx][srcPos + src_sub_block_in_width + 1];
 
-        // TODO: bug aomedia:433531610 - serialize input values in a way that's
-        // independent of the computer architecture's endianness
-        buf[dst_idx][dst_pos] =
-            av1_get_crc32c_value(calc, (uint8_t *)to_hash, sizeof(to_hash));
-        dst_pos++;
+          // TODO: bug aomedia:433531610 - serialize input values in a way
+          // that's independent of the computer architecture's endianness
+          buf[dst_idx][dst_pos] =
+              av1_get_crc32c_value(calc, (uint8_t *)to_hash, sizeof(to_hash));
+          dst_pos++;
+        }
       }
-    }
 
-    src_sub_block_in_width = sub_block_in_width;
-    sub_block_in_width >>= 1;
+      src_sub_block_in_width = sub_block_in_width;
+      sub_block_in_width >>= 1;
+    }
   }
 
   *hash_value1 = (buf[dst_idx][0] & crc_mask) + add_value;
