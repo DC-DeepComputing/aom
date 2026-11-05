@@ -17,6 +17,24 @@
       "isAi": true,
       "revId": "f341e87ff41dc7a2852d2df170fa770602968319",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "955b0688_1f88ddf4",
+        "filename": "av1/encoder/txb_rdopt.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 141,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-11-05T17:53:11Z",
+      "side": 1,
+      "message": "Good catch! Both branches are simplified in follow-up CLs in this stack: the `else` branch (`allow_lower_qc`) is simplified in the very next CL (https://aomedia-review.googlesource.com/c/aom/+/219191), and `ctx-\u003esharpness` in the `abs_qc \u003d\u003d 1` branch is removed in https://aomedia-review.googlesource.com/c/aom/+/219199.",
+      "parentUuid": "1c0c6d56_7c02b78e",
+      "revId": "f341e87ff41dc7a2852d2df170fa770602968319",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
