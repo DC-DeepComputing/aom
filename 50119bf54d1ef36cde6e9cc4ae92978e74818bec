@@ -1,0 +1,88 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "5a138bfa_fe8a0de4",
+        "filename": "av1/encoder/encodetxb.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 247,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-05T18:18:11Z",
+      "side": 1,
+      "message": "Calling return get_lower_levels_ctx_eob(bhl, width, scan_idx); directly?",
+      "range": {
+        "startLine": 242,
+        "startChar": 0,
+        "endLine": 247,
+        "endChar": 3
+      },
+      "revId": "50119bf54d1ef36cde6e9cc4ae92978e74818bec",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "caa97808_3b5249e4",
+        "filename": "av1/encoder/encodetxb.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 876,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-05T18:18:11Z",
+      "side": 1,
+      "message": "When args-\u003edry_run !\u003d OUTPUT_ENABLED, the remaining bodies of av1_update_and_record_txb_context and av1_record_txb_context are identical. Probably consider to factor this out into a small helper function.",
+      "range": {
+        "startLine": 860,
+        "startChar": 2,
+        "endLine": 876,
+        "endChar": 45
+      },
+      "fixSuggestions": [
+        {
+          "fixId": "e1b57ebe_8cc4c62a",
+          "description": "prompt_to_edit API",
+          "replacements": [
+            {
+              "path": "av1/encoder/encodetxb.c",
+              "range": {
+                "startLine": 849,
+                "startChar": 0,
+                "endLine": 859,
+                "endChar": 0
+              },
+              "replacement": "static void dry_run_txb_context(int plane, int block, int blk_row, int blk_col,\n                                BLOCK_SIZE plane_bsize, TX_SIZE tx_size,\n                                struct tokenize_b_args *const args) {\n"
+            },
+            {
+              "path": "av1/encoder/encodetxb.c",
+              "range": {
+                "startLine": 1,
+                "startChar": 0,
+                "endLine": 1,
+                "endChar": 0
+              },
+              "replacement": "}\n\nvoid av1_update_and_record_txb_context(int plane, int block, int blk_row,\n                                       int blk_col, BLOCK_SIZE plane_bsize,\n                                       TX_SIZE tx_size, void *arg) {\n  struct tokenize_b_args *const args \u003d arg;\n  if (args-\u003edry_run \u003d\u003d OUTPUT_ENABLED) {\n    update_and_record_txb_context_output(plane, block, blk_row, blk_col,\n                                         plane_bsize, tx_size, args);\n    return;\n  }\n  dry_run_txb_context(plane, block, blk_row, blk_col, plane_bsize, tx_size,\n                      args);\n"
+            },
+            {
+              "path": "av1/encoder/encodetxb.c",
+              "range": {
+                "startLine": 888,
+                "startChar": 0,
+                "endLine": 906,
+                "endChar": 0
+              },
+              "replacement": "  dry_run_txb_context(plane, block, blk_row, blk_col, plane_bsize, tx_size,\n                      args);\n"
+            }
+          ]
+        }
+      ],
+      "revId": "50119bf54d1ef36cde6e9cc4ae92978e74818bec",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
