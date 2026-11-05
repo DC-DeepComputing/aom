@@ -3,6 +3,24 @@
     {
       "unresolved": true,
       "key": {
+        "uuid": "ac20fbbf_83fe8664",
+        "filename": "av1/common/av1_rtcd_defs.pl",
+        "patchSetId": 10
+      },
+      "lineNbr": 496,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-05T17:36:13Z",
+      "side": 1,
+      "message": "Could we add unit tests in `test/` comparing the `_c` and `_sse2` implementations of `av1_{lowbd,highbd}_generate_hog` and `av1_{lowbd,highbd}_compute_gradient_info_sb` across 8/10/12-bit inputs and edge cases (`dx \u003d\u003d 0`, `dy \u003d\u003d 0`, max gradients, odd/small dimensions, and padded strides)? None of these four new RTCD entry points currently have gtest coverage, and because SSE2 is always enabled on x86-64, the rewritten branchless C `get_hist_bin_idx` fallback is otherwise unexercised on x86-64 CI. (For `generate_hog`, `EXPECT_NEAR` with a small tolerance like `1e-6f` avoids 1-ULP x87 vs. SSE float rounding differences in `normalize_hog` on 32-bit x86 builds.)",
+      "isAi": true,
+      "revId": "f3889ab6ddfd370b4f171513b75040630117a39d",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
         "uuid": "2948bd61_92ab4ac7",
         "filename": "av1/encoder/intra_mode_search_utils.h",
         "patchSetId": 10
@@ -32,6 +50,43 @@
           ]
         }
       ],
+      "revId": "f3889ab6ddfd370b4f171513b75040630117a39d",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "07cb31a1_e6273229",
+        "filename": "av1/encoder/intra_mode_search_utils.h",
+        "patchSetId": 10
+      },
+      "lineNbr": 337,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-05T17:36:13Z",
+      "side": 1,
+      "message": "+1 to guarding small widths: before this CL, `cols \u003c 3` never entered the inner loop and performed zero loads, whereas priming columns `0` and `1` now runs unconditionally whenever `rows \u003e\u003d 3`—doing wasted row loads when `cols \u003d\u003d 2` (reachable on 4:2:0/4:2:2 chroma right-edge blocks) and reading out-of-bounds at `row_*[1]` if a direct RTCD caller passes `rows \u003e\u003d 3 \u0026\u0026 cols \u003c 2`. Rather than returning early here in the `generate_hog()` wrapper (which wouldn\u0027t protect direct `av1_{lowbd,highbd}_generate_hog` callers and would skip `normalize_hog(total, hist)`), consider guarding the `r` loop with `if (cols \u003e\u003d 3)` inside `lowbd_generate_hog` (line 138), `highbd_generate_hog` (line 240), and their `_sse2` counterparts (`intra_mode_search_sse2.c` lines 64 and 164).",
+      "parentUuid": "2948bd61_92ab4ac7",
+      "isAi": true,
+      "revId": "f3889ab6ddfd370b4f171513b75040630117a39d",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "241ef475_f3ecea5b",
+        "filename": "av1/encoder/x86/intra_mode_search_sse2.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 29,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-05T17:36:13Z",
+      "side": 1,
+      "message": "Since this file already includes `intra_mode_search_utils.h`, `thresholds` (along with `BINS` and `FIX_PREC_BITS`) could be shared from the header instead of duplicating the 64-byte-aligned table in both files. Optionally, parameterizing the four `static inline` Sobel helpers in `intra_mode_search_utils.h` with a bin-lookup helper would also let `*_c` and `*_sse2` share a single copy of the Sobel window loop.",
+      "isAi": true,
       "revId": "f3889ab6ddfd370b4f171513b75040630117a39d",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
