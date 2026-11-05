@@ -1,0 +1,94 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "00969661_7be9ce28",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 11
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-05T17:36:37Z",
+      "side": 1,
+      "message": "Consider expanding `test/subtract_test.cc` to cover the cases exercised by the new `subtract_avx2.c` paths:\n- `kValidBlockSize` (line 216) currently only tests square and 1:2 / 2:1 block sizes; adding the six 1:4 / 4:1 rectangular block sizes (`BLOCK_4X16`, `BLOCK_16X4`, `BLOCK_8X32`, `BLOCK_32X8`, `BLOCK_16X64`, `BLOCK_64X16`) would cover the new AVX2 `4xN`, `8xN`, and unrolled `16xN` paths on `4x16`, `8x32`, `16x4`, and `16x64`.\n- Also test `stride \u003e cols` and unaligned `src`/`pred` pointer offsets (plus 8-byte-aligned `diff` sub-block offsets for `cols \u003d\u003d 4`), since `CheckResult()` currently only tests `src_stride \u003d\u003d pred_stride \u003d\u003d diff_stride \u003d\u003d block_width_` on 32-byte-aligned base buffers.",
+      "isAi": true,
+      "revId": "98b8b66ca3180d59347203b800094f87002d57be",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "27f68a1e_31cf42dc",
+        "filename": "aom_dsp/x86/subtract_avx2.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 95,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-05T17:36:37Z",
+      "side": 1,
+      "message": "`subtract_block_4xn_avx2`, `subtract_block_8xn_avx2`, and `subtract_block_16xn_avx2` now all use `int32_t j \u003d rows \u003e\u003e 1; do { ... } while (--j !\u003d 0);` (removing `16xn`\u0027s previous 1-row remainder loop), and `32xn`/`64xn`/`128xn` also switch from `for` loops to `do { ... } while (--j !\u003d 0);`. While AV1 block/transform heights are always even and `\u003e\u003d 4`, adding `assert(rows \u003e\u003d 2 \u0026\u0026 (rows \u0026 1) \u003d\u003d 0)` in `4xn`/`8xn`/`16xn` and `assert(rows \u003e 0)` in `32xn`–`128xn` would guard against `j \u003d\u003d 0` underflow or silently dropping a trailing odd row.",
+      "isAi": true,
+      "revId": "98b8b66ca3180d59347203b800094f87002d57be",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "07e35880_a5b4cb5a",
+        "filename": "aom_dsp/x86/subtract_avx2.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 181,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-05T17:36:37Z",
+      "side": 1,
+      "message": "Replacing `case 128:` and the SSE2/C `default:` fallback with an unconditional `default: subtract_block_128xn_avx2(...)` means any unexpected `cols` passed through RTCD would read 128 bytes/row and write 256 bytes/row out of bounds instead of falling back. Please add `assert(cols \u003d\u003d 128)` in the `default:` branch (and consider asserting 32-byte alignment of `diff_ptr` and `diff_stride` for `cols \u003e\u003d 16`, which use aligned `_mm256_store_si256`).",
+      "isAi": true,
+      "revId": "98b8b66ca3180d59347203b800094f87002d57be",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "dbbb1800_eab90965",
+        "filename": "av1/common/txb_common.h",
+        "patchSetId": 11
+      },
+      "lineNbr": 328,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-05T17:36:37Z",
+      "side": 1,
+      "message": "`((int)stride - 5)` hardcodes `5` for `TX_PAD_HOR + 1` (relying on `stride \u003d\u003d (1 \u003c\u003c bhl) + TX_PAD_HOR` so `stride - 5 \u003d\u003d (1 \u003c\u003c bhl) - 1`). Using `(int)stride - (TX_PAD_HOR + 1)` compiles to the same immediate while keeping the `TX_PAD_HOR` dependency explicit, and adding `assert(coeff_idx \u003e 0 \u0026\u0026 stride \u003d\u003d (1 \u003c\u003c bhl) + TX_PAD_HOR)` (matching `get_lower_levels_ctx_2d` and `get_br_ctx_simple`) would catch accidental calls on DC.",
+      "isAi": true,
+      "revId": "98b8b66ca3180d59347203b800094f87002d57be",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "3bc4a55f_14accebd",
+        "filename": "av1/encoder/txb_rdopt.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 185,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-05T17:36:37Z",
+      "side": 1,
+      "message": "Replacing `base_cost[5]` (line 156) and `get_two_coeff_cost_simple()` here removes the last caller in the codebase of `get_two_coeff_cost_simple()`, `get_br_cost_with_diff()`, `golomb_bits_cost`, and `golomb_cost_diff` in `av1/encoder/txb_rdopt_utils.h`. If not already handled higher up in your stack, consider removing those dead helpers/tables (and the unused diff slots in `LV_MAP_COEFF_COST`) in a follow-up CL.",
+      "isAi": true,
+      "revId": "98b8b66ca3180d59347203b800094f87002d57be",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
