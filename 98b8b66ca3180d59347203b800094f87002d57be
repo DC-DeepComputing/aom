@@ -19,6 +19,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "5d72bf32_785a615a",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 11
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-11-06T17:45:28Z",
+      "side": 1,
+      "message": "Done. Added the six `1:4` / `4:1` rectangular block sizes (`BLOCK_4X16`..`BLOCK_64X16`) to `kValidBlockSize` and extended `CheckResult()` to test padded `src`/`pred`/`diff` strides, unaligned `src`/`pred` pointer offsets, valid sub-block `diff` offsets (including 8-byte offsets for `cols \u003d\u003d 4`), and surrounding canary checks.",
+      "parentUuid": "00969661_7be9ce28",
+      "revId": "98b8b66ca3180d59347203b800094f87002d57be",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "27f68a1e_31cf42dc",
@@ -33,6 +51,24 @@
       "side": 1,
       "message": "`subtract_block_4xn_avx2`, `subtract_block_8xn_avx2`, and `subtract_block_16xn_avx2` now all use `int32_t j \u003d rows \u003e\u003e 1; do { ... } while (--j !\u003d 0);` (removing `16xn`\u0027s previous 1-row remainder loop), and `32xn`/`64xn`/`128xn` also switch from `for` loops to `do { ... } while (--j !\u003d 0);`. While AV1 block/transform heights are always even and `\u003e\u003d 4`, adding `assert(rows \u003e\u003d 2 \u0026\u0026 (rows \u0026 1) \u003d\u003d 0)` in `4xn`/`8xn`/`16xn` and `assert(rows \u003e 0)` in `32xn`–`128xn` would guard against `j \u003d\u003d 0` underflow or silently dropping a trailing odd row.",
       "isAi": true,
+      "revId": "98b8b66ca3180d59347203b800094f87002d57be",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "c4fe6935_05d12d27",
+        "filename": "aom_dsp/x86/subtract_avx2.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 95,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-11-06T17:45:28Z",
+      "side": 1,
+      "message": "Done. Added `assert(rows \u003e\u003d 2 \u0026\u0026 (rows \u0026 1) \u003d\u003d 0);` in `4xn`, `8xn`, and `16xn`, and `assert(rows \u003e 0);` in `32xn`, `64xn`, and `128xn`.",
+      "parentUuid": "27f68a1e_31cf42dc",
       "revId": "98b8b66ca3180d59347203b800094f87002d57be",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
@@ -55,6 +91,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "4bcb86bd_64a03f2b",
+        "filename": "aom_dsp/x86/subtract_avx2.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 181,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-11-06T17:45:28Z",
+      "side": 1,
+      "message": "Done. Added `assert(cols \u003d\u003d 128);` in `default:` and 32-byte alignment asserts on `diff_ptr` and `diff_stride` for `cols \u003e\u003d 16`.",
+      "parentUuid": "07e35880_a5b4cb5a",
+      "revId": "98b8b66ca3180d59347203b800094f87002d57be",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "dbbb1800_eab90965",
@@ -73,6 +127,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "30b030ab_813190db",
+        "filename": "av1/common/txb_common.h",
+        "patchSetId": 11
+      },
+      "lineNbr": 328,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-11-06T17:45:28Z",
+      "side": 1,
+      "message": "Done. Replaced `(int)stride - 5` with `(int)stride - (TX_PAD_HOR + 1)` and added `assert(coeff_idx \u003e 0 \u0026\u0026 stride \u003d\u003d ((intptr_t)1 \u003c\u003c bhl) + TX_PAD_HOR);`.",
+      "parentUuid": "dbbb1800_eab90965",
+      "revId": "98b8b66ca3180d59347203b800094f87002d57be",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "3bc4a55f_14accebd",
@@ -87,6 +159,24 @@
       "side": 1,
       "message": "Replacing `base_cost[5]` (line 156) and `get_two_coeff_cost_simple()` here removes the last caller in the codebase of `get_two_coeff_cost_simple()`, `get_br_cost_with_diff()`, `golomb_bits_cost`, and `golomb_cost_diff` in `av1/encoder/txb_rdopt_utils.h`. If not already handled higher up in your stack, consider removing those dead helpers/tables (and the unused diff slots in `LV_MAP_COEFF_COST`) in a follow-up CL.",
       "isAi": true,
+      "revId": "98b8b66ca3180d59347203b800094f87002d57be",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "92f1ac96_f4153dff",
+        "filename": "av1/encoder/txb_rdopt.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 185,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-11-06T17:45:28Z",
+      "side": 1,
+      "message": "Good catch — this cleanup is already handled up-stack in https://aomedia-review.googlesource.com/c/aom/+/219199, which removes `get_two_coeff_cost_simple()`, `get_br_cost_with_diff()`, `golomb_bits_cost`, `golomb_cost_diff`, and the unused diff slots in `LV_MAP_COEFF_COST`.",
+      "parentUuid": "3bc4a55f_14accebd",
       "revId": "98b8b66ca3180d59347203b800094f87002d57be",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
