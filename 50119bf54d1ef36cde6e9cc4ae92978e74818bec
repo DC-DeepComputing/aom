@@ -24,6 +24,30 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "dd04ca32_349f9aba",
+        "filename": "av1/encoder/encodetxb.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 247,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-11-06T15:31:32Z",
+      "side": 1,
+      "message": "Done. Replaced the inline checks with `if (is_eob) return get_lower_levels_ctx_eob(bhl, width, scan_idx);`.",
+      "parentUuid": "5a138bfa_fe8a0de4",
+      "range": {
+        "startLine": 242,
+        "startChar": 0,
+        "endLine": 247,
+        "endChar": 3
+      },
+      "revId": "50119bf54d1ef36cde6e9cc4ae92978e74818bec",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "caa97808_3b5249e4",
@@ -81,6 +105,30 @@
           ]
         }
       ],
+      "revId": "50119bf54d1ef36cde6e9cc4ae92978e74818bec",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "edf59fb7_ef3ba994",
+        "filename": "av1/encoder/encodetxb.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 876,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-11-06T15:31:32Z",
+      "side": 1,
+      "message": "Done. Factored the shared non-`OUTPUT_ENABLED` tail of `av1_update_and_record_txb_context` and `av1_record_txb_context` into `record_txb_context_dry_run()`.",
+      "parentUuid": "caa97808_3b5249e4",
+      "range": {
+        "startLine": 860,
+        "startChar": 2,
+        "endLine": 876,
+        "endChar": 45
+      },
       "revId": "50119bf54d1ef36cde6e9cc4ae92978e74818bec",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
