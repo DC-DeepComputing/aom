@@ -19,6 +19,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "0d4c6a40_da48689a",
+        "filename": "av1/common/av1_rtcd_defs.pl",
+        "patchSetId": 10
+      },
+      "lineNbr": 496,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-11-06T07:00:02Z",
+      "side": 1,
+      "message": "Done. Added `test/intra_hog_test.cc` testing both `_c` (against a reference 3x3 Sobel + linear threshold scan so the 5-step C binary search is directly exercised on x86-64 CI) and `_sse2` (using `EXPECT_NEAR(..., 1e-6f)` for `generate_hog` and exact checks for `compute_gradient_info_sb`) across 8/10/12-bit inputs, `dx \u003d\u003d 0`, `dy \u003d\u003d 0`, max gradients, all 31 threshold boundaries, padded strides, and odd/small dimensions (`cols`/`rows` in `1..3`).",
+      "parentUuid": "ac20fbbf_83fe8664",
+      "revId": "f3889ab6ddfd370b4f171513b75040630117a39d",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "2948bd61_92ab4ac7",
@@ -73,6 +91,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "cfa0372a_514e401d",
+        "filename": "av1/encoder/intra_mode_search_utils.h",
+        "patchSetId": 10
+      },
+      "lineNbr": 337,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-11-06T07:00:02Z",
+      "side": 1,
+      "message": "Done. Guarded the row loops inside `lowbd_generate_hog` and `highbd_generate_hog` with `if (cols \u003e\u003d 3)` (keeping `normalize_hog(total, hist)` intact) and added `if (sb_width \u003c 3) return;` in `lowbd`/`highbd_compute_gradient_info_sb`; also covered `cols \u003d 1, 2, 3` under ASan/UBSan in `test/intra_hog_test.cc`.",
+      "parentUuid": "07cb31a1_e6273229",
+      "revId": "f3889ab6ddfd370b4f171513b75040630117a39d",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "241ef475_f3ecea5b",
@@ -87,6 +123,24 @@
       "side": 1,
       "message": "Since this file already includes `intra_mode_search_utils.h`, `thresholds` (along with `BINS` and `FIX_PREC_BITS`) could be shared from the header instead of duplicating the 64-byte-aligned table in both files. Optionally, parameterizing the four `static inline` Sobel helpers in `intra_mode_search_utils.h` with a bin-lookup helper would also let `*_c` and `*_sse2` share a single copy of the Sobel window loop.",
       "isAi": true,
+      "revId": "f3889ab6ddfd370b4f171513b75040630117a39d",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "cbc8e274_bc769aa2",
+        "filename": "av1/encoder/x86/intra_mode_search_sse2.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 29,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-11-06T07:00:02Z",
+      "side": 1,
+      "message": "Done. Shared `HOG_BINS`, `HOG_FIX_PREC_BITS`, `av1_get_hog_thresholds()`, and parameterized the four Sobel helpers in `intra_mode_search_utils.h` with `hog_bin_lookup_fn` so `*_c` and `*_sse2` share a single copy of the Sobel window loop (verified `get_hist_bin_idx_sse2` still fully inlines in both GCC and Clang).",
+      "parentUuid": "241ef475_f3ecea5b",
       "revId": "f3889ab6ddfd370b4f171513b75040630117a39d",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
@@ -122,6 +176,24 @@
           ]
         }
       ],
+      "revId": "f3889ab6ddfd370b4f171513b75040630117a39d",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "4325fb82_75047898",
+        "filename": "av1/encoder/x86/intra_mode_search_sse2.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 38,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-11-06T07:00:02Z",
+      "side": 1,
+      "message": "Done. Replaced `-3194` with `thresholds[15]`.",
+      "parentUuid": "d9f4cdf7_21277887",
       "revId": "f3889ab6ddfd370b4f171513b75040630117a39d",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
