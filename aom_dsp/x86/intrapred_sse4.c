@@ -18,6 +18,43 @@
 #include "aom_dsp/x86/lpf_common_sse2.h"
 
 // Low bit depth functions
+static DECLARE_ALIGNED(16, const uint8_t, EvenOddMaskx[8][16]) = {
+  { 0, 2, 4, 6, 8, 10, 12, 14, 1, 3, 5, 7, 9, 11, 13, 15 },
+  { 0, 1, 3, 5, 7, 9, 11, 13, 0, 2, 4, 6, 8, 10, 12, 14 },
+  { 0, 0, 2, 4, 6, 8, 10, 12, 0, 0, 3, 5, 7, 9, 11, 13 },
+  { 0, 0, 0, 3, 5, 7, 9, 11, 0, 0, 0, 4, 6, 8, 10, 12 },
+  { 0, 0, 0, 0, 4, 6, 8, 10, 0, 0, 0, 0, 5, 7, 9, 11 },
+  { 0, 0, 0, 0, 0, 5, 7, 9, 0, 0, 0, 0, 0, 6, 8, 10 },
+  { 0, 0, 0, 0, 0, 0, 6, 8, 0, 0, 0, 0, 0, 0, 7, 9 },
+  { 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 8 }
+};
+
+static DECLARE_ALIGNED(16, const uint8_t, LoadMaskx[16][16]) = {
+  { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 },
+  { 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 },
+  { 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13 },
+  { 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 },
+  { 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 },
+  { 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 },
+  { 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 },
+  { 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8 },
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7 },
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6 },
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5 },
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4 },
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3 },
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2 },
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 },
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+};
+
+static DECLARE_ALIGNED(16, const int32_t, LoadMaskz2[4][4]) = {
+  { -1, 0, 0, 0 },
+  { -1, -1, 0, 0 },
+  { -1, -1, -1, 0 },
+  { -1, -1, -1, -1 },
+};
+
 static DECLARE_ALIGNED(16, uint8_t, Mask[2][33][16]) = {
   { { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
     { 0xff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
@@ -162,7 +199,8 @@ static AOM_FORCE_INLINE void dr_prediction_z1_HxW_internal_sse4_1(
     a1_above = _mm_loadu_si128((__m128i *)(above + base + 1));
 
     if (upsample_above) {
-      a0_above = _mm_shuffle_epi8(a0_above, *(__m128i *)EvenOddMaskx[0]);
+      a0_above = _mm_shuffle_epi8(
+          a0_above, _mm_load_si128((const __m128i *)EvenOddMaskx[0]));
       a1_above = _mm_srli_si128(a0_above, 8);
 
       shift = _mm_srli_epi16(
@@ -510,8 +548,9 @@ static void dr_prediction_z2_Nx4_sse4_1(int N, uint8_t *dst, ptrdiff_t stride,
       r6 = _mm_slli_epi16(c1234, 6);
 
       if (upsample_above) {
-        a0_above =
-            _mm_shuffle_epi8(a0_above, *(__m128i *)EvenOddMaskx[base_shift]);
+        a0_above = _mm_shuffle_epi8(
+            a0_above,
+            _mm_load_si128((const __m128i *)EvenOddMaskx[base_shift]));
         a1_above = _mm_srli_si128(a0_above, 8);
 
         shift = _mm_srli_epi16(
@@ -519,8 +558,8 @@ static void dr_prediction_z2_Nx4_sse4_1(int N, uint8_t *dst, ptrdiff_t stride,
                 _mm_slli_epi16(_mm_sub_epi16(r6, ydx), upsample_above), c3f),
             1);
       } else {
-        a0_above =
-            _mm_shuffle_epi8(a0_above, *(__m128i *)LoadMaskx[base_shift]);
+        a0_above = _mm_shuffle_epi8(
+            a0_above, _mm_load_si128((const __m128i *)LoadMaskx[base_shift]));
         a1_above = _mm_srli_si128(a0_above, 1);
 
         shift = _mm_srli_epi16(_mm_and_si128(_mm_sub_epi16(r6, ydx), c3f), 1);
@@ -626,8 +665,9 @@ static void dr_prediction_z2_Nx8_sse4_1(int N, uint8_t *dst, ptrdiff_t stride,
       ydx = _mm_set1_epi16(y * dx);
       r6 = _mm_slli_epi16(_mm_srli_si128(c1234, 2), 6);
       if (upsample_above) {
-        a0_above =
-            _mm_shuffle_epi8(a0_above, *(__m128i *)EvenOddMaskx[base_shift]);
+        a0_above = _mm_shuffle_epi8(
+            a0_above,
+            _mm_load_si128((const __m128i *)EvenOddMaskx[base_shift]));
         a1_above = _mm_srli_si128(a0_above, 8);
 
         shift = _mm_srli_epi16(
@@ -636,10 +676,10 @@ static void dr_prediction_z2_Nx8_sse4_1(int N, uint8_t *dst, ptrdiff_t stride,
             1);
       } else {
         a1_above = _mm_srli_si128(a0_above, 1);
-        a0_above =
-            _mm_shuffle_epi8(a0_above, *(__m128i *)LoadMaskx[base_shift]);
-        a1_above =
-            _mm_shuffle_epi8(a1_above, *(__m128i *)LoadMaskx[base_shift]);
+        a0_above = _mm_shuffle_epi8(
+            a0_above, _mm_load_si128((const __m128i *)LoadMaskx[base_shift]));
+        a1_above = _mm_shuffle_epi8(
+            a1_above, _mm_load_si128((const __m128i *)LoadMaskx[base_shift]));
 
         shift = _mm_srli_epi16(_mm_and_si128(_mm_sub_epi16(r6, ydx), c3f), 1);
       }
@@ -759,10 +799,10 @@ static void dr_prediction_z2_HxW_sse4_1(int H, int W, uint8_t *dst,
             _mm_loadu_si128((__m128i *)(above + base_x + base_shift + j));
         a1_above =
             _mm_loadu_si128((__m128i *)(above + base_x + base_shift + 1 + j));
-        a0_above =
-            _mm_shuffle_epi8(a0_above, *(__m128i *)LoadMaskx[base_shift]);
-        a1_above =
-            _mm_shuffle_epi8(a1_above, *(__m128i *)LoadMaskx[base_shift]);
+        a0_above = _mm_shuffle_epi8(
+            a0_above, _mm_load_si128((const __m128i *)LoadMaskx[base_shift]));
+        a1_above = _mm_shuffle_epi8(
+            a1_above, _mm_load_si128((const __m128i *)LoadMaskx[base_shift]));
 
         a0_x = _mm_cvtepu8_epi16(a0_above);
         a1_x = _mm_cvtepu8_epi16(a1_above);
@@ -832,7 +872,7 @@ static void dr_prediction_z2_HxW_sse4_1(int H, int W, uint8_t *dst,
           __m128i a0_mask = _mm_loadu_si128((__m128i *)(left + min_y));
           __m128i a1_mask = _mm_loadu_si128((__m128i *)(left + min_y + 1));
           __m128i LoadMask =
-              _mm_loadu_si128((__m128i *)(LoadMaskz2[offset_diff / 4]));
+              _mm_load_si128((const __m128i *)LoadMaskz2[offset_diff / 4]);
 
           a0_mask = _mm_and_si128(a0_mask, LoadMask);
           a1_mask = _mm_and_si128(a1_mask, LoadMask);
