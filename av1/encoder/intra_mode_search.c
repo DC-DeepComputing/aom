@@ -350,11 +350,25 @@ void av1_count_colors(const uint8_t *src, int stride, int rows, int cols,
   const int max_pix_val = 1 << 8;
   memset(val_count, 0, max_pix_val * sizeof(val_count[0]));
   for (int r = 0; r < rows; ++r) {
-    for (int c = 0; c < cols; ++c) {
-      const int this_val = src[c];
-      assert(this_val < max_pix_val);
-      ++val_count[this_val];
+    int c = 0;
+    for (; c <= cols - 8; c += 8) {
+      uint64_t w;
+      memcpy(&w, src + c, sizeof(w));
+      const uint8_t b0 = src[c];
+      if (w == (uint64_t)b0 * 0x0101010101010101ULL) {
+        val_count[b0] += 8;
+      } else {
+        ++val_count[b0];
+        ++val_count[src[c + 1]];
+        ++val_count[src[c + 2]];
+        ++val_count[src[c + 3]];
+        ++val_count[src[c + 4]];
+        ++val_count[src[c + 5]];
+        ++val_count[src[c + 6]];
+        ++val_count[src[c + 7]];
+      }
     }
+    for (; c < cols; ++c) ++val_count[src[c]];
     src += stride;
   }
 #if INTRA_MODE_SEARCH_SSE2
@@ -444,6 +458,7 @@ bool av1_count_colors_with_threshold(const uint8_t *src, int stride, int rows,
   uint64_t seen3[4] = { 0 };
   int max_possible = 0;
   const int cols4 = cols & ~3;
+  uint64_t prev_w = ~(uint64_t)0;
 
   do {
     const uint8_t *p = src;
@@ -451,14 +466,17 @@ bool av1_count_colors_with_threshold(const uint8_t *src, int stride, int rows,
     while (p < end4) {
       uint32_t w;
       memcpy(&w, p, sizeof(w));
-      const uint32_t v0 = (uint8_t)w;
-      const uint32_t v1 = (uint8_t)(w >> 8);
-      const uint32_t v2 = (uint8_t)(w >> 16);
-      const uint32_t v3 = w >> 24;
-      seen0[v0 >> 6] |= 1ULL << (v0 & 63);
-      seen1[v1 >> 6] |= 1ULL << (v1 & 63);
-      seen2[v2 >> 6] |= 1ULL << (v2 & 63);
-      seen3[v3 >> 6] |= 1ULL << (v3 & 63);
+      if (w != prev_w) {
+        prev_w = w;
+        const uint32_t v0 = (uint8_t)w;
+        const uint32_t v1 = (uint8_t)(w >> 8);
+        const uint32_t v2 = (uint8_t)(w >> 16);
+        const uint32_t v3 = w >> 24;
+        seen0[v0 >> 6] |= 1ULL << (v0 & 63);
+        seen1[v1 >> 6] |= 1ULL << (v1 & 63);
+        seen2[v2 >> 6] |= 1ULL << (v2 & 63);
+        seen3[v3 >> 6] |= 1ULL << (v3 & 63);
+      }
       p += 4;
     }
     if (cols & 2) {
@@ -2160,11 +2178,16 @@ int64_t av1_rd_pick_intra_sby_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
   const int allow_pal_bsize = av1_allow_palette(
       cpi->common.features.allow_screen_content_tools, mbmi_bsize);
   const int try_palette = cpi->oxcf.tool_cfg.enable_palette && allow_pal_bsize;
-  const int above_ctx =
-      intra_mode_context[av1_above_block_mode(xd->above_mbmi)];
-  const int left_ctx = intra_mode_context[av1_left_block_mode(xd->left_mbmi)];
+  const MB_MODE_INFO *const above_mi = xd->above_mbmi;
+  const MB_MODE_INFO *const left_mi = xd->left_mbmi;
+  assert(!above_mi || !is_inter_block(above_mi) || is_intrabc_block(above_mi));
+  assert(!left_mi || !is_inter_block(left_mi) || is_intrabc_block(left_mi));
+  const PREDICTION_MODE above_mode = above_mi ? above_mi->mode : DC_PRED;
+  const PREDICTION_MODE left_mode = left_mi ? left_mi->mode : DC_PRED;
+  assert(above_mode < INTRA_MODES && left_mode < INTRA_MODES);
   const int *const bmode_costs =
-      x->mode_costs.y_mode_costs[above_ctx][left_ctx];
+      x->mode_costs.y_mode_costs[intra_mode_context[above_mode]]
+                                [intra_mode_context[left_mode]];
 
   PREDICTION_MODE best_mode = mbmi->mode;
   int8_t best_angle_delta_y = 0;
@@ -2261,17 +2284,15 @@ int64_t av1_rd_pick_intra_sby_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
   int beat_best_rd = 0;
 
 #if HAVE_AVX2
-#if CONFIG_RUNTIME_CPU_DETECT
-  const int has_avx2_satd = (aom_satd == aom_satd_avx2);
-#else
-  const int has_avx2_satd = 1;
-#endif
   int model_mode = 0;
   int stepr = 0, stepc = 0, max_blocks_high = 0, max_blocks_wide = 0;
   if (LIKELY(!is_cur_buf_hbd(xd) &&
              (!cpi->do_border_pad ||
-              (x->pix_to_bottom_edge >= 0 && x->pix_to_right_edge >= 0)) &&
-             has_avx2_satd)) {
+              (x->pix_to_bottom_edge >= 0 && x->pix_to_right_edge >= 0)))
+#if CONFIG_RUNTIME_CPU_DETECT && !defined(aom_satd)
+      && LIKELY(aom_satd == aom_satd_avx2)
+#endif
+  ) {
     stepr = tx_size_high_unit[tx_size];
     stepc = tx_size_wide_unit[tx_size];
     max_blocks_high = max_block_high(xd, bsize, 0);

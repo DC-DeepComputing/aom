@@ -19,6 +19,15 @@
 #include "av1/encoder/ml.h"
 #include "av1/encoder/x86/ml_sse3.h"
 
+static AOM_FORCE_INLINE __m256 fast_hadd256_ps(__m256 a, __m256 b) {
+  return _mm256_add_ps(_mm256_shuffle_ps(a, b, 0x88),
+                       _mm256_shuffle_ps(a, b, 0xdd));
+}
+
+static AOM_FORCE_INLINE __m128 fast_hadd128_ps(__m128 a, __m128 b) {
+  return _mm_add_ps(_mm_shuffle_ps(a, b, 0x88), _mm_shuffle_ps(a, b, 0xdd));
+}
+
 static inline void compute_gradient_16_avx2(const uint8_t *row_above,
                                             const uint8_t *row_cur,
                                             const uint8_t *row_below,
@@ -255,9 +264,9 @@ static inline void nn_propagate_8to1(const float *const inputs,
       const __m256 s13 =
           _mm256_add_ps(_mm256_permute2f128_ps(acc1, acc3, 0x20),
                         _mm256_permute2f128_ps(acc1, acc3, 0x31));
-      const __m256 h = _mm256_hadd_ps(s02, s13);
-      const __m128 sum_tot =
-          _mm_hadd_ps(_mm256_castps256_ps128(h), _mm256_extractf128_ps(h, 1));
+      const __m256 h = fast_hadd256_ps(s02, s13);
+      const __m128 sum_tot = fast_hadd128_ps(_mm256_castps256_ps128(h),
+                                             _mm256_extractf128_ps(h, 1));
       __m128 v_out = _mm_add_ps(_mm_loadu_ps(&bias[out]), sum_tot);
       if (is_clip_required) v_out = _mm_max_ps(v_out, _mm_setzero_ps());
       _mm_storeu_ps(&output_nodes[out], v_out);
@@ -322,13 +331,13 @@ static inline void nn_propagate_8to4(const float *const inputs,
       do {
         const __m256 inputs256 = _mm256_loadu_ps(in_ptr);
         const __m256 hadd0 =
-            _mm256_hadd_ps(_mm256_mul_ps(inputs256, _mm256_loadu_ps(&r0[0])),
-                           _mm256_mul_ps(inputs256, _mm256_loadu_ps(&r0[s])));
-        const __m256 hadd1 = _mm256_hadd_ps(
+            fast_hadd256_ps(_mm256_mul_ps(inputs256, _mm256_loadu_ps(&r0[0])),
+                            _mm256_mul_ps(inputs256, _mm256_loadu_ps(&r0[s])));
+        const __m256 hadd1 = fast_hadd256_ps(
             _mm256_mul_ps(inputs256, _mm256_loadu_ps(&r0[2 * s])),
             _mm256_mul_ps(inputs256, _mm256_loadu_ps(&r0[s3])));
 
-        const __m256 sum_par = _mm256_hadd_ps(hadd0, hadd1);
+        const __m256 sum_par = fast_hadd256_ps(hadd0, hadd1);
         const __m128 low_128 = _mm256_castps256_ps128(sum_par);
         const __m128 high_128 = _mm256_extractf128_ps(sum_par, 1);
         const __m128 result = _mm_add_ps(low_128, high_128);
@@ -416,19 +425,19 @@ static inline void nn_propagate_8to8(const float *const inputs,
       do {
         const __m256 inputs256 = _mm256_loadu_ps(in_ptr);
         const __m256 hadd0 =
-            _mm256_hadd_ps(_mm256_mul_ps(inputs256, _mm256_loadu_ps(&r0[0])),
-                           _mm256_mul_ps(inputs256, _mm256_loadu_ps(&r0[s])));
-        const __m256 hadd1 = _mm256_hadd_ps(
+            fast_hadd256_ps(_mm256_mul_ps(inputs256, _mm256_loadu_ps(&r0[0])),
+                            _mm256_mul_ps(inputs256, _mm256_loadu_ps(&r0[s])));
+        const __m256 hadd1 = fast_hadd256_ps(
             _mm256_mul_ps(inputs256, _mm256_loadu_ps(&r0[2 * s])),
             _mm256_mul_ps(inputs256, _mm256_loadu_ps(&r0[s3])));
         const __m256 hadd2 =
-            _mm256_hadd_ps(_mm256_mul_ps(inputs256, _mm256_loadu_ps(&r4[0])),
-                           _mm256_mul_ps(inputs256, _mm256_loadu_ps(&r4[s])));
-        const __m256 hadd3 = _mm256_hadd_ps(
+            fast_hadd256_ps(_mm256_mul_ps(inputs256, _mm256_loadu_ps(&r4[0])),
+                            _mm256_mul_ps(inputs256, _mm256_loadu_ps(&r4[s])));
+        const __m256 hadd3 = fast_hadd256_ps(
             _mm256_mul_ps(inputs256, _mm256_loadu_ps(&r4[2 * s])),
             _mm256_mul_ps(inputs256, _mm256_loadu_ps(&r4[s3])));
-        const __m256 hh0 = _mm256_hadd_ps(hadd0, hadd1);
-        const __m256 hh1 = _mm256_hadd_ps(hadd2, hadd3);
+        const __m256 hh0 = fast_hadd256_ps(hadd0, hadd1);
+        const __m256 hh1 = fast_hadd256_ps(hadd2, hadd3);
 
         __m256 ht_0 = _mm256_permute2f128_ps(hh0, hh1, 0x20);
         __m256 ht_1 = _mm256_permute2f128_ps(hh0, hh1, 0x31);
@@ -545,11 +554,11 @@ static AOM_FORCE_INLINE __m256 nn_layer_8to8_relu_avx2(__m256 inputs256,
   for (int i = 0; i < 4; i++) {
     const __m256 weight0 = _mm256_loadu_ps(&weights[16 * i]);
     const __m256 weight1 = _mm256_loadu_ps(&weights[16 * i + 8]);
-    hadd[i] = _mm256_hadd_ps(_mm256_mul_ps(inputs256, weight0),
-                             _mm256_mul_ps(inputs256, weight1));
+    hadd[i] = fast_hadd256_ps(_mm256_mul_ps(inputs256, weight0),
+                              _mm256_mul_ps(inputs256, weight1));
   }
-  const __m256 hh0 = _mm256_hadd_ps(hadd[0], hadd[1]);
-  const __m256 hh1 = _mm256_hadd_ps(hadd[2], hadd[3]);
+  const __m256 hh0 = fast_hadd256_ps(hadd[0], hadd[1]);
+  const __m256 hh1 = fast_hadd256_ps(hadd[2], hadd[3]);
   const __m256 res = _mm256_add_ps(_mm256_permute2f128_ps(hh0, hh1, 0x20),
                                    _mm256_permute2f128_ps(hh0, hh1, 0x31));
   return _mm256_max_ps(_mm256_add_ps(res, _mm256_loadu_ps(bias)),
@@ -623,19 +632,19 @@ void av1_nn_predict_avx2(const float *input_nodes,
       do {
         const __m256 in = _mm256_loadu_ps(in_ptr);
         const __m256 h0 =
-            _mm256_hadd_ps(_mm256_mul_ps(in, _mm256_loadu_ps(&r0[0])),
-                           _mm256_mul_ps(in, _mm256_loadu_ps(&r0[32])));
+            fast_hadd256_ps(_mm256_mul_ps(in, _mm256_loadu_ps(&r0[0])),
+                            _mm256_mul_ps(in, _mm256_loadu_ps(&r0[32])));
         const __m256 h1 =
-            _mm256_hadd_ps(_mm256_mul_ps(in, _mm256_loadu_ps(&r0[64])),
-                           _mm256_mul_ps(in, _mm256_loadu_ps(&r0[96])));
+            fast_hadd256_ps(_mm256_mul_ps(in, _mm256_loadu_ps(&r0[64])),
+                            _mm256_mul_ps(in, _mm256_loadu_ps(&r0[96])));
         const __m256 h2 =
-            _mm256_hadd_ps(_mm256_mul_ps(in, _mm256_loadu_ps(&r0[128])),
-                           _mm256_mul_ps(in, _mm256_loadu_ps(&r0[160])));
+            fast_hadd256_ps(_mm256_mul_ps(in, _mm256_loadu_ps(&r0[128])),
+                            _mm256_mul_ps(in, _mm256_loadu_ps(&r0[160])));
         const __m256 h3 =
-            _mm256_hadd_ps(_mm256_mul_ps(in, _mm256_loadu_ps(&r0[192])),
-                           _mm256_mul_ps(in, _mm256_loadu_ps(&r0[224])));
-        const __m256 hh0 = _mm256_hadd_ps(h0, h1);
-        const __m256 hh1 = _mm256_hadd_ps(h2, h3);
+            fast_hadd256_ps(_mm256_mul_ps(in, _mm256_loadu_ps(&r0[192])),
+                            _mm256_mul_ps(in, _mm256_loadu_ps(&r0[224])));
+        const __m256 hh0 = fast_hadd256_ps(h0, h1);
+        const __m256 hh1 = fast_hadd256_ps(h2, h3);
         acc = _mm256_add_ps(
             acc, _mm256_add_ps(_mm256_permute2f128_ps(hh0, hh1, 0x20),
                                _mm256_permute2f128_ps(hh0, hh1, 0x31)));
