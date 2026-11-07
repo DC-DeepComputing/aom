@@ -979,12 +979,15 @@ TEST_P(SatdTest, Random) {
   int expected;
   switch (satd_size_) {
     case 16: expected = 205298; break;
+    case 32: expected = 509911; break;
+    case 48: expected = 837922; break;
     case 64: expected = 1113950; break;
+    case 112: expected = 1923302; break;
     case 256: expected = 4268415; break;
     case 1024: expected = 16954082; break;
     default:
       FAIL() << "Invalid satd size (" << satd_size_
-             << ") valid: 16/64/256/1024";
+             << ") valid: 16/32/48/64/112/256/1024";
   }
   FillRandom();
   Check(expected);
@@ -1002,7 +1005,10 @@ GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(SatdTest);
 INSTANTIATE_TEST_SUITE_P(
     C, SatdTest,
     ::testing::Values(SatdTestParam<SatdFunc>(16, &aom_satd_c, &aom_satd_c),
+                      SatdTestParam<SatdFunc>(32, &aom_satd_c, &aom_satd_c),
+                      SatdTestParam<SatdFunc>(48, &aom_satd_c, &aom_satd_c),
                       SatdTestParam<SatdFunc>(64, &aom_satd_c, &aom_satd_c),
+                      SatdTestParam<SatdFunc>(112, &aom_satd_c, &aom_satd_c),
                       SatdTestParam<SatdFunc>(256, &aom_satd_c, &aom_satd_c),
                       SatdTestParam<SatdFunc>(1024, &aom_satd_c, &aom_satd_c)));
 
@@ -1045,7 +1051,12 @@ INSTANTIATE_TEST_SUITE_P(
 INSTANTIATE_TEST_SUITE_P(
     AVX2, SatdTest,
     ::testing::Values(SatdTestParam<SatdFunc>(16, &aom_satd_c, &aom_satd_avx2),
+                      // 32, 48 and 112 cover the remainder paths of the
+                      // AVX2 kernel (length % 64 != 0).
+                      SatdTestParam<SatdFunc>(32, &aom_satd_c, &aom_satd_avx2),
+                      SatdTestParam<SatdFunc>(48, &aom_satd_c, &aom_satd_avx2),
                       SatdTestParam<SatdFunc>(64, &aom_satd_c, &aom_satd_avx2),
+                      SatdTestParam<SatdFunc>(112, &aom_satd_c, &aom_satd_avx2),
                       SatdTestParam<SatdFunc>(256, &aom_satd_c, &aom_satd_avx2),
                       SatdTestParam<SatdFunc>(1024, &aom_satd_c,
                                               &aom_satd_avx2)));

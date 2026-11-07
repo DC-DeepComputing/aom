@@ -483,13 +483,61 @@ int aom_satd_avx2(const tran_low_t *coeff, int length) {
   __m256i accum0 = _mm256_abs_epi32(_mm256_loadu_si256((const __m256i *)coeff));
   __m256i accum1 =
       _mm256_abs_epi32(_mm256_loadu_si256((const __m256i *)(coeff + 8)));
-  for (int i = 16; i < length; i += 16) {
-    accum0 = _mm256_add_epi32(
-        accum0,
-        _mm256_abs_epi32(_mm256_loadu_si256((const __m256i *)(coeff + i))));
-    accum1 = _mm256_add_epi32(
-        accum1,
-        _mm256_abs_epi32(_mm256_loadu_si256((const __m256i *)(coeff + i + 8))));
+  if (length > 16) {
+    __m256i accum2 =
+        _mm256_abs_epi32(_mm256_loadu_si256((const __m256i *)(coeff + 16)));
+    __m256i accum3 =
+        _mm256_abs_epi32(_mm256_loadu_si256((const __m256i *)(coeff + 24)));
+    int rem = length - 32;
+    if (rem > 0) {
+      coeff += 32;
+      while (rem >= 64) {
+        accum0 = _mm256_add_epi32(
+            accum0,
+            _mm256_abs_epi32(_mm256_loadu_si256((const __m256i *)(coeff))));
+        accum1 = _mm256_add_epi32(
+            accum1,
+            _mm256_abs_epi32(_mm256_loadu_si256((const __m256i *)(coeff + 8))));
+        accum2 = _mm256_add_epi32(accum2, _mm256_abs_epi32(_mm256_loadu_si256(
+                                              (const __m256i *)(coeff + 16))));
+        accum3 = _mm256_add_epi32(accum3, _mm256_abs_epi32(_mm256_loadu_si256(
+                                              (const __m256i *)(coeff + 24))));
+        accum0 = _mm256_add_epi32(accum0, _mm256_abs_epi32(_mm256_loadu_si256(
+                                              (const __m256i *)(coeff + 32))));
+        accum1 = _mm256_add_epi32(accum1, _mm256_abs_epi32(_mm256_loadu_si256(
+                                              (const __m256i *)(coeff + 40))));
+        accum2 = _mm256_add_epi32(accum2, _mm256_abs_epi32(_mm256_loadu_si256(
+                                              (const __m256i *)(coeff + 48))));
+        accum3 = _mm256_add_epi32(accum3, _mm256_abs_epi32(_mm256_loadu_si256(
+                                              (const __m256i *)(coeff + 56))));
+        coeff += 64;
+        rem -= 64;
+      }
+      if (rem >= 32) {
+        accum0 = _mm256_add_epi32(
+            accum0,
+            _mm256_abs_epi32(_mm256_loadu_si256((const __m256i *)(coeff))));
+        accum1 = _mm256_add_epi32(
+            accum1,
+            _mm256_abs_epi32(_mm256_loadu_si256((const __m256i *)(coeff + 8))));
+        accum2 = _mm256_add_epi32(accum2, _mm256_abs_epi32(_mm256_loadu_si256(
+                                              (const __m256i *)(coeff + 16))));
+        accum3 = _mm256_add_epi32(accum3, _mm256_abs_epi32(_mm256_loadu_si256(
+                                              (const __m256i *)(coeff + 24))));
+        coeff += 32;
+        rem -= 32;
+      }
+      if (rem > 0) {
+        accum0 = _mm256_add_epi32(
+            accum0,
+            _mm256_abs_epi32(_mm256_loadu_si256((const __m256i *)(coeff))));
+        accum1 = _mm256_add_epi32(
+            accum1,
+            _mm256_abs_epi32(_mm256_loadu_si256((const __m256i *)(coeff + 8))));
+      }
+    }
+    accum0 = _mm256_add_epi32(accum0, accum2);
+    accum1 = _mm256_add_epi32(accum1, accum3);
   }
   return hsum_epi32_avx2(_mm256_add_epi32(accum0, accum1));
 }
@@ -555,11 +603,13 @@ static inline int hadamard_sub_satd_4x4_avx2(const uint8_t *src,
 
 static inline __m256i load_sub_8x2_avx2(const uint8_t *s0, const uint8_t *s1,
                                         const uint8_t *d0, const uint8_t *d1) {
-  const __m128i sp = _mm_unpacklo_epi64(_mm_loadl_epi64((const __m128i *)s0),
-                                        _mm_loadl_epi64((const __m128i *)s1));
-  const __m128i dp = _mm_unpacklo_epi64(_mm_loadl_epi64((const __m128i *)d0),
-                                        _mm_loadl_epi64((const __m128i *)d1));
-  return _mm256_sub_epi16(_mm256_cvtepu8_epi16(sp), _mm256_cvtepu8_epi16(dp));
+  const __m128i sd0 =
+      _mm_sub_epi16(_mm_cvtepu8_epi16(_mm_loadl_epi64((const __m128i *)s0)),
+                    _mm_cvtepu8_epi16(_mm_loadl_epi64((const __m128i *)d0)));
+  const __m128i sd1 =
+      _mm_sub_epi16(_mm_cvtepu8_epi16(_mm_loadl_epi64((const __m128i *)s1)),
+                    _mm_cvtepu8_epi16(_mm_loadl_epi64((const __m128i *)d1)));
+  return _mm256_inserti128_si256(_mm256_castsi128_si256(sd0), sd1, 1);
 }
 
 static inline int hadamard_sub_satd_8x8_avx2(const uint8_t *src,
@@ -568,15 +618,16 @@ static inline int hadamard_sub_satd_8x8_avx2(const uint8_t *src,
                                              ptrdiff_t dst_stride) {
   const uint8_t *src4 = src + 4 * src_stride;
   const uint8_t *dst4 = dst + 4 * dst_stride;
+  const uint8_t *src3 = src4 - src_stride;
+  const uint8_t *dst3 = dst4 - dst_stride;
   const __m256i r04 = load_sub_8x2_avx2(src, src4, dst, dst4);
   const __m256i r15 = load_sub_8x2_avx2(src + src_stride, src4 + src_stride,
                                         dst + dst_stride, dst4 + dst_stride);
   const __m256i r26 =
       load_sub_8x2_avx2(src + 2 * src_stride, src4 + 2 * src_stride,
                         dst + 2 * dst_stride, dst4 + 2 * dst_stride);
-  const __m256i r37 =
-      load_sub_8x2_avx2(src + 3 * src_stride, src4 + 3 * src_stride,
-                        dst + 3 * dst_stride, dst4 + 3 * dst_stride);
+  const __m256i r37 = load_sub_8x2_avx2(src3, src3 + 4 * src_stride, dst3,
+                                        dst3 + 4 * dst_stride);
 
   __m256i b04 = _mm256_add_epi16(r04, r15);
   __m256i b15 = _mm256_sub_epi16(r04, r15);
@@ -723,11 +774,13 @@ static inline int hadamard_sub_satd_32x32_avx2(const uint8_t *src,
                                                const uint8_t *dst,
                                                ptrdiff_t dst_stride) {
   DECLARE_ALIGNED(32, int16_t, temp_coeff[1024]);
+  const uint8_t *const src16 = src + 16 * src_stride;
+  const uint8_t *const dst16 = dst + 16 * dst_stride;
   for (int idx = 0; idx < 4; ++idx) {
-    const ptrdiff_t row_off = (idx >> 1) * 16;
     const ptrdiff_t col_off = (idx & 1) * 16;
-    hadamard_sub_lp_16x16_avx2(src + row_off * src_stride + col_off, src_stride,
-                               dst + row_off * dst_stride + col_off, dst_stride,
+    const uint8_t *const qs = ((idx & 2) ? src16 : src) + col_off;
+    const uint8_t *const qd = ((idx & 2) ? dst16 : dst) + col_off;
+    hadamard_sub_lp_16x16_avx2(qs, src_stride, qd, dst_stride,
                                temp_coeff + idx * 256);
   }
   const int16_t *t_coeff = temp_coeff;
