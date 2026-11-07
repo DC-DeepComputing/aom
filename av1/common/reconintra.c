@@ -191,7 +191,7 @@ static const uint8_t *get_has_tr_table(PARTITION_TYPE partition,
   // If this is a mixed vertical partition, look up bsize in orders_vert.
   if (partition == PARTITION_VERT_A || partition == PARTITION_VERT_B) {
     assert(bsize < BLOCK_SIZES);
-    ret = has_tr_vert_tables[bsize];
+    ret = (bsize < BLOCK_SIZES) ? has_tr_vert_tables[bsize] : NULL;
   } else {
     ret = has_tr_tables[bsize];
   }
@@ -210,16 +210,16 @@ static int has_top_right(BLOCK_SIZE sb_size, BLOCK_SIZE bsize, int mi_row,
   const int top_right_count_unit = tx_size_wide_unit[txsz];
 
   if (row_off > 0) {  // Just need to check if enough pixels on the right.
-    if (block_size_wide[bsize] > block_size_wide[BLOCK_64X64]) {
+    if (UNLIKELY(block_size_wide[bsize] > block_size_wide[BLOCK_64X64])) {
       // Special case: For 128x128 blocks, the transform unit whose
       // top-right corner is at the center of the block does in fact have
       // pixels available at its top-right corner.
+      const int plane_bw_unit_64 = mi_size_wide[BLOCK_64X64] >> ss_x;
       if (row_off == mi_size_high[BLOCK_64X64] >> ss_y &&
-          col_off + top_right_count_unit == mi_size_wide[BLOCK_64X64] >> ss_x) {
+          col_off + top_right_count_unit == plane_bw_unit_64) {
         return 1;
       }
-      const int plane_bw_unit_64 = mi_size_wide[BLOCK_64X64] >> ss_x;
-      const int col_off_64 = col_off % plane_bw_unit_64;
+      const int col_off_64 = col_off & (plane_bw_unit_64 - 1);
       return col_off_64 + top_right_count_unit < plane_bw_unit_64;
     }
     return col_off + top_right_count_unit < plane_bw_unit;
@@ -231,11 +231,9 @@ static int has_top_right(BLOCK_SIZE sb_size, BLOCK_SIZE bsize, int mi_row,
     const int bh_in_mi_log2 = mi_size_high_log2[bsize];
     const int sb_mi_size = mi_size_high[sb_size];
     const int blk_row_in_sb = (mi_row & (sb_mi_size - 1)) >> bh_in_mi_log2;
-    const int blk_col_in_sb = (mi_col & (sb_mi_size - 1)) >> bw_in_mi_log2;
-
-    // Top row of superblock: so top-right pixels are in the top and/or
-    // top-right superblocks, both of which are already available.
     if (blk_row_in_sb == 0) return 1;
+
+    const int blk_col_in_sb = (mi_col & (sb_mi_size - 1)) >> bw_in_mi_log2;
 
     // Rightmost column of superblock (and not the top row): so top-right pixels
     // fall in the right superblock, which is not available yet.
@@ -245,13 +243,11 @@ static int has_top_right(BLOCK_SIZE sb_size, BLOCK_SIZE bsize, int mi_row,
 
     // General case (neither top row nor rightmost column): check if the
     // top-right block is coded before the current block.
-    const int this_blk_index =
-        ((blk_row_in_sb + 0) << (MAX_MIB_SIZE_LOG2 - bw_in_mi_log2)) +
-        blk_col_in_sb + 0;
-    const int idx1 = this_blk_index / 8;
-    const int idx2 = this_blk_index % 8;
+    const uint32_t this_blk_index =
+        (uint32_t)((blk_row_in_sb << (MAX_MIB_SIZE_LOG2 - bw_in_mi_log2)) +
+                   blk_col_in_sb);
     const uint8_t *has_tr_table = get_has_tr_table(partition, bsize);
-    return (has_tr_table[idx1] >> idx2) & 1;
+    return (has_tr_table[this_blk_index >> 3] >> (this_blk_index & 7u)) & 1;
   }
 }
 
@@ -376,7 +372,7 @@ static const uint8_t *get_has_bl_table(PARTITION_TYPE partition,
   // If this is a mixed vertical partition, look up bsize in orders_vert.
   if (partition == PARTITION_VERT_A || partition == PARTITION_VERT_B) {
     assert(bsize < BLOCK_SIZES);
-    ret = has_bl_vert_tables[bsize];
+    ret = (bsize < BLOCK_SIZES) ? has_bl_vert_tables[bsize] : NULL;
   } else {
     ret = has_bl_tables[bsize];
   }
@@ -390,25 +386,20 @@ static int has_bottom_left(BLOCK_SIZE sb_size, BLOCK_SIZE bsize, int mi_row,
                            int col_off, int ss_x, int ss_y) {
   if (!bottom_available || !left_available) return 0;
 
-  // Special case for 128x* blocks, when col_off is half the block width.
-  // This is needed because 128x* superblocks are divided into 64x* blocks in
-  // raster order
-  if (block_size_wide[bsize] > block_size_wide[BLOCK_64X64] && col_off > 0) {
-    const int plane_bw_unit_64 = mi_size_wide[BLOCK_64X64] >> ss_x;
-    const int col_off_64 = col_off % plane_bw_unit_64;
-    if (col_off_64 == 0) {
-      // We are at the left edge of top-right or bottom-right 64x* block.
-      const int plane_bh_unit_64 = mi_size_high[BLOCK_64X64] >> ss_y;
-      const int row_off_64 = row_off % plane_bh_unit_64;
-      const int plane_bh_unit =
-          AOMMIN(mi_size_high[bsize] >> ss_y, plane_bh_unit_64);
-      // Check if all bottom-left pixels are in the left 64x* block (which is
-      // already coded).
-      return row_off_64 + tx_size_high_unit[txsz] < plane_bh_unit;
-    }
-  }
-
   if (col_off > 0) {
+    // Special case for 128x* blocks, when col_off is half the block width.
+    // This is needed because 128x* superblocks are divided into 64x* blocks in
+    // raster order
+    if (UNLIKELY(block_size_wide[bsize] > block_size_wide[BLOCK_64X64])) {
+      const int plane_bw_unit_64 = mi_size_wide[BLOCK_64X64] >> ss_x;
+      if ((col_off & (plane_bw_unit_64 - 1)) == 0) {
+        const int plane_bh_unit_64 = mi_size_high[BLOCK_64X64] >> ss_y;
+        const int row_off_64 = row_off & (plane_bh_unit_64 - 1);
+        const int plane_bh_unit =
+            AOMMIN(mi_size_high[bsize] >> ss_y, plane_bh_unit_64);
+        return row_off_64 + tx_size_high_unit[txsz] < plane_bh_unit;
+      }
+    }
     // Bottom-left pixels are in the bottom-left block, which is not available.
     return 0;
   } else {
@@ -429,9 +420,7 @@ static int has_bottom_left(BLOCK_SIZE sb_size, BLOCK_SIZE bsize, int mi_row,
     // and/or bottom-left superblocks. But only the left superblock is
     // available, so check if all required pixels fall in that superblock.
     if (blk_col_in_sb == 0) {
-      const int blk_start_row_off =
-          blk_row_in_sb << (bh_in_mi_log2 + MI_SIZE_LOG2 - MI_SIZE_LOG2) >>
-          ss_y;
+      const int blk_start_row_off = (blk_row_in_sb << bh_in_mi_log2) >> ss_y;
       const int row_off_in_sb = blk_start_row_off + row_off;
       const int sb_height_unit = sb_mi_size >> ss_y;
       return row_off_in_sb + bottom_left_count_unit < sb_height_unit;
@@ -443,13 +432,11 @@ static int has_bottom_left(BLOCK_SIZE sb_size, BLOCK_SIZE bsize, int mi_row,
 
     // General case (neither leftmost column nor bottom row): check if the
     // bottom-left block is coded before the current block.
-    const int this_blk_index =
-        ((blk_row_in_sb + 0) << (MAX_MIB_SIZE_LOG2 - bw_in_mi_log2)) +
-        blk_col_in_sb + 0;
-    const int idx1 = this_blk_index / 8;
-    const int idx2 = this_blk_index % 8;
+    const uint32_t this_blk_index =
+        (uint32_t)((blk_row_in_sb << (MAX_MIB_SIZE_LOG2 - bw_in_mi_log2)) +
+                   blk_col_in_sb);
     const uint8_t *has_bl_table = get_has_bl_table(partition, bsize);
-    return (has_bl_table[idx1] >> idx2) & 1;
+    return (has_bl_table[this_blk_index >> 3] >> (this_blk_index & 7u)) & 1;
   }
 }
 
@@ -640,30 +627,6 @@ void av1_dr_prediction_z3_c(uint8_t *dst, ptrdiff_t stride, int bw, int bh,
         break;
       }
     }
-  }
-}
-
-static AOM_FORCE_INLINE void dr_predictor(uint8_t *dst, ptrdiff_t stride,
-                                          TX_SIZE tx_size, const uint8_t *above,
-                                          const uint8_t *left,
-                                          int upsample_above, int upsample_left,
-                                          int angle) {
-  const int bw = tx_size_wide[tx_size];
-  const int bh = tx_size_high[tx_size];
-  assert(angle > 0 && angle < 270);
-
-  if (angle < 90) {
-    av1_dr_prediction_z1(dst, stride, bw, bh, above, left, upsample_above,
-                         dr_intra_derivative[angle], 1);
-  } else if (angle < 180) {
-    assert(angle > 90);
-    av1_dr_prediction_z2(dst, stride, bw, bh, above, left, upsample_above,
-                         upsample_left, dr_intra_derivative[180 - angle],
-                         dr_intra_derivative[angle - 90]);
-  } else {
-    assert(angle > 180 && angle < 270);
-    av1_dr_prediction_z3(dst, stride, bw, bh, above, left, upsample_left, 1,
-                         dr_intra_derivative[270 - angle]);
   }
 }
 
@@ -958,77 +921,52 @@ static void highbd_filter_intra_predictor(uint16_t *dst, ptrdiff_t stride,
 }
 #endif  // CONFIG_AV1_HIGHBITDEPTH
 
-static AOM_FORCE_INLINE int is_smooth(const MB_MODE_INFO *mbmi, int plane) {
-  if (plane == 0) {
-    const PREDICTION_MODE mode = mbmi->mode;
-    return (mode == SMOOTH_PRED || mode == SMOOTH_V_PRED ||
-            mode == SMOOTH_H_PRED);
-  } else {
-    // uv_mode is not set for inter blocks, so need to explicitly
-    // detect that case.
-    if (is_inter_block(mbmi)) return 0;
+static AOM_FORCE_INLINE int is_smooth_luma(const MB_MODE_INFO *mbmi) {
+  return (uint32_t)(mbmi->mode - SMOOTH_PRED) <= 2u;
+}
 
-    const UV_PREDICTION_MODE uv_mode = mbmi->uv_mode;
-    return (uv_mode == UV_SMOOTH_PRED || uv_mode == UV_SMOOTH_V_PRED ||
-            uv_mode == UV_SMOOTH_H_PRED);
-  }
+static AOM_FORCE_INLINE int is_smooth_chroma(const MB_MODE_INFO *mbmi) {
+  return !is_inter_block(mbmi) &&
+         (uint32_t)(mbmi->uv_mode - UV_SMOOTH_PRED) <= 2u;
 }
 
 static AOM_FORCE_INLINE int get_intra_edge_filter_type(const MACROBLOCKD *xd,
                                                        int plane) {
-  const MB_MODE_INFO *above;
-  const MB_MODE_INFO *left;
-
   if (plane == 0) {
-    above = xd->above_mbmi;
-    left = xd->left_mbmi;
+    const MB_MODE_INFO *const above = xd->above_mbmi;
+    const MB_MODE_INFO *const left = xd->left_mbmi;
+    return (above && is_smooth_luma(above)) || (left && is_smooth_luma(left));
   } else {
-    above = xd->chroma_above_mbmi;
-    left = xd->chroma_left_mbmi;
+    const MB_MODE_INFO *const above = xd->chroma_above_mbmi;
+    const MB_MODE_INFO *const left = xd->chroma_left_mbmi;
+    return (above && is_smooth_chroma(above)) ||
+           (left && is_smooth_chroma(left));
   }
-
-  return (above && is_smooth(above, plane)) || (left && is_smooth(left, plane));
 }
 
+static AOM_FORCE_INLINE int intra_edge_filter_strength_pos(int blk_wh, int d,
+                                                           int type) {
+  if (type == 0) {
+    if (blk_wh <= 8) return d >= 56;
+    if (blk_wh <= 16) return d >= 40;
+    if (blk_wh <= 24) return (d >= 8) + (d >= 16) + (d >= 32);
+    if (blk_wh <= 32) return 1 + (d >= 4) + (d >= 32);
+    return 3;
+  }
+  if (blk_wh <= 8) return (d >= 40) + (d >= 64);
+  if (blk_wh <= 16) return (d >= 20) + (d >= 48);
+  if (blk_wh <= 24) return d >= 4 ? 3 : 0;
+  return 3;
+}
+
+#if CONFIG_AV1_HIGHBITDEPTH
 static AOM_FORCE_INLINE int intra_edge_filter_strength(int bs0, int bs1,
                                                        int delta, int type) {
   const int d = abs(delta);
-  int strength = 0;
-
-  const int blk_wh = bs0 + bs1;
-  if (type == 0) {
-    if (blk_wh <= 8) {
-      if (d >= 56) strength = 1;
-    } else if (blk_wh <= 12) {
-      if (d >= 40) strength = 1;
-    } else if (blk_wh <= 16) {
-      if (d >= 40) strength = 1;
-    } else if (blk_wh <= 24) {
-      if (d >= 8) strength = 1;
-      if (d >= 16) strength = 2;
-      if (d >= 32) strength = 3;
-    } else if (blk_wh <= 32) {
-      if (d >= 1) strength = 1;
-      if (d >= 4) strength = 2;
-      if (d >= 32) strength = 3;
-    } else {
-      if (d >= 1) strength = 3;
-    }
-  } else {
-    if (blk_wh <= 8) {
-      if (d >= 40) strength = 1;
-      if (d >= 64) strength = 2;
-    } else if (blk_wh <= 16) {
-      if (d >= 20) strength = 1;
-      if (d >= 48) strength = 2;
-    } else if (blk_wh <= 24) {
-      if (d >= 4) strength = 3;
-    } else {
-      if (d >= 1) strength = 3;
-    }
-  }
-  return strength;
+  if (d == 0) return 0;
+  return intra_edge_filter_strength_pos(bs0 + bs1, d, type);
 }
+#endif  // CONFIG_AV1_HIGHBITDEPTH
 
 void av1_filter_intra_edge_c(uint8_t *p, int sz, int strength) {
   if (!strength) return;
@@ -1051,17 +989,6 @@ void av1_filter_intra_edge_c(uint8_t *p, int sz, int strength) {
     s = (s + 8) >> 4;
     p[i] = s;
   }
-}
-
-static AOM_FORCE_INLINE void filter_intra_edge_corner(uint8_t *p_above,
-                                                      uint8_t *p_left) {
-  const int kernel[3] = { 5, 6, 5 };
-
-  int s = (p_left[0] * kernel[0]) + (p_above[-1] * kernel[1]) +
-          (p_above[0] * kernel[2]);
-  s = (s + 8) >> 4;
-  p_above[-1] = s;
-  p_left[-1] = s;
 }
 
 void av1_upsample_intra_edge_c(uint8_t *p, int sz) {
@@ -1087,6 +1014,37 @@ void av1_upsample_intra_edge_c(uint8_t *p, int sz) {
   }
 }
 
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
+static void copy_above_row_tail_lbd(uint8_t *above_row,
+                                    const uint8_t *above_ref, int n_copy) {
+  int i = 0;
+#if defined(__SSE2__) || defined(_M_X64) || \
+    (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC unroll 1
+#endif
+  for (; i + 16 <= n_copy; i += 16) {
+    _mm_store_si128((__m128i *)(above_row + i),
+                    _mm_loadu_si128((const __m128i *)(above_ref + i)));
+  }
+#endif
+  if (n_copy - i >= 8) {
+    memcpy(above_row + i, above_ref + i, 8);
+    i += 8;
+  }
+  if (n_copy - i >= 4) {
+    memcpy(above_row + i, above_ref + i, 4);
+    i += 4;
+  }
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC novector
+#pragma GCC unroll 1
+#endif
+  for (; i < n_copy; ++i) above_row[i] = above_ref[i];
+}
+
 static AOM_FORCE_INLINE void copy_above_row_lbd(uint8_t *above_row,
                                                 const uint8_t *above_ref,
                                                 int n_copy) {
@@ -1100,28 +1058,24 @@ static AOM_FORCE_INLINE void copy_above_row_lbd(uint8_t *above_row,
     memcpy(above_row, above_ref, 32);
   } else if (n_copy == 64) {
     memcpy(above_row, above_ref, 64);
-  } else if (n_copy == 128) {
-    memcpy(above_row, above_ref, 128);
   } else {
-    int k = 0;
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC novector
-#pragma GCC unroll 1
-#endif
-    for (; k + 4 <= n_copy; k += 4) memcpy(above_row + k, above_ref + k, 4);
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC novector
-#pragma GCC unroll 1
-#endif
-    for (; k < n_copy; ++k) above_row[k] = above_ref[k];
+    copy_above_row_tail_lbd(above_row, above_ref, n_copy);
   }
 }
+
+#if defined(__SSE2__) || defined(_M_X64) || \
+    (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
+static AOM_FORCE_INLINE __m128i sse2_bcast8_lbd(uint8_t val) {
+  uint32_t v4 = (uint32_t)val * 0x01010101u;
+  return _mm_shuffle_epi32(_mm_cvtsi32_si128((int)v4), 0);
+}
+#endif
 
 static AOM_FORCE_INLINE void fill_intra_edge_lbd(uint8_t *p, uint8_t val,
                                                  int n) {
 #if defined(__SSE2__) || defined(_M_X64) || \
     (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
-  const __m128i v = _mm_set1_epi8((char)val);
+  const __m128i v = sse2_bcast8_lbd(val);
   _mm_storeu_si128((__m128i *)p, v);
   if (UNLIKELY(n > 16)) {
 #if defined(__GNUC__) && !defined(__clang__)
@@ -1137,24 +1091,56 @@ static AOM_FORCE_INLINE void fill_intra_edge_lbd(uint8_t *p, uint8_t val,
 #endif
 }
 
-static AOM_FORCE_INLINE void copy_left_col_lbd(uint8_t *left_col,
-                                               const uint8_t *left_ref,
-                                               int ref_stride, int n_copy) {
-  const int ref_stride2 = ref_stride * 2;
-  const int ref_stride3 = ref_stride * 3;
-  const int ref_stride4 = ref_stride * 4;
+static AOM_FORCE_INLINE uint32_t gather_left4_lbd(const uint8_t *p,
+                                                  ptrdiff_t stride,
+                                                  ptrdiff_t stride3) {
+  return (uint32_t)p[0] | ((uint32_t)p[stride] << 8) |
+         ((uint32_t)p[stride * 2] << 16) | ((uint32_t)p[stride3] << 24);
+}
+
+static AOM_FORCE_INLINE void copy_left_col_wide_lbd(uint8_t *left_col,
+                                                    const uint8_t *left_ref,
+                                                    int ref_stride,
+                                                    int n_copy) {
+  const ptrdiff_t s = ref_stride;
+  const ptrdiff_t s3 = s * 3;
+  const ptrdiff_t s4 = s * 4;
   int i = 0;
+#if defined(__SSE2__) || defined(_M_X64) || \
+    (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
+  const ptrdiff_t s8 = s * 8;
+  const ptrdiff_t s12 = s * 12;
+  const ptrdiff_t s16 = s * 16;
 #if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC novector
 #pragma GCC unroll 1
 #endif
-  for (; i + 4 <= n_copy; i += 4) {
-    const uint32_t v = (uint32_t)left_ref[0] |
-                       ((uint32_t)left_ref[ref_stride] << 8) |
-                       ((uint32_t)left_ref[ref_stride2] << 16) |
-                       ((uint32_t)left_ref[ref_stride3] << 24);
-    memcpy(&left_col[i], &v, 4);
-    left_ref += ref_stride4;
+  for (; i + 16 <= n_copy; i += 16) {
+    const uint32_t v0 = gather_left4_lbd(left_ref, s, s3);
+    const uint32_t v1 = gather_left4_lbd(left_ref + s4, s, s3);
+    const uint32_t v2 = gather_left4_lbd(left_ref + s8, s, s3);
+    const uint32_t v3 = gather_left4_lbd(left_ref + s12, s, s3);
+    const __m128i lo = _mm_unpacklo_epi32(_mm_cvtsi32_si128((int)v0),
+                                          _mm_cvtsi32_si128((int)v1));
+    const __m128i hi = _mm_unpacklo_epi32(_mm_cvtsi32_si128((int)v2),
+                                          _mm_cvtsi32_si128((int)v3));
+    _mm_store_si128((__m128i *)(left_col + i), _mm_unpacklo_epi64(lo, hi));
+    left_ref += s16;
+  }
+  if (i == n_copy) return;
+#endif
+  if (n_copy - i >= 8) {
+    const uint32_t v0 = gather_left4_lbd(left_ref, s, s3);
+    const uint32_t v1 = gather_left4_lbd(left_ref + s4, s, s3);
+    const uint64_t v = (uint64_t)v0 | ((uint64_t)v1 << 32);
+    memcpy(left_col + i, &v, 8);
+    left_ref += s * 8;
+    i += 8;
+  }
+  if (n_copy - i >= 4) {
+    const uint32_t v0 = gather_left4_lbd(left_ref, s, s3);
+    memcpy(left_col + i, &v0, 4);
+    left_ref += s4;
+    i += 4;
   }
 #if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC novector
@@ -1162,9 +1148,452 @@ static AOM_FORCE_INLINE void copy_left_col_lbd(uint8_t *left_col,
 #endif
   for (; i < n_copy; ++i) {
     left_col[i] = *left_ref;
-    left_ref += ref_stride;
+    left_ref += s;
   }
 }
+
+static AOM_FORCE_INLINE void copy_left_col_lbd(uint8_t *left_col,
+                                               const uint8_t *left_ref,
+                                               int ref_stride, int n_copy) {
+  const ptrdiff_t s = ref_stride;
+  const ptrdiff_t s3 = s * 3;
+  if (n_copy == 4) {
+    const uint32_t v0 = gather_left4_lbd(left_ref, s, s3);
+    memcpy(left_col, &v0, 4);
+  } else if (n_copy == 8) {
+    const uint32_t v0 = gather_left4_lbd(left_ref, s, s3);
+    const uint32_t v1 = gather_left4_lbd(left_ref + s * 4, s, s3);
+    const uint64_t v = (uint64_t)v0 | ((uint64_t)v1 << 32);
+    memcpy(left_col, &v, 8);
+  } else {
+    copy_left_col_wide_lbd(left_col, left_ref, ref_stride, n_copy);
+  }
+}
+
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
+static void copy_and_pad_above_lbd(uint8_t *above_row, const uint8_t *above_ref,
+                                   int n_copy, int num_needed) {
+#if defined(__SSE2__) || defined(_M_X64) || \
+    (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
+  if (n_copy == 4 && num_needed >= 8) {
+    uint32_t u0;
+    memcpy(&u0, above_ref, 4);
+    const uint8_t last = (uint8_t)(u0 >> 24);
+    const uint32_t pad4 = (uint32_t)last * 0x01010101u;
+    if (num_needed <= 12) {
+      const uint64_t v8 = (uint64_t)u0 | ((uint64_t)pad4 << 32);
+      memcpy(above_row, &v8, 8);
+      if (num_needed > 8) memcpy(above_row + 8, &pad4, 4);
+    } else {
+      const __m128i vp = _mm_set1_epi8((char)last);
+      _mm_store_si128(
+          (__m128i *)above_row,
+          _mm_unpacklo_epi64(_mm_unpacklo_epi32(_mm_cvtsi32_si128((int)u0), vp),
+                             vp));
+      if (num_needed > 16) {
+        fill_intra_edge_lbd(above_row + 16, last, num_needed - 16);
+      }
+    }
+    return;
+  }
+  if (n_copy == 8 && num_needed >= 12) {
+    const uint8_t last = above_ref[7];
+    if (num_needed == 12) {
+      memcpy(above_row, above_ref, 8);
+      const uint32_t pad4 = (uint32_t)last * 0x01010101u;
+      memcpy(above_row + 8, &pad4, 4);
+    } else {
+      const __m128i vp = _mm_set1_epi8((char)last);
+      _mm_store_si128(
+          (__m128i *)above_row,
+          _mm_unpacklo_epi64(_mm_loadl_epi64((const __m128i *)above_ref), vp));
+      if (num_needed > 16) {
+        fill_intra_edge_lbd(above_row + 16, last, num_needed - 16);
+      }
+    }
+    return;
+  }
+#endif
+  copy_above_row_lbd(above_row, above_ref, n_copy);
+  fill_intra_edge_lbd(above_row + n_copy, above_row[n_copy - 1],
+                      num_needed - n_copy);
+}
+
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
+static void copy_and_pad_left_lbd(uint8_t *left_col, const uint8_t *left_ref,
+                                  int ref_stride, int n_copy, int num_needed) {
+#if defined(__SSE2__) || defined(_M_X64) || \
+    (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
+  const ptrdiff_t s = ref_stride;
+  const ptrdiff_t s3 = s * 3;
+  if (n_copy == 4 && num_needed >= 8) {
+    const uint32_t u0 = gather_left4_lbd(left_ref, s, s3);
+    const uint8_t last = (uint8_t)(u0 >> 24);
+    const uint32_t pad4 = (uint32_t)last * 0x01010101u;
+    if (num_needed <= 12) {
+      const uint64_t v8 = (uint64_t)u0 | ((uint64_t)pad4 << 32);
+      memcpy(left_col, &v8, 8);
+      if (num_needed > 8) memcpy(left_col + 8, &pad4, 4);
+    } else {
+      const __m128i vp = _mm_set1_epi8((char)last);
+      _mm_store_si128(
+          (__m128i *)left_col,
+          _mm_unpacklo_epi64(_mm_unpacklo_epi32(_mm_cvtsi32_si128((int)u0), vp),
+                             vp));
+      if (num_needed > 16) {
+        fill_intra_edge_lbd(left_col + 16, last, num_needed - 16);
+      }
+    }
+    return;
+  }
+  if (n_copy == 8 && num_needed >= 12) {
+    const uint32_t v0 = gather_left4_lbd(left_ref, s, s3);
+    const uint32_t v1 = gather_left4_lbd(left_ref + s * 4, s, s3);
+    const uint8_t last = (uint8_t)(v1 >> 24);
+    if (num_needed == 12) {
+      const uint64_t v8 = (uint64_t)v0 | ((uint64_t)v1 << 32);
+      const uint32_t pad4 = (uint32_t)last * 0x01010101u;
+      memcpy(left_col, &v8, 8);
+      memcpy(left_col + 8, &pad4, 4);
+    } else {
+      const __m128i lo = _mm_unpacklo_epi32(_mm_cvtsi32_si128((int)v0),
+                                            _mm_cvtsi32_si128((int)v1));
+      const __m128i vp = _mm_set1_epi8((char)last);
+      _mm_store_si128((__m128i *)left_col, _mm_unpacklo_epi64(lo, vp));
+      if (num_needed > 16) {
+        fill_intra_edge_lbd(left_col + 16, last, num_needed - 16);
+      }
+    }
+    return;
+  }
+#endif
+  copy_left_col_lbd(left_col, left_ref, ref_stride, n_copy);
+  fill_intra_edge_lbd(left_col + n_copy, left_col[n_copy - 1],
+                      num_needed - n_copy);
+}
+
+#if defined(__SSE2__) || defined(_M_X64) || \
+    (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
+static AOM_FORCE_INLINE __m128i sse2_all_ones_lbd(void) {
+  const __m128i z = _mm_setzero_si128();
+  return _mm_cmpeq_epi32(z, z);
+}
+
+static AOM_FORCE_INLINE __m128i shl1_ins0_lbd(__m128i v, int b0) {
+  return _mm_or_si128(_mm_slli_si128(v, 1), _mm_cvtsi32_si128(b0));
+}
+
+static AOM_FORCE_INLINE __m128i shr1_merge_lbd(__m128i lo, __m128i hi) {
+  return _mm_or_si128(_mm_srli_si128(lo, 1), _mm_slli_si128(hi, 15));
+}
+
+static AOM_FORCE_INLINE __m128i shr2_merge_lbd(__m128i lo, __m128i hi) {
+  return _mm_or_si128(_mm_srli_si128(lo, 2), _mm_slli_si128(hi, 14));
+}
+
+static AOM_FORCE_INLINE __m128i load_tail_padded_lbd(const uint8_t *src,
+                                                     int rem, __m128i v_last) {
+  if (rem >= 16) return _mm_loadu_si128((const __m128i *)src);
+  if (rem == 4) {
+    uint32_t u0;
+    memcpy(&u0, src, 4);
+    return _mm_unpacklo_epi64(
+        _mm_unpacklo_epi32(_mm_cvtsi32_si128((int)u0), v_last), v_last);
+  }
+  if (rem == 8) {
+    return _mm_unpacklo_epi64(_mm_loadl_epi64((const __m128i *)src), v_last);
+  }
+  uint32_t u2;
+  memcpy(&u2, src + 8, 4);
+  return _mm_unpacklo_epi64(
+      _mm_loadl_epi64((const __m128i *)src),
+      _mm_unpacklo_epi32(_mm_cvtsi32_si128((int)u2), v_last));
+}
+
+static AOM_FORCE_INLINE __m128i filt1_vec16_lbd(__m128i a, __m128i b, __m128i c,
+                                                __m128i one8) {
+  const __m128i odd = _mm_and_si128(_mm_xor_si128(a, c), one8);
+  return _mm_avg_epu8(_mm_sub_epi8(_mm_avg_epu8(a, c), odd), b);
+}
+
+static AOM_FORCE_INLINE __m128i filt2_half_lbd(__m128i a16, __m128i b16,
+                                               __m128i c16, __m128i eight) {
+  const __m128i ac = _mm_add_epi16(a16, c16);
+  const __m128i abc = _mm_add_epi16(ac, b16);
+  const __m128i ac2b = _mm_add_epi16(ac, _mm_add_epi16(b16, b16));
+  return _mm_srli_epi16(
+      _mm_add_epi16(_mm_add_epi16(_mm_slli_epi16(abc, 2), ac2b), eight), 4);
+}
+
+static AOM_FORCE_INLINE __m128i filt3_half_lbd(__m128i aa16, __m128i a16,
+                                               __m128i b16, __m128i c16,
+                                               __m128i d16, __m128i four) {
+  const __m128i ae = _mm_add_epi16(aa16, d16);
+  const __m128i bcd = _mm_add_epi16(_mm_add_epi16(a16, b16), c16);
+  return _mm_srli_epi16(
+      _mm_add_epi16(_mm_add_epi16(ae, four), _mm_add_epi16(bcd, bcd)), 3);
+}
+
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
+static void filter_intra_edge_from_lbd(uint8_t *dst, const uint8_t *src,
+                                       uint8_t corner, int len, int strength) {
+  if (UNLIKELY((len & 3) != 0)) {
+    if (dst != src) copy_above_row_lbd(dst, src, len);
+    dst[-1] = corner;
+    av1_filter_intra_edge_c(dst - 1, len + 1, strength);
+    return;
+  }
+  dst[-1] = corner;
+  const uint8_t last_b = src[len - 1];
+  const __m128i v_last = sse2_bcast8_lbd(last_b);
+  const __m128i z = _mm_setzero_si128();
+  const __m128i ones = sse2_all_ones_lbd();
+
+  if (len <= 8) {
+    const __m128i b =
+        (len == 8)
+            ? _mm_unpacklo_epi64(_mm_loadl_epi64((const __m128i *)src), v_last)
+            : load_tail_padded_lbd(src, 4, v_last);
+    const __m128i a = shl1_ins0_lbd(b, corner);
+    const __m128i c = shr1_merge_lbd(b, v_last);
+    __m128i out;
+    if (strength == 1) {
+      out = filt1_vec16_lbd(a, b, c, _mm_sub_epi8(z, ones));
+    } else if (strength == 2) {
+      const __m128i eight = _mm_slli_epi16(_mm_srli_epi16(ones, 15), 3);
+      const __m128i r =
+          filt2_half_lbd(_mm_unpacklo_epi8(a, z), _mm_unpacklo_epi8(b, z),
+                         _mm_unpacklo_epi8(c, z), eight);
+      out = _mm_unpacklo_epi64(_mm_packus_epi16(r, r), v_last);
+    } else {
+      const __m128i four = _mm_slli_epi16(_mm_srli_epi16(ones, 15), 2);
+      const __m128i aa = shl1_ins0_lbd(a, corner);
+      const __m128i d = _mm_srli_si128(b, 2);
+      const __m128i r =
+          filt3_half_lbd(_mm_unpacklo_epi8(aa, z), _mm_unpacklo_epi8(a, z),
+                         _mm_unpacklo_epi8(b, z), _mm_unpacklo_epi8(c, z),
+                         _mm_unpacklo_epi8(d, z), four);
+      out = _mm_unpacklo_epi64(_mm_packus_epi16(r, r), v_last);
+    }
+    _mm_store_si128((__m128i *)dst, out);
+    if (strength == 3 && len < 8) dst[len] = last_b;
+    return;
+  }
+
+  if (len <= 16) {
+    const __m128i b = (len == 16) ? _mm_loadu_si128((const __m128i *)src)
+                                  : load_tail_padded_lbd(src, 12, v_last);
+    const __m128i a = shl1_ins0_lbd(b, corner);
+    const __m128i c = shr1_merge_lbd(b, v_last);
+    __m128i out;
+    if (strength == 1) {
+      out = filt1_vec16_lbd(a, b, c, _mm_sub_epi8(z, ones));
+    } else if (strength == 2) {
+      const __m128i eight = _mm_slli_epi16(_mm_srli_epi16(ones, 15), 3);
+      const __m128i rl =
+          filt2_half_lbd(_mm_unpacklo_epi8(a, z), _mm_unpacklo_epi8(b, z),
+                         _mm_unpacklo_epi8(c, z), eight);
+      const __m128i rh =
+          filt2_half_lbd(_mm_unpackhi_epi8(a, z), _mm_unpackhi_epi8(b, z),
+                         _mm_unpackhi_epi8(c, z), eight);
+      out = _mm_packus_epi16(rl, rh);
+    } else {
+      const __m128i four = _mm_slli_epi16(_mm_srli_epi16(ones, 15), 2);
+      const __m128i aa = shl1_ins0_lbd(a, corner);
+      const __m128i d = shr2_merge_lbd(b, v_last);
+      const __m128i rl =
+          filt3_half_lbd(_mm_unpacklo_epi8(aa, z), _mm_unpacklo_epi8(a, z),
+                         _mm_unpacklo_epi8(b, z), _mm_unpacklo_epi8(c, z),
+                         _mm_unpacklo_epi8(d, z), four);
+      const __m128i rh =
+          filt3_half_lbd(_mm_unpackhi_epi8(aa, z), _mm_unpackhi_epi8(a, z),
+                         _mm_unpackhi_epi8(b, z), _mm_unpackhi_epi8(c, z),
+                         _mm_unpackhi_epi8(d, z), four);
+      out = _mm_packus_epi16(rl, rh);
+    }
+    _mm_store_si128((__m128i *)dst, out);
+    if (strength == 3 && len < 16) dst[len] = last_b;
+    return;
+  }
+
+  __m128i cur = _mm_loadu_si128((const __m128i *)src);
+  int prev1 = corner;
+  if (strength == 1) {
+    const __m128i one8 = _mm_sub_epi8(z, ones);
+    for (int i = 0;;) {
+      const int rem = len - i;
+      const __m128i next =
+          (rem <= 16) ? v_last
+                      : load_tail_padded_lbd(src + i + 16, rem - 16, v_last);
+      const __m128i out = filt1_vec16_lbd(shl1_ins0_lbd(cur, prev1), cur,
+                                          shr1_merge_lbd(cur, next), one8);
+      prev1 = (_mm_extract_epi16(cur, 7) >> 8) & 0xff;
+      _mm_store_si128((__m128i *)(dst + i), out);
+      if (rem <= 16) break;
+      cur = next;
+      i += 16;
+    }
+  } else if (strength == 2) {
+    const __m128i eight = _mm_slli_epi16(_mm_srli_epi16(ones, 15), 3);
+    for (int i = 0;;) {
+      const int rem = len - i;
+      const __m128i next =
+          (rem <= 16) ? v_last
+                      : load_tail_padded_lbd(src + i + 16, rem - 16, v_last);
+      const __m128i a = shl1_ins0_lbd(cur, prev1);
+      const __m128i c = shr1_merge_lbd(cur, next);
+      const __m128i rl =
+          filt2_half_lbd(_mm_unpacklo_epi8(a, z), _mm_unpacklo_epi8(cur, z),
+                         _mm_unpacklo_epi8(c, z), eight);
+      const __m128i rh =
+          filt2_half_lbd(_mm_unpackhi_epi8(a, z), _mm_unpackhi_epi8(cur, z),
+                         _mm_unpackhi_epi8(c, z), eight);
+      prev1 = (_mm_extract_epi16(cur, 7) >> 8) & 0xff;
+      _mm_store_si128((__m128i *)(dst + i), _mm_packus_epi16(rl, rh));
+      if (rem <= 16) break;
+      cur = next;
+      i += 16;
+    }
+  } else {
+    const __m128i four = _mm_slli_epi16(_mm_srli_epi16(ones, 15), 2);
+    int prev2 = corner;
+    for (int i = 0;;) {
+      const int rem = len - i;
+      const __m128i next =
+          (rem <= 16) ? v_last
+                      : load_tail_padded_lbd(src + i + 16, rem - 16, v_last);
+      const __m128i a = shl1_ins0_lbd(cur, prev1);
+      const __m128i aa = shl1_ins0_lbd(a, prev2);
+      const __m128i c = shr1_merge_lbd(cur, next);
+      const __m128i d = shr2_merge_lbd(cur, next);
+      const __m128i rl =
+          filt3_half_lbd(_mm_unpacklo_epi8(aa, z), _mm_unpacklo_epi8(a, z),
+                         _mm_unpacklo_epi8(cur, z), _mm_unpacklo_epi8(c, z),
+                         _mm_unpacklo_epi8(d, z), four);
+      const __m128i rh =
+          filt3_half_lbd(_mm_unpackhi_epi8(aa, z), _mm_unpackhi_epi8(a, z),
+                         _mm_unpackhi_epi8(cur, z), _mm_unpackhi_epi8(c, z),
+                         _mm_unpackhi_epi8(d, z), four);
+      const int top16 = _mm_extract_epi16(cur, 7);
+      prev2 = top16 & 0xff;
+      prev1 = (top16 >> 8) & 0xff;
+      _mm_store_si128((__m128i *)(dst + i), _mm_packus_epi16(rl, rh));
+      if (rem <= 16) {
+        if (rem < 16) dst[len] = last_b;
+        break;
+      }
+      cur = next;
+      i += 16;
+    }
+  }
+}
+
+static AOM_FORCE_INLINE void upsample_intra_edge_from_lbd(uint8_t *dst,
+                                                          const uint8_t *src,
+                                                          uint8_t corner,
+                                                          int sz) {
+  const __m128i z = _mm_setzero_si128();
+  const __m128i ones = sse2_all_ones_lbd();
+  const __m128i eight = _mm_slli_epi16(_mm_srli_epi16(ones, 15), 3);
+  const int tl2 = (int)((uint32_t)corner * 0x0101u);
+  if (sz <= 8) {
+    __m128i v;
+    int last_b;
+    if (sz == 4) {
+      uint32_t u;
+      memcpy(&u, src, 4);
+      last_b = (int)(u >> 24);
+      const uint32_t pad = (uint32_t)last_b * 0x01010101u;
+      v = _mm_unpacklo_epi32(_mm_cvtsi32_si128((int)u),
+                             _mm_cvtsi32_si128((int)pad));
+    } else {
+      v = _mm_loadl_epi64((const __m128i *)src);
+      last_b = src[7];
+    }
+    __m128i ext = _mm_or_si128(_mm_cvtsi32_si128(tl2), _mm_slli_si128(v, 2));
+    ext = _mm_insert_epi16(ext, (int)((uint32_t)last_b * 0x0101u), 5);
+    const __m128i a16 = _mm_unpacklo_epi8(ext, z);
+    const __m128i b = _mm_srli_si128(ext, 1);
+    const __m128i b16 = _mm_unpacklo_epi8(b, z);
+    const __m128i c16 = _mm_unpacklo_epi8(_mm_srli_si128(ext, 2), z);
+    const __m128i d16 = _mm_unpacklo_epi8(_mm_srli_si128(ext, 3), z);
+    const __m128i bc = _mm_add_epi16(b16, c16);
+    const __m128i bc9 = _mm_add_epi16(bc, _mm_slli_epi16(bc, 3));
+    const __m128i ad = _mm_sub_epi16(eight, _mm_add_epi16(a16, d16));
+    const __m128i s16 = _mm_srai_epi16(_mm_add_epi16(bc9, ad), 4);
+    const __m128i s8 = _mm_packus_epi16(s16, s16);
+    _mm_storeu_si128((__m128i *)(dst - 2), _mm_unpacklo_epi8(b, s8));
+    if (sz == 8) dst[14] = (uint8_t)last_b;
+    return;
+  }
+
+  __m128i c;
+  int last_b;
+  if (sz == 12) {
+    uint32_t u2;
+    memcpy(&u2, src + 8, 4);
+    last_b = (int)(u2 >> 24);
+    const uint32_t pad = (uint32_t)last_b * 0x01010101u;
+    const __m128i lo = _mm_loadl_epi64((const __m128i *)src);
+    const __m128i hi = _mm_unpacklo_epi32(_mm_cvtsi32_si128((int)u2),
+                                          _mm_cvtsi32_si128((int)pad));
+    c = _mm_unpacklo_epi64(lo, hi);
+  } else {
+    c = _mm_loadu_si128((const __m128i *)src);
+    last_b = (_mm_extract_epi16(c, 7) >> 8) & 0xff;
+  }
+  const int last_pair = last_b | (last_b << 8);
+  const __m128i b = shl1_ins0_lbd(c, corner);
+  const __m128i a = shl1_ins0_lbd(b, corner);
+  const __m128i d = _mm_insert_epi16(_mm_srli_si128(c, 1), last_pair, 7);
+
+  const __m128i bc_lo =
+      _mm_add_epi16(_mm_unpacklo_epi8(b, z), _mm_unpacklo_epi8(c, z));
+  const __m128i bc_hi =
+      _mm_add_epi16(_mm_unpackhi_epi8(b, z), _mm_unpackhi_epi8(c, z));
+  const __m128i bc9_lo = _mm_add_epi16(bc_lo, _mm_slli_epi16(bc_lo, 3));
+  const __m128i bc9_hi = _mm_add_epi16(bc_hi, _mm_slli_epi16(bc_hi, 3));
+  const __m128i ad_lo = _mm_sub_epi16(
+      eight, _mm_add_epi16(_mm_unpacklo_epi8(a, z), _mm_unpacklo_epi8(d, z)));
+  const __m128i ad_hi = _mm_sub_epi16(
+      eight, _mm_add_epi16(_mm_unpackhi_epi8(a, z), _mm_unpackhi_epi8(d, z)));
+  const __m128i s_lo = _mm_srai_epi16(_mm_add_epi16(bc9_lo, ad_lo), 4);
+  const __m128i s_hi = _mm_srai_epi16(_mm_add_epi16(bc9_hi, ad_hi), 4);
+  const __m128i s8 = _mm_packus_epi16(s_lo, s_hi);
+
+  const int s0 = _mm_cvtsi128_si32(s8) & 0xff;
+  const int s15_last = ((_mm_extract_epi16(s8, 7) >> 8) & 0xff) | (last_b << 8);
+  const __m128i s_sh = _mm_insert_epi16(_mm_srli_si128(s8, 1), s15_last, 7);
+  const uint16_t pre = (uint16_t)((uint32_t)corner | ((uint32_t)s0 << 8));
+  memcpy(dst - 2, &pre, 2);
+  _mm_store_si128((__m128i *)dst, _mm_unpacklo_epi8(c, s_sh));
+  _mm_store_si128((__m128i *)(dst + 16), _mm_unpackhi_epi8(c, s_sh));
+}
+#else
+static AOM_FORCE_INLINE void filter_intra_edge_from_lbd(uint8_t *dst,
+                                                        const uint8_t *src,
+                                                        uint8_t corner, int len,
+                                                        int strength) {
+  if (dst != src) copy_above_row_lbd(dst, src, len);
+  dst[-1] = corner;
+  av1_filter_intra_edge(dst - 1, len + 1, strength);
+}
+
+static AOM_FORCE_INLINE void upsample_intra_edge_from_lbd(uint8_t *dst,
+                                                          const uint8_t *src,
+                                                          uint8_t corner,
+                                                          int sz) {
+  if (dst != src) copy_above_row_lbd(dst, src, sz);
+  dst[-1] = corner;
+  av1_upsample_intra_edge(dst, sz);
+}
+#endif
 
 static AOM_FORCE_INLINE void fill_block_lbd(uint8_t *dst, ptrdiff_t dst_stride,
                                             uint8_t val, int txwpx, int txhpx) {
@@ -1200,7 +1629,7 @@ static AOM_FORCE_INLINE void fill_block_lbd(uint8_t *dst, ptrdiff_t dst_stride,
   } else {
 #if defined(__SSE2__) || defined(_M_X64) || \
     (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
-    const __m128i v = _mm_set1_epi8((char)val);
+    const __m128i v = sse2_bcast8_lbd(val);
     if (txwpx == 16) {
 #if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC unroll 1
@@ -1270,11 +1699,10 @@ static void build_filter_intra_predictors(const uint8_t *ref, int ref_stride,
   uint8_t *const above_row = above_data + 16;
   uint8_t *const left_col = left_data + 16;
 
-  if (n_left_px > 0) {
-    copy_left_col_lbd(left_col, left_ref, ref_stride, n_left_px);
-    if (UNLIKELY(n_left_px < txhpx))
-      fill_intra_edge_lbd(&left_col[n_left_px], left_col[n_left_px - 1],
-                          txhpx - n_left_px);
+  if (LIKELY(n_left_px == txhpx)) {
+    copy_left_col_lbd(left_col, left_ref, ref_stride, txhpx);
+  } else if (n_left_px > 0) {
+    copy_and_pad_left_lbd(left_col, left_ref, ref_stride, n_left_px, txhpx);
   } else {
     const uint8_t val = (n_top_px > 0) ? above_ref[0] : 129;
     fill_intra_edge_lbd(left_col, val, txhpx);
@@ -1283,9 +1711,7 @@ static void build_filter_intra_predictors(const uint8_t *ref, int ref_stride,
   if (LIKELY(n_top_px == txwpx)) {
     copy_above_row_lbd(above_row, above_ref, txwpx);
   } else if (n_top_px > 0) {
-    copy_above_row_lbd(above_row, above_ref, n_top_px);
-    fill_intra_edge_lbd(&above_row[n_top_px], above_row[n_top_px - 1],
-                        txwpx - n_top_px);
+    copy_and_pad_above_lbd(above_row, above_ref, n_top_px, txwpx);
   } else {
     const uint8_t val = (n_left_px > 0) ? left_ref[0] : 127;
     fill_intra_edge_lbd(above_row, val, txwpx);
@@ -1306,141 +1732,240 @@ static void build_filter_intra_predictors(const uint8_t *ref, int ref_stride,
                              filter_intra_mode);
 }
 
-static void build_directional_intra_predictors(
-    const uint8_t *ref, int ref_stride, uint8_t *dst, int dst_stride,
-    int p_angle, TX_SIZE tx_size, int disable_edge_filter, int n_top_px,
-    int n_topright_px, int n_left_px, int n_bottomleft_px,
-    int intra_edge_filter_type) {
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
+static void build_directional_intra_predictors(const uint8_t *ref,
+                                               int ref_stride, uint8_t *dst,
+                                               int dst_stride,
+                                               uint32_t angle_tx_flags,
+                                               uint32_t avail_px) {
+  const int p_angle = (int)(angle_tx_flags & 0x1ff);
+  const TX_SIZE tx_size = (TX_SIZE)((angle_tx_flags >> 9) & 0x1f);
+  const int disable_edge_filter = (int)((angle_tx_flags >> 14) & 1);
+  const int intra_edge_filter_type = (int)(angle_tx_flags >> 15);
+  const int n_top_px = (int)(avail_px & 0xff);
+  const int n_topright_px = (int)((avail_px >> 8) & 0xff);
+  const int n_left_px = (int)((avail_px >> 16) & 0xff);
+  const int n_bottomleft_px = (int)(avail_px >> 24);
   const uint8_t *above_ref = ref - ref_stride;
   const uint8_t *left_ref = ref - 1;
   const int txwpx = tx_size_wide[tx_size];
   const int txhpx = tx_size_high[tx_size];
-  const int need_above = p_angle < 180;
-  const int need_left = p_angle > 90;
-
-  assert(n_top_px >= 0);
-  assert(n_topright_px >= -1);
-  assert(n_left_px >= 0);
-  assert(n_bottomleft_px >= -1);
-
-  if ((!need_above && n_left_px == 0) || (!need_left && n_top_px == 0)) {
-    uint8_t val;
-    if (need_left) {
-      val = (n_top_px > 0) ? above_ref[0] : 129;
-    } else {
-      val = (n_left_px > 0) ? left_ref[0] : 127;
-    }
-    fill_block_lbd(dst, dst_stride, val, txwpx, txhpx);
-    return;
-  }
 
   DECLARE_ALIGNED(16, uint8_t, left_data[NUM_INTRA_NEIGHBOUR_PIXELS]);
   DECLARE_ALIGNED(16, uint8_t, above_data[NUM_INTRA_NEIGHBOUR_PIXELS]);
   uint8_t *const above_row = above_data + 16;
   uint8_t *const left_col = left_data + 16;
 
-  // NEED_LEFT
-  if (need_left) {
-    const int num_left_pixels_needed =
-        txhpx + (n_bottomleft_px >= 0 ? txwpx : 0);
-    if (n_left_px > 0) {
-      const int n_left_copy =
-          n_left_px + (n_bottomleft_px > 0 ? n_bottomleft_px : 0);
-      copy_left_col_lbd(left_col, left_ref, ref_stride, n_left_copy);
-      if (n_left_copy < num_left_pixels_needed)
-        fill_intra_edge_lbd(&left_col[n_left_copy], left_col[n_left_copy - 1],
-                            num_left_pixels_needed - n_left_copy);
-    } else {
-      const uint8_t val = (n_top_px > 0) ? above_ref[0] : 129;
-      fill_intra_edge_lbd(left_col, val, num_left_pixels_needed);
-    }
-  }
-
-  // NEED_ABOVE
-  if (need_above) {
-    const int num_top_pixels_needed = txwpx + (n_topright_px >= 0 ? txhpx : 0);
-    if (n_top_px > 0) {
-      const int n_top_copy = n_top_px + (n_topright_px > 0 ? n_topright_px : 0);
-      copy_above_row_lbd(above_row, above_ref, n_top_copy);
-      if (n_top_copy < num_top_pixels_needed)
-        fill_intra_edge_lbd(&above_row[n_top_copy], above_row[n_top_copy - 1],
-                            num_top_pixels_needed - n_top_copy);
-    } else {
+  if (p_angle < 90) {
+    if (UNLIKELY(n_top_px == 0)) {
       const uint8_t val = (n_left_px > 0) ? left_ref[0] : 127;
-      fill_intra_edge_lbd(above_row, val, num_top_pixels_needed);
+      fill_block_lbd(dst, dst_stride, val, txwpx, txhpx);
+      return;
     }
+    assert(n_topright_px >= 0);
+    const int blk_wh = txwpx + txhpx;
+    const uint8_t corner = (n_left_px > 0) ? above_ref[-1] : above_ref[0];
+    int upsample_above = 0;
+    int strength = 0;
+    if (LIKELY(!disable_edge_filter)) {
+      const int d = 90 - p_angle;
+      if (d < 40 && blk_wh <= (16 >> intra_edge_filter_type)) {
+        upsample_above = 1;
+      } else {
+        strength =
+            intra_edge_filter_strength_pos(blk_wh, d, intra_edge_filter_type);
+      }
+    }
+    const uint8_t *src = above_row;
+    if (n_top_px == txwpx && n_topright_px >= txhpx) {
+      if (upsample_above | strength) {
+        src = above_ref;
+      } else {
+        copy_above_row_lbd(above_row, above_ref, blk_wh);
+      }
+    } else {
+      const int n_top_copy = AOMMIN(n_top_px + n_topright_px, blk_wh);
+      if (n_top_copy < blk_wh) {
+        copy_and_pad_above_lbd(above_row, above_ref, n_top_copy, blk_wh);
+      } else {
+        copy_above_row_lbd(above_row, above_ref, blk_wh);
+      }
+    }
+    if (upsample_above) {
+      upsample_intra_edge_from_lbd(above_row, src, corner, blk_wh);
+    } else if (strength) {
+      filter_intra_edge_from_lbd(above_row, src, corner, n_top_px + txhpx,
+                                 strength);
+    } else {
+      above_row[-1] = corner;
+    }
+    memset(above_row + (blk_wh << upsample_above), 0,
+           (blk_wh == 128) ? 16 : 32);
+    av1_dr_prediction_z1(dst, dst_stride, txwpx, txhpx, above_row, NULL,
+                         upsample_above, dr_intra_derivative[p_angle], 1);
+    return;
   }
 
-  if (p_angle == 90) {
+  if (p_angle > 180) {
+    if (UNLIKELY(n_left_px == 0)) {
+      const uint8_t val = (n_top_px > 0) ? above_ref[0] : 129;
+      fill_block_lbd(dst, dst_stride, val, txwpx, txhpx);
+      return;
+    }
+    assert(n_bottomleft_px >= 0);
+    const int blk_wh = txhpx + txwpx;
+    const uint8_t corner = (n_top_px > 0) ? above_ref[-1] : left_ref[0];
+    const int n_left_copy = AOMMIN(n_left_px + n_bottomleft_px, blk_wh);
+    if (n_left_copy < blk_wh) {
+      copy_and_pad_left_lbd(left_col, left_ref, ref_stride, n_left_copy,
+                            blk_wh);
+    } else {
+      copy_left_col_lbd(left_col, left_ref, ref_stride, blk_wh);
+    }
+    int upsample_left = 0;
+    if (LIKELY(!disable_edge_filter)) {
+      const int d = p_angle - 180;
+      if (d < 40 && blk_wh <= (16 >> intra_edge_filter_type)) {
+        upsample_left = 1;
+        upsample_intra_edge_from_lbd(left_col, left_col, corner, blk_wh);
+      } else {
+        const int strength =
+            intra_edge_filter_strength_pos(blk_wh, d, intra_edge_filter_type);
+        if (strength) {
+          filter_intra_edge_from_lbd(left_col, left_col, corner,
+                                     n_left_px + txwpx, strength);
+        } else {
+          left_col[-1] = corner;
+        }
+      }
+    } else {
+      left_col[-1] = corner;
+    }
+    memset(left_col + (blk_wh << upsample_left), 0, (blk_wh == 128) ? 16 : 32);
+    av1_dr_prediction_z3(dst, dst_stride, txwpx, txhpx, NULL, left_col,
+                         upsample_left, 1, dr_intra_derivative[270 - p_angle]);
+    return;
+  }
+
+  if (UNLIKELY(p_angle == 90)) {
+    if (n_top_px == 0) {
+      const uint8_t val = (n_left_px > 0) ? left_ref[0] : 127;
+      fill_block_lbd(dst, dst_stride, val, txwpx, txhpx);
+      return;
+    }
+    if (n_top_px < txwpx) {
+      copy_and_pad_above_lbd(above_row, above_ref, n_top_px, txwpx);
+    } else {
+      copy_above_row_lbd(above_row, above_ref, txwpx);
+    }
     pred[V_PRED][tx_size](dst, dst_stride, above_row, NULL);
     return;
   }
-  if (p_angle == 180) {
+  if (UNLIKELY(p_angle == 180)) {
+    if (n_left_px == 0) {
+      const uint8_t val = (n_top_px > 0) ? above_ref[0] : 129;
+      fill_block_lbd(dst, dst_stride, val, txwpx, txhpx);
+      return;
+    }
+    if (n_left_px < txhpx) {
+      copy_and_pad_left_lbd(left_col, left_ref, ref_stride, n_left_px, txhpx);
+    } else {
+      copy_left_col_lbd(left_col, left_ref, ref_stride, txhpx);
+    }
     pred[H_PRED][tx_size](dst, dst_stride, NULL, left_col);
     return;
   }
 
-  const int tail_zero = (txwpx + txhpx == 128) ? 16 : 32;
+  // Zone 2: 90 < p_angle < 180
+  const int blk_wh = txwpx + txhpx;
   memset(above_data, 0, 16);
   memset(left_data, 0, 16);
-  memset(above_row + txwpx + txhpx, 0, tail_zero);
-  memset(left_col + txwpx + txhpx, 0, tail_zero);
-
-  if (n_top_px > 0 && n_left_px > 0) {
-    above_row[-1] = above_ref[-1];
+  uint8_t corner;
+  if (LIKELY(n_top_px > 0 && n_left_px > 0)) {
+    corner = above_ref[-1];
+    if (blk_wh >= 24 && LIKELY(!disable_edge_filter)) {
+      corner =
+          (uint8_t)((left_ref[0] * 5 + corner * 6 + above_ref[0] * 5 + 8) >> 4);
+    }
   } else if (n_top_px > 0) {
-    above_row[-1] = above_ref[0];
+    corner = above_ref[0];
   } else if (n_left_px > 0) {
-    above_row[-1] = left_ref[0];
+    corner = left_ref[0];
   } else {
-    above_row[-1] = 128;
+    corner = 128;
   }
-  left_col[-1] = above_row[-1];
+
+  if (LIKELY(n_left_px == txhpx)) {
+    copy_left_col_lbd(left_col, left_ref, ref_stride, txhpx);
+  } else if (n_left_px > 0) {
+    copy_and_pad_left_lbd(left_col, left_ref, ref_stride, n_left_px, txhpx);
+  } else {
+    const uint8_t val = (n_top_px > 0) ? above_ref[0] : 129;
+    fill_intra_edge_lbd(left_col, val, txhpx);
+  }
+
+  int upsample_left = 0;
+  if (LIKELY(!disable_edge_filter)) {
+    const int d_left = 180 - p_angle;
+    if (d_left < 40 && blk_wh <= (16 >> intra_edge_filter_type)) {
+      upsample_left = 1;
+      upsample_intra_edge_from_lbd(left_col, left_col, corner, txhpx);
+    } else if (LIKELY(n_left_px > 0)) {
+      const int s_left = intra_edge_filter_strength_pos(blk_wh, d_left,
+                                                        intra_edge_filter_type);
+      if (s_left) {
+        filter_intra_edge_from_lbd(left_col, left_col, corner, n_left_px,
+                                   s_left);
+      } else {
+        left_col[-1] = corner;
+      }
+    } else {
+      left_col[-1] = corner;
+    }
+  } else {
+    left_col[-1] = corner;
+  }
 
   int upsample_above = 0;
-  int upsample_left = 0;
-  if (!disable_edge_filter) {
-    const int need_right = p_angle < 90;
-    const int need_bottom = p_angle > 180;
-    const int ab_le = 1;
-    if (need_above && need_left && (txwpx + txhpx >= 24)) {
-      filter_intra_edge_corner(above_row, left_col);
-    }
-    if (need_above) {
-      if (n_top_px > 0) {
-        const int strength = intra_edge_filter_strength(
-            txwpx, txhpx, p_angle - 90, intra_edge_filter_type);
-        if (strength) {
-          const int n_px = n_top_px + ab_le + (need_right ? txhpx : 0);
-          av1_filter_intra_edge(above_row - ab_le, n_px, strength);
-        }
-      }
-      if (av1_use_intra_edge_upsample(txwpx, txhpx, p_angle - 90,
-                                      intra_edge_filter_type)) {
-        upsample_above = 1;
-        const int n_px = txwpx + (need_right ? txhpx : 0);
-        av1_upsample_intra_edge(above_row, n_px);
-      }
-    }
-    if (need_left) {
-      if (n_left_px > 0) {
-        const int strength = intra_edge_filter_strength(
-            txhpx, txwpx, p_angle - 180, intra_edge_filter_type);
-        if (strength) {
-          const int n_px = n_left_px + ab_le + (need_bottom ? txwpx : 0);
-          av1_filter_intra_edge(left_col - ab_le, n_px, strength);
-        }
-      }
-      if (av1_use_intra_edge_upsample(txhpx, txwpx, p_angle - 180,
-                                      intra_edge_filter_type)) {
-        upsample_left = 1;
-        const int n_px = txhpx + (need_bottom ? txwpx : 0);
-        av1_upsample_intra_edge(left_col, n_px);
-      }
+  int s_above = 0;
+  if (LIKELY(!disable_edge_filter)) {
+    const int d_above = p_angle - 90;
+    if (d_above < 40 && blk_wh <= (16 >> intra_edge_filter_type)) {
+      upsample_above = 1;
+    } else if (LIKELY(n_top_px > 0)) {
+      s_above = intra_edge_filter_strength_pos(blk_wh, d_above,
+                                               intra_edge_filter_type);
     }
   }
-  dr_predictor(dst, dst_stride, tx_size, above_row, left_col, upsample_above,
-               upsample_left, p_angle);
+  const uint8_t *src_above = above_row;
+  if (LIKELY(n_top_px == txwpx)) {
+    if (upsample_above | s_above) {
+      src_above = above_ref;
+    } else {
+      copy_above_row_lbd(above_row, above_ref, txwpx);
+    }
+  } else if (n_top_px > 0) {
+    copy_and_pad_above_lbd(above_row, above_ref, n_top_px, txwpx);
+  } else {
+    const uint8_t val = (n_left_px > 0) ? left_ref[0] : 127;
+    fill_intra_edge_lbd(above_row, val, txwpx);
+  }
+  if (upsample_above) {
+    upsample_intra_edge_from_lbd(above_row, src_above, corner, txwpx);
+  } else if (s_above) {
+    filter_intra_edge_from_lbd(above_row, src_above, corner, n_top_px, s_above);
+  } else {
+    above_row[-1] = corner;
+  }
+
+  memset(above_row + (txwpx << upsample_above), 0, 16);
+  memset(left_col + (txhpx << upsample_left), 0, 16);
+  av1_dr_prediction_z2(dst, dst_stride, txwpx, txhpx, above_row, left_col,
+                       upsample_above, upsample_left,
+                       dr_intra_derivative[180 - p_angle],
+                       dr_intra_derivative[p_angle - 90]);
 }
 
 static AOM_FORCE_INLINE uint32_t sum_above_row_lbd(const uint8_t *above_ref,
@@ -1451,26 +1976,55 @@ static AOM_FORCE_INLINE uint32_t sum_above_row_lbd(const uint8_t *above_ref,
 }
 
 static AOM_FORCE_INLINE uint32_t sum_left_col_lbd(const uint8_t *left_ref,
-                                                  int ref_stride, int txhpx) {
-  const int s2 = ref_stride * 2;
-  const int s3 = ref_stride * 3;
-  const int s4 = ref_stride * 4;
-  uint32_t sum0 = 0, sum1 = 0;
-  for (int i = 0; i < txhpx; i += 4) {
-    sum0 += (uint32_t)left_ref[0] + (uint32_t)left_ref[ref_stride];
-    sum1 += (uint32_t)left_ref[s2] + (uint32_t)left_ref[s3];
-    left_ref += s4;
+                                                  ptrdiff_t ref_stride,
+                                                  int txhpx) {
+  const ptrdiff_t s2 = ref_stride * 2;
+  const ptrdiff_t s3 = ref_stride * 3;
+  if (txhpx == 4) {
+    return ((uint32_t)left_ref[0] + (uint32_t)left_ref[ref_stride]) +
+           ((uint32_t)left_ref[s2] + (uint32_t)left_ref[s3]);
+  }
+  const uint8_t *p1 = left_ref + ref_stride * 4;
+  uint32_t sum0 = ((uint32_t)left_ref[0] + (uint32_t)left_ref[ref_stride]) +
+                  ((uint32_t)left_ref[s2] + (uint32_t)left_ref[s3]);
+  uint32_t sum1 = ((uint32_t)p1[0] + (uint32_t)p1[ref_stride]) +
+                  ((uint32_t)p1[s2] + (uint32_t)p1[s3]);
+  if (txhpx > 8) {
+    const ptrdiff_t s8 = ref_stride * 8;
+    int i = 8;
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC unroll 1
+#endif
+    do {
+      left_ref += s8;
+      p1 = left_ref + ref_stride * 4;
+      sum0 += ((uint32_t)left_ref[0] + (uint32_t)left_ref[ref_stride]) +
+              ((uint32_t)left_ref[s2] + (uint32_t)left_ref[s3]);
+      sum1 += ((uint32_t)p1[0] + (uint32_t)p1[ref_stride]) +
+              ((uint32_t)p1[s2] + (uint32_t)p1[s3]);
+      i += 8;
+    } while (i < txhpx);
   }
   return sum0 + sum1;
 }
 
-// Computes 8-bit DC_PRED directly from the reference boundary pixels without
-// staging above_row and left_col buffers on the stack.
-static AOM_FORCE_INLINE uint8_t compute_dc_val_lbd(const uint8_t *ref,
-                                                   int ref_stride,
-                                                   TX_SIZE tx_size, int txwpx,
-                                                   int txhpx, int n_top_px,
-                                                   int n_left_px) {
+static const uint8_t dc_shift1_tab[TX_SIZES_ALL] = {
+  2, 3, 4, 5, 6,           // 4x4, 8x8, 16x16, 32x32, 64x64
+  2, 2, 3, 3, 4, 4, 5, 5,  // 4x8..64x32
+  2, 2, 3, 3, 4, 4         // 4x16..64x16
+};
+static const uint16_t dc_mult_tab[TX_SIZES_ALL] = {
+  0x8000, 0x8000, 0x8000, 0x8000, 0x8000, 0x5556, 0x5556,
+  0x5556, 0x5556, 0x5556, 0x5556, 0x5556, 0x5556, 0x3334,
+  0x3334, 0x3334, 0x3334, 0x3334, 0x3334
+};
+
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
+static uint8_t compute_dc_val_edge_lbd(const uint8_t *ref, ptrdiff_t ref_stride,
+                                       TX_SIZE tx_size, int txwpx, int txhpx,
+                                       int n_top_px, int n_left_px) {
   const uint8_t *above_ref = ref - ref_stride;
   const uint8_t *left_ref = ref - 1;
   uint32_t sum_top = 0;
@@ -1495,36 +2049,38 @@ static AOM_FORCE_INLINE uint8_t compute_dc_val_lbd(const uint8_t *ref,
     }
   }
 
-  uint8_t dc_val;
   if (n_top_px > 0 && n_left_px > 0) {
-    // Reciprocal multiplication tables to divide by (txwpx + txhpx) for square,
-    // 1:2 / 2:1, and 1:4 / 4:1 transform blocks.
-    static const uint8_t dc_shift1_tab[TX_SIZES_ALL] = {
-      2, 3, 4, 5, 6,  // 4x4, 8x8, 16x16, 32x32, 64x64
-      2, 2, 3, 3, 4, 4,
-      5, 5,             // 4x8, 8x4, 8x16, 16x8, 16x32, 32x16, 32x64, 64x32
-      2, 2, 3, 3, 4, 4  // 4x16, 16x4, 8x32, 32x8, 16x64, 64x16
-    };
-    static const uint16_t dc_mult_tab[TX_SIZES_ALL] = {
-      0x8000, 0x8000, 0x8000, 0x8000, 0x8000, 0x5556, 0x5556,
-      0x5556, 0x5556, 0x5556, 0x5556, 0x5556, 0x5556, 0x3334,
-      0x3334, 0x3334, 0x3334, 0x3334, 0x3334
-    };
     const uint32_t total =
         sum_top + sum_left + (uint32_t)((txwpx + txhpx) >> 1);
-    dc_val =
-        (uint8_t)(((total >> dc_shift1_tab[tx_size]) * dc_mult_tab[tx_size]) >>
-                  16);
+    return (
+        uint8_t)(((total >> dc_shift1_tab[tx_size]) * dc_mult_tab[tx_size]) >>
+                 16);
   } else if (n_top_px > 0) {
-    const int log2_w = tx_size_wide_log2[tx_size];
-    dc_val = (uint8_t)((sum_top + (uint32_t)(txwpx >> 1)) >> log2_w);
+    return (uint8_t)((sum_top + (uint32_t)(txwpx >> 1)) >>
+                     tx_size_wide_log2[tx_size]);
   } else if (n_left_px > 0) {
-    const int log2_h = tx_size_high_log2[tx_size];
-    dc_val = (uint8_t)((sum_left + (uint32_t)(txhpx >> 1)) >> log2_h);
-  } else {
-    dc_val = 128;
+    return (uint8_t)((sum_left + (uint32_t)(txhpx >> 1)) >>
+                     tx_size_high_log2[tx_size]);
   }
-  return dc_val;
+  return 128;
+}
+
+static AOM_FORCE_INLINE uint8_t compute_dc_val_lbd(const uint8_t *ref,
+                                                   ptrdiff_t ref_stride,
+                                                   TX_SIZE tx_size, int txwpx,
+                                                   int txhpx, int n_top_px,
+                                                   int n_left_px) {
+  if (LIKELY(n_top_px == txwpx && n_left_px == txhpx)) {
+    const uint32_t sum_top = sum_above_row_lbd(ref - ref_stride, txwpx);
+    const uint32_t sum_left = sum_left_col_lbd(ref - 1, ref_stride, txhpx);
+    const uint32_t total =
+        sum_top + sum_left + (uint32_t)((txwpx + txhpx) >> 1);
+    return (
+        uint8_t)(((total >> dc_shift1_tab[tx_size]) * dc_mult_tab[tx_size]) >>
+                 16);
+  }
+  return compute_dc_val_edge_lbd(ref, ref_stride, tx_size, txwpx, txhpx,
+                                 n_top_px, n_left_px);
 }
 
 void av1_predict_dc_block_lbd_c(const uint8_t *ref, int ref_stride,
@@ -1639,55 +2195,94 @@ static AOM_FORCE_INLINE void h_pred_direct_lbd(uint8_t *dst,
 #pragma GCC unroll 1
 #endif
     do {
-      memset(dst, left_ref[0], 4);
-      memset(dst + dst_stride, left_ref[ref_stride], 4);
-      dst += dst_stride * 2;
+      const uint32_t v0 = (uint32_t)left_ref[0] * 0x01010101u;
+      const uint32_t v1 = (uint32_t)left_ref[ref_stride] * 0x01010101u;
       left_ref += ref_stride * 2;
-      i += 2;
+      const uint32_t v2 = (uint32_t)left_ref[0] * 0x01010101u;
+      const uint32_t v3 = (uint32_t)left_ref[ref_stride] * 0x01010101u;
+      left_ref += ref_stride * 2;
+      memcpy(dst, &v0, 4);
+      memcpy(dst + dst_stride, &v1, 4);
+      dst += dst_stride * 2;
+      memcpy(dst, &v2, 4);
+      memcpy(dst + dst_stride, &v3, 4);
+      dst += dst_stride * 2;
+      i += 4;
     } while (i < txhpx);
   } else if (txwpx == 8) {
 #if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC unroll 1
 #endif
     do {
-      memset(dst, left_ref[0], 8);
-      memset(dst + dst_stride, left_ref[ref_stride], 8);
-      dst += dst_stride * 2;
+      const uint64_t v0 = (uint64_t)left_ref[0] * 0x0101010101010101ULL;
+      const uint64_t v1 =
+          (uint64_t)left_ref[ref_stride] * 0x0101010101010101ULL;
       left_ref += ref_stride * 2;
-      i += 2;
-    } while (i < txhpx);
-  } else if (txwpx == 16) {
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC unroll 1
-#endif
-    do {
-      memset(dst, left_ref[0], 16);
-      memset(dst + dst_stride, left_ref[ref_stride], 16);
-      dst += dst_stride * 2;
+      const uint64_t v2 = (uint64_t)left_ref[0] * 0x0101010101010101ULL;
+      const uint64_t v3 =
+          (uint64_t)left_ref[ref_stride] * 0x0101010101010101ULL;
       left_ref += ref_stride * 2;
-      i += 2;
-    } while (i < txhpx);
-  } else if (txwpx == 32) {
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC unroll 1
-#endif
-    do {
-      memset(dst, left_ref[0], 32);
-      memset(dst + dst_stride, left_ref[ref_stride], 32);
+      memcpy(dst, &v0, 8);
+      memcpy(dst + dst_stride, &v1, 8);
       dst += dst_stride * 2;
-      left_ref += ref_stride * 2;
-      i += 2;
+      memcpy(dst, &v2, 8);
+      memcpy(dst + dst_stride, &v3, 8);
+      dst += dst_stride * 2;
+      i += 4;
     } while (i < txhpx);
   } else {
+#if defined(__SSE2__) || defined(_M_X64) || \
+    (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
+    if (txwpx == 16) {
 #if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC unroll 1
 #endif
-    do {
-      memset(dst, *left_ref, 64);
+      do {
+        const __m128i v0 = sse2_bcast8_lbd(left_ref[0]);
+        const __m128i v1 = sse2_bcast8_lbd(left_ref[ref_stride]);
+        _mm_storeu_si128((__m128i *)dst, v0);
+        _mm_storeu_si128((__m128i *)(dst + dst_stride), v1);
+        dst += dst_stride * 2;
+        left_ref += ref_stride * 2;
+        i += 2;
+      } while (i < txhpx);
+    } else if (txwpx == 32) {
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC unroll 1
+#endif
+      do {
+        const __m128i v0 = sse2_bcast8_lbd(left_ref[0]);
+        const __m128i v1 = sse2_bcast8_lbd(left_ref[ref_stride]);
+        _mm_storeu_si128((__m128i *)dst, v0);
+        _mm_storeu_si128((__m128i *)(dst + 16), v0);
+        _mm_storeu_si128((__m128i *)(dst + dst_stride), v1);
+        _mm_storeu_si128((__m128i *)(dst + dst_stride + 16), v1);
+        dst += dst_stride * 2;
+        left_ref += ref_stride * 2;
+        i += 2;
+      } while (i < txhpx);
+    } else {
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC unroll 1
+#endif
+      do {
+        const __m128i v0 = sse2_bcast8_lbd(*left_ref);
+        _mm_storeu_si128((__m128i *)dst, v0);
+        _mm_storeu_si128((__m128i *)(dst + 16), v0);
+        _mm_storeu_si128((__m128i *)(dst + 32), v0);
+        _mm_storeu_si128((__m128i *)(dst + 48), v0);
+        dst += dst_stride;
+        left_ref += ref_stride;
+        ++i;
+      } while (i < txhpx);
+    }
+#else
+    for (; i < txhpx; ++i) {
+      memset(dst, *left_ref, txwpx);
       dst += dst_stride;
       left_ref += ref_stride;
-      ++i;
-    } while (i < txhpx);
+    }
+#endif
   }
 }
 
@@ -1725,9 +2320,7 @@ static void build_non_directional_intra_predictors(const uint8_t *ref,
       return;
     }
     if (n_top_px > 0) {
-      copy_above_row_lbd(above_row, above_ref, n_top_px);
-      fill_intra_edge_lbd(&above_row[n_top_px], above_row[n_top_px - 1],
-                          txwpx - n_top_px);
+      copy_and_pad_above_lbd(above_row, above_ref, n_top_px, txwpx);
     } else {
       const uint8_t val = (n_left_px > 0) ? left_ref[0] : 127;
       fill_intra_edge_lbd(above_row, val, txwpx);
@@ -1736,11 +2329,10 @@ static void build_non_directional_intra_predictors(const uint8_t *ref,
     return;
   }
 
-  if (n_left_px > 0) {
-    copy_left_col_lbd(left_col, left_ref, ref_stride, n_left_px);
-    if (UNLIKELY(n_left_px < txhpx))
-      fill_intra_edge_lbd(&left_col[n_left_px], left_col[n_left_px - 1],
-                          txhpx - n_left_px);
+  if (LIKELY(n_left_px == txhpx)) {
+    copy_left_col_lbd(left_col, left_ref, ref_stride, txhpx);
+  } else if (n_left_px > 0) {
+    copy_and_pad_left_lbd(left_col, left_ref, ref_stride, n_left_px, txhpx);
   } else {
     const uint8_t val = (n_top_px > 0) ? above_ref[0] : 129;
     fill_intra_edge_lbd(left_col, val, txhpx);
@@ -1757,13 +2349,16 @@ static void build_non_directional_intra_predictors(const uint8_t *ref,
     pred[SMOOTH_PRED][tx_size](dst, dst_stride, above_ref, left_col);
     return;
   }
+  if (mode == PAETH_PRED && LIKELY(n_top_px == txwpx && n_left_px > 0) &&
+      (txwpx < 16 || (((uintptr_t)above_ref & 15) == 0))) {
+    pred[PAETH_PRED][tx_size](dst, dst_stride, above_ref, left_col);
+    return;
+  }
 
   if (LIKELY(n_top_px == txwpx)) {
     copy_above_row_lbd(above_row, above_ref, txwpx);
   } else if (n_top_px > 0) {
-    copy_above_row_lbd(above_row, above_ref, n_top_px);
-    fill_intra_edge_lbd(&above_row[n_top_px], above_row[n_top_px - 1],
-                        txwpx - n_top_px);
+    copy_and_pad_above_lbd(above_row, above_ref, n_top_px, txwpx);
   } else {
     const uint8_t val = (n_left_px > 0) ? left_ref[0] : 127;
     fill_intra_edge_lbd(above_row, val, txwpx);
@@ -2329,10 +2924,17 @@ static AOM_FORCE_INLINE void predict_intra_block_internal(
   const int have_left =
       (col_off | (ss_x ? xd->chroma_left_available : xd->left_available)) != 0;
 
-  const int right_px = (xd->mb_to_right_edge >> (3 + ss_x)) + wpx - x;
-  const int bottom_px = (xd->mb_to_bottom_edge >> (3 + ss_y)) + hpx - y;
-  const int n_top_px = AOMMIN(AOMMAX(right_px, 0), txwpx) & -have_top;
-  const int n_left_px = AOMMIN(AOMMAX(bottom_px, 0), txhpx) & -have_left;
+  int n_top_px;
+  int n_left_px;
+  if (LIKELY((xd->mb_to_right_edge | xd->mb_to_bottom_edge) >= 0)) {
+    n_top_px = have_top ? txwpx : 0;
+    n_left_px = have_left ? txhpx : 0;
+  } else {
+    const int right_px = (xd->mb_to_right_edge >> (3 + ss_x)) + wpx - x;
+    const int bottom_px = (xd->mb_to_bottom_edge >> (3 + ss_y)) + hpx - y;
+    n_top_px = AOMMIN(AOMMAX(right_px, 0), txwpx) & -have_top;
+    n_left_px = AOMMIN(AOMMAX(bottom_px, 0), txhpx) & -have_left;
+  }
   if (UNLIKELY(filter_intra_mode != FILTER_INTRA_MODES)) {
     build_filter_intra_predictors(
         ref, ref_stride, dst, dst_stride,
@@ -2367,38 +2969,41 @@ static AOM_FORCE_INLINE void predict_intra_block_internal(
   }
 
   const MB_MODE_INFO *const mbmi = xd->mi[0];
-  int n_topright_px = -1;
-  int n_bottomleft_px = -1;
+  int n_topright_px = 0;
+  int n_bottomleft_px = 0;
   if (p_angle < 90) {
-    n_topright_px = 0;
-    const int xr = right_px - txwpx;
-    if (have_top && xr > 0) {
-      const int mi_col = -xd->mb_to_left_edge >> (3 + MI_SIZE_LOG2);
-      const int txw = tx_size_wide_unit[tx_size];
-      if (mi_col + ((col_off + txw) << ss_x) < xd->tile.mi_col_end) {
-        const int mi_row = -xd->mb_to_top_edge >> (3 + MI_SIZE_LOG2);
-        BLOCK_SIZE bsize = mbmi->bsize;
-        if (ss_x || ss_y) bsize = scale_chroma_bsize(bsize, ss_x, ss_y);
-        if (has_top_right(sb_size, bsize, mi_row, mi_col, 1, 1, mbmi->partition,
-                          tx_size, row_off, col_off, ss_x, ss_y)) {
-          n_topright_px = AOMMIN(xr, txwpx);
+    if (n_top_px > 0) {
+      const int xr = (xd->mb_to_right_edge >> (3 + ss_x)) + wpx - x - txwpx;
+      if (xr > 0) {
+        const int mi_col = -xd->mb_to_left_edge >> (3 + MI_SIZE_LOG2);
+        const int txw = tx_size_wide_unit[tx_size];
+        if (mi_col + ((col_off + txw) << ss_x) < xd->tile.mi_col_end) {
+          const int mi_row = -xd->mb_to_top_edge >> (3 + MI_SIZE_LOG2);
+          BLOCK_SIZE bsize = mbmi->bsize;
+          if (ss_x || ss_y) bsize = scale_chroma_bsize(bsize, ss_x, ss_y);
+          if (has_top_right(sb_size, bsize, mi_row, mi_col, 1, 1,
+                            mbmi->partition, tx_size, row_off, col_off, ss_x,
+                            ss_y)) {
+            n_topright_px = AOMMIN(xr, txwpx);
+          }
         }
       }
     }
   } else if (p_angle > 180) {
-    n_bottomleft_px = 0;
-    const int yd = bottom_px - txhpx;
-    if (have_left && yd > 0) {
-      const int mi_row = -xd->mb_to_top_edge >> (3 + MI_SIZE_LOG2);
-      const int txh = tx_size_high_unit[tx_size];
-      if (mi_row + ((row_off + txh) << ss_y) < xd->tile.mi_row_end) {
-        const int mi_col = -xd->mb_to_left_edge >> (3 + MI_SIZE_LOG2);
-        BLOCK_SIZE bsize = mbmi->bsize;
-        if (ss_x || ss_y) bsize = scale_chroma_bsize(bsize, ss_x, ss_y);
-        if (has_bottom_left(sb_size, bsize, mi_row, mi_col, 1, 1,
-                            mbmi->partition, tx_size, row_off, col_off, ss_x,
-                            ss_y)) {
-          n_bottomleft_px = AOMMIN(yd, txhpx);
+    if (n_left_px > 0) {
+      const int yd = (xd->mb_to_bottom_edge >> (3 + ss_y)) + hpx - y - txhpx;
+      if (yd > 0) {
+        const int mi_row = -xd->mb_to_top_edge >> (3 + MI_SIZE_LOG2);
+        const int txh = tx_size_high_unit[tx_size];
+        if (mi_row + ((row_off + txh) << ss_y) < xd->tile.mi_row_end) {
+          const int mi_col = -xd->mb_to_left_edge >> (3 + MI_SIZE_LOG2);
+          BLOCK_SIZE bsize = mbmi->bsize;
+          if (ss_x || ss_y) bsize = scale_chroma_bsize(bsize, ss_x, ss_y);
+          if (has_bottom_left(sb_size, bsize, mi_row, mi_col, 1, 1,
+                              mbmi->partition, tx_size, row_off, col_off, ss_x,
+                              ss_y)) {
+            n_bottomleft_px = AOMMIN(yd, txhpx);
+          }
         }
       }
     }
@@ -2409,10 +3014,13 @@ static AOM_FORCE_INLINE void predict_intra_block_internal(
       (!disable_edge_filter && p_angle != 90 && p_angle != 180)
           ? get_intra_edge_filter_type(xd, plane)
           : 0;
-  build_directional_intra_predictors(ref, ref_stride, dst, dst_stride, p_angle,
-                                     tx_size, disable_edge_filter, n_top_px,
-                                     n_topright_px, n_left_px, n_bottomleft_px,
-                                     intra_edge_filter_type);
+  build_directional_intra_predictors(
+      ref, ref_stride, dst, dst_stride,
+      (uint32_t)p_angle | ((uint32_t)tx_size << 9) |
+          ((uint32_t)disable_edge_filter << 14) |
+          ((uint32_t)intra_edge_filter_type << 15),
+      (uint32_t)n_top_px | ((uint32_t)n_topright_px << 8) |
+          ((uint32_t)n_left_px << 16) | ((uint32_t)n_bottomleft_px << 24));
 }
 
 void av1_predict_intra_block(const MACROBLOCKD *xd, BLOCK_SIZE sb_size,
@@ -2458,21 +3066,34 @@ static void predict_cfl_block_facade(const AV1_COMMON *cm, MACROBLOCKD *xd,
   CFL_PRED_TYPE pred_plane = get_cfl_pred_type(plane);
 #if HAVE_SSSE3 && (defined(__SSE2__) || defined(_M_X64) || \
                    (defined(_M_IX86_FP) && _M_IX86_FP >= 2))
+#if CONFIG_RUNTIME_CPU_DETECT
   if (LIKELY(!is_cur_buf_hbd(xd) && !use_palette &&
              cfl_get_predict_lbd_fn != cfl_get_predict_lbd_fn_c)) {
-    if (!cfl->dc_pred_is_cached[pred_plane]) {
+#else
+  if (LIKELY(!is_cur_buf_hbd(xd) && !use_palette)) {
+#endif
+    if (cfl->dc_pred_is_cached[pred_plane]) {
+      dst[0] = ((const uint8_t *)cfl->dc_pred_cache[pred_plane])[0];
+    } else {
       const int txwpx = tx_size_wide[tx_size];
       const int txhpx = tx_size_high[tx_size];
-      const int ss_x = pd->subsampling_x;
-      const int ss_y = pd->subsampling_y;
       const int have_top = (blk_row | xd->chroma_up_available) != 0;
       const int have_left = (blk_col | xd->chroma_left_available) != 0;
-      const int right_px = (xd->mb_to_right_edge >> (3 + ss_x)) + pd->width -
-                           (blk_col << MI_SIZE_LOG2);
-      const int bottom_px = (xd->mb_to_bottom_edge >> (3 + ss_y)) + pd->height -
-                            (blk_row << MI_SIZE_LOG2);
-      const int n_top_px = AOMMIN(AOMMAX(right_px, 0), txwpx) & -have_top;
-      const int n_left_px = AOMMIN(AOMMAX(bottom_px, 0), txhpx) & -have_left;
+      int n_top_px;
+      int n_left_px;
+      if (LIKELY((xd->mb_to_right_edge | xd->mb_to_bottom_edge) >= 0)) {
+        n_top_px = have_top ? txwpx : 0;
+        n_left_px = have_left ? txhpx : 0;
+      } else {
+        const int ss_x = pd->subsampling_x;
+        const int ss_y = pd->subsampling_y;
+        const int right_px = (xd->mb_to_right_edge >> (3 + ss_x)) + pd->width -
+                             (blk_col << MI_SIZE_LOG2);
+        const int bottom_px = (xd->mb_to_bottom_edge >> (3 + ss_y)) +
+                              pd->height - (blk_row << MI_SIZE_LOG2);
+        n_top_px = AOMMIN(AOMMAX(right_px, 0), txwpx) & -have_top;
+        n_left_px = AOMMIN(AOMMAX(bottom_px, 0), txhpx) & -have_left;
+      }
       const uint8_t dc_val = compute_dc_val_lbd(dst, dst_stride, tx_size, txwpx,
                                                 txhpx, n_top_px, n_left_px);
       dst[0] = dc_val;
@@ -2480,8 +3101,6 @@ static void predict_cfl_block_facade(const AV1_COMMON *cm, MACROBLOCKD *xd,
         ((uint8_t *)cfl->dc_pred_cache[pred_plane])[0] = dc_val;
         cfl->dc_pred_is_cached[pred_plane] = true;
       }
-    } else {
-      dst[0] = ((const uint8_t *)cfl->dc_pred_cache[pred_plane])[0];
     }
     av1_cfl_predict_block(xd, dst, dst_stride, tx_size, plane);
     return;
@@ -2554,48 +3173,53 @@ static void predict_directional_chroma_facade(const AV1_COMMON *cm,
   const int n_top_px = (int)(top_left_px & 0xffff);
   const int n_left_px = (int)(top_left_px >> 16);
   const SequenceHeader *const seq_params = cm->seq_params;
-  const struct macroblockd_plane *const pd = &xd->plane[plane];
-  const int ss_x = pd->subsampling_x;
-  const int ss_y = pd->subsampling_y;
-  int n_topright_px = -1;
-  int n_bottomleft_px = -1;
+  int n_topright_px = 0;
+  int n_bottomleft_px = 0;
   if (p_angle < 90) {
-    n_topright_px = 0;
-    const int txwpx = tx_size_wide[tx_size];
-    const int xr = (xd->mb_to_right_edge >> (3 + ss_x)) + pd->width -
-                   (blk_col << MI_SIZE_LOG2) - txwpx;
-    if (((blk_row | xd->chroma_up_available) != 0) && xr > 0) {
-      const int mi_col = -xd->mb_to_left_edge >> (3 + MI_SIZE_LOG2);
-      const int txw = tx_size_wide_unit[tx_size];
-      if (mi_col + ((blk_col + txw) << ss_x) < xd->tile.mi_col_end) {
-        const int mi_row = -xd->mb_to_top_edge >> (3 + MI_SIZE_LOG2);
-        const MB_MODE_INFO *const mbmi = xd->mi[0];
-        BLOCK_SIZE bsize = mbmi->bsize;
-        if (ss_x || ss_y) bsize = scale_chroma_bsize(bsize, ss_x, ss_y);
-        if (has_top_right(seq_params->sb_size, bsize, mi_row, mi_col, 1, 1,
-                          mbmi->partition, tx_size, blk_row, blk_col, ss_x,
-                          ss_y)) {
-          n_topright_px = AOMMIN(xr, txwpx);
+    if (n_top_px > 0) {
+      const struct macroblockd_plane *const pd = &xd->plane[plane];
+      const int ss_x = pd->subsampling_x;
+      const int txwpx = tx_size_wide[tx_size];
+      const int xr = (xd->mb_to_right_edge >> (3 + ss_x)) + pd->width -
+                     (blk_col << MI_SIZE_LOG2) - txwpx;
+      if (xr > 0) {
+        const int mi_col = -xd->mb_to_left_edge >> (3 + MI_SIZE_LOG2);
+        const int txw = tx_size_wide_unit[tx_size];
+        if (mi_col + ((blk_col + txw) << ss_x) < xd->tile.mi_col_end) {
+          const int ss_y = pd->subsampling_y;
+          const int mi_row = -xd->mb_to_top_edge >> (3 + MI_SIZE_LOG2);
+          const MB_MODE_INFO *const mbmi = xd->mi[0];
+          BLOCK_SIZE bsize = mbmi->bsize;
+          if (ss_x || ss_y) bsize = scale_chroma_bsize(bsize, ss_x, ss_y);
+          if (has_top_right(seq_params->sb_size, bsize, mi_row, mi_col, 1, 1,
+                            mbmi->partition, tx_size, blk_row, blk_col, ss_x,
+                            ss_y)) {
+            n_topright_px = AOMMIN(xr, txwpx);
+          }
         }
       }
     }
   } else if (p_angle > 180) {
-    n_bottomleft_px = 0;
-    const int txhpx = tx_size_high[tx_size];
-    const int yd = (xd->mb_to_bottom_edge >> (3 + ss_y)) + pd->height -
-                   (blk_row << MI_SIZE_LOG2) - txhpx;
-    if (((blk_col | xd->chroma_left_available) != 0) && yd > 0) {
-      const int mi_row = -xd->mb_to_top_edge >> (3 + MI_SIZE_LOG2);
-      const int txh = tx_size_high_unit[tx_size];
-      if (mi_row + ((blk_row + txh) << ss_y) < xd->tile.mi_row_end) {
-        const int mi_col = -xd->mb_to_left_edge >> (3 + MI_SIZE_LOG2);
-        const MB_MODE_INFO *const mbmi = xd->mi[0];
-        BLOCK_SIZE bsize = mbmi->bsize;
-        if (ss_x || ss_y) bsize = scale_chroma_bsize(bsize, ss_x, ss_y);
-        if (has_bottom_left(seq_params->sb_size, bsize, mi_row, mi_col, 1, 1,
-                            mbmi->partition, tx_size, blk_row, blk_col, ss_x,
-                            ss_y)) {
-          n_bottomleft_px = AOMMIN(yd, txhpx);
+    if (n_left_px > 0) {
+      const struct macroblockd_plane *const pd = &xd->plane[plane];
+      const int ss_y = pd->subsampling_y;
+      const int txhpx = tx_size_high[tx_size];
+      const int yd = (xd->mb_to_bottom_edge >> (3 + ss_y)) + pd->height -
+                     (blk_row << MI_SIZE_LOG2) - txhpx;
+      if (yd > 0) {
+        const int mi_row = -xd->mb_to_top_edge >> (3 + MI_SIZE_LOG2);
+        const int txh = tx_size_high_unit[tx_size];
+        if (mi_row + ((blk_row + txh) << ss_y) < xd->tile.mi_row_end) {
+          const int ss_x = pd->subsampling_x;
+          const int mi_col = -xd->mb_to_left_edge >> (3 + MI_SIZE_LOG2);
+          const MB_MODE_INFO *const mbmi = xd->mi[0];
+          BLOCK_SIZE bsize = mbmi->bsize;
+          if (ss_x || ss_y) bsize = scale_chroma_bsize(bsize, ss_x, ss_y);
+          if (has_bottom_left(seq_params->sb_size, bsize, mi_row, mi_col, 1, 1,
+                              mbmi->partition, tx_size, blk_row, blk_col, ss_x,
+                              ss_y)) {
+            n_bottomleft_px = AOMMIN(yd, txhpx);
+          }
         }
       }
     }
@@ -2606,10 +3230,13 @@ static void predict_directional_chroma_facade(const AV1_COMMON *cm,
       (!disable_edge_filter && p_angle != 90 && p_angle != 180)
           ? get_intra_edge_filter_type(xd, plane)
           : 0;
-  build_directional_intra_predictors(dst, dst_stride, dst, dst_stride, p_angle,
-                                     tx_size, disable_edge_filter, n_top_px,
-                                     n_topright_px, n_left_px, n_bottomleft_px,
-                                     intra_edge_filter_type);
+  build_directional_intra_predictors(
+      dst, dst_stride, dst, dst_stride,
+      (uint32_t)p_angle | ((uint32_t)tx_size << 9) |
+          ((uint32_t)disable_edge_filter << 14) |
+          ((uint32_t)intra_edge_filter_type << 15),
+      (uint32_t)n_top_px | ((uint32_t)n_topright_px << 8) |
+          ((uint32_t)n_left_px << 16) | ((uint32_t)n_bottomleft_px << 24));
 }
 
 #if defined(__GNUC__) || defined(__clang__)
@@ -2626,8 +3253,8 @@ static void predict_intra_block_chroma_facade(const AV1_COMMON *cm,
     return;
   }
 #endif  // !CONFIG_REALTIME_ONLY || CONFIG_AV1_DECODER
-  if (UNLIKELY(is_cur_buf_hbd(xd) ||
-               mbmi->palette_mode_info.palette_size[1] > 0)) {
+  if (UNLIKELY((is_cur_buf_hbd(xd) | mbmi->palette_mode_info.palette_size[1]) !=
+               0)) {
     predict_intra_block_chroma_slow_facade(cm, xd, plane, blk_col, blk_row,
                                            tx_size);
     return;
@@ -2635,19 +3262,26 @@ static void predict_intra_block_chroma_facade(const AV1_COMMON *cm,
   struct macroblockd_plane *const pd = &xd->plane[plane];
   const int dst_stride = pd->dst.stride;
   uint8_t *dst = &pd->dst.buf[(blk_row * dst_stride + blk_col) << MI_SIZE_LOG2];
-  const PREDICTION_MODE mode = get_uv_mode(mbmi->uv_mode);
+  const PREDICTION_MODE mode = (PREDICTION_MODE)mbmi->uv_mode;
   const int txwpx = tx_size_wide[tx_size];
   const int txhpx = tx_size_high[tx_size];
-  const int ss_x = pd->subsampling_x;
-  const int ss_y = pd->subsampling_y;
   const int have_top = (blk_row | xd->chroma_up_available) != 0;
   const int have_left = (blk_col | xd->chroma_left_available) != 0;
-  const int right_px = (xd->mb_to_right_edge >> (3 + ss_x)) + pd->width -
-                       (blk_col << MI_SIZE_LOG2);
-  const int bottom_px = (xd->mb_to_bottom_edge >> (3 + ss_y)) + pd->height -
-                        (blk_row << MI_SIZE_LOG2);
-  const int n_top_px = AOMMIN(AOMMAX(right_px, 0), txwpx) & -have_top;
-  const int n_left_px = AOMMIN(AOMMAX(bottom_px, 0), txhpx) & -have_left;
+  int n_top_px;
+  int n_left_px;
+  if (LIKELY((xd->mb_to_right_edge | xd->mb_to_bottom_edge) >= 0)) {
+    n_top_px = have_top ? txwpx : 0;
+    n_left_px = have_left ? txhpx : 0;
+  } else {
+    const int ss_x = pd->subsampling_x;
+    const int ss_y = pd->subsampling_y;
+    const int right_px = (xd->mb_to_right_edge >> (3 + ss_x)) + pd->width -
+                         (blk_col << MI_SIZE_LOG2);
+    const int bottom_px = (xd->mb_to_bottom_edge >> (3 + ss_y)) + pd->height -
+                          (blk_row << MI_SIZE_LOG2);
+    n_top_px = AOMMIN(AOMMAX(right_px, 0), txwpx) & -have_top;
+    n_left_px = AOMMIN(AOMMAX(bottom_px, 0), txhpx) & -have_left;
+  }
 
   if (!av1_is_directional_mode(mode)) {
     if (mode == DC_PRED) {
@@ -2733,41 +3367,43 @@ static void predict_directional_luma_facade(const AV1_COMMON *cm,
   const int n_top_px = (int)(top_left_px & 0xffff);
   const int n_left_px = (int)(top_left_px >> 16);
   const SequenceHeader *const seq_params = cm->seq_params;
-  int n_topright_px = -1;
-  int n_bottomleft_px = -1;
+  int n_topright_px = 0;
+  int n_bottomleft_px = 0;
   if (p_angle < 90) {
-    n_topright_px = 0;
-    const int txwpx = tx_size_wide[tx_size];
-    const int xr = (xd->mb_to_right_edge >> 3) + xd->plane[0].width -
-                   (blk_col << MI_SIZE_LOG2) - txwpx;
-    if (((blk_row | xd->up_available) != 0) && xr > 0) {
-      const int mi_col = -xd->mb_to_left_edge >> (3 + MI_SIZE_LOG2);
-      const int txw = tx_size_wide_unit[tx_size];
-      if (mi_col + blk_col + txw < xd->tile.mi_col_end) {
-        const int mi_row = -xd->mb_to_top_edge >> (3 + MI_SIZE_LOG2);
-        const MB_MODE_INFO *const mbmi = xd->mi[0];
-        if (has_top_right(seq_params->sb_size, mbmi->bsize, mi_row, mi_col, 1,
-                          1, mbmi->partition, tx_size, blk_row, blk_col, 0,
-                          0)) {
-          n_topright_px = AOMMIN(xr, txwpx);
+    if (n_top_px > 0) {
+      const int txwpx = tx_size_wide[tx_size];
+      const int xr = (xd->mb_to_right_edge >> 3) + xd->plane[0].width -
+                     (blk_col << MI_SIZE_LOG2) - txwpx;
+      if (xr > 0) {
+        const int mi_col = -xd->mb_to_left_edge >> (3 + MI_SIZE_LOG2);
+        const int txw = tx_size_wide_unit[tx_size];
+        if (mi_col + blk_col + txw < xd->tile.mi_col_end) {
+          const int mi_row = -xd->mb_to_top_edge >> (3 + MI_SIZE_LOG2);
+          const MB_MODE_INFO *const mbmi = xd->mi[0];
+          if (has_top_right(seq_params->sb_size, mbmi->bsize, mi_row, mi_col, 1,
+                            1, mbmi->partition, tx_size, blk_row, blk_col, 0,
+                            0)) {
+            n_topright_px = AOMMIN(xr, txwpx);
+          }
         }
       }
     }
   } else if (p_angle > 180) {
-    n_bottomleft_px = 0;
-    const int txhpx = tx_size_high[tx_size];
-    const int yd = (xd->mb_to_bottom_edge >> 3) + xd->plane[0].height -
-                   (blk_row << MI_SIZE_LOG2) - txhpx;
-    if (((blk_col | xd->left_available) != 0) && yd > 0) {
-      const int mi_row = -xd->mb_to_top_edge >> (3 + MI_SIZE_LOG2);
-      const int txh = tx_size_high_unit[tx_size];
-      if (mi_row + blk_row + txh < xd->tile.mi_row_end) {
-        const int mi_col = -xd->mb_to_left_edge >> (3 + MI_SIZE_LOG2);
-        const MB_MODE_INFO *const mbmi = xd->mi[0];
-        if (has_bottom_left(seq_params->sb_size, mbmi->bsize, mi_row, mi_col, 1,
-                            1, mbmi->partition, tx_size, blk_row, blk_col, 0,
-                            0)) {
-          n_bottomleft_px = AOMMIN(yd, txhpx);
+    if (n_left_px > 0 && (blk_col & 15) == 0) {
+      const int txhpx = tx_size_high[tx_size];
+      const int yd = (xd->mb_to_bottom_edge >> 3) + xd->plane[0].height -
+                     (blk_row << MI_SIZE_LOG2) - txhpx;
+      if (yd > 0) {
+        const int mi_row = -xd->mb_to_top_edge >> (3 + MI_SIZE_LOG2);
+        const int txh = tx_size_high_unit[tx_size];
+        if (mi_row + blk_row + txh < xd->tile.mi_row_end) {
+          const int mi_col = -xd->mb_to_left_edge >> (3 + MI_SIZE_LOG2);
+          const MB_MODE_INFO *const mbmi = xd->mi[0];
+          if (has_bottom_left(seq_params->sb_size, mbmi->bsize, mi_row, mi_col,
+                              1, 1, mbmi->partition, tx_size, blk_row, blk_col,
+                              0, 0)) {
+            n_bottomleft_px = AOMMIN(yd, txhpx);
+          }
         }
       }
     }
@@ -2778,22 +3414,24 @@ static void predict_directional_luma_facade(const AV1_COMMON *cm,
       (!disable_edge_filter && p_angle != 90 && p_angle != 180)
           ? get_intra_edge_filter_type(xd, 0)
           : 0;
-  build_directional_intra_predictors(dst, dst_stride, dst, dst_stride, p_angle,
-                                     tx_size, disable_edge_filter, n_top_px,
-                                     n_topright_px, n_left_px, n_bottomleft_px,
-                                     intra_edge_filter_type);
+  build_directional_intra_predictors(
+      dst, dst_stride, dst, dst_stride,
+      (uint32_t)p_angle | ((uint32_t)tx_size << 9) |
+          ((uint32_t)disable_edge_filter << 14) |
+          ((uint32_t)intra_edge_filter_type << 15),
+      (uint32_t)n_top_px | ((uint32_t)n_topright_px << 8) |
+          ((uint32_t)n_left_px << 16) | ((uint32_t)n_bottomleft_px << 24));
 }
 
-void av1_predict_intra_block_facade(const AV1_COMMON *cm, MACROBLOCKD *xd,
-                                    int plane, int blk_col, int blk_row,
-                                    TX_SIZE tx_size) {
-  if (UNLIKELY(plane != AOM_PLANE_Y)) {
-    predict_intra_block_chroma_facade(cm, xd, plane, blk_col, blk_row, tx_size);
-    return;
-  }
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
+static void predict_intra_block_luma_facade(const AV1_COMMON *cm,
+                                            MACROBLOCKD *xd, int blk_col,
+                                            int blk_row, TX_SIZE tx_size) {
   const MB_MODE_INFO *const mbmi = xd->mi[0];
-  if (UNLIKELY(is_cur_buf_hbd(xd) ||
-               mbmi->palette_mode_info.palette_size[0] > 0)) {
+  if (UNLIKELY((is_cur_buf_hbd(xd) | mbmi->palette_mode_info.palette_size[0]) !=
+               0)) {
     predict_intra_block_luma_slow_facade(cm, xd, blk_col, blk_row, tx_size);
     return;
   }
@@ -2804,12 +3442,19 @@ void av1_predict_intra_block_facade(const AV1_COMMON *cm, MACROBLOCKD *xd,
   const int txhpx = tx_size_high[tx_size];
   const int have_top = (blk_row | xd->up_available) != 0;
   const int have_left = (blk_col | xd->left_available) != 0;
-  const int right_px =
-      (xd->mb_to_right_edge >> 3) + pd->width - (blk_col << MI_SIZE_LOG2);
-  const int bottom_px =
-      (xd->mb_to_bottom_edge >> 3) + pd->height - (blk_row << MI_SIZE_LOG2);
-  const int n_top_px = AOMMIN(AOMMAX(right_px, 0), txwpx) & -have_top;
-  const int n_left_px = AOMMIN(AOMMAX(bottom_px, 0), txhpx) & -have_left;
+  int n_top_px;
+  int n_left_px;
+  if (LIKELY((xd->mb_to_right_edge | xd->mb_to_bottom_edge) >= 0)) {
+    n_top_px = have_top ? txwpx : 0;
+    n_left_px = have_left ? txhpx : 0;
+  } else {
+    const int right_px =
+        (xd->mb_to_right_edge >> 3) + pd->width - (blk_col << MI_SIZE_LOG2);
+    const int bottom_px =
+        (xd->mb_to_bottom_edge >> 3) + pd->height - (blk_row << MI_SIZE_LOG2);
+    n_top_px = AOMMIN(AOMMAX(right_px, 0), txwpx) & -have_top;
+    n_left_px = AOMMIN(AOMMAX(bottom_px, 0), txhpx) & -have_left;
+  }
 
   if (UNLIKELY(mbmi->filter_intra_mode_info.use_filter_intra)) {
     build_filter_intra_predictors(
@@ -2852,6 +3497,16 @@ void av1_predict_intra_block_facade(const AV1_COMMON *cm, MACROBLOCKD *xd,
       (uint32_t)blk_col | ((uint32_t)blk_row << 7) | ((uint32_t)tx_size << 14) |
           ((uint32_t)p_angle << 20),
       (uint32_t)n_top_px | ((uint32_t)n_left_px << 16));
+}
+
+void av1_predict_intra_block_facade(const AV1_COMMON *cm, MACROBLOCKD *xd,
+                                    int plane, int blk_col, int blk_row,
+                                    TX_SIZE tx_size) {
+  if (plane == AOM_PLANE_Y) {
+    predict_intra_block_luma_facade(cm, xd, blk_col, blk_row, tx_size);
+  } else {
+    predict_intra_block_chroma_facade(cm, xd, plane, blk_col, blk_row, tx_size);
+  }
 }
 
 void av1_init_intra_predictors(void) {
