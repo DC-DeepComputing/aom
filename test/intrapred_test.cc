@@ -419,64 +419,128 @@ INSTANTIATE_TEST_SUITE_P(SSSE3, LowbdIntraPredTest,
 #if HAVE_AVX2
 const IntraPredFunc<IntraPred> LowbdIntraPredTestVectorAvx2[] = {
 #if !CONFIG_REALTIME_ONLY || CONFIG_AV1_DECODER
-  lowbd_entry(dc, 32, 16, avx2),      lowbd_entry(dc, 32, 32, avx2),
-  lowbd_entry(dc, 32, 64, avx2),      lowbd_entry(dc, 64, 16, avx2),
-  lowbd_entry(dc, 64, 32, avx2),      lowbd_entry(dc, 64, 64, avx2),
+  lowbd_entry(dc, 32, 16, avx2),       lowbd_entry(dc, 32, 32, avx2),
+  lowbd_entry(dc, 32, 64, avx2),       lowbd_entry(dc, 64, 16, avx2),
+  lowbd_entry(dc, 64, 32, avx2),       lowbd_entry(dc, 64, 64, avx2),
 
-  lowbd_entry(dc_top, 32, 16, avx2),  lowbd_entry(dc_top, 32, 32, avx2),
-  lowbd_entry(dc_top, 32, 64, avx2),  lowbd_entry(dc_top, 64, 16, avx2),
-  lowbd_entry(dc_top, 64, 32, avx2),  lowbd_entry(dc_top, 64, 64, avx2),
+  lowbd_entry(dc_top, 32, 16, avx2),   lowbd_entry(dc_top, 32, 32, avx2),
+  lowbd_entry(dc_top, 32, 64, avx2),   lowbd_entry(dc_top, 64, 16, avx2),
+  lowbd_entry(dc_top, 64, 32, avx2),   lowbd_entry(dc_top, 64, 64, avx2),
 
-  lowbd_entry(dc_left, 32, 16, avx2), lowbd_entry(dc_left, 32, 32, avx2),
-  lowbd_entry(dc_left, 32, 64, avx2), lowbd_entry(dc_left, 64, 16, avx2),
-  lowbd_entry(dc_left, 64, 32, avx2), lowbd_entry(dc_left, 64, 64, avx2),
+  lowbd_entry(dc_left, 32, 16, avx2),  lowbd_entry(dc_left, 32, 32, avx2),
+  lowbd_entry(dc_left, 32, 64, avx2),  lowbd_entry(dc_left, 64, 16, avx2),
+  lowbd_entry(dc_left, 64, 32, avx2),  lowbd_entry(dc_left, 64, 64, avx2),
 
-  lowbd_entry(dc_128, 32, 16, avx2),  lowbd_entry(dc_128, 32, 32, avx2),
-  lowbd_entry(dc_128, 32, 64, avx2),  lowbd_entry(dc_128, 64, 16, avx2),
-  lowbd_entry(dc_128, 64, 32, avx2),  lowbd_entry(dc_128, 64, 64, avx2),
+  lowbd_entry(dc_128, 32, 16, avx2),   lowbd_entry(dc_128, 32, 32, avx2),
+  lowbd_entry(dc_128, 32, 64, avx2),   lowbd_entry(dc_128, 64, 16, avx2),
+  lowbd_entry(dc_128, 64, 32, avx2),   lowbd_entry(dc_128, 64, 64, avx2),
 
-  lowbd_entry(v, 32, 16, avx2),       lowbd_entry(v, 32, 32, avx2),
-  lowbd_entry(v, 32, 64, avx2),       lowbd_entry(v, 64, 16, avx2),
-  lowbd_entry(v, 64, 32, avx2),       lowbd_entry(v, 64, 64, avx2),
+  lowbd_entry(v, 32, 16, avx2),        lowbd_entry(v, 32, 32, avx2),
+  lowbd_entry(v, 32, 64, avx2),        lowbd_entry(v, 64, 16, avx2),
+  lowbd_entry(v, 64, 32, avx2),        lowbd_entry(v, 64, 64, avx2),
 
   lowbd_entry(h, 32, 32, avx2),
 
-  lowbd_entry(paeth, 16, 8, avx2),    lowbd_entry(paeth, 16, 16, avx2),
-  lowbd_entry(paeth, 16, 32, avx2),   lowbd_entry(paeth, 32, 16, avx2),
-  lowbd_entry(paeth, 32, 32, avx2),   lowbd_entry(paeth, 32, 64, avx2),
-  lowbd_entry(paeth, 64, 32, avx2),   lowbd_entry(paeth, 64, 64, avx2),
+  lowbd_entry(paeth, 8, 4, avx2),      lowbd_entry(paeth, 8, 8, avx2),
+  lowbd_entry(paeth, 8, 16, avx2),     lowbd_entry(paeth, 8, 32, avx2),
+  lowbd_entry(paeth, 16, 4, avx2),     lowbd_entry(paeth, 16, 8, avx2),
+  lowbd_entry(paeth, 16, 16, avx2),    lowbd_entry(paeth, 16, 32, avx2),
+  lowbd_entry(paeth, 16, 64, avx2),    lowbd_entry(paeth, 32, 8, avx2),
+  lowbd_entry(paeth, 32, 16, avx2),    lowbd_entry(paeth, 32, 32, avx2),
+  lowbd_entry(paeth, 32, 64, avx2),    lowbd_entry(paeth, 64, 16, avx2),
+  lowbd_entry(paeth, 64, 32, avx2),    lowbd_entry(paeth, 64, 64, avx2),
+
+  lowbd_entry(smooth, 8, 4, avx2),     lowbd_entry(smooth, 8, 8, avx2),
+  lowbd_entry(smooth, 8, 16, avx2),    lowbd_entry(smooth, 16, 8, avx2),
+  lowbd_entry(smooth, 16, 16, avx2),   lowbd_entry(smooth, 16, 32, avx2),
+  lowbd_entry(smooth, 32, 16, avx2),   lowbd_entry(smooth, 32, 32, avx2),
+  lowbd_entry(smooth, 64, 64, avx2),
+
+  lowbd_entry(smooth_v, 16, 16, avx2), lowbd_entry(smooth_v, 32, 32, avx2),
+
+  lowbd_entry(smooth_h, 16, 16, avx2), lowbd_entry(smooth_h, 32, 32, avx2),
 #else
-  lowbd_entry(dc, 32, 16, avx2),      lowbd_entry(dc, 32, 32, avx2),
-  lowbd_entry(dc, 32, 64, avx2),      lowbd_entry(dc, 64, 32, avx2),
+  lowbd_entry(dc, 32, 16, avx2),       lowbd_entry(dc, 32, 32, avx2),
+  lowbd_entry(dc, 32, 64, avx2),       lowbd_entry(dc, 64, 32, avx2),
   lowbd_entry(dc, 64, 64, avx2),
 
-  lowbd_entry(dc_top, 32, 16, avx2),  lowbd_entry(dc_top, 32, 32, avx2),
-  lowbd_entry(dc_top, 32, 64, avx2),  lowbd_entry(dc_top, 64, 32, avx2),
+  lowbd_entry(dc_top, 32, 16, avx2),   lowbd_entry(dc_top, 32, 32, avx2),
+  lowbd_entry(dc_top, 32, 64, avx2),   lowbd_entry(dc_top, 64, 32, avx2),
   lowbd_entry(dc_top, 64, 64, avx2),
 
-  lowbd_entry(dc_left, 32, 16, avx2), lowbd_entry(dc_left, 32, 32, avx2),
-  lowbd_entry(dc_left, 32, 64, avx2), lowbd_entry(dc_left, 64, 32, avx2),
+  lowbd_entry(dc_left, 32, 16, avx2),  lowbd_entry(dc_left, 32, 32, avx2),
+  lowbd_entry(dc_left, 32, 64, avx2),  lowbd_entry(dc_left, 64, 32, avx2),
   lowbd_entry(dc_left, 64, 64, avx2),
 
-  lowbd_entry(dc_128, 32, 16, avx2),  lowbd_entry(dc_128, 32, 32, avx2),
-  lowbd_entry(dc_128, 32, 64, avx2),  lowbd_entry(dc_128, 64, 32, avx2),
+  lowbd_entry(dc_128, 32, 16, avx2),   lowbd_entry(dc_128, 32, 32, avx2),
+  lowbd_entry(dc_128, 32, 64, avx2),   lowbd_entry(dc_128, 64, 32, avx2),
   lowbd_entry(dc_128, 64, 64, avx2),
 
-  lowbd_entry(v, 32, 16, avx2),       lowbd_entry(v, 32, 32, avx2),
-  lowbd_entry(v, 32, 64, avx2),       lowbd_entry(v, 64, 32, avx2),
+  lowbd_entry(v, 32, 16, avx2),        lowbd_entry(v, 32, 32, avx2),
+  lowbd_entry(v, 32, 64, avx2),        lowbd_entry(v, 64, 32, avx2),
   lowbd_entry(v, 64, 64, avx2),
 
   lowbd_entry(h, 32, 32, avx2),
 
-  lowbd_entry(paeth, 16, 8, avx2),    lowbd_entry(paeth, 16, 16, avx2),
-  lowbd_entry(paeth, 16, 32, avx2),   lowbd_entry(paeth, 32, 16, avx2),
-  lowbd_entry(paeth, 32, 32, avx2),   lowbd_entry(paeth, 32, 64, avx2),
-  lowbd_entry(paeth, 64, 32, avx2),   lowbd_entry(paeth, 64, 64, avx2),
+  lowbd_entry(paeth, 8, 4, avx2),      lowbd_entry(paeth, 8, 8, avx2),
+  lowbd_entry(paeth, 8, 16, avx2),     lowbd_entry(paeth, 16, 8, avx2),
+  lowbd_entry(paeth, 16, 16, avx2),    lowbd_entry(paeth, 16, 32, avx2),
+  lowbd_entry(paeth, 32, 16, avx2),    lowbd_entry(paeth, 32, 32, avx2),
+  lowbd_entry(paeth, 32, 64, avx2),    lowbd_entry(paeth, 64, 32, avx2),
+  lowbd_entry(paeth, 64, 64, avx2),
+
+  lowbd_entry(smooth, 8, 4, avx2),     lowbd_entry(smooth, 8, 8, avx2),
+  lowbd_entry(smooth, 8, 16, avx2),    lowbd_entry(smooth, 16, 8, avx2),
+  lowbd_entry(smooth, 16, 16, avx2),   lowbd_entry(smooth, 16, 32, avx2),
+  lowbd_entry(smooth, 32, 16, avx2),   lowbd_entry(smooth, 32, 32, avx2),
+  lowbd_entry(smooth, 64, 64, avx2),
+
+  lowbd_entry(smooth_v, 16, 16, avx2), lowbd_entry(smooth_v, 32, 32, avx2),
+
+  lowbd_entry(smooth_h, 16, 16, avx2), lowbd_entry(smooth_h, 32, 32, avx2),
 #endif  // !CONFIG_REALTIME_ONLY || CONFIG_AV1_DECODER
 };
 
 INSTANTIATE_TEST_SUITE_P(AVX2, LowbdIntraPredTest,
                          ::testing::ValuesIn(LowbdIntraPredTestVectorAvx2));
+
+// build_non_directional_intra_predictors passes ref - ref_stride directly as
+// `above` for smooth and paeth modes, so exercise odd `above` alignments.
+TEST(AVX2, SmoothAndPaethUnalignedAbove) {
+  ACMRandom rnd(ACMRandom::DeterministicSeed());
+  DECLARE_ALIGNED(32, uint8_t, above_buf[256]);
+  DECLARE_ALIGNED(16, uint8_t, left_col[64]);
+  DECLARE_ALIGNED(32, uint8_t, dst[64 * 64]);
+  DECLARE_ALIGNED(32, uint8_t, ref_dst[64 * 64]);
+
+  for (size_t i = 0; i < sizeof(above_buf); ++i) above_buf[i] = rnd.Rand8();
+  for (size_t i = 0; i < sizeof(left_col); ++i) left_col[i] = rnd.Rand8();
+
+  const size_t num_entries = sizeof(LowbdIntraPredTestVectorAvx2) /
+                             sizeof(LowbdIntraPredTestVectorAvx2[0]);
+  bool in_smooth_paeth = false;
+  size_t tested = 0;
+  for (size_t idx = 0; idx < num_entries; ++idx) {
+    const IntraPredFunc<IntraPred> &entry = LowbdIntraPredTestVectorAvx2[idx];
+    if (!in_smooth_paeth) {
+      if (entry.ref_fn == aom_h_predictor_32x32_c) in_smooth_paeth = true;
+      continue;
+    }
+    ++tested;
+    const int bw = entry.block_width;
+    const int bh = entry.block_height;
+    for (int off = 1; off < 32; ++off) {
+      const uint8_t *const above = above_buf + 32 + off;
+      memset(dst, 0xa5, sizeof(dst));
+      memset(ref_dst, 0x5a, sizeof(ref_dst));
+      entry.ref_fn(ref_dst, bw, above, left_col);
+      entry.pred_fn(dst, bw, above, left_col);
+      ASSERT_EQ(0, memcmp(ref_dst, dst, static_cast<size_t>(bw * bh)))
+          << "idx=" << idx << " " << bw << "x" << bh << " off=" << off;
+    }
+  }
+  ASSERT_GT(tested, 0u);
+}
 #endif  // HAVE_AVX2
 
 #if CONFIG_AV1_HIGHBITDEPTH

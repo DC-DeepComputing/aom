@@ -13,6 +13,7 @@
 
 #include "config/aom_dsp_rtcd.h"
 #include "config/av1_rtcd.h"
+#include "aom_dsp/intrapred_common.h"
 #include "aom_dsp/x86/intrapred_x86.h"
 #include "aom_dsp/x86/intrapred_utils.h"
 #include "aom_dsp/x86/lpf_common_sse2.h"
@@ -724,373 +725,839 @@ void aom_v_predictor_64x16_avx2(uint8_t *dst, ptrdiff_t stride,
 #endif  // !CONFIG_REALTIME_ONLY || CONFIG_AV1_DECODER
 
 // -----------------------------------------------------------------------------
-// PAETH_PRED
+// PAETH_PRED, SMOOTH_PRED, SMOOTH_V_PRED, SMOOTH_H_PRED
 
-// Return 16 16-bit pixels in one row (__m256i) using precomputed dt/pl/dl/pt
+#if defined(__GNUC__) && !defined(__clang__) && !defined(__INTEL_COMPILER) && \
+    __GNUC__ >= 8
+#define AOM_NO_UNROLL _Pragma("GCC unroll 1")
+#else
+#define AOM_NO_UNROLL
+#endif
+
+// Offsets into shared `smooth_weights` / `smooth_weights_u16` tables
+// (bs = 4 at +0, 8 at +4, 16 at +12, 32 at +28, 64 at +60).
+static AOM_FORCE_INLINE __m256i sm_w8_2rows_u16_avx2(void) {
+  return _mm256_broadcastsi128_si256(
+      _mm_loadu_si128((const __m128i *)(smooth_weights_u16 + 4)));
+}
+
+static AOM_FORCE_INLINE __m256i sm_w16_dup128_avx2(void) {
+  return _mm256_broadcastsi128_si256(
+      _mm_loadu_si128((const __m128i *)(smooth_weights + 12)));
+}
+
+static AOM_FORCE_INLINE void sm_w16_2rows_u16_avx2(__m256i *wx0, __m256i *wx1) {
+  *wx0 = _mm256_broadcastsi128_si256(
+      _mm_loadu_si128((const __m128i *)(smooth_weights_u16 + 12)));
+  *wx1 = _mm256_broadcastsi128_si256(
+      _mm_loadu_si128((const __m128i *)(smooth_weights_u16 + 20)));
+}
+
+static AOM_FORCE_INLINE __m256i sm_w32_raw_avx2(void) {
+  return _mm256_loadu_si256((const __m256i *)(smooth_weights + 28));
+}
+
+static AOM_FORCE_INLINE __m256i sm_w64_lo_avx2(void) {
+  return _mm256_loadu_si256((const __m256i *)(smooth_weights + 60));
+}
+
+static AOM_FORCE_INLINE __m256i sm_w64_hi_avx2(void) {
+  return _mm256_loadu_si256((const __m256i *)(smooth_weights + 92));
+}
+
+static AOM_FORCE_INLINE __m256i rep01_u16_avx2(void) {
+  return _mm256_setr_epi16(-32768, -32768, -32768, -32768, -32768, -32768,
+                           -32768, -32768, -32767, -32767, -32767, -32767,
+                           -32767, -32767, -32767, -32767);
+}
+
+static AOM_FORCE_INLINE __m256i two_u16_avx2(void) {
+  return _mm256_set1_epi16(2);
+}
+
+static AOM_FORCE_INLINE __m256i all_ones_avx2(void) {
+  return _mm256_set1_epi32(-1);
+}
+
+static AOM_FORCE_INLINE __m256i load4_dup128_avx2(const uint8_t *p) {
+  return _mm256_broadcastd_epi32(xx_loadl_32(p));
+}
+
+static AOM_FORCE_INLINE __m256i load8_dup128_avx2(const uint8_t *p) {
+  return _mm256_broadcastq_epi64(_mm_loadl_epi64((const __m128i *)p));
+}
+
+static AOM_FORCE_INLINE __m256i load16u_dup128_avx2(const uint8_t *p) {
+  return _mm256_broadcastsi128_si256(_mm_loadu_si128((const __m128i *)p));
+}
+
+static AOM_FORCE_INLINE __m256i load8_2rows_u16_avx2(const uint8_t *p) {
+  const __m128i q = _mm_loadl_epi64((const __m128i *)p);
+  return _mm256_cvtepu8_epi16(_mm_unpacklo_epi64(q, q));
+}
+
+// Loads 16 u8 bytes into lo = [c0..7 | c0..7] and hi = [c8..15 | c8..15] u16,
+// so _mm256_packus_epi16(p0, p1) directly gives [row r | row r+1] (0 vpermq).
+static AOM_FORCE_INLINE void load16u_2rows_u16_avx2(const uint8_t *p,
+                                                    __m256i *lo, __m256i *hi) {
+  const __m256i d = load16u_dup128_avx2(p);
+  const __m256i z = _mm256_setzero_si256();
+  *lo = _mm256_unpacklo_epi8(d, z);
+  *hi = _mm256_unpackhi_epi8(d, z);
+}
+
+// Loads 32 u8 bytes into lane-interleaved [c0..7 | c16..23], [c8..15 | c24..31]
+// so _mm256_packus_epi16(p0, p1) directly gives [c0..31] (0 vpermq).
+static AOM_FORCE_INLINE void load32u_interleaved_u16_avx2(const uint8_t *p,
+                                                          __m256i *lo,
+                                                          __m256i *hi) {
+  const __m256i raw = _mm256_loadu_si256((const __m256i *)p);
+  const __m256i z = _mm256_setzero_si256();
+  *lo = _mm256_unpacklo_epi8(raw, z);
+  *hi = _mm256_unpackhi_epi8(raw, z);
+}
+
+static AOM_FORCE_INLINE void store_8x4_packed_avx2(uint8_t *dst,
+                                                   ptrdiff_t stride,
+                                                   __m256i p01, __m256i p23) {
+  const __m256i pk = _mm256_packus_epi16(p01, p23);
+  const __m128i r02 = _mm256_castsi256_si128(pk);
+  const __m128i r13 = _mm256_extracti128_si256(pk, 1);
+  const ptrdiff_t s2 = stride * 2;
+  _mm_storel_epi64((__m128i *)(void *)dst, r02);
+  _mm_storel_epi64((__m128i *)(void *)(dst + stride), r13);
+  _mm_storel_epi64((__m128i *)(void *)(dst + s2), _mm_unpackhi_epi64(r02, r02));
+  _mm_storel_epi64((__m128i *)(void *)(dst + s2 + stride),
+                   _mm_unpackhi_epi64(r13, r13));
+}
+
+static AOM_FORCE_INLINE void store_16x2_split_avx2(uint8_t *dst,
+                                                   ptrdiff_t stride, __m256i p0,
+                                                   __m256i p1) {
+  const __m256i pk = _mm256_packus_epi16(p0, p1);
+  _mm_storeu_si128((__m128i *)(void *)dst, _mm256_castsi256_si128(pk));
+  _mm_storeu_si128((__m128i *)(void *)(dst + stride),
+                   _mm256_extracti128_si256(pk, 1));
+}
+
+// Return 16 16-bit pixels in __m256i using precomputed dt/pl/dl/pt.
 static AOM_FORCE_INLINE __m256i paeth_pred_pre(
-    const __m256i left, const __m256i top, const __m256i topleft,
-    const __m256i dt, const __m256i pl, const __m256i dl, const __m256i pt) {
+    const __m256i left, const __m256i top, const __m256i tl, const __m256i dt,
+    const __m256i pl, const __m256i dl, const __m256i pt) {
   const __m256i ptl = _mm256_abs_epi16(_mm256_add_epi16(dt, dl));
-  const __m256i mask1 = _mm256_cmpgt_epi16(pl, _mm256_min_epi16(pt, ptl));
-  const __m256i mask2 = _mm256_cmpgt_epi16(pt, ptl);
-  const __m256i pt_tl = _mm256_blendv_epi8(top, topleft, mask2);
-  return _mm256_blendv_epi8(left, pt_tl, mask1);
+  const __m256i m1 = _mm256_cmpgt_epi16(pl, _mm256_min_epi16(pt, ptl));
+  const __m256i m2 = _mm256_cmpgt_epi16(pt, ptl);
+  const __m256i pt_tl = _mm256_blendv_epi8(top, tl, m2);
+  return _mm256_blendv_epi8(left, pt_tl, m1);
 }
 
-// Return 16 8-bit pixels in one row (__m128i)
-static AOM_FORCE_INLINE __m128i paeth_16x1_pred_pre(const __m256i left,
-                                                    const __m256i top,
-                                                    const __m256i topleft,
-                                                    const __m256i dt,
-                                                    const __m256i pl) {
-  const __m256i dl = _mm256_sub_epi16(left, topleft);
+static AOM_FORCE_INLINE __m256i paeth_row_avx2(const __m256i l16,
+                                               const __m256i top,
+                                               const __m256i tl,
+                                               const __m256i dt,
+                                               const __m256i pl) {
+  const __m256i dl = _mm256_sub_epi16(l16, tl);
   const __m256i pt = _mm256_abs_epi16(dl);
-  const __m256i p0 = paeth_pred_pre(left, top, topleft, dt, pl, dl, pt);
-  const __m256i p1 = _mm256_permute4x64_epi64(p0, 0xe);
-  const __m256i p = _mm256_packus_epi16(p0, p1);
-  return _mm256_castsi256_si128(p);
+  return paeth_pred_pre(l16, top, tl, dt, pl, dl, pt);
 }
 
-static inline __m256i get_top_vector(const uint8_t *above) {
-  return _mm256_cvtepu8_epi16(_mm_loadu_si128((const __m128i *)above));
-}
-
-void aom_paeth_predictor_16x8_avx2(uint8_t *dst, ptrdiff_t stride,
-                                   const uint8_t *above, const uint8_t *left) {
-  __m128i x = _mm_loadl_epi64((const __m128i *)left);
-  const __m256i l = _mm256_inserti128_si256(_mm256_castsi128_si256(x), x, 1);
-  const __m256i tl16 = _mm256_set1_epi16((int16_t)above[-1]);
-  __m256i rep = _mm256_set1_epi16((short)0x8000);
-  const __m256i one = _mm256_set1_epi16(1);
-  const __m256i top = get_top_vector(above);
-  const __m256i dt = _mm256_sub_epi16(top, tl16);
+void aom_paeth_predictor_8x4_avx2(uint8_t *dst, ptrdiff_t stride,
+                                  const uint8_t *above, const uint8_t *left) {
+  const __m256i tl = _mm256_set1_epi16((int16_t)above[-1]);
+  const __m256i top = load8_2rows_u16_avx2(above);
+  const __m256i dt = _mm256_sub_epi16(top, tl);
   const __m256i pl = _mm256_abs_epi16(dt);
+  const __m256i l_raw = load4_dup128_avx2(left);
+  const __m256i r01 = rep01_u16_avx2();
+  const __m256i r23 = _mm256_add_epi16(r01, two_u16_avx2());
+  store_8x4_packed_avx2(
+      dst, stride,
+      paeth_row_avx2(_mm256_shuffle_epi8(l_raw, r01), top, tl, dt, pl),
+      paeth_row_avx2(_mm256_shuffle_epi8(l_raw, r23), top, tl, dt, pl));
+}
 
-  for (int i = 0; i < 8; ++i) {
-    const __m256i l16 = _mm256_shuffle_epi8(l, rep);
-    const __m128i row = paeth_16x1_pred_pre(l16, top, tl16, dt, pl);
+void aom_paeth_predictor_8x8_avx2(uint8_t *dst, ptrdiff_t stride,
+                                  const uint8_t *above, const uint8_t *left) {
+  const __m256i tl = _mm256_set1_epi16((int16_t)above[-1]);
+  const __m256i top = load8_2rows_u16_avx2(above);
+  const __m256i dt = _mm256_sub_epi16(top, tl);
+  const __m256i pl = _mm256_abs_epi16(dt);
+  const __m256i l_raw = load8_dup128_avx2(left);
+  const __m256i r01 = rep01_u16_avx2();
+  const __m256i two = two_u16_avx2();
+  const __m256i r23 = _mm256_add_epi16(r01, two);
+  const __m256i four = _mm256_add_epi16(two, two);
+  store_8x4_packed_avx2(
+      dst, stride,
+      paeth_row_avx2(_mm256_shuffle_epi8(l_raw, r01), top, tl, dt, pl),
+      paeth_row_avx2(_mm256_shuffle_epi8(l_raw, r23), top, tl, dt, pl));
+  const __m256i r45 = _mm256_add_epi16(r01, four);
+  const __m256i r67 = _mm256_add_epi16(r23, four);
+  store_8x4_packed_avx2(
+      dst + stride * 4, stride,
+      paeth_row_avx2(_mm256_shuffle_epi8(l_raw, r45), top, tl, dt, pl),
+      paeth_row_avx2(_mm256_shuffle_epi8(l_raw, r67), top, tl, dt, pl));
+}
 
-    _mm_store_si128((__m128i *)dst, row);
-    dst += stride;
-    rep = _mm256_add_epi16(rep, one);
+static AOM_FORCE_INLINE void paeth_8xge16_avx2(uint8_t *dst, ptrdiff_t stride,
+                                               const uint8_t *above,
+                                               const uint8_t *left, int bh) {
+  const __m256i tl = _mm256_set1_epi16((int16_t)above[-1]);
+  const __m256i top = load8_2rows_u16_avx2(above);
+  const __m256i dt = _mm256_sub_epi16(top, tl);
+  const __m256i pl = _mm256_abs_epi16(dt);
+  const __m256i rep_init = rep01_u16_avx2();
+  const __m256i two = two_u16_avx2();
+  const __m256i four = _mm256_add_epi16(two, two);
+  const ptrdiff_t stride4 = stride * 4;
+  AOM_NO_UNROLL
+  for (int j = 0; j < bh; j += 16) {
+    const __m256i l_raw = load16u_dup128_avx2(left + j);
+    __m256i r01 = rep_init;
+    AOM_NO_UNROLL
+    for (int i = 0; i < 4; ++i) {
+      const __m256i r23 = _mm256_add_epi16(r01, two);
+      store_8x4_packed_avx2(
+          dst, stride,
+          paeth_row_avx2(_mm256_shuffle_epi8(l_raw, r01), top, tl, dt, pl),
+          paeth_row_avx2(_mm256_shuffle_epi8(l_raw, r23), top, tl, dt, pl));
+      dst += stride4;
+      r01 = _mm256_add_epi16(r01, four);
+    }
   }
 }
 
-static inline __m256i get_left_vector(const uint8_t *left) {
-  const __m128i x = _mm_load_si128((const __m128i *)left);
-  return _mm256_inserti128_si256(_mm256_castsi128_si256(x), x, 1);
+void aom_paeth_predictor_8x16_avx2(uint8_t *dst, ptrdiff_t stride,
+                                   const uint8_t *above, const uint8_t *left) {
+  paeth_8xge16_avx2(dst, stride, above, left, 16);
+}
+
+#if !CONFIG_REALTIME_ONLY || CONFIG_AV1_DECODER
+void aom_paeth_predictor_8x32_avx2(uint8_t *dst, ptrdiff_t stride,
+                                   const uint8_t *above, const uint8_t *left) {
+  paeth_8xge16_avx2(dst, stride, above, left, 32);
+}
+#endif  // !CONFIG_REALTIME_ONLY || CONFIG_AV1_DECODER
+
+static AOM_FORCE_INLINE void paeth_16x2_step_avx2(
+    uint8_t *dst, ptrdiff_t stride, __m256i l16, __m256i t0, __m256i t1,
+    __m256i tl, __m256i dt0, __m256i pl0, __m256i dt1, __m256i pl1) {
+  const __m256i dl = _mm256_sub_epi16(l16, tl);
+  const __m256i pt = _mm256_abs_epi16(dl);
+  const __m256i p0 = paeth_pred_pre(l16, t0, tl, dt0, pl0, dl, pt);
+  const __m256i p1 = paeth_pred_pre(l16, t1, tl, dt1, pl1, dl, pt);
+  store_16x2_split_avx2(dst, stride, p0, p1);
+}
+
+#if !CONFIG_REALTIME_ONLY || CONFIG_AV1_DECODER
+void aom_paeth_predictor_16x4_avx2(uint8_t *dst, ptrdiff_t stride,
+                                   const uint8_t *above, const uint8_t *left) {
+  const __m256i tl = _mm256_set1_epi16((int16_t)above[-1]);
+  __m256i t0, t1;
+  load16u_2rows_u16_avx2(above, &t0, &t1);
+  const __m256i dt0 = _mm256_sub_epi16(t0, tl), pl0 = _mm256_abs_epi16(dt0);
+  const __m256i dt1 = _mm256_sub_epi16(t1, tl), pl1 = _mm256_abs_epi16(dt1);
+  const __m256i l_raw = load4_dup128_avx2(left);
+  const __m256i r01 = rep01_u16_avx2();
+  paeth_16x2_step_avx2(dst, stride, _mm256_shuffle_epi8(l_raw, r01), t0, t1, tl,
+                       dt0, pl0, dt1, pl1);
+  paeth_16x2_step_avx2(
+      dst + stride * 2, stride,
+      _mm256_shuffle_epi8(l_raw, _mm256_add_epi16(r01, two_u16_avx2())), t0, t1,
+      tl, dt0, pl0, dt1, pl1);
+}
+#endif  // !CONFIG_REALTIME_ONLY || CONFIG_AV1_DECODER
+
+void aom_paeth_predictor_16x8_avx2(uint8_t *dst, ptrdiff_t stride,
+                                   const uint8_t *above, const uint8_t *left) {
+  const __m256i tl = _mm256_set1_epi16((int16_t)above[-1]);
+  __m256i t0, t1;
+  load16u_2rows_u16_avx2(above, &t0, &t1);
+  const __m256i dt0 = _mm256_sub_epi16(t0, tl), pl0 = _mm256_abs_epi16(dt0);
+  const __m256i dt1 = _mm256_sub_epi16(t1, tl), pl1 = _mm256_abs_epi16(dt1);
+  const __m256i l_raw = load8_dup128_avx2(left);
+  __m256i rep = rep01_u16_avx2();
+  const __m256i two = two_u16_avx2();
+  const ptrdiff_t stride2 = stride * 2;
+  AOM_NO_UNROLL
+  for (int i = 0; i < 4; ++i) {
+    paeth_16x2_step_avx2(dst, stride, _mm256_shuffle_epi8(l_raw, rep), t0, t1,
+                         tl, dt0, pl0, dt1, pl1);
+    dst += stride2;
+    rep = _mm256_add_epi16(rep, two);
+  }
+}
+
+static AOM_FORCE_INLINE void paeth_16xge16_avx2(uint8_t *dst, ptrdiff_t stride,
+                                                const uint8_t *above,
+                                                const uint8_t *left, int bh) {
+  const __m256i tl = _mm256_set1_epi16((int16_t)above[-1]);
+  __m256i t0, t1;
+  load16u_2rows_u16_avx2(above, &t0, &t1);
+  const __m256i dt0 = _mm256_sub_epi16(t0, tl), pl0 = _mm256_abs_epi16(dt0);
+  const __m256i dt1 = _mm256_sub_epi16(t1, tl), pl1 = _mm256_abs_epi16(dt1);
+  const __m256i rep_init = rep01_u16_avx2();
+  const __m256i two = two_u16_avx2();
+  const ptrdiff_t stride2 = stride * 2;
+  AOM_NO_UNROLL
+  for (int j = 0; j < bh; j += 16) {
+    const __m256i l_raw = load16u_dup128_avx2(left + j);
+    __m256i rep = rep_init;
+#if defined(__clang__)
+#pragma clang loop unroll(disable)
+#elif defined(__GNUC__) && !defined(__INTEL_COMPILER) && __GNUC__ >= 8
+#pragma GCC unroll 1
+#endif
+    for (int i = 0; i < 8; ++i) {
+      paeth_16x2_step_avx2(dst, stride, _mm256_shuffle_epi8(l_raw, rep), t0, t1,
+                           tl, dt0, pl0, dt1, pl1);
+      dst += stride2;
+      rep = _mm256_add_epi16(rep, two);
+    }
+  }
 }
 
 void aom_paeth_predictor_16x16_avx2(uint8_t *dst, ptrdiff_t stride,
                                     const uint8_t *above, const uint8_t *left) {
-  const __m256i l = get_left_vector(left);
-  const __m256i tl16 = _mm256_set1_epi16((int16_t)above[-1]);
-  __m256i rep = _mm256_set1_epi16((short)0x8000);
-  const __m256i one = _mm256_set1_epi16(1);
-  const __m256i top = get_top_vector(above);
-  const __m256i dt = _mm256_sub_epi16(top, tl16);
-  const __m256i pl = _mm256_abs_epi16(dt);
-
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC unroll 1
-#endif
-  for (int i = 0; i < 16; ++i) {
-    const __m256i l16 = _mm256_shuffle_epi8(l, rep);
-    const __m128i row = paeth_16x1_pred_pre(l16, top, tl16, dt, pl);
-
-    _mm_store_si128((__m128i *)dst, row);
-    dst += stride;
-    rep = _mm256_add_epi16(rep, one);
-  }
+  paeth_16xge16_avx2(dst, stride, above, left, 16);
 }
 
 void aom_paeth_predictor_16x32_avx2(uint8_t *dst, ptrdiff_t stride,
                                     const uint8_t *above, const uint8_t *left) {
-  __m256i l = get_left_vector(left);
-  const __m256i tl16 = _mm256_set1_epi16((int16_t)above[-1]);
-  __m256i rep = _mm256_set1_epi16((short)0x8000);
-  const __m256i one = _mm256_set1_epi16(1);
-  const __m256i top = get_top_vector(above);
-  const __m256i dt = _mm256_sub_epi16(top, tl16);
-  const __m256i pl = _mm256_abs_epi16(dt);
-
-  int i;
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC unroll 1
-#endif
-  for (i = 0; i < 16; ++i) {
-    const __m256i l16 = _mm256_shuffle_epi8(l, rep);
-    const __m128i row = paeth_16x1_pred_pre(l16, top, tl16, dt, pl);
-
-    _mm_store_si128((__m128i *)dst, row);
-    dst += stride;
-    rep = _mm256_add_epi16(rep, one);
-  }
-
-  l = get_left_vector(left + 16);
-  rep = _mm256_set1_epi16((short)0x8000);
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC unroll 1
-#endif
-  for (i = 0; i < 16; ++i) {
-    const __m256i l16 = _mm256_shuffle_epi8(l, rep);
-    const __m128i row = paeth_16x1_pred_pre(l16, top, tl16, dt, pl);
-
-    _mm_store_si128((__m128i *)dst, row);
-    dst += stride;
-    rep = _mm256_add_epi16(rep, one);
-  }
+  paeth_16xge16_avx2(dst, stride, above, left, 32);
 }
 
 #if !CONFIG_REALTIME_ONLY || CONFIG_AV1_DECODER
 void aom_paeth_predictor_16x64_avx2(uint8_t *dst, ptrdiff_t stride,
                                     const uint8_t *above, const uint8_t *left) {
-  const __m256i tl16 = _mm256_set1_epi16((int16_t)above[-1]);
-  const __m256i one = _mm256_set1_epi16(1);
-  const __m256i top = get_top_vector(above);
-  const __m256i dt = _mm256_sub_epi16(top, tl16);
-  const __m256i pl = _mm256_abs_epi16(dt);
+  paeth_16xge16_avx2(dst, stride, above, left, 64);
+}
 
-  for (int j = 0; j < 4; ++j) {
-    const __m256i l = get_left_vector(left + j * 16);
-    __m256i rep = _mm256_set1_epi16((short)0x8000);
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC unroll 1
-#endif
-    for (int i = 0; i < 16; ++i) {
-      const __m256i l16 = _mm256_shuffle_epi8(l, rep);
-      const __m128i row = paeth_16x1_pred_pre(l16, top, tl16, dt, pl);
-
-      _mm_store_si128((__m128i *)dst, row);
-      dst += stride;
-      rep = _mm256_add_epi16(rep, one);
-    }
+void aom_paeth_predictor_32x8_avx2(uint8_t *dst, ptrdiff_t stride,
+                                   const uint8_t *above, const uint8_t *left) {
+  const __m256i tl = _mm256_set1_epi16((int16_t)above[-1]);
+  __m256i t0, t1;
+  load32u_interleaved_u16_avx2(above, &t0, &t1);
+  const __m256i dt0 = _mm256_sub_epi16(t0, tl), pl0 = _mm256_abs_epi16(dt0);
+  const __m256i dt1 = _mm256_sub_epi16(t1, tl), pl1 = _mm256_abs_epi16(dt1);
+  const __m256i ones = all_ones_avx2();
+  __m256i rep = _mm256_slli_epi16(ones, 15);
+  const __m256i one = _mm256_srli_epi16(ones, 15);
+  const __m256i l_raw = load8_dup128_avx2(left);
+  AOM_NO_UNROLL
+  for (int i = 0; i < 8; ++i) {
+    const __m256i l16 = _mm256_shuffle_epi8(l_raw, rep);
+    const __m256i dl = _mm256_sub_epi16(l16, tl);
+    const __m256i pt = _mm256_abs_epi16(dl);
+    const __m256i p0 = paeth_pred_pre(l16, t0, tl, dt0, pl0, dl, pt);
+    const __m256i p1 = paeth_pred_pre(l16, t1, tl, dt1, pl1, dl, pt);
+    _mm256_storeu_si256((__m256i *)(void *)dst, _mm256_packus_epi16(p0, p1));
+    dst += stride;
+    rep = _mm256_add_epi16(rep, one);
   }
 }
 #endif  // !CONFIG_REALTIME_ONLY || CONFIG_AV1_DECODER
 
-// Return 32 8-bit pixels in one row (__m256i)
-static AOM_FORCE_INLINE __m256i paeth_32x1_pred_pre(
-    const __m256i left, const __m256i top0, const __m256i top1,
-    const __m256i topleft, const __m256i dt0, const __m256i pl0,
-    const __m256i dt1, const __m256i pl1, const __m256i dl, const __m256i pt) {
-  const __m256i p0 = paeth_pred_pre(left, top0, topleft, dt0, pl0, dl, pt);
-  const __m256i p1 = paeth_pred_pre(left, top1, topleft, dt1, pl1, dl, pt);
-  return _mm256_permute4x64_epi64(_mm256_packus_epi16(p0, p1), 0xd8);
+static AOM_FORCE_INLINE void paeth_w32_avx2(uint8_t *dst, ptrdiff_t stride,
+                                            const uint8_t *above,
+                                            const uint8_t *left, int bw,
+                                            int bh) {
+  const __m256i tl = _mm256_set1_epi16((int16_t)above[-1]);
+  const __m256i ones = all_ones_avx2();
+  const __m256i rep_init = _mm256_slli_epi16(ones, 15);
+  const __m256i one = _mm256_srli_epi16(ones, 15);
+  const uint8_t *const a_end = above + bw;
+  const uint8_t *const l_end = left + bh;
+  AOM_NO_UNROLL
+  do {
+    __m256i t0, t1;
+    load32u_interleaved_u16_avx2(above, &t0, &t1);
+    const __m256i dt0 = _mm256_sub_epi16(t0, tl), pl0 = _mm256_abs_epi16(dt0);
+    const __m256i dt1 = _mm256_sub_epi16(t1, tl), pl1 = _mm256_abs_epi16(dt1);
+    uint8_t *d = dst;
+    const uint8_t *lp = left;
+    AOM_NO_UNROLL
+    do {
+      const __m256i l_raw = load16u_dup128_avx2(lp);
+      __m256i rep = rep_init;
+      uint8_t *const d_end = d + stride * 16;
+      AOM_NO_UNROLL
+      do {
+        const __m256i l16 = _mm256_shuffle_epi8(l_raw, rep);
+        const __m256i dl = _mm256_sub_epi16(l16, tl);
+        const __m256i pt = _mm256_abs_epi16(dl);
+        const __m256i p0 = paeth_pred_pre(l16, t0, tl, dt0, pl0, dl, pt);
+        const __m256i p1 = paeth_pred_pre(l16, t1, tl, dt1, pl1, dl, pt);
+        _mm256_storeu_si256((__m256i *)(void *)d, _mm256_packus_epi16(p0, p1));
+        d += stride;
+        rep = _mm256_add_epi16(rep, one);
+      } while (d != d_end);
+      lp += 16;
+    } while (lp != l_end);
+    above += 32;
+    dst += 32;
+  } while (above != a_end);
 }
 
 void aom_paeth_predictor_32x16_avx2(uint8_t *dst, ptrdiff_t stride,
                                     const uint8_t *above, const uint8_t *left) {
-  const __m256i l = get_left_vector(left);
-  const __m256i t0 = get_top_vector(above);
-  const __m256i t1 = get_top_vector(above + 16);
-  const __m256i tl = _mm256_set1_epi16((int16_t)above[-1]);
-  const __m256i dt0 = _mm256_sub_epi16(t0, tl);
-  const __m256i pl0 = _mm256_abs_epi16(dt0);
-  const __m256i dt1 = _mm256_sub_epi16(t1, tl);
-  const __m256i pl1 = _mm256_abs_epi16(dt1);
-  __m256i rep = _mm256_set1_epi16((short)0x8000);
-  const __m256i one = _mm256_set1_epi16(1);
-
-  for (int i = 0; i < 16; ++i) {
-    const __m256i l16 = _mm256_shuffle_epi8(l, rep);
-    const __m256i dl = _mm256_sub_epi16(l16, tl);
-    const __m256i pt = _mm256_abs_epi16(dl);
-    const __m256i r =
-        paeth_32x1_pred_pre(l16, t0, t1, tl, dt0, pl0, dt1, pl1, dl, pt);
-
-    _mm256_storeu_si256((__m256i *)dst, r);
-
-    dst += stride;
-    rep = _mm256_add_epi16(rep, one);
-  }
+  paeth_w32_avx2(dst, stride, above, left, 32, 16);
 }
 
 void aom_paeth_predictor_32x32_avx2(uint8_t *dst, ptrdiff_t stride,
                                     const uint8_t *above, const uint8_t *left) {
-  __m256i l = get_left_vector(left);
-  const __m256i t0 = get_top_vector(above);
-  const __m256i t1 = get_top_vector(above + 16);
-  const __m256i tl = _mm256_set1_epi16((int16_t)above[-1]);
-  const __m256i dt0 = _mm256_sub_epi16(t0, tl);
-  const __m256i pl0 = _mm256_abs_epi16(dt0);
-  const __m256i dt1 = _mm256_sub_epi16(t1, tl);
-  const __m256i pl1 = _mm256_abs_epi16(dt1);
-  __m256i rep = _mm256_set1_epi16((short)0x8000);
-  const __m256i one = _mm256_set1_epi16(1);
-
-  int i;
-  for (i = 0; i < 16; ++i) {
-    const __m256i l16 = _mm256_shuffle_epi8(l, rep);
-    const __m256i dl = _mm256_sub_epi16(l16, tl);
-    const __m256i pt = _mm256_abs_epi16(dl);
-    const __m256i r =
-        paeth_32x1_pred_pre(l16, t0, t1, tl, dt0, pl0, dt1, pl1, dl, pt);
-
-    _mm256_storeu_si256((__m256i *)dst, r);
-
-    dst += stride;
-    rep = _mm256_add_epi16(rep, one);
-  }
-
-  l = get_left_vector(left + 16);
-  rep = _mm256_set1_epi16((short)0x8000);
-  for (i = 0; i < 16; ++i) {
-    const __m256i l16 = _mm256_shuffle_epi8(l, rep);
-    const __m256i dl = _mm256_sub_epi16(l16, tl);
-    const __m256i pt = _mm256_abs_epi16(dl);
-    const __m256i r =
-        paeth_32x1_pred_pre(l16, t0, t1, tl, dt0, pl0, dt1, pl1, dl, pt);
-
-    _mm256_storeu_si256((__m256i *)dst, r);
-
-    dst += stride;
-    rep = _mm256_add_epi16(rep, one);
-  }
+  paeth_w32_avx2(dst, stride, above, left, 32, 32);
 }
 
 void aom_paeth_predictor_32x64_avx2(uint8_t *dst, ptrdiff_t stride,
                                     const uint8_t *above, const uint8_t *left) {
-  const __m256i t0 = get_top_vector(above);
-  const __m256i t1 = get_top_vector(above + 16);
-  const __m256i tl = _mm256_set1_epi16((int16_t)above[-1]);
-  const __m256i dt0 = _mm256_sub_epi16(t0, tl);
-  const __m256i pl0 = _mm256_abs_epi16(dt0);
-  const __m256i dt1 = _mm256_sub_epi16(t1, tl);
-  const __m256i pl1 = _mm256_abs_epi16(dt1);
-  const __m256i one = _mm256_set1_epi16(1);
-
-  for (int j = 0; j < 4; ++j) {
-    const __m256i l = get_left_vector(left + j * 16);
-    __m256i rep = _mm256_set1_epi16((short)0x8000);
-    for (int i = 0; i < 16; ++i) {
-      const __m256i l16 = _mm256_shuffle_epi8(l, rep);
-      const __m256i dl = _mm256_sub_epi16(l16, tl);
-      const __m256i pt = _mm256_abs_epi16(dl);
-      const __m256i r =
-          paeth_32x1_pred_pre(l16, t0, t1, tl, dt0, pl0, dt1, pl1, dl, pt);
-
-      _mm256_storeu_si256((__m256i *)dst, r);
-
-      dst += stride;
-      rep = _mm256_add_epi16(rep, one);
-    }
-  }
+  paeth_w32_avx2(dst, stride, above, left, 32, 64);
 }
 
 void aom_paeth_predictor_64x32_avx2(uint8_t *dst, ptrdiff_t stride,
                                     const uint8_t *above, const uint8_t *left) {
-  const __m256i t0 = get_top_vector(above);
-  const __m256i t1 = get_top_vector(above + 16);
-  const __m256i t2 = get_top_vector(above + 32);
-  const __m256i t3 = get_top_vector(above + 48);
-  const __m256i tl = _mm256_set1_epi16((int16_t)above[-1]);
-  const __m256i dt0 = _mm256_sub_epi16(t0, tl);
-  const __m256i pl0 = _mm256_abs_epi16(dt0);
-  const __m256i dt1 = _mm256_sub_epi16(t1, tl);
-  const __m256i pl1 = _mm256_abs_epi16(dt1);
-  const __m256i dt2 = _mm256_sub_epi16(t2, tl);
-  const __m256i pl2 = _mm256_abs_epi16(dt2);
-  const __m256i dt3 = _mm256_sub_epi16(t3, tl);
-  const __m256i pl3 = _mm256_abs_epi16(dt3);
-  const __m256i one = _mm256_set1_epi16(1);
-
-  for (int j = 0; j < 2; ++j) {
-    const __m256i l = get_left_vector(left + j * 16);
-    __m256i rep = _mm256_set1_epi16((short)0x8000);
-    for (int i = 0; i < 16; ++i) {
-      const __m256i l16 = _mm256_shuffle_epi8(l, rep);
-      const __m256i dl = _mm256_sub_epi16(l16, tl);
-      const __m256i pt = _mm256_abs_epi16(dl);
-      const __m256i r01 =
-          paeth_32x1_pred_pre(l16, t0, t1, tl, dt0, pl0, dt1, pl1, dl, pt);
-      const __m256i r23 =
-          paeth_32x1_pred_pre(l16, t2, t3, tl, dt2, pl2, dt3, pl3, dl, pt);
-
-      _mm256_storeu_si256((__m256i *)dst, r01);
-      _mm256_storeu_si256((__m256i *)(dst + 32), r23);
-
-      dst += stride;
-      rep = _mm256_add_epi16(rep, one);
-    }
-  }
+  paeth_w32_avx2(dst, stride, above, left, 64, 32);
 }
 
 void aom_paeth_predictor_64x64_avx2(uint8_t *dst, ptrdiff_t stride,
                                     const uint8_t *above, const uint8_t *left) {
-  const __m256i t0 = get_top_vector(above);
-  const __m256i t1 = get_top_vector(above + 16);
-  const __m256i t2 = get_top_vector(above + 32);
-  const __m256i t3 = get_top_vector(above + 48);
-  const __m256i tl = _mm256_set1_epi16((int16_t)above[-1]);
-  const __m256i dt0 = _mm256_sub_epi16(t0, tl);
-  const __m256i pl0 = _mm256_abs_epi16(dt0);
-  const __m256i dt1 = _mm256_sub_epi16(t1, tl);
-  const __m256i pl1 = _mm256_abs_epi16(dt1);
-  const __m256i dt2 = _mm256_sub_epi16(t2, tl);
-  const __m256i pl2 = _mm256_abs_epi16(dt2);
-  const __m256i dt3 = _mm256_sub_epi16(t3, tl);
-  const __m256i pl3 = _mm256_abs_epi16(dt3);
-  const __m256i one = _mm256_set1_epi16(1);
-
-  for (int j = 0; j < 4; ++j) {
-    const __m256i l = get_left_vector(left + j * 16);
-    __m256i rep = _mm256_set1_epi16((short)0x8000);
-    for (int i = 0; i < 16; ++i) {
-      const __m256i l16 = _mm256_shuffle_epi8(l, rep);
-      const __m256i dl = _mm256_sub_epi16(l16, tl);
-      const __m256i pt = _mm256_abs_epi16(dl);
-      const __m256i r01 =
-          paeth_32x1_pred_pre(l16, t0, t1, tl, dt0, pl0, dt1, pl1, dl, pt);
-      const __m256i r23 =
-          paeth_32x1_pred_pre(l16, t2, t3, tl, dt2, pl2, dt3, pl3, dl, pt);
-
-      _mm256_storeu_si256((__m256i *)dst, r01);
-      _mm256_storeu_si256((__m256i *)(dst + 32), r23);
-
-      dst += stride;
-      rep = _mm256_add_epi16(rep, one);
-    }
-  }
+  paeth_w32_avx2(dst, stride, above, left, 64, 64);
 }
 
 #if !CONFIG_REALTIME_ONLY || CONFIG_AV1_DECODER
 void aom_paeth_predictor_64x16_avx2(uint8_t *dst, ptrdiff_t stride,
                                     const uint8_t *above, const uint8_t *left) {
-  const __m256i t0 = get_top_vector(above);
-  const __m256i t1 = get_top_vector(above + 16);
-  const __m256i t2 = get_top_vector(above + 32);
-  const __m256i t3 = get_top_vector(above + 48);
-  const __m256i tl = _mm256_set1_epi16((int16_t)above[-1]);
-  const __m256i dt0 = _mm256_sub_epi16(t0, tl);
-  const __m256i pl0 = _mm256_abs_epi16(dt0);
-  const __m256i dt1 = _mm256_sub_epi16(t1, tl);
-  const __m256i pl1 = _mm256_abs_epi16(dt1);
-  const __m256i dt2 = _mm256_sub_epi16(t2, tl);
-  const __m256i pl2 = _mm256_abs_epi16(dt2);
-  const __m256i dt3 = _mm256_sub_epi16(t3, tl);
-  const __m256i pl3 = _mm256_abs_epi16(dt3);
-  const __m256i one = _mm256_set1_epi16(1);
+  paeth_w32_avx2(dst, stride, above, left, 64, 16);
+}
+#endif  // !CONFIG_REALTIME_ONLY || CONFIG_AV1_DECODER
 
-  const __m256i l = get_left_vector(left);
-  __m256i rep = _mm256_set1_epi16((short)0x8000);
+static AOM_FORCE_INLINE void make_smooth_bases_avx2(int16_t bl_s, int16_t tr_s,
+                                                    __m256i ones, __m256i *bl16,
+                                                    __m256i *bl_base,
+                                                    __m256i *tr16,
+                                                    __m256i *tr_base) {
+  *bl16 = _mm256_set1_epi16(bl_s);
+  *tr16 = _mm256_set1_epi16(tr_s);
+  const __m256i c127 = _mm256_srli_epi16(ones, 9);
+  const __m256i c128 = _mm256_sub_epi16(c127, ones);
+  *bl_base = _mm256_or_si256(_mm256_slli_epi16(*bl16, 8), c128);
+  *tr_base = _mm256_or_si256(_mm256_slli_epi16(*tr16, 8), c127);
+}
+
+static AOM_FORCE_INLINE __m256i smooth_u16_avx2(__m256i wy, __m256i tdiff,
+                                                __m256i bl_base, __m256i wx,
+                                                __m256i ldiff,
+                                                __m256i tr_base) {
+  const __m256i v = _mm256_add_epi16(_mm256_mullo_epi16(wy, tdiff), bl_base);
+  const __m256i h = _mm256_add_epi16(_mm256_mullo_epi16(wx, ldiff), tr_base);
+  return _mm256_srli_epi16(_mm256_avg_epu16(v, h), 8);
+}
+
+void aom_smooth_predictor_8x4_avx2(uint8_t *dst, ptrdiff_t stride,
+                                   const uint8_t *above, const uint8_t *left) {
+  __m256i bl16, bl_base, tr16, tr_base;
+  make_smooth_bases_avx2(left[3], above[7], all_ones_avx2(), &bl16, &bl_base,
+                         &tr16, &tr_base);
+  const __m256i r01 = rep01_u16_avx2();
+  const __m256i r23 = _mm256_add_epi16(r01, two_u16_avx2());
+  const __m256i tdiff = _mm256_sub_epi16(load8_2rows_u16_avx2(above), bl16);
+  const __m256i wx = sm_w8_2rows_u16_avx2();
+  const __m256i wh_raw = load4_dup128_avx2(smooth_weights);
+  const __m256i l_raw = load4_dup128_avx2(left);
+  const __m256i p01 = smooth_u16_avx2(
+      _mm256_shuffle_epi8(wh_raw, r01), tdiff, bl_base, wx,
+      _mm256_sub_epi16(_mm256_shuffle_epi8(l_raw, r01), tr16), tr_base);
+  const __m256i p23 = smooth_u16_avx2(
+      _mm256_shuffle_epi8(wh_raw, r23), tdiff, bl_base, wx,
+      _mm256_sub_epi16(_mm256_shuffle_epi8(l_raw, r23), tr16), tr_base);
+  store_8x4_packed_avx2(dst, stride, p01, p23);
+}
+
+void aom_smooth_predictor_8x8_avx2(uint8_t *dst, ptrdiff_t stride,
+                                   const uint8_t *above, const uint8_t *left) {
+  __m256i bl16, bl_base, tr16, tr_base;
+  make_smooth_bases_avx2(left[7], above[7], all_ones_avx2(), &bl16, &bl_base,
+                         &tr16, &tr_base);
+  const __m256i r01 = rep01_u16_avx2();
+  const __m256i two = two_u16_avx2();
+  const __m256i wx = sm_w8_2rows_u16_avx2();
+  const __m256i wh_raw = _mm256_packus_epi16(wx, wx);
+  const __m256i tdiff = _mm256_sub_epi16(load8_2rows_u16_avx2(above), bl16);
+  const __m256i l_raw = load8_dup128_avx2(left);
+  const __m256i r23 = _mm256_add_epi16(r01, two);
+  const __m256i four = _mm256_add_epi16(two, two);
+  const __m256i p01 = smooth_u16_avx2(
+      _mm256_shuffle_epi8(wh_raw, r01), tdiff, bl_base, wx,
+      _mm256_sub_epi16(_mm256_shuffle_epi8(l_raw, r01), tr16), tr_base);
+  const __m256i p23 = smooth_u16_avx2(
+      _mm256_shuffle_epi8(wh_raw, r23), tdiff, bl_base, wx,
+      _mm256_sub_epi16(_mm256_shuffle_epi8(l_raw, r23), tr16), tr_base);
+  store_8x4_packed_avx2(dst, stride, p01, p23);
+  const __m256i r45 = _mm256_add_epi16(r01, four);
+  const __m256i r67 = _mm256_add_epi16(r23, four);
+  const __m256i p45 = smooth_u16_avx2(
+      _mm256_shuffle_epi8(wh_raw, r45), tdiff, bl_base, wx,
+      _mm256_sub_epi16(_mm256_shuffle_epi8(l_raw, r45), tr16), tr_base);
+  const __m256i p67 = smooth_u16_avx2(
+      _mm256_shuffle_epi8(wh_raw, r67), tdiff, bl_base, wx,
+      _mm256_sub_epi16(_mm256_shuffle_epi8(l_raw, r67), tr16), tr_base);
+  store_8x4_packed_avx2(dst + stride * 4, stride, p45, p67);
+}
+
+void aom_smooth_predictor_8x16_avx2(uint8_t *dst, ptrdiff_t stride,
+                                    const uint8_t *above, const uint8_t *left) {
+  __m256i bl16, bl_base, tr16, tr_base;
+  make_smooth_bases_avx2(left[15], above[7], all_ones_avx2(), &bl16, &bl_base,
+                         &tr16, &tr_base);
+  __m256i r01 = rep01_u16_avx2();
+  const __m256i two = two_u16_avx2();
+  const __m256i four = _mm256_add_epi16(two, two);
+  const __m256i tdiff = _mm256_sub_epi16(load8_2rows_u16_avx2(above), bl16);
+  const __m256i wx = sm_w8_2rows_u16_avx2();
+  const __m256i wh_raw = sm_w16_dup128_avx2();
+  const __m256i l_raw = load16u_dup128_avx2(left);
+  const ptrdiff_t stride4 = stride * 4;
+  AOM_NO_UNROLL
+  for (int i = 0; i < 4; ++i) {
+    const __m256i r23 = _mm256_add_epi16(r01, two);
+    const __m256i p01 = smooth_u16_avx2(
+        _mm256_shuffle_epi8(wh_raw, r01), tdiff, bl_base, wx,
+        _mm256_sub_epi16(_mm256_shuffle_epi8(l_raw, r01), tr16), tr_base);
+    const __m256i p23 = smooth_u16_avx2(
+        _mm256_shuffle_epi8(wh_raw, r23), tdiff, bl_base, wx,
+        _mm256_sub_epi16(_mm256_shuffle_epi8(l_raw, r23), tr16), tr_base);
+    store_8x4_packed_avx2(dst, stride, p01, p23);
+    dst += stride4;
+    r01 = _mm256_add_epi16(r01, four);
+  }
+}
+
+static AOM_FORCE_INLINE void smooth_16x2_step_avx2(
+    uint8_t *dst, ptrdiff_t stride, __m256i wy, __m256i ld, __m256i td0,
+    __m256i td1, __m256i bl_base, __m256i wx0, __m256i wx1, __m256i tr_base) {
+  const __m256i p0 = smooth_u16_avx2(wy, td0, bl_base, wx0, ld, tr_base);
+  const __m256i p1 = smooth_u16_avx2(wy, td1, bl_base, wx1, ld, tr_base);
+  store_16x2_split_avx2(dst, stride, p0, p1);
+}
+
+void aom_smooth_predictor_16x8_avx2(uint8_t *dst, ptrdiff_t stride,
+                                    const uint8_t *above, const uint8_t *left) {
+  __m256i bl16, bl_base, tr16, tr_base, t0, t1, wx0, wx1;
+  make_smooth_bases_avx2(left[7], above[15], all_ones_avx2(), &bl16, &bl_base,
+                         &tr16, &tr_base);
+  __m256i rep = rep01_u16_avx2();
+  const __m256i two = two_u16_avx2();
+  load16u_2rows_u16_avx2(above, &t0, &t1);
+  sm_w16_2rows_u16_avx2(&wx0, &wx1);
+  const __m256i td0 = _mm256_sub_epi16(t0, bl16);
+  const __m256i td1 = _mm256_sub_epi16(t1, bl16);
+  const __m256i w8 = sm_w8_2rows_u16_avx2();
+  const __m256i wh_raw = _mm256_packus_epi16(w8, w8);
+  const __m256i l_raw = load8_dup128_avx2(left);
+  const ptrdiff_t stride2 = stride * 2;
+  AOM_NO_UNROLL
+  for (int i = 0; i < 4; ++i) {
+    smooth_16x2_step_avx2(
+        dst, stride, _mm256_shuffle_epi8(wh_raw, rep),
+        _mm256_sub_epi16(_mm256_shuffle_epi8(l_raw, rep), tr16), td0, td1,
+        bl_base, wx0, wx1, tr_base);
+    dst += stride2;
+    rep = _mm256_add_epi16(rep, two);
+  }
+}
+
+static AOM_FORCE_INLINE void smooth_16x16_blk_avx2(
+    uint8_t *dst, ptrdiff_t stride, __m256i td0, __m256i td1, __m256i bl_base,
+    __m256i wx0, __m256i wx1, __m256i tr16, __m256i tr_base, __m256i wh_raw,
+    const uint8_t *left, __m256i rep, __m256i two) {
+  const __m256i l_raw = load16u_dup128_avx2(left);
+  const __m256i four = _mm256_add_epi16(two, two);
+  const ptrdiff_t stride2 = stride * 2;
+  const ptrdiff_t stride4 = stride * 4;
+  AOM_NO_UNROLL
+  for (int i = 0; i < 4; ++i) {
+    const __m256i r23 = _mm256_add_epi16(rep, two);
+    smooth_16x2_step_avx2(
+        dst, stride, _mm256_shuffle_epi8(wh_raw, rep),
+        _mm256_sub_epi16(_mm256_shuffle_epi8(l_raw, rep), tr16), td0, td1,
+        bl_base, wx0, wx1, tr_base);
+    smooth_16x2_step_avx2(
+        dst + stride2, stride, _mm256_shuffle_epi8(wh_raw, r23),
+        _mm256_sub_epi16(_mm256_shuffle_epi8(l_raw, r23), tr16), td0, td1,
+        bl_base, wx0, wx1, tr_base);
+    dst += stride4;
+    rep = _mm256_add_epi16(rep, four);
+  }
+}
+
+void aom_smooth_predictor_16x16_avx2(uint8_t *dst, ptrdiff_t stride,
+                                     const uint8_t *above,
+                                     const uint8_t *left) {
+  __m256i bl16, bl_base, tr16, tr_base, t0, t1, wx0, wx1;
+  make_smooth_bases_avx2(left[15], above[15], all_ones_avx2(), &bl16, &bl_base,
+                         &tr16, &tr_base);
+  load16u_2rows_u16_avx2(above, &t0, &t1);
+  sm_w16_2rows_u16_avx2(&wx0, &wx1);
+  smooth_16x16_blk_avx2(dst, stride, _mm256_sub_epi16(t0, bl16),
+                        _mm256_sub_epi16(t1, bl16), bl_base, wx0, wx1, tr16,
+                        tr_base, sm_w16_dup128_avx2(), left, rep01_u16_avx2(),
+                        two_u16_avx2());
+}
+
+void aom_smooth_predictor_16x32_avx2(uint8_t *dst, ptrdiff_t stride,
+                                     const uint8_t *above,
+                                     const uint8_t *left) {
+  __m256i bl16, bl_base, tr16, tr_base, t0, t1, wx0, wx1;
+  make_smooth_bases_avx2(left[31], above[15], all_ones_avx2(), &bl16, &bl_base,
+                         &tr16, &tr_base);
+  const __m256i rep_init = rep01_u16_avx2();
+  const __m256i two = two_u16_avx2();
+  load16u_2rows_u16_avx2(above, &t0, &t1);
+  sm_w16_2rows_u16_avx2(&wx0, &wx1);
+  const __m256i td0 = _mm256_sub_epi16(t0, bl16);
+  const __m256i td1 = _mm256_sub_epi16(t1, bl16);
+  const __m256i w32 = sm_w32_raw_avx2();
+  const ptrdiff_t stride2 = stride * 2;
+  AOM_NO_UNROLL
+  for (int y = 0; y < 32; y += 16) {
+    const __m256i wh_raw = y ? _mm256_permute2x128_si256(w32, w32, 0x11)
+                             : _mm256_permute2x128_si256(w32, w32, 0x00);
+    const __m256i l_raw = load16u_dup128_avx2(left + y);
+    __m256i rep = rep_init;
+#if defined(__clang__)
+#pragma clang loop unroll(disable)
+#elif defined(__GNUC__) && !defined(__INTEL_COMPILER) && __GNUC__ >= 8
+#pragma GCC unroll 1
+#endif
+    for (int i = 0; i < 8; ++i) {
+      smooth_16x2_step_avx2(
+          dst, stride, _mm256_shuffle_epi8(wh_raw, rep),
+          _mm256_sub_epi16(_mm256_shuffle_epi8(l_raw, rep), tr16), td0, td1,
+          bl_base, wx0, wx1, tr_base);
+      dst += stride2;
+      rep = _mm256_add_epi16(rep, two);
+    }
+  }
+}
+
+static AOM_FORCE_INLINE void unpack_interleaved_u16_avx2(__m256i raw,
+                                                         __m256i *lo,
+                                                         __m256i *hi) {
+  const __m256i z = _mm256_setzero_si256();
+  *lo = _mm256_unpacklo_epi8(raw, z);
+  *hi = _mm256_unpackhi_epi8(raw, z);
+}
+
+static AOM_FORCE_INLINE void smooth_32x16_blk_avx2(
+    uint8_t *dst, ptrdiff_t stride, __m256i td0, __m256i td1, __m256i bl_base,
+    __m256i wx0, __m256i wx1, __m256i tr16, __m256i tr_base, __m256i wh_raw,
+    const uint8_t *left, __m256i rep, __m256i one) {
+  const __m256i l_raw = load16u_dup128_avx2(left);
+  AOM_NO_UNROLL
   for (int i = 0; i < 16; ++i) {
-    const __m256i l16 = _mm256_shuffle_epi8(l, rep);
-    const __m256i dl = _mm256_sub_epi16(l16, tl);
-    const __m256i pt = _mm256_abs_epi16(dl);
-    const __m256i r01 =
-        paeth_32x1_pred_pre(l16, t0, t1, tl, dt0, pl0, dt1, pl1, dl, pt);
-    const __m256i r23 =
-        paeth_32x1_pred_pre(l16, t2, t3, tl, dt2, pl2, dt3, pl3, dl, pt);
-
-    _mm256_storeu_si256((__m256i *)dst, r01);
-    _mm256_storeu_si256((__m256i *)(dst + 32), r23);
-
+    const __m256i wy = _mm256_shuffle_epi8(wh_raw, rep);
+    const __m256i ld = _mm256_sub_epi16(_mm256_shuffle_epi8(l_raw, rep), tr16);
+    const __m256i p0 = smooth_u16_avx2(wy, td0, bl_base, wx0, ld, tr_base);
+    const __m256i p1 = smooth_u16_avx2(wy, td1, bl_base, wx1, ld, tr_base);
+    _mm256_storeu_si256((__m256i *)(void *)dst, _mm256_packus_epi16(p0, p1));
     dst += stride;
     rep = _mm256_add_epi16(rep, one);
   }
 }
-#endif  // !CONFIG_REALTIME_ONLY || CONFIG_AV1_DECODER
+
+void aom_smooth_predictor_32x16_avx2(uint8_t *dst, ptrdiff_t stride,
+                                     const uint8_t *above,
+                                     const uint8_t *left) {
+  const __m256i ones = all_ones_avx2();
+  __m256i bl16, bl_base, tr16, tr_base, t0, t1, wx0, wx1;
+  make_smooth_bases_avx2(left[15], above[31], ones, &bl16, &bl_base, &tr16,
+                         &tr_base);
+  load32u_interleaved_u16_avx2(above, &t0, &t1);
+  unpack_interleaved_u16_avx2(sm_w32_raw_avx2(), &wx0, &wx1);
+  smooth_32x16_blk_avx2(
+      dst, stride, _mm256_sub_epi16(t0, bl16), _mm256_sub_epi16(t1, bl16),
+      bl_base, wx0, wx1, tr16, tr_base, sm_w16_dup128_avx2(), left,
+      _mm256_slli_epi16(ones, 15), _mm256_srli_epi16(ones, 15));
+}
+
+void aom_smooth_predictor_32x32_avx2(uint8_t *dst, ptrdiff_t stride,
+                                     const uint8_t *above,
+                                     const uint8_t *left) {
+  const __m256i ones = all_ones_avx2();
+  __m256i bl16, bl_base, tr16, tr_base, t0, t1, wx0, wx1;
+  make_smooth_bases_avx2(left[31], above[31], ones, &bl16, &bl_base, &tr16,
+                         &tr_base);
+  load32u_interleaved_u16_avx2(above, &t0, &t1);
+  const __m256i w32 = sm_w32_raw_avx2();
+  unpack_interleaved_u16_avx2(w32, &wx0, &wx1);
+  const __m256i td0 = _mm256_sub_epi16(t0, bl16);
+  const __m256i td1 = _mm256_sub_epi16(t1, bl16);
+  const __m256i rep = _mm256_slli_epi16(ones, 15);
+  const __m256i one = _mm256_srli_epi16(ones, 15);
+  AOM_NO_UNROLL
+  for (int y = 0; y < 32; y += 16) {
+    const __m256i wh_raw = y ? _mm256_permute2x128_si256(w32, w32, 0x11)
+                             : _mm256_permute2x128_si256(w32, w32, 0x00);
+    smooth_32x16_blk_avx2(dst, stride, td0, td1, bl_base, wx0, wx1, tr16,
+                          tr_base, wh_raw, left + y, rep, one);
+    dst += stride * 16;
+  }
+}
+
+void aom_smooth_predictor_64x64_avx2(uint8_t *dst, ptrdiff_t stride,
+                                     const uint8_t *above,
+                                     const uint8_t *left) {
+  const __m256i ones = all_ones_avx2();
+  __m256i bl16, bl_base, tr16, tr_base;
+  make_smooth_bases_avx2(left[63], above[63], ones, &bl16, &bl_base, &tr16,
+                         &tr_base);
+  const __m256i rep = _mm256_slli_epi16(ones, 15);
+  const __m256i one = _mm256_srli_epi16(ones, 15);
+  AOM_NO_UNROLL
+  for (uint32_t x = 0; x < 64; x += 32) {
+    __m256i t0, t1, wx0, wx1;
+    load32u_interleaved_u16_avx2(above + x, &t0, &t1);
+    unpack_interleaved_u16_avx2(x ? sm_w64_hi_avx2() : sm_w64_lo_avx2(), &wx0,
+                                &wx1);
+    const __m256i td0 = _mm256_sub_epi16(t0, bl16);
+    const __m256i td1 = _mm256_sub_epi16(t1, bl16);
+    uint8_t *d = dst + x;
+    AOM_NO_UNROLL
+    for (uint32_t y = 0; y < 64; y += 16) {
+      const __m256i wy32 = (y & 32) ? sm_w64_hi_avx2() : sm_w64_lo_avx2();
+      const __m256i wh_raw = (y & 16)
+                                 ? _mm256_permute2x128_si256(wy32, wy32, 0x11)
+                                 : _mm256_permute2x128_si256(wy32, wy32, 0x00);
+      const __m256i l_raw = load16u_dup128_avx2(left + y);
+      __m256i r = rep;
+#if defined(__clang__)
+#pragma clang loop unroll(disable)
+#elif defined(__GNUC__) && !defined(__INTEL_COMPILER) && __GNUC__ >= 8
+#pragma GCC unroll 1
+#endif
+      for (uint32_t i = 0; i < 16; ++i) {
+        const __m256i wy = _mm256_shuffle_epi8(wh_raw, r);
+        const __m256i ld =
+            _mm256_sub_epi16(_mm256_shuffle_epi8(l_raw, r), tr16);
+        const __m256i p0 = smooth_u16_avx2(wy, td0, bl_base, wx0, ld, tr_base);
+        const __m256i p1 = smooth_u16_avx2(wy, td1, bl_base, wx1, ld, tr_base);
+        _mm256_storeu_si256((__m256i *)(void *)d, _mm256_packus_epi16(p0, p1));
+        d += stride;
+        r = _mm256_add_epi16(r, one);
+      }
+    }
+  }
+}
+
+static AOM_FORCE_INLINE void make_base128_avx2(int16_t b_s, __m256i ones,
+                                               __m256i *b16, __m256i *b_base) {
+  *b16 = _mm256_set1_epi16(b_s);
+  const __m256i c128 = _mm256_srli_epi16(_mm256_slli_epi16(ones, 15), 8);
+  *b_base = _mm256_or_si256(_mm256_slli_epi16(*b16, 8), c128);
+}
+
+static AOM_FORCE_INLINE __m256i scale_round8_avx2(__m256i w, __m256i diff,
+                                                  __m256i base) {
+  return _mm256_srli_epi16(_mm256_add_epi16(_mm256_mullo_epi16(w, diff), base),
+                           8);
+}
+
+void aom_smooth_v_predictor_16x16_avx2(uint8_t *dst, ptrdiff_t stride,
+                                       const uint8_t *above,
+                                       const uint8_t *left) {
+  __m256i bl16, bl_base, t0, t1;
+  make_base128_avx2(left[15], all_ones_avx2(), &bl16, &bl_base);
+  __m256i rep = rep01_u16_avx2();
+  const __m256i two = two_u16_avx2();
+  load16u_2rows_u16_avx2(above, &t0, &t1);
+  const __m256i td0 = _mm256_sub_epi16(t0, bl16);
+  const __m256i td1 = _mm256_sub_epi16(t1, bl16);
+  const __m256i wh_raw = sm_w16_dup128_avx2();
+  const ptrdiff_t stride2 = stride * 2;
+  AOM_NO_UNROLL
+  for (int i = 0; i < 8; ++i) {
+    const __m256i wy = _mm256_shuffle_epi8(wh_raw, rep);
+    store_16x2_split_avx2(dst, stride, scale_round8_avx2(wy, td0, bl_base),
+                          scale_round8_avx2(wy, td1, bl_base));
+    dst += stride2;
+    rep = _mm256_add_epi16(rep, two);
+  }
+}
+
+void aom_smooth_v_predictor_32x32_avx2(uint8_t *dst, ptrdiff_t stride,
+                                       const uint8_t *above,
+                                       const uint8_t *left) {
+  const __m256i ones = all_ones_avx2();
+  __m256i bl16, bl_base, t0, t1;
+  make_base128_avx2(left[31], ones, &bl16, &bl_base);
+  load32u_interleaved_u16_avx2(above, &t0, &t1);
+  const __m256i td0 = _mm256_sub_epi16(t0, bl16);
+  const __m256i td1 = _mm256_sub_epi16(t1, bl16);
+  const __m256i rep_init = _mm256_slli_epi16(ones, 15);
+  const __m256i one = _mm256_srli_epi16(ones, 15);
+  const __m256i w32 = sm_w32_raw_avx2();
+  AOM_NO_UNROLL
+  for (int j = 0; j < 2; ++j) {
+    const __m256i wh_raw = j ? _mm256_permute2x128_si256(w32, w32, 0x11)
+                             : _mm256_permute2x128_si256(w32, w32, 0x00);
+    __m256i rep = rep_init;
+    AOM_NO_UNROLL
+    for (int i = 0; i < 16; ++i) {
+      const __m256i wy = _mm256_shuffle_epi8(wh_raw, rep);
+      const __m256i p0 = scale_round8_avx2(wy, td0, bl_base);
+      const __m256i p1 = scale_round8_avx2(wy, td1, bl_base);
+      _mm256_storeu_si256((__m256i *)(void *)dst, _mm256_packus_epi16(p0, p1));
+      dst += stride;
+      rep = _mm256_add_epi16(rep, one);
+    }
+  }
+}
+
+void aom_smooth_h_predictor_16x16_avx2(uint8_t *dst, ptrdiff_t stride,
+                                       const uint8_t *above,
+                                       const uint8_t *left) {
+  __m256i tr16, tr_base, wx0, wx1;
+  make_base128_avx2(above[15], all_ones_avx2(), &tr16, &tr_base);
+  __m256i rep = rep01_u16_avx2();
+  const __m256i two = two_u16_avx2();
+  sm_w16_2rows_u16_avx2(&wx0, &wx1);
+  const __m256i l_raw = load16u_dup128_avx2(left);
+  const ptrdiff_t stride2 = stride * 2;
+  AOM_NO_UNROLL
+  for (int i = 0; i < 8; ++i) {
+    const __m256i ld = _mm256_sub_epi16(_mm256_shuffle_epi8(l_raw, rep), tr16);
+    store_16x2_split_avx2(dst, stride, scale_round8_avx2(wx0, ld, tr_base),
+                          scale_round8_avx2(wx1, ld, tr_base));
+    dst += stride2;
+    rep = _mm256_add_epi16(rep, two);
+  }
+}
+
+void aom_smooth_h_predictor_32x32_avx2(uint8_t *dst, ptrdiff_t stride,
+                                       const uint8_t *above,
+                                       const uint8_t *left) {
+  const __m256i ones = all_ones_avx2();
+  __m256i tr16, tr_base, wx0, wx1;
+  make_base128_avx2(above[31], ones, &tr16, &tr_base);
+  unpack_interleaved_u16_avx2(sm_w32_raw_avx2(), &wx0, &wx1);
+  const __m256i rep_init = _mm256_slli_epi16(ones, 15);
+  const __m256i one = _mm256_srli_epi16(ones, 15);
+  AOM_NO_UNROLL
+  for (int j = 0; j < 32; j += 16) {
+    const __m256i l_raw = load16u_dup128_avx2(left + j);
+    __m256i rep = rep_init;
+    AOM_NO_UNROLL
+    for (int i = 0; i < 16; ++i) {
+      const __m256i ld =
+          _mm256_sub_epi16(_mm256_shuffle_epi8(l_raw, rep), tr16);
+      const __m256i p0 = scale_round8_avx2(wx0, ld, tr_base);
+      const __m256i p1 = scale_round8_avx2(wx1, ld, tr_base);
+      _mm256_storeu_si256((__m256i *)(void *)dst, _mm256_packus_epi16(p0, p1));
+      dst += stride;
+      rep = _mm256_add_epi16(rep, one);
+    }
+  }
+}
 
 #if CONFIG_AV1_HIGHBITDEPTH
 
@@ -5202,3 +5669,5 @@ void av1_dr_prediction_z3_avx2(uint8_t *dst, ptrdiff_t stride, int bw, int bh,
     }
   }
 }
+
+#undef AOM_NO_UNROLL
