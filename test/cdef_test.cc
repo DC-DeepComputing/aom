@@ -15,6 +15,7 @@
 #include <iostream>
 #include <string>
 #include <tuple>
+#include <vector>
 
 #include "gtest/gtest.h"
 
@@ -23,6 +24,7 @@
 
 #include "aom_ports/aom_timer.h"
 #include "av1/common/cdef_block.h"
+#include "av1/common/enums.h"
 #include "test/acm_random.h"
 #include "test/register_state_check.h"
 #include "test/util.h"
@@ -618,6 +620,194 @@ TEST_P(CDEFCopyRect16to16Test, TestSIMDNoMismatch) {
 }
 #endif  // CONFIG_AV1_HIGHBITDEPTH
 
+#if CONFIG_AV1_ENCODER && HAVE_AVX2
+class CDEFMseCalcBlockLvl4Test : public ::testing::TestWithParam<int> {};
+GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(CDEFMseCalcBlockLvl4Test);
+
+int AdjustStrengthRef(int strength, int32_t var) {
+  const int i = (var >> 6) ? AOMMIN(get_msb(var >> 6), 12) : 0;
+  return var ? (strength * (4 + i) + 8) >> 4 : 0;
+}
+
+void CalcMseLvl4Ref(const uint16_t *in, const uint8_t *ref_buf, int ref_stride,
+                    int row, int col, const cdef_list *dlist, int cdef_count,
+                    int dir[CDEF_NBLOCKS][CDEF_NBLOCKS],
+                    int var[CDEF_NBLOCKS][CDEF_NBLOCKS], int damping, int pli,
+                    int mi_wide_l2, uint64_t mse[4]) {
+  static constexpr int kPriConvLvl4[2] = { 0, 11 };
+  static constexpr int kSecConvLvl3[2] = { 0, 2 };
+  static const cdef_filter_block_func kFilterC[4] = { &cdef_filter_8_0_c,
+                                                      &cdef_filter_8_1_c,
+                                                      &cdef_filter_8_2_c,
+                                                      &cdef_filter_8_3_c };
+  if (pli == 0) {
+    for (int bi = 0; bi < cdef_count; ++bi) {
+      const int by = dlist[bi].by;
+      const int bx = dlist[bi].bx;
+      dir[by][bx] = cdef_find_dir_c(&in[8 * by * CDEF_BSTRIDE + 8 * bx],
+                                    CDEF_BSTRIDE, &var[by][bx], 0);
+    }
+  }
+  const int shift = mi_wide_l2 + 1;
+  const int bsize = 1 << shift;
+  const int damp = damping - (pli != AOM_PLANE_Y);
+  for (int gi = 0; gi < 4; ++gi) {
+    const int pri = kPriConvLvl4[gi / 2];
+    const int sec = kSecConvLvl3[gi % 2];
+    uint64_t sse = 0;
+    DECLARE_ALIGNED(16, uint8_t, dst8[8 * 8]);
+    for (int bi = 0; bi < cdef_count; ++bi) {
+      const int by = dlist[bi].by;
+      const int bx = dlist[bi].bx;
+      const int t =
+          (pli != AOM_PLANE_Y) ? pri : AdjustStrengthRef(pri, var[by][bx]);
+      const int sidx = (sec == 0) | ((t == 0) << 1);
+      kFilterC[sidx](dst8, 8, &in[(by * CDEF_BSTRIDE << shift) + (bx << shift)],
+                     t, sec, pri ? dir[by][bx] : 0, damp, damp, 0, bsize,
+                     bsize);
+      const uint8_t *rb =
+          &ref_buf[(row + (by << shift)) * ref_stride + col + (bx << shift)];
+      for (int r = 0; r < bsize; ++r) {
+        for (int c = 0; c < bsize; ++c) {
+          const int diff = dst8[r * 8 + c] - rb[r * ref_stride + c];
+          sse += static_cast<uint64_t>(diff * diff);
+        }
+      }
+    }
+    if (pli < 2) {
+      mse[gi] = sse;
+    } else {
+      mse[gi] += sse;
+    }
+  }
+}
+
+TEST_P(CDEFMseCalcBlockLvl4Test, TestSIMDNoMismatch) {
+  const int damping = GetParam();
+  ACMRandom rnd(ACMRandom::DeterministicSeed() + damping);
+  DECLARE_ALIGNED(32, uint16_t, inbuf[CDEF_INBUF_SIZE]);
+  uint16_t *const in = inbuf + CDEF_VBORDER * CDEF_BSTRIDE + CDEF_HBORDER;
+  constexpr int kRefStride = 197;
+  constexpr int kRefRows = 160;
+  std::vector<uint8_t> ref_y(kRefStride * kRefRows);
+  std::vector<uint8_t> ref_u(kRefStride * kRefRows);
+  std::vector<uint8_t> ref_v(kRefStride * kRefRows);
+  cdef_list dlist[MI_SIZE_128X128 * MI_SIZE_128X128];
+  const int kCounts[] = { 0, 1, 2, 3, 8, 15, 64 };
+
+  for (int mode = 0; mode < 5; ++mode) {
+    for (int boundary = 0; boundary < 16; ++boundary) {
+      for (size_t i = 0; i < CDEF_INBUF_SIZE; ++i) {
+        if (mode == 0) {
+          inbuf[i] = 128;  // Flat block: forces var == 0, t == 0, dir == 0.
+        } else if (mode == 1) {
+          inbuf[i] = (rnd.Rand8() & 1) ? 255 : 0;  // Extreme contrast/clamping.
+        } else if (mode == 2) {
+          inbuf[i] =
+              120 + (rnd.Rand8() & 3);  // Very low contrast: var==0, dir!=0.
+        } else if (mode == 3) {
+          inbuf[i] = 120 + (rnd.Rand8() & 15);  // Low/mid variance.
+        } else {
+          inbuf[i] = rnd.Rand8();
+        }
+      }
+      if (boundary & 1) {
+        for (int r = 0; r < (1 << MAX_SB_SIZE_LOG2) + 2 * CDEF_VBORDER; ++r)
+          for (int c = 0; c < CDEF_HBORDER; ++c)
+            inbuf[r * CDEF_BSTRIDE + c] = CDEF_VERY_LARGE;
+      }
+      if (boundary & 2) {
+        for (int r = 0; r < (1 << MAX_SB_SIZE_LOG2) + 2 * CDEF_VBORDER; ++r)
+          for (int c = CDEF_HBORDER + 64; c < CDEF_BSTRIDE; ++c)
+            inbuf[r * CDEF_BSTRIDE + c] = CDEF_VERY_LARGE;
+      }
+      if (boundary & 4) {
+        for (int r = 0; r < CDEF_VBORDER; ++r)
+          for (int c = 0; c < CDEF_BSTRIDE; ++c)
+            inbuf[r * CDEF_BSTRIDE + c] = CDEF_VERY_LARGE;
+      }
+      if (boundary & 8) {
+        for (int r = CDEF_VBORDER + 64;
+             r < (1 << MAX_SB_SIZE_LOG2) + 2 * CDEF_VBORDER; ++r)
+          for (int c = 0; c < CDEF_BSTRIDE; ++c)
+            inbuf[r * CDEF_BSTRIDE + c] = CDEF_VERY_LARGE;
+      }
+      for (size_t i = 0; i < ref_y.size(); ++i) {
+        ref_y[i] = rnd.Rand8();
+        ref_u[i] = rnd.Rand8();
+        ref_v[i] = rnd.Rand8();
+      }
+
+      for (int cdef_count : kCounts) {
+        for (int bi = 0; bi < cdef_count; ++bi) {
+          dlist[bi].by = static_cast<uint8_t>((bi / 8) & 7);
+          dlist[bi].bx = static_cast<uint8_t>(bi & 7);
+        }
+        const int row = (boundary & 3) * 4;
+        const int col = ((boundary >> 2) & 3) * 4;
+
+        int dir_ref[CDEF_NBLOCKS][CDEF_NBLOCKS] = { { 0 } };
+        int var_ref[CDEF_NBLOCKS][CDEF_NBLOCKS] = { { 0 } };
+        int dir_tst[CDEF_NBLOCKS][CDEF_NBLOCKS] = { { 0 } };
+        int var_tst[CDEF_NBLOCKS][CDEF_NBLOCKS] = { { 0 } };
+        uint64_t mse_ref[4] = { 99, 99, 99, 99 };
+        uint64_t mse_tst[4] = { 77, 77, 77, 77 };
+
+        CalcMseLvl4Ref(in, ref_y.data(), kRefStride, row, col, dlist,
+                       cdef_count, dir_ref, var_ref, damping, 0, 2, mse_ref);
+        API_REGISTER_STATE_CHECK(av1_cdef_mse_calc_block_lvl4_avx2(
+            in, ref_y.data(), kRefStride, row, col, dlist, cdef_count, dir_tst,
+            var_tst, damping, 0, 2, mse_tst));
+        for (int gi = 0; gi < 4; ++gi) {
+          ASSERT_EQ(mse_ref[gi], mse_tst[gi])
+              << "Luma gi=" << gi << " damp=" << damping
+              << " cnt=" << cdef_count << " bnd=" << boundary
+              << " mode=" << mode;
+        }
+        for (int bi = 0; bi < cdef_count; ++bi) {
+          const int by = dlist[bi].by;
+          const int bx = dlist[bi].bx;
+          ASSERT_EQ(dir_ref[by][bx], dir_tst[by][bx]);
+          ASSERT_EQ(var_ref[by][bx], var_tst[by][bx]);
+        }
+
+        // Test both 4:2:0 (mi_wide_l2=1, 4x4) and 4:4:4 (mi_wide_l2=2, 8x8)
+        // chroma across pli=1 (overwrite) + pli=2 (accumulate), cycling all
+        // 8 directions so every (d & 3) parity branch is covered.
+        for (int mi_wide_l2 : { 1, 2 }) {
+          for (int bi = 0; bi < cdef_count; ++bi) {
+            dir_ref[dlist[bi].by][dlist[bi].bx] = (bi + boundary + mode) & 7;
+            dir_tst[dlist[bi].by][dlist[bi].bx] = (bi + boundary + mode) & 7;
+          }
+          uint64_t uv_ref[4] = { 123, 456, 789, 1011 };
+          uint64_t uv_tst[4] = { 999, 888, 777, 666 };
+          CalcMseLvl4Ref(in, ref_u.data(), kRefStride, row, col, dlist,
+                         cdef_count, dir_ref, var_ref, damping, 1, mi_wide_l2,
+                         uv_ref);
+          API_REGISTER_STATE_CHECK(av1_cdef_mse_calc_block_lvl4_avx2(
+              in, ref_u.data(), kRefStride, row, col, dlist, cdef_count,
+              dir_tst, var_tst, damping, 1, mi_wide_l2, uv_tst));
+          for (int gi = 0; gi < 4; ++gi) {
+            ASSERT_EQ(uv_ref[gi], uv_tst[gi])
+                << "Chroma U mi_wide_l2=" << mi_wide_l2 << " gi=" << gi;
+          }
+          CalcMseLvl4Ref(in, ref_v.data(), kRefStride, row, col, dlist,
+                         cdef_count, dir_ref, var_ref, damping, 2, mi_wide_l2,
+                         uv_ref);
+          API_REGISTER_STATE_CHECK(av1_cdef_mse_calc_block_lvl4_avx2(
+              in, ref_v.data(), kRefStride, row, col, dlist, cdef_count,
+              dir_tst, var_tst, damping, 2, mi_wide_l2, uv_tst));
+          for (int gi = 0; gi < 4; ++gi) {
+            ASSERT_EQ(uv_ref[gi], uv_tst[gi])
+                << "Chroma U+V mi_wide_l2=" << mi_wide_l2 << " gi=" << gi;
+          }
+        }
+      }
+    }
+  }
+}
+#endif  // CONFIG_AV1_ENCODER && HAVE_AVX2
+
 using std::make_tuple;
 
 #if ((AOM_ARCH_X86 && HAVE_SSSE3) || HAVE_SSE4_1 || HAVE_AVX2 || HAVE_NEON || \
@@ -767,6 +957,10 @@ INSTANTIATE_TEST_SUITE_P(
     ::testing::Values(make_tuple(&cdef_copy_rect8_16bit_to_16bit_c,
                                  &cdef_copy_rect8_16bit_to_16bit_avx2)));
 #endif  // CONFIG_AV1_HIGHBITDEPTH
+#if CONFIG_AV1_ENCODER
+INSTANTIATE_TEST_SUITE_P(AVX2, CDEFMseCalcBlockLvl4Test,
+                         ::testing::Range(3, 7));
+#endif  // CONFIG_AV1_ENCODER
 #endif
 
 #if HAVE_NEON
