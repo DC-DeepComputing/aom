@@ -380,71 +380,6 @@ static inline __m256i constrain16_avx2(__m256i a, __m256i b,
   return _mm256_sign_epi16(_mm256_min_epi16(diff, s), raw_diff);
 }
 
-static inline __m256i load_tap_8x2(const uint16_t *p) {
-  return v256_from_v128(v128_load_unaligned(p),
-                        v128_load_unaligned(p + CDEF_BSTRIDE));
-}
-
-static inline __m256i load_tap_const_8x2(const uint16_t *in_row,
-                                         intptr_t offset) {
-  __m128i hi = v128_load_unaligned(in_row + offset);
-  __m128i lo = v128_load_unaligned(in_row + CDEF_BSTRIDE + offset);
-  return v256_from_v128(hi, lo);
-}
-
-static inline __m256i tap_pair_sum_const_avx2(const uint16_t *in_row,
-                                              intptr_t offset, __m256i r,
-                                              unsigned int threshold,
-                                              unsigned int adjdamp) {
-  const __m256i tap0 = load_tap_const_8x2(in_row, offset);
-  const __m256i p0 = constrain16_avx2(tap0, r, threshold, adjdamp);
-  const __m256i tap1 = load_tap_const_8x2(in_row, -offset);
-  const __m256i p1 = constrain16_avx2(tap1, r, threshold, adjdamp);
-  __m256i sum = _mm256_add_epi16(p0, p1);
-  return sum;
-}
-
-static inline __m256i tap_pair_sum_avx2(const uint16_t *in_row, intptr_t offset,
-                                        __m256i r, unsigned int threshold,
-                                        unsigned int adjdamp) {
-  const __m256i tap0 = load_tap_8x2(in_row + offset);
-  const __m256i p0 = constrain16_avx2(tap0, r, threshold, adjdamp);
-  const __m256i tap1 = load_tap_8x2(in_row - offset);
-  const __m256i p1 = constrain16_avx2(tap1, r, threshold, adjdamp);
-  __m256i sum = _mm256_add_epi16(p0, p1);
-  return sum;
-}
-
-static inline __m256i tap_pair_sum_minmax_avx2(
-    const uint16_t *in_row, intptr_t offset, __m256i r, unsigned int threshold,
-    unsigned int adjdamp, __m256i *max_u8, __m256i *min_s16) {
-  const __m256i tap0 = load_tap_8x2(in_row + offset);
-  *max_u8 = _mm256_max_epu8(*max_u8, tap0);
-  *min_s16 = _mm256_min_epi16(*min_s16, tap0);
-  const __m256i p0 = constrain16_avx2(tap0, r, threshold, adjdamp);
-  const __m256i tap1 = load_tap_8x2(in_row - offset);
-  *max_u8 = _mm256_max_epu8(*max_u8, tap1);
-  *min_s16 = _mm256_min_epi16(*min_s16, tap1);
-  const __m256i p1 = constrain16_avx2(tap1, r, threshold, adjdamp);
-  __m256i sum = _mm256_add_epi16(p0, p1);
-  return sum;
-}
-
-static inline __m256i tap_pair_sum_const_minmax_avx2(
-    const uint16_t *in_row, intptr_t offset, __m256i r, unsigned int threshold,
-    unsigned int adjdamp, __m256i *max_u8, __m256i *min_s16) {
-  const __m256i tap0 = load_tap_const_8x2(in_row, offset);
-  *max_u8 = _mm256_max_epu8(*max_u8, tap0);
-  *min_s16 = _mm256_min_epi16(*min_s16, tap0);
-  const __m256i p0 = constrain16_avx2(tap0, r, threshold, adjdamp);
-  const __m256i tap1 = load_tap_const_8x2(in_row, -offset);
-  *max_u8 = _mm256_max_epu8(*max_u8, tap1);
-  *min_s16 = _mm256_min_epi16(*min_s16, tap1);
-  const __m256i p1 = constrain16_avx2(tap1, r, threshold, adjdamp);
-  __m256i sum = _mm256_add_epi16(p0, p1);
-  return sum;
-}
-
 static inline __m256i finish_filter_avx2(__m256i r, __m256i sum) {
   sum = _mm256_add_epi16(sum, _mm256_srai_epi16(sum, 15));
   sum = _mm256_srai_epi16(_mm256_add_epi16(sum, _mm256_set1_epi16(8)), 4);
@@ -499,9 +434,13 @@ static inline uint64_t hsum_u32_avx2(__m256i v) {
   return (uint32_t)_mm_cvtsi128_si32(sum128);
 }
 
-__attribute__((noinline)) static void cdef_find_dir_list_avx2(
-    const uint16_t *in, const cdef_list *dlist, int cdef_count,
-    int dir[CDEF_NBLOCKS][CDEF_NBLOCKS], int var[CDEF_NBLOCKS][CDEF_NBLOCKS]) {
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
+static void cdef_find_dir_list_avx2(const uint16_t *in, const cdef_list *dlist,
+                                    int cdef_count,
+                                    int dir[CDEF_NBLOCKS][CDEF_NBLOCKS],
+                                    int var[CDEF_NBLOCKS][CDEF_NBLOCKS]) {
   int bi;
   for (bi = 0; bi < cdef_count - 1; bi += 2) {
     const int by = dlist[bi].by;
@@ -521,7 +460,10 @@ __attribute__((noinline)) static void cdef_find_dir_list_avx2(
   }
 }
 
-__attribute__((noinline)) static void cdef_mse_calc_block_lvl4_chroma_4x4_avx2(
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
+static void cdef_mse_calc_block_lvl4_chroma_4x4_avx2(
     const uint16_t *in, const uint8_t *ref_buffer, int ref_stride, int row,
     int col, const cdef_list *dlist, int cdef_count,
     const int dir[CDEF_NBLOCKS][CDEF_NBLOCKS], int damping, int pli,
@@ -678,6 +620,52 @@ void av1_cdef_mse_calc_block_lvl4_luma_avx2(
     int dir[CDEF_NBLOCKS][CDEF_NBLOCKS], int var[CDEF_NBLOCKS][CDEF_NBLOCKS],
     int damping, int pli, int xdec, uint64_t mse[4]);
 
+static inline __m256i load_u16_8x2(const uint16_t *p) {
+  const __m128i lo = _mm_loadu_si128((const __m128i *)(p + CDEF_BSTRIDE));
+  return _mm256_inserti128_si256(_mm256_castsi128_si256(lo),
+                                 _mm_loadu_si128((const __m128i *)p), 1);
+}
+
+static inline __m256i load_ref16_8x2(const uint8_t *ref_row, int ref_stride) {
+  const __m128i r0 = _mm_loadl_epi64((const __m128i *)ref_row);
+  const __m128i r1 = _mm_loadl_epi64((const __m128i *)(ref_row + ref_stride));
+  return _mm256_cvtepu8_epi16(_mm_unpacklo_epi64(r1, r0));
+}
+
+static inline __m256i tap_pair_sum_fast(__m256i t0, __m256i t1, __m256i r,
+                                        __m256i v_thresh, __m128i v_damp) {
+  const __m256i raw0 = _mm256_sub_epi16(t0, r);
+  const __m256i raw1 = _mm256_sub_epi16(t1, r);
+  const __m256i diff0 = _mm256_abs_epi16(raw0);
+  const __m256i diff1 = _mm256_abs_epi16(raw1);
+  const __m256i s0 =
+      _mm256_subs_epu16(v_thresh, _mm256_srl_epi16(diff0, v_damp));
+  const __m256i s1 =
+      _mm256_subs_epu16(v_thresh, _mm256_srl_epi16(diff1, v_damp));
+  const __m256i c0 = _mm256_sign_epi16(_mm256_min_epi16(diff0, s0), raw0);
+  const __m256i c1 = _mm256_sign_epi16(_mm256_min_epi16(diff1, s1), raw1);
+  return _mm256_add_epi16(c0, c1);
+}
+
+static inline __m256i tap_pair_sum_minmax_fast(__m256i t0, __m256i t1,
+                                               __m256i r, __m256i v_thresh,
+                                               __m128i v_damp, __m256i *max_u8,
+                                               __m256i *min_s16) {
+  *max_u8 = _mm256_max_epu8(*max_u8, _mm256_max_epu8(t0, t1));
+  *min_s16 = _mm256_min_epi16(*min_s16, _mm256_min_epi16(t0, t1));
+  return tap_pair_sum_fast(t0, t1, r, v_thresh, v_damp);
+}
+
+static inline __m256i finish_delta_fast(__m256i sum, __m256i c8) {
+  sum = _mm256_add_epi16(sum, _mm256_srai_epi16(sum, 15));
+  return _mm256_srai_epi16(_mm256_add_epi16(sum, c8), 4);
+}
+
+static inline __m256i calc_sse_fast(__m256i res, __m256i ref16) {
+  const __m256i diff = _mm256_sub_epi16(res, ref16);
+  return _mm256_madd_epi16(diff, diff);
+}
+
 void av1_cdef_mse_calc_block_lvl4_luma_avx2(
     const uint16_t *in, const uint8_t *ref_buffer, int ref_stride, int row,
     int col, const cdef_list *dlist, int cdef_count,
@@ -694,15 +682,18 @@ void av1_cdef_mse_calc_block_lvl4_luma_avx2(
   } else {
     cdef_find_dir_list_avx2(in, dlist, cdef_count, dir, var);
   }
-  int bi;
+
   __m256i v_sse0 = _mm256_setzero_si256();
   __m256i v_sse1 = _mm256_setzero_si256();
   __m256i v_sse2 = _mm256_setzero_si256();
   __m256i v_sse3 = _mm256_setzero_si256();
 
+  const __m256i c8 = _mm256_set1_epi16(8);
+  const __m256i v_sec_thresh = _mm256_set1_epi16(2);
   const unsigned int sec_damping = AOMMAX(0, damping - 1);
+  const __m128i v_sec_damp = _mm_cvtsi32_si128((int)sec_damping);
 
-  for (bi = 0; bi < cdef_count; ++bi) {
+  for (int bi = 0; bi < cdef_count; ++bi) {
     const int by = dlist[bi].by;
     const int bx = dlist[bi].bx;
     const int d = dir[by][bx];
@@ -720,35 +711,40 @@ void av1_cdef_mse_calc_block_lvl4_luma_avx2(
 
     if (t == 0) {
       if ((d & 3) == 0) {
+#if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC unroll 1
+#endif
         for (int i = 0; i < 8;
              i += 2, in_row += 2 * CDEF_BSTRIDE, ref_row += 2 * ref_stride) {
-          const __m256i r =
-              v256_from_v128(v128_load_aligned(in_row),
-                             v128_load_aligned(in_row + CDEF_BSTRIDE));
-          const __m256i ref16 = _mm256_cvtepu8_epi16(
-              v128_from_v64(v64_load_aligned(ref_row),
-                            v64_load_aligned(ref_row + ref_stride)));
+          const __m256i r = load_u16_8x2(in_row);
+          const __m256i ref16 = load_ref16_8x2(ref_row, ref_stride);
           const __m256i diff0 = _mm256_sub_epi16(r, ref16);
           const __m256i sse0 = _mm256_madd_epi16(diff0, diff0);
           v_sse0 = _mm256_add_epi32(v_sse0, sse0);
           v_sse2 = _mm256_add_epi32(v_sse2, sse0);
 
-          const __m256i sn1 =
-              tap_pair_sum_const_avx2(in_row, 1, r, 2, sec_damping);
-          const __m256i sn2 =
-              tap_pair_sum_const_avx2(in_row, CDEF_BSTRIDE, r, 2, sec_damping);
+          const __m256i sn1 = tap_pair_sum_fast(load_u16_8x2(in_row + 1),
+                                                load_u16_8x2(in_row - 1), r,
+                                                v_sec_thresh, v_sec_damp);
+          const __m256i sn2 = tap_pair_sum_fast(
+              load_u16_8x2(in_row + CDEF_BSTRIDE),
+              load_u16_8x2(in_row - CDEF_BSTRIDE), r, v_sec_thresh, v_sec_damp);
           const __m256i sec_near = _mm256_add_epi16(sn1, sn2);
           __m256i sum_sec = _mm256_add_epi16(sec_near, sec_near);
-          const __m256i sf1 =
-              tap_pair_sum_const_avx2(in_row, 2, r, 2, sec_damping);
+
+          const __m256i sf1 = tap_pair_sum_fast(load_u16_8x2(in_row + 2),
+                                                load_u16_8x2(in_row - 2), r,
+                                                v_sec_thresh, v_sec_damp);
           sum_sec = _mm256_add_epi16(sum_sec, sf1);
-          const __m256i sf2 = tap_pair_sum_const_avx2(in_row, 2 * CDEF_BSTRIDE,
-                                                      r, 2, sec_damping);
+
+          const __m256i sf2 =
+              tap_pair_sum_fast(load_u16_8x2(in_row + 2 * CDEF_BSTRIDE),
+                                load_u16_8x2(in_row - 2 * CDEF_BSTRIDE), r,
+                                v_sec_thresh, v_sec_damp);
           sum_sec = _mm256_add_epi16(sum_sec, sf2);
 
-          const __m256i res1 = finish_filter_avx2(r, sum_sec);
-          const __m256i diff1 = _mm256_sub_epi16(res1, ref16);
+          const __m256i diff1 =
+              _mm256_add_epi16(diff0, finish_delta_fast(sum_sec, c8));
           const __m256i sse1 = _mm256_madd_epi16(diff1, diff1);
           v_sse1 = _mm256_add_epi32(v_sse1, sse1);
           v_sse3 = _mm256_add_epi32(v_sse3, sse1);
@@ -758,52 +754,63 @@ void av1_cdef_mse_calc_block_lvl4_luma_avx2(
         const intptr_t s1o2 = cdef_directions_padded_inline[d + 4][1];
         const intptr_t s2o1 = cdef_directions_padded_inline[d][0];
         const intptr_t s2o2 = cdef_directions_padded_inline[d][1];
+#if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC unroll 1
+#endif
         for (int i = 0; i < 8;
              i += 2, in_row += 2 * CDEF_BSTRIDE, ref_row += 2 * ref_stride) {
-          const __m256i r =
-              v256_from_v128(v128_load_aligned(in_row),
-                             v128_load_aligned(in_row + CDEF_BSTRIDE));
-          const __m256i ref16 = _mm256_cvtepu8_epi16(
-              v128_from_v64(v64_load_aligned(ref_row),
-                            v64_load_aligned(ref_row + ref_stride)));
+          const __m256i r = load_u16_8x2(in_row);
+          const __m256i ref16 = load_ref16_8x2(ref_row, ref_stride);
           const __m256i diff0 = _mm256_sub_epi16(r, ref16);
           const __m256i sse0 = _mm256_madd_epi16(diff0, diff0);
           v_sse0 = _mm256_add_epi32(v_sse0, sse0);
           v_sse2 = _mm256_add_epi32(v_sse2, sse0);
 
-          const __m256i sn1 =
-              tap_pair_sum_const_avx2(in_row, 1, r, 2, sec_damping);
-          const __m256i sn2 =
-              tap_pair_sum_const_avx2(in_row, CDEF_BSTRIDE, r, 2, sec_damping);
+          const __m256i sn1 = tap_pair_sum_fast(load_u16_8x2(in_row + 1),
+                                                load_u16_8x2(in_row - 1), r,
+                                                v_sec_thresh, v_sec_damp);
+          const __m256i sn2 = tap_pair_sum_fast(
+              load_u16_8x2(in_row + CDEF_BSTRIDE),
+              load_u16_8x2(in_row - CDEF_BSTRIDE), r, v_sec_thresh, v_sec_damp);
           const __m256i sec_near0 = _mm256_add_epi16(sn1, sn2);
           __m256i sum_sec0 = _mm256_add_epi16(sec_near0, sec_near0);
-          const __m256i sf1 =
-              tap_pair_sum_const_avx2(in_row, 2, r, 2, sec_damping);
+
+          const __m256i sf1 = tap_pair_sum_fast(load_u16_8x2(in_row + 2),
+                                                load_u16_8x2(in_row - 2), r,
+                                                v_sec_thresh, v_sec_damp);
           sum_sec0 = _mm256_add_epi16(sum_sec0, sf1);
-          const __m256i sf2 = tap_pair_sum_const_avx2(in_row, 2 * CDEF_BSTRIDE,
-                                                      r, 2, sec_damping);
+
+          const __m256i sf2 =
+              tap_pair_sum_fast(load_u16_8x2(in_row + 2 * CDEF_BSTRIDE),
+                                load_u16_8x2(in_row - 2 * CDEF_BSTRIDE), r,
+                                v_sec_thresh, v_sec_damp);
           sum_sec0 = _mm256_add_epi16(sum_sec0, sf2);
 
-          const __m256i res1 = finish_filter_avx2(r, sum_sec0);
-          const __m256i diff1 = _mm256_sub_epi16(res1, ref16);
+          const __m256i diff1 =
+              _mm256_add_epi16(diff0, finish_delta_fast(sum_sec0, c8));
           v_sse1 = _mm256_add_epi32(v_sse1, _mm256_madd_epi16(diff1, diff1));
 
-          const __m256i snd1 =
-              tap_pair_sum_avx2(in_row, s1o1, r, 2, sec_damping);
-          const __m256i snd2 =
-              tap_pair_sum_avx2(in_row, s2o1, r, 2, sec_damping);
+          const __m256i snd1 = tap_pair_sum_fast(load_u16_8x2(in_row + s1o1),
+                                                 load_u16_8x2(in_row - s1o1), r,
+                                                 v_sec_thresh, v_sec_damp);
+          const __m256i snd2 = tap_pair_sum_fast(load_u16_8x2(in_row + s2o1),
+                                                 load_u16_8x2(in_row - s2o1), r,
+                                                 v_sec_thresh, v_sec_damp);
           const __m256i sec_neard = _mm256_add_epi16(snd1, snd2);
           __m256i sum_secd = _mm256_add_epi16(sec_neard, sec_neard);
-          const __m256i sfd1 =
-              tap_pair_sum_avx2(in_row, s1o2, r, 2, sec_damping);
+
+          const __m256i sfd1 = tap_pair_sum_fast(load_u16_8x2(in_row + s1o2),
+                                                 load_u16_8x2(in_row - s1o2), r,
+                                                 v_sec_thresh, v_sec_damp);
           sum_secd = _mm256_add_epi16(sum_secd, sfd1);
-          const __m256i sfd2 =
-              tap_pair_sum_avx2(in_row, s2o2, r, 2, sec_damping);
+
+          const __m256i sfd2 = tap_pair_sum_fast(load_u16_8x2(in_row + s2o2),
+                                                 load_u16_8x2(in_row - s2o2), r,
+                                                 v_sec_thresh, v_sec_damp);
           sum_secd = _mm256_add_epi16(sum_secd, sfd2);
 
-          const __m256i res3 = finish_filter_avx2(r, sum_secd);
-          const __m256i diff3 = _mm256_sub_epi16(res3, ref16);
+          const __m256i diff3 =
+              _mm256_add_epi16(diff0, finish_delta_fast(sum_secd, c8));
           v_sse3 = _mm256_add_epi32(v_sse3, _mm256_madd_epi16(diff3, diff3));
         }
       }
@@ -811,132 +818,163 @@ void av1_cdef_mse_calc_block_lvl4_luma_avx2(
     }
 
     const unsigned int pri_damping = AOMMAX(0, damping - get_msb(t));
+    const __m128i v_pri_damp = _mm_cvtsi32_si128((int)pri_damping);
+    const __m256i v_pri_thresh = _mm256_set1_epi16((int16_t)t);
     const intptr_t po1 = cdef_directions_padded_inline[d + 2][0];
     const intptr_t po2 = cdef_directions_padded_inline[d + 2][1];
+    const int t_odd = t & 1;
 
     if ((d & 3) == 0) {
+#if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC unroll 1
+#endif
       for (int i = 0; i < 8;
            i += 2, in_row += 2 * CDEF_BSTRIDE, ref_row += 2 * ref_stride) {
-        const __m256i r =
-            v256_from_v128(v128_load_aligned(in_row),
-                           v128_load_aligned(in_row + CDEF_BSTRIDE));
-        const __m256i ref16 = _mm256_cvtepu8_epi16(v128_from_v64(
-            v64_load_aligned(ref_row), v64_load_aligned(ref_row + ref_stride)));
+        const __m256i r = load_u16_8x2(in_row);
+        const __m256i ref16 = load_ref16_8x2(ref_row, ref_stride);
         const __m256i diff0 = _mm256_sub_epi16(r, ref16);
         v_sse0 = _mm256_add_epi32(v_sse0, _mm256_madd_epi16(diff0, diff0));
 
+        // 1. Filter 1: orthogonal secondary
         __m256i max_u8 = r;
         __m256i min_s16 = r;
-        unsigned int t_local = (unsigned int)t;
-        unsigned int pd_local = pri_damping;
-        const __m256i pn = tap_pair_sum_minmax_avx2(
-            in_row, po1, r, t_local, pd_local, &max_u8, &min_s16);
-        const __m256i pf = tap_pair_sum_minmax_avx2(
-            in_row, po2, r, t_local, pd_local, &max_u8, &min_s16);
-        const __m256i p_sum = _mm256_add_epi16(pn, pf);
-        const __m256i sum_pri =
-            _mm256_add_epi16(_mm256_add_epi16(p_sum, p_sum),
-                             (t_local & 1) ? p_sum : _mm256_add_epi16(pn, pn));
 
-        const __m256i res2 = finish_filter_avx2(r, sum_pri);
-        const __m256i diff2 = _mm256_sub_epi16(res2, ref16);
-        v_sse2 = _mm256_add_epi32(v_sse2, _mm256_madd_epi16(diff2, diff2));
+        const __m256i sn1 = tap_pair_sum_minmax_fast(
+            load_u16_8x2(in_row + 1), load_u16_8x2(in_row - 1), r, v_sec_thresh,
+            v_sec_damp, &max_u8, &min_s16);
+        const __m256i sn2 = tap_pair_sum_minmax_fast(
+            load_u16_8x2(in_row + CDEF_BSTRIDE),
+            load_u16_8x2(in_row - CDEF_BSTRIDE), r, v_sec_thresh, v_sec_damp,
+            &max_u8, &min_s16);
+        const __m256i sec_near = _mm256_add_epi16(sn1, sn2);
+        __m256i sum_sec = _mm256_add_epi16(sec_near, sec_near);
 
-        const __m256i sn1 = tap_pair_sum_const_minmax_avx2(
-            in_row, 1, r, 2, sec_damping, &max_u8, &min_s16);
-        __m256i sum_sec = _mm256_add_epi16(sn1, sn1);
-        const __m256i sn2 = tap_pair_sum_const_minmax_avx2(
-            in_row, CDEF_BSTRIDE, r, 2, sec_damping, &max_u8, &min_s16);
-        sum_sec = _mm256_add_epi16(sum_sec, _mm256_add_epi16(sn2, sn2));
-        const __m256i sf1 = tap_pair_sum_const_minmax_avx2(
-            in_row, 2, r, 2, sec_damping, &max_u8, &min_s16);
+        const __m256i sf1 = tap_pair_sum_minmax_fast(
+            load_u16_8x2(in_row + 2), load_u16_8x2(in_row - 2), r, v_sec_thresh,
+            v_sec_damp, &max_u8, &min_s16);
         sum_sec = _mm256_add_epi16(sum_sec, sf1);
-        const __m256i sf2 = tap_pair_sum_const_minmax_avx2(
-            in_row, 2 * CDEF_BSTRIDE, r, 2, sec_damping, &max_u8, &min_s16);
+
+        const __m256i sf2 = tap_pair_sum_minmax_fast(
+            load_u16_8x2(in_row + 2 * CDEF_BSTRIDE),
+            load_u16_8x2(in_row - 2 * CDEF_BSTRIDE), r, v_sec_thresh,
+            v_sec_damp, &max_u8, &min_s16);
         sum_sec = _mm256_add_epi16(sum_sec, sf2);
 
-        const __m256i res1 = finish_filter_avx2(r, sum_sec);
-        const __m256i diff1 = _mm256_sub_epi16(res1, ref16);
+        const __m256i diff1 =
+            _mm256_add_epi16(diff0, finish_delta_fast(sum_sec, c8));
         v_sse1 = _mm256_add_epi32(v_sse1, _mm256_madd_epi16(diff1, diff1));
 
+        // 2. Filter 2: primary
+        const __m256i pn = tap_pair_sum_minmax_fast(
+            load_u16_8x2(in_row + po1), load_u16_8x2(in_row - po1), r,
+            v_pri_thresh, v_pri_damp, &max_u8, &min_s16);
+        const __m256i pf = tap_pair_sum_minmax_fast(
+            load_u16_8x2(in_row + po2), load_u16_8x2(in_row - po2), r,
+            v_pri_thresh, v_pri_damp, &max_u8, &min_s16);
+        const __m256i p_sum = _mm256_add_epi16(pn, pf);
+        const __m256i sum_pri =
+            t_odd ? _mm256_add_epi16(_mm256_slli_epi16(p_sum, 1), p_sum)
+                  : _mm256_add_epi16(_mm256_slli_epi16(p_sum, 1),
+                                     _mm256_slli_epi16(pn, 1));
+
+        const __m256i diff2 =
+            _mm256_add_epi16(diff0, finish_delta_fast(sum_pri, c8));
+        v_sse2 = _mm256_add_epi32(v_sse2, _mm256_madd_epi16(diff2, diff2));
+
+        // 3. Combined
         const __m256i sum_tot = _mm256_add_epi16(sum_pri, sum_sec);
         const __m256i max_s16 =
             _mm256_srli_epi16(_mm256_slli_epi16(max_u8, 2), 2);
-        __m256i res3 = finish_filter_avx2(r, sum_tot);
+        __m256i res3 = _mm256_add_epi16(r, finish_delta_fast(sum_tot, c8));
         res3 = _mm256_min_epi16(_mm256_max_epi16(res3, min_s16), max_s16);
-        const __m256i diff3 = _mm256_sub_epi16(res3, ref16);
-        v_sse3 = _mm256_add_epi32(v_sse3, _mm256_madd_epi16(diff3, diff3));
+        v_sse3 = _mm256_add_epi32(v_sse3, calc_sse_fast(res3, ref16));
       }
     } else {
       const intptr_t s1o1 = cdef_directions_padded_inline[d + 4][0];
       const intptr_t s1o2 = cdef_directions_padded_inline[d + 4][1];
       const intptr_t s2o1 = cdef_directions_padded_inline[d][0];
       const intptr_t s2o2 = cdef_directions_padded_inline[d][1];
+#if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC unroll 1
+#endif
       for (int i = 0; i < 8;
            i += 2, in_row += 2 * CDEF_BSTRIDE, ref_row += 2 * ref_stride) {
-        const __m256i r =
-            v256_from_v128(v128_load_aligned(in_row),
-                           v128_load_aligned(in_row + CDEF_BSTRIDE));
-        const __m256i ref16 = _mm256_cvtepu8_epi16(v128_from_v64(
-            v64_load_aligned(ref_row), v64_load_aligned(ref_row + ref_stride)));
+        const __m256i r = load_u16_8x2(in_row);
+        const __m256i ref16 = load_ref16_8x2(ref_row, ref_stride);
         const __m256i diff0 = _mm256_sub_epi16(r, ref16);
         v_sse0 = _mm256_add_epi32(v_sse0, _mm256_madd_epi16(diff0, diff0));
 
-        const __m256i sn1 =
-            tap_pair_sum_const_avx2(in_row, 1, r, 2, sec_damping);
-        __m256i sum_sec0 = _mm256_add_epi16(sn1, sn1);
-        const __m256i sn2 =
-            tap_pair_sum_const_avx2(in_row, CDEF_BSTRIDE, r, 2, sec_damping);
-        sum_sec0 = _mm256_add_epi16(sum_sec0, _mm256_add_epi16(sn2, sn2));
-        const __m256i sf1 =
-            tap_pair_sum_const_avx2(in_row, 2, r, 2, sec_damping);
+        // 1. Filter 1: orthogonal secondary
+        const __m256i sn1 = tap_pair_sum_fast(load_u16_8x2(in_row + 1),
+                                              load_u16_8x2(in_row - 1), r,
+                                              v_sec_thresh, v_sec_damp);
+        const __m256i sn2 = tap_pair_sum_fast(
+            load_u16_8x2(in_row + CDEF_BSTRIDE),
+            load_u16_8x2(in_row - CDEF_BSTRIDE), r, v_sec_thresh, v_sec_damp);
+        const __m256i sec_near0 = _mm256_add_epi16(sn1, sn2);
+        __m256i sum_sec0 = _mm256_add_epi16(sec_near0, sec_near0);
+
+        const __m256i sf1 = tap_pair_sum_fast(load_u16_8x2(in_row + 2),
+                                              load_u16_8x2(in_row - 2), r,
+                                              v_sec_thresh, v_sec_damp);
         sum_sec0 = _mm256_add_epi16(sum_sec0, sf1);
-        const __m256i sf2 = tap_pair_sum_const_avx2(in_row, 2 * CDEF_BSTRIDE, r,
-                                                    2, sec_damping);
+
+        const __m256i sf2 =
+            tap_pair_sum_fast(load_u16_8x2(in_row + 2 * CDEF_BSTRIDE),
+                              load_u16_8x2(in_row - 2 * CDEF_BSTRIDE), r,
+                              v_sec_thresh, v_sec_damp);
         sum_sec0 = _mm256_add_epi16(sum_sec0, sf2);
 
-        const __m256i res1 = finish_filter_avx2(r, sum_sec0);
-        const __m256i diff1 = _mm256_sub_epi16(res1, ref16);
+        const __m256i diff1 =
+            _mm256_add_epi16(diff0, finish_delta_fast(sum_sec0, c8));
         v_sse1 = _mm256_add_epi32(v_sse1, _mm256_madd_epi16(diff1, diff1));
 
+        // 2. Filter 2: primary
         __m256i max_u8 = r;
         __m256i min_s16 = r;
-        unsigned int t_local = (unsigned int)t;
-        unsigned int pd_local = pri_damping;
-        const __m256i pn = tap_pair_sum_minmax_avx2(
-            in_row, po1, r, t_local, pd_local, &max_u8, &min_s16);
-        const __m256i pf = tap_pair_sum_minmax_avx2(
-            in_row, po2, r, t_local, pd_local, &max_u8, &min_s16);
-        const __m256i p_sum = _mm256_add_epi16(pn, pf);
-        __m256i sum_tot =
-            _mm256_add_epi16(_mm256_add_epi16(p_sum, p_sum),
-                             (t_local & 1) ? p_sum : _mm256_add_epi16(pn, pn));
 
-        const __m256i res2 = finish_filter_avx2(r, sum_tot);
-        const __m256i diff2 = _mm256_sub_epi16(res2, ref16);
+        const __m256i pn = tap_pair_sum_minmax_fast(
+            load_u16_8x2(in_row + po1), load_u16_8x2(in_row - po1), r,
+            v_pri_thresh, v_pri_damp, &max_u8, &min_s16);
+        const __m256i pf = tap_pair_sum_minmax_fast(
+            load_u16_8x2(in_row + po2), load_u16_8x2(in_row - po2), r,
+            v_pri_thresh, v_pri_damp, &max_u8, &min_s16);
+        const __m256i p_sum = _mm256_add_epi16(pn, pf);
+        const __m256i sum_pri =
+            t_odd ? _mm256_add_epi16(_mm256_slli_epi16(p_sum, 1), p_sum)
+                  : _mm256_add_epi16(_mm256_slli_epi16(p_sum, 1),
+                                     _mm256_slli_epi16(pn, 1));
+
+        const __m256i diff2 =
+            _mm256_add_epi16(diff0, finish_delta_fast(sum_pri, c8));
         v_sse2 = _mm256_add_epi32(v_sse2, _mm256_madd_epi16(diff2, diff2));
 
-        const __m256i snd1 = tap_pair_sum_minmax_avx2(
-            in_row, s1o1, r, 2, sec_damping, &max_u8, &min_s16);
-        sum_tot = _mm256_add_epi16(sum_tot, _mm256_add_epi16(snd1, snd1));
-        const __m256i snd2 = tap_pair_sum_minmax_avx2(
-            in_row, s2o1, r, 2, sec_damping, &max_u8, &min_s16);
-        sum_tot = _mm256_add_epi16(sum_tot, _mm256_add_epi16(snd2, snd2));
-        const __m256i sfd1 = tap_pair_sum_minmax_avx2(
-            in_row, s1o2, r, 2, sec_damping, &max_u8, &min_s16);
-        sum_tot = _mm256_add_epi16(sum_tot, sfd1);
-        const __m256i sfd2 = tap_pair_sum_minmax_avx2(
-            in_row, s2o2, r, 2, sec_damping, &max_u8, &min_s16);
-        sum_tot = _mm256_add_epi16(sum_tot, sfd2);
+        // 3. Filter 3: directional secondary + combined
+        const __m256i snd1 = tap_pair_sum_minmax_fast(
+            load_u16_8x2(in_row + s1o1), load_u16_8x2(in_row - s1o1), r,
+            v_sec_thresh, v_sec_damp, &max_u8, &min_s16);
+        const __m256i snd2 = tap_pair_sum_minmax_fast(
+            load_u16_8x2(in_row + s2o1), load_u16_8x2(in_row - s2o1), r,
+            v_sec_thresh, v_sec_damp, &max_u8, &min_s16);
+        const __m256i sec_neard = _mm256_add_epi16(snd1, snd2);
+        __m256i sum_secd = _mm256_add_epi16(sec_neard, sec_neard);
 
+        const __m256i sfd1 = tap_pair_sum_minmax_fast(
+            load_u16_8x2(in_row + s1o2), load_u16_8x2(in_row - s1o2), r,
+            v_sec_thresh, v_sec_damp, &max_u8, &min_s16);
+        sum_secd = _mm256_add_epi16(sum_secd, sfd1);
+
+        const __m256i sfd2 = tap_pair_sum_minmax_fast(
+            load_u16_8x2(in_row + s2o2), load_u16_8x2(in_row - s2o2), r,
+            v_sec_thresh, v_sec_damp, &max_u8, &min_s16);
+        sum_secd = _mm256_add_epi16(sum_secd, sfd2);
+
+        const __m256i sum_tot = _mm256_add_epi16(sum_pri, sum_secd);
         const __m256i max_s16 =
             _mm256_srli_epi16(_mm256_slli_epi16(max_u8, 2), 2);
-        __m256i res3 = finish_filter_avx2(r, sum_tot);
+        __m256i res3 = _mm256_add_epi16(r, finish_delta_fast(sum_tot, c8));
         res3 = _mm256_min_epi16(_mm256_max_epi16(res3, min_s16), max_s16);
-        const __m256i diff3 = _mm256_sub_epi16(res3, ref16);
-        v_sse3 = _mm256_add_epi32(v_sse3, _mm256_madd_epi16(diff3, diff3));
+        v_sse3 = _mm256_add_epi32(v_sse3, calc_sse_fast(res3, ref16));
       }
     }
   }
