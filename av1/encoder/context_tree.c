@@ -19,11 +19,6 @@
 #include "av1/encoder/encoder.h"
 #include "av1/encoder/rd.h"
 
-typedef struct PmcPoolHeader {
-  PICK_MODE_CONTEXT *pmc_free[2][11];
-  uintptr_t pad[2];
-} PmcPoolHeader;
-
 static inline int pmc_size_idx(int num_blk) {
 #if defined(__GNUC__) || defined(__clang__)
   return __builtin_ctz(num_blk);
@@ -75,6 +70,7 @@ void av1_copy_tree_context(PICK_MODE_CONTEXT *dst_ctx,
 void av1_setup_shared_coeff_buffer(const SequenceHeader *const seq_params,
                                    PC_TREE_SHARED_BUFFERS *shared_bufs,
                                    struct aom_internal_error_info *error) {
+  assert((sizeof(PmcPoolHeader) & 31) == 0);
   const int num_planes = seq_params->monochrome ? 1 : MAX_MB_PLANE;
   const int max_sb_square_y = 1 << num_pels_log2_lookup[seq_params->sb_size];
   const int max_sb_square_uv = max_sb_square_y >> (seq_params->subsampling_x +

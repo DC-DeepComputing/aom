@@ -100,6 +100,20 @@ typedef struct SIMPLE_MOTION_DATA_TREE {
   int sms_rect_valid;
 } SIMPLE_MOTION_DATA_TREE;
 
+/*!\cond */
+typedef struct PmcPoolHeader {
+  PICK_MODE_CONTEXT *pmc_free[2][11];
+  uintptr_t pad[2];
+} PmcPoolHeader;
+
+static inline PmcPoolHeader *av1_pmc_pool(
+    const PC_TREE_SHARED_BUFFERS *shared_bufs) {
+  return shared_bufs->coeff_buf[0] != NULL
+             ? ((PmcPoolHeader *)shared_bufs->coeff_buf[0] - 1)
+             : NULL;
+}
+/*!\endcond */
+
 void av1_setup_shared_coeff_buffer(const SequenceHeader *const seq_params,
                                    PC_TREE_SHARED_BUFFERS *shared_bufs,
                                    struct aom_internal_error_info *error);

@@ -1051,6 +1051,9 @@ void av1_change_config(struct AV1_COMP *cpi, const AV1EncoderConfig *oxcf,
 
   if (cm->width > cpi->data_alloc_width ||
       cm->height > cpi->data_alloc_height || is_sb_size_changed) {
+    av1_free_pc_tree_recursive(cpi->td.pc_root, av1_num_planes(cm), 0, 0,
+                               cpi->sf.part_sf.partition_search_type);
+    cpi->td.pc_root = NULL;
     av1_free_context_buffers(cm);
     av1_free_shared_coeff_buffer(&cpi->td.shared_coeff_buf);
     av1_free_sms_tree(&cpi->td);
@@ -2879,6 +2882,9 @@ static int set_size_literal(AV1_COMP *cpi, int width, int height) {
 
   if (cm->width > cpi->data_alloc_width ||
       cm->height > cpi->data_alloc_height) {
+    av1_free_pc_tree_recursive(cpi->td.pc_root, av1_num_planes(cm), 0, 0,
+                               cpi->sf.part_sf.partition_search_type);
+    cpi->td.pc_root = NULL;
     av1_free_context_buffers(cm);
     av1_free_shared_coeff_buffer(&cpi->td.shared_coeff_buf);
     av1_free_sms_tree(&cpi->td);
