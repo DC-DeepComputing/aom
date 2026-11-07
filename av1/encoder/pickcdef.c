@@ -472,14 +472,6 @@ static AOM_FORCE_INLINE int get_error_calc_width_in_filt_units(
   return 1;
 }
 
-#if HAVE_AVX2
-void av1_cdef_mse_calc_block_lvl4_luma(
-    const uint16_t *in, const uint8_t *ref_buffer, int ref_stride, int row,
-    int col, const cdef_list *dlist, int cdef_count,
-    int dir[CDEF_NBLOCKS][CDEF_NBLOCKS], int var[CDEF_NBLOCKS][CDEF_NBLOCKS],
-    int damping, int pli, int xdec, uint64_t mse[4]);
-#endif
-
 // Returns the block error after CDEF filtering for a given strength
 static inline uint64_t get_filt_error(
     const CdefSearchCtx *cdef_search_ctx, const struct macroblockd_plane *pd,
@@ -704,7 +696,7 @@ void av1_cdef_mse_calc_block(CdefSearchCtx *cdef_search_ctx,
         !cdef_search_ctx->use_highbitdepth &&
         mi_wide_l2[pli] == mi_high_l2[pli] && use_avx2_find_dir) {
       dirinit = 1;
-      av1_cdef_mse_calc_block_lvl4_luma(
+      av1_cdef_mse_calc_block_lvl4_avx2(
           in, ref_buffer[pli], ref_stride[pli], row, col, dlist, cdef_count,
           dir, var, cdef_search_ctx->damping, pli, mi_wide_l2[pli],
           cdef_search_ctx->mse[pli > 0][sb_count]);

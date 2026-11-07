@@ -12,6 +12,8 @@
 #ifndef AOM_AV1_COMMON_CDEF_BLOCK_H_
 #define AOM_AV1_COMMON_CDEF_BLOCK_H_
 
+#include "config/aom_config.h"
+
 #include "aom_dsp/odintrin.h"
 
 #define CDEF_BLOCKSIZE 64
@@ -30,6 +32,10 @@
 #define CDEF_VERY_LARGE (0x4000)
 #define CDEF_INBUF_SIZE \
   (CDEF_BSTRIDE * ((1 << MAX_SB_SIZE_LOG2) + 2 * CDEF_VBORDER))
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC visibility push(hidden)
@@ -75,8 +81,20 @@ void av1_cdef_filter_fb(uint8_t *dst8, uint16_t *dst16, int dstride,
                         cdef_list *dlist, int cdef_count, int level,
                         int sec_strength, int damping, int coeff_shift);
 
+#if CONFIG_AV1_ENCODER && HAVE_AVX2
+void av1_cdef_mse_calc_block_lvl4_avx2(
+    const uint16_t *in, const uint8_t *ref_buffer, int ref_stride, int row,
+    int col, const cdef_list *dlist, int cdef_count,
+    int dir[CDEF_NBLOCKS][CDEF_NBLOCKS], int var[CDEF_NBLOCKS][CDEF_NBLOCKS],
+    int damping, int pli, int mi_wide_l2, uint64_t mse[4]);
+#endif  // CONFIG_AV1_ENCODER && HAVE_AVX2
+
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC visibility pop
+#endif
+
+#ifdef __cplusplus
+}  // extern "C"
 #endif
 
 static inline void fill_rect(uint16_t *dst, int dstride, int v, int h,
