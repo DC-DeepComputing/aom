@@ -15,6 +15,7 @@
 #include "config/aom_config.h"
 #include "config/av1_rtcd.h"
 
+#include "av1/common/av1_txfm.h"
 #include "av1/common/blockd.h"
 
 #ifdef __cplusplus
@@ -45,6 +46,29 @@ static inline void av1_fwd_txfm(const int16_t *src_diff, tran_low_t *coeff,
  */
 void av1_quick_txfm(int use_hadamard, TX_SIZE tx_size, BitDepthInfo bd_info,
                     const int16_t *src_diff, int src_stride, tran_low_t *coeff);
+
+#if HAVE_AVX2 && !CONFIG_HIGHWAY
+/*!\cond */
+FwdTxfm2dFunc av1_lowbd_fwd_txfm2d_func_avx2(TX_SIZE tx_size);
+
+void av1_lowbd_fwd_txfm_nl_avx2(const int16_t *src_diff, tran_low_t *coeff,
+                                int diff_stride, TX_SIZE tx_size,
+                                TX_TYPE tx_type);
+
+uint64_t av1_sub_sum_sse_lbd_avx2(const uint8_t *src, int src_stride,
+                                  const uint8_t *dst, int dst_stride,
+                                  int16_t *diff, uint32_t dims_pack);
+
+int64_t av1_sse_dc_add_8bit_avx2(const uint8_t *src, int src_stride,
+                                 const uint8_t *dst, int dst_stride,
+                                 uint32_t dims_dc);
+
+int64_t av1_dist_block_px_lbd_recon_avx2(const uint8_t *src, int src_stride,
+                                         const uint8_t *dst, int dst_stride,
+                                         const tran_low_t *dqcoeff,
+                                         uint32_t tx_info);
+/*!\endcond */
+#endif  // HAVE_AVX2 && !CONFIG_HIGHWAY
 
 #if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
 #pragma GCC visibility pop

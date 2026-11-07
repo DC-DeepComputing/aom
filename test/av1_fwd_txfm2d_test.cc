@@ -10,8 +10,10 @@
  */
 
 #include <math.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <tuple>
 #include <vector>
 
@@ -22,6 +24,7 @@
 #include "test/util.h"
 #include "test/av1_txfm_test.h"
 #include "av1/common/av1_txfm.h"
+#include "av1/common/scan.h"
 #include "av1/encoder/hybrid_fwd_txfm.h"
 
 using libaom_test::ACMRandom;
@@ -703,5 +706,432 @@ INSTANTIATE_TEST_SUITE_P(NEON, AV1HighbdFwdTxfm2dTest,
                          Combine(ValuesIn(Highbd_fwd_txfm_for_neon),
                                  Values(av1_highbd_fwd_txfm)));
 #endif  // HAVE_NEON
+
+#if CONFIG_AV1_ENCODER && HAVE_AVX2 && !CONFIG_HIGHWAY && !CONFIG_SHARED
+TEST(AVX2, Av1LowbdFwdTxfm2dFuncAndNlMatchC) {
+  ACMRandom rnd(ACMRandom::DeterministicSeed());
+  DECLARE_ALIGNED(32, tran_low_t, out_fn[64 * 64]);
+  DECLARE_ALIGNED(32, tran_low_t, out_nl[64 * 64]);
+  DECLARE_ALIGNED(32, tran_low_t, out_avx2[64 * 64]);
+  DECLARE_ALIGNED(32, tran_low_t, out_ref[64 * 64]);
+  DECLARE_ALIGNED(32, int16_t, diff_buf[128 * 72]);
+
+  for (int s = 0; s < TX_SIZES_ALL; ++s) {
+    const TX_SIZE tx_size = static_cast<TX_SIZE>(s);
+    const int rows = tx_size_high[tx_size];
+    const int cols = tx_size_wide[tx_size];
+    const int check_cols = AOMMIN(32, cols);
+    const int check_rows = AOMMIN(32, rows * cols / check_cols);
+    const int check_n = check_rows * check_cols;
+    const FwdTxfm2dFunc fn = av1_lowbd_fwd_txfm2d_func_avx2(tx_size);
+    ASSERT_NE(fn, nullptr);
+    const FwdTxfm2dFunc ref_fn = libaom_test::fwd_txfm_func_ls[tx_size];
+    const int strides[4] = { cols, AOMMAX(cols, 16), AOMMAX(cols, 64), 128 };
+
+    for (int t = 0; t < TX_TYPES; ++t) {
+      const TX_TYPE tx_type = static_cast<TX_TYPE>(t);
+      if (!libaom_test::IsTxSizeTypeValid(tx_size, tx_type)) continue;
+
+      TxfmParam param;
+      memset(&param, 0, sizeof(param));
+      param.tx_type = tx_type;
+      param.tx_size = tx_size;
+      param.tx_set_type = EXT_TX_SET_ALL16;
+      param.bd = 8;
+      param.lossless = 0;
+
+      for (int si = 0; si < 4; ++si) {
+        const int stride = strides[si];
+        int16_t *const input =
+            diff_buf + ((si & 1) && cols <= 64 ? AOMMAX(cols, 16) : 0);
+        for (int pat = 0; pat < 6; ++pat) {
+          for (size_t i = 0; i < sizeof(diff_buf) / sizeof(diff_buf[0]); ++i) {
+            diff_buf[i] = static_cast<int16_t>(rnd.Rand8()) -
+                          static_cast<int16_t>(rnd.Rand8());
+          }
+          for (int r = 0; r < rows; ++r) {
+            for (int c = 0; c < cols; ++c) {
+              int16_t v = 0;
+              if (pat == 0) {
+                v = 255;
+              } else if (pat == 1) {
+                v = -255;
+              } else if (pat == 2) {
+                v = 0;
+              } else if (pat == 3) {
+                v = ((r + c) & 1) ? 255 : -255;
+              } else if (pat == 4) {
+                v = static_cast<int16_t>(rnd.Rand8Extremes()) -
+                    static_cast<int16_t>(rnd.Rand8Extremes());
+              } else {
+                v = static_cast<int16_t>(rnd.Rand8()) -
+                    static_cast<int16_t>(rnd.Rand8());
+              }
+              input[r * stride + c] = v;
+            }
+          }
+
+          memset(out_fn, 0xa5, sizeof(out_fn));
+          memset(out_nl, 0x5a, sizeof(out_nl));
+          memset(out_avx2, 0x3c, sizeof(out_avx2));
+          fn(input, out_fn, stride, tx_type, 8);
+          av1_lowbd_fwd_txfm_nl_avx2(input, out_nl, stride, tx_size, tx_type);
+          av1_lowbd_fwd_txfm_avx2(input, out_avx2, stride, &param);
+
+          for (int i = 0; i < check_n; ++i) {
+            ASSERT_EQ(out_avx2[i], out_fn[i])
+                << "tx_size=" << cols << "x" << rows << " tx_type=" << t
+                << " stride=" << stride << " pat=" << pat << " idx=" << i;
+            ASSERT_EQ(out_avx2[i], out_nl[i])
+                << "tx_size=" << cols << "x" << rows << " tx_type=" << t
+                << " stride=" << stride << " pat=" << pat << " idx=" << i;
+          }
+          if (ref_fn != nullptr) {
+            memset(out_ref, 0, sizeof(out_ref));
+            ref_fn(input, out_ref, stride, tx_type, 8);
+            for (int i = 0; i < check_n; ++i) {
+              ASSERT_EQ(out_ref[i], out_nl[i])
+                  << "ref mismatch tx_size=" << cols << "x" << rows
+                  << " tx_type=" << t << " stride=" << stride << " pat=" << pat
+                  << " idx=" << i;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+TEST(AVX2, Av1SubSumSseLbdMatchC) {
+  ACMRandom rnd(ACMRandom::DeterministicSeed());
+  constexpr int kDims[4] = { 4, 8, 16, 32 };
+  constexpr int16_t kCanary = static_cast<int16_t>(0x5a5a);
+  vector<uint8_t> src_buf(128 * 40);
+  vector<uint8_t> dst_buf(128 * 40);
+  vector<int16_t> diff_buf(128 * 40);
+
+  for (int wi = 0; wi < 4; ++wi) {
+    const int bsw = kDims[wi];
+    for (int hi = 0; hi < 4; ++hi) {
+      const int bsh = kDims[hi];
+      const int sstrides[4] = { bsw, bsw + 1, 67, 99 };
+      const int dstrides[4] = { bsw, bsw + 3, 73, 64 };
+      const int fstrides[4] = { bsw, bsw + 5, 32 < bsw ? bsw : 32, 71 };
+
+      for (int si = 0; si < 4; ++si) {
+        const int sstride = sstrides[si];
+        const int dstride = dstrides[si];
+        const int fstride = fstrides[si];
+        constexpr size_t kGuard = 37;
+        uint8_t *const src = src_buf.data() + (si & 1 ? 3 : 16);
+        uint8_t *const dst = dst_buf.data() + (si & 1 ? 7 : 16);
+        int16_t *const diff = diff_buf.data() + kGuard;
+        const uint32_t dims_pack = static_cast<uint32_t>(fstride) |
+                                   (static_cast<uint32_t>(bsw) << 16) |
+                                   (static_cast<uint32_t>(bsh) << 24);
+
+        for (int pat = 0; pat < 10; ++pat) {
+          for (size_t i = 0; i < src_buf.size(); ++i) {
+            src_buf[i] = rnd.Rand8();
+            dst_buf[i] = rnd.Rand8();
+          }
+          std::fill(diff_buf.begin(), diff_buf.end(), kCanary);
+
+          int32_t ref_sum = 0;
+          uint32_t ref_sse = 0;
+          for (int r = 0; r < bsh; ++r) {
+            for (int c = 0; c < bsw; ++c) {
+              uint8_t sv = 0;
+              uint8_t dv = 0;
+              if (pat == 0) {
+                sv = 0;
+                dv = 255;
+              } else if (pat == 1) {
+                sv = 255;
+                dv = 0;
+              } else if (pat == 2) {
+                sv = 128;
+                dv = 128;
+              } else if (pat == 3) {
+                sv = ((r + c) & 1) ? 255 : 0;
+                dv = ((r + c) & 1) ? 0 : 255;
+              } else if (pat == 4) {
+                sv = (r & 1) ? 255 : 0;
+                dv = (c & 1) ? 255 : 0;
+              } else if (pat < 7) {
+                sv = rnd.Rand8Extremes();
+                dv = rnd.Rand8Extremes();
+              } else {
+                sv = rnd.Rand8();
+                dv = rnd.Rand8();
+              }
+              src[r * sstride + c] = sv;
+              dst[r * dstride + c] = dv;
+              const int32_t d = static_cast<int32_t>(sv) - dv;
+              ref_sum += d;
+              ref_sse += static_cast<uint32_t>(d * d);
+            }
+          }
+
+          const uint64_t got = av1_sub_sum_sse_lbd_avx2(
+              src, sstride, dst, dstride, diff, dims_pack);
+          const int32_t got_sum = static_cast<int32_t>(got >> 32);
+          const uint32_t got_sse = static_cast<uint32_t>(got);
+          ASSERT_EQ(ref_sum, got_sum)
+              << bsw << "x" << bsh << " si=" << si << " pat=" << pat;
+          ASSERT_EQ(ref_sse, got_sse)
+              << bsw << "x" << bsh << " si=" << si << " pat=" << pat;
+
+          for (size_t i = 0; i < kGuard; ++i) {
+            ASSERT_EQ(kCanary, diff_buf[i]);
+          }
+          for (int r = 0; r < bsh; ++r) {
+            for (int c = 0; c < fstride; ++c) {
+              const int16_t got_d = diff[r * fstride + c];
+              if (c < bsw) {
+                const int16_t exp_d =
+                    static_cast<int16_t>(src[r * sstride + c]) -
+                    static_cast<int16_t>(dst[r * dstride + c]);
+                ASSERT_EQ(exp_d, got_d)
+                    << bsw << "x" << bsh << " r=" << r << " c=" << c;
+              } else {
+                ASSERT_EQ(kCanary, got_d)
+                    << "clobbered stride padding " << bsw << "x" << bsh
+                    << " r=" << r << " c=" << c;
+              }
+            }
+          }
+          for (size_t i = kGuard + static_cast<size_t>(bsh) * fstride;
+               i < diff_buf.size(); ++i) {
+            ASSERT_EQ(kCanary, diff_buf[i]);
+          }
+        }
+      }
+    }
+  }
+}
+
+TEST(AVX2, Av1SseDcAdd8bitMatchC) {
+  ACMRandom rnd(ACMRandom::DeterministicSeed());
+  constexpr int kDims[5] = { 4, 8, 16, 32, 64 };
+  constexpr int kDcs[11] = {
+    -255, -200, -128, -17, -1, 0, 1, 17, 127, 200, 255
+  };
+  vector<uint8_t> src_buf(128 * 72);
+  vector<uint8_t> dst_buf(128 * 72);
+
+  for (int wi = 0; wi < 5; ++wi) {
+    const int bsw = kDims[wi];
+    for (int hi = 0; hi < 5; ++hi) {
+      const int bsh = kDims[hi];
+      const int sstrides[3] = { bsw, bsw + 1, 97 };
+      const int dstrides[3] = { bsw, bsw + 3, 101 };
+
+      for (int si = 0; si < 3; ++si) {
+        const int sstride = sstrides[si];
+        const int dstride = dstrides[si];
+        uint8_t *const src = src_buf.data() + (si == 1 ? 3 : 0);
+        uint8_t *const dst = dst_buf.data() + (si == 1 ? 5 : 0);
+
+        for (int pat = 0; pat < 7; ++pat) {
+          for (size_t i = 0; i < src_buf.size(); ++i) {
+            src_buf[i] = rnd.Rand8();
+            dst_buf[i] = rnd.Rand8();
+          }
+          for (int r = 0; r < bsh; ++r) {
+            for (int c = 0; c < bsw; ++c) {
+              uint8_t sv = 0;
+              uint8_t dv = 0;
+              if (pat == 0) {
+                sv = 0;
+                dv = 0;
+              } else if (pat == 1) {
+                sv = 0;
+                dv = 255;
+              } else if (pat == 2) {
+                sv = 255;
+                dv = 0;
+              } else if (pat == 3) {
+                sv = 255;
+                dv = 255;
+              } else if (pat == 4) {
+                sv = ((r + c) & 1) ? 255 : 0;
+                dv = ((r + c) & 1) ? 0 : 255;
+              } else if (pat == 5) {
+                sv = rnd.Rand8Extremes();
+                dv = rnd.Rand8Extremes();
+              } else {
+                sv = rnd.Rand8();
+                dv = rnd.Rand8();
+              }
+              src[r * sstride + c] = sv;
+              dst[r * dstride + c] = dv;
+            }
+          }
+
+          for (int di = 0; di < 11; ++di) {
+            const int dc = kDcs[di];
+            const uint32_t dc_pos = dc > 0 ? static_cast<uint32_t>(dc) : 0u;
+            const uint32_t dc_neg = dc < 0 ? static_cast<uint32_t>(-dc) : 0u;
+            const uint32_t dims_dc = static_cast<uint32_t>(bsw) |
+                                     (static_cast<uint32_t>(bsh) << 8) |
+                                     (dc_pos << 16) | (dc_neg << 24);
+            int64_t ref_sse = 0;
+            for (int r = 0; r < bsh; ++r) {
+              for (int c = 0; c < bsw; ++c) {
+                int recon = static_cast<int>(dst[r * dstride + c]) + dc;
+                if (recon < 0) recon = 0;
+                if (recon > 255) recon = 255;
+                const int64_t err =
+                    static_cast<int64_t>(src[r * sstride + c]) - recon;
+                ref_sse += err * err;
+              }
+            }
+            const int64_t ref_dist = 16 * ref_sse;
+            const int64_t got_dist =
+                av1_sse_dc_add_8bit_avx2(src, sstride, dst, dstride, dims_dc);
+            ASSERT_EQ(ref_dist, got_dist) << bsw << "x" << bsh << " si=" << si
+                                          << " pat=" << pat << " dc=" << dc;
+          }
+        }
+      }
+    }
+  }
+}
+
+TEST(AVX2, Av1DistBlockPxLbdReconMatchC) {
+  ACMRandom rnd(ACMRandom::DeterministicSeed());
+  DECLARE_ALIGNED(32, int16_t, res_diff[32 * 32]);
+  DECLARE_ALIGNED(32, tran_low_t, coeff_full[32 * 32]);
+  DECLARE_ALIGNED(32, tran_low_t, dqcoeff[32 * 32]);
+  DECLARE_ALIGNED(32, uint16_t, ref_recon[64 * 64]);
+  vector<uint8_t> src_buf(96 * 40);
+  vector<uint8_t> dst_buf(96 * 40);
+
+  for (int s = 0; s < TX_SIZES_ALL; ++s) {
+    const TX_SIZE tx_size = static_cast<TX_SIZE>(s);
+    const int bsw = tx_size_wide[tx_size];
+    const int bsh = tx_size_high[tx_size];
+    if (bsw > 32 || bsh > 32) continue;
+
+    const FwdTxfm2dFunc fwd_fn =
+        libaom_test::fwd_txfm_func_ls[tx_size] != nullptr
+            ? libaom_test::fwd_txfm_func_ls[tx_size]
+            : av1_lowbd_fwd_txfm2d_func_avx2(tx_size);
+    const libaom_test::InvTxfm2dFunc inv_ref =
+        libaom_test::inv_txfm_func_ls[tx_size];
+    ASSERT_NE(fwd_fn, nullptr);
+    ASSERT_NE(inv_ref, nullptr);
+
+    const int eobmax = bsw * bsh;
+    const int cutoffs[4] = { 1, 2, AOMMAX(1, eobmax / 4), eobmax };
+    const int sstrides[3] = { bsw, bsw + 1, 67 };
+    const int dstrides[3] = { bsw, bsw + 3, 71 };
+
+    for (int t = 0; t < TX_TYPES; ++t) {
+      const TX_TYPE tx_type = static_cast<TX_TYPE>(t);
+      if (!libaom_test::IsTxSizeTypeValid(tx_size, tx_type)) continue;
+      const int16_t *const scan = get_default_scan(tx_size, tx_type)->scan;
+
+      for (int si = 0; si < 3; ++si) {
+        const int sstride = sstrides[si];
+        const int dstride = dstrides[si];
+        uint8_t *const src = src_buf.data() + (si == 1 ? 3 : 0);
+        uint8_t *const dst = dst_buf.data() + (si == 1 ? 5 : 0);
+
+        for (int pat = 0; pat < 5; ++pat) {
+          for (size_t i = 0; i < src_buf.size(); ++i) {
+            src_buf[i] = rnd.Rand8();
+            dst_buf[i] = rnd.Rand8();
+          }
+          for (int r = 0; r < bsh; ++r) {
+            for (int c = 0; c < bsw; ++c) {
+              uint8_t sv = 0;
+              uint8_t dv = 0;
+              int16_t rv = 0;
+              if (pat == 0) {
+                sv = 0;
+                dv = 255;
+                rv = -255;
+              } else if (pat == 1) {
+                sv = 255;
+                dv = 0;
+                rv = 255;
+              } else if (pat == 2) {
+                const int odd = (r + c) & 1;
+                sv = odd ? 255 : 0;
+                dv = odd ? 0 : 255;
+                rv = odd ? 255 : -255;
+              } else if (pat == 3) {
+                sv = rnd.Rand8Extremes();
+                dv = rnd.Rand8Extremes();
+                rv = static_cast<int16_t>(rnd.Rand8Extremes()) -
+                     static_cast<int16_t>(rnd.Rand8Extremes());
+              } else {
+                sv = rnd.Rand8();
+                dv = rnd.Rand8();
+                rv = static_cast<int16_t>(sv) - static_cast<int16_t>(dv);
+              }
+              src[r * sstride + c] = sv;
+              dst[r * dstride + c] = dv;
+              res_diff[r * bsw + c] = rv;
+            }
+          }
+
+          memset(coeff_full, 0, sizeof(coeff_full));
+          fwd_fn(res_diff, coeff_full, bsw, tx_type, 8);
+
+          for (int ci = 0; ci < 4; ++ci) {
+            const int cutoff = cutoffs[ci];
+            memcpy(dqcoeff, coeff_full, sizeof(dqcoeff));
+            for (int i = cutoff; i < eobmax; ++i) {
+              dqcoeff[scan[i]] = 0;
+            }
+            int actual_eob = 0;
+            for (int i = cutoff - 1; i >= 0; --i) {
+              if (dqcoeff[scan[i]] != 0) {
+                actual_eob = i + 1;
+                break;
+              }
+            }
+            if (actual_eob == 0) {
+              dqcoeff[scan[0]] = 16;
+              actual_eob = 1;
+            }
+
+            memset(ref_recon, 0, sizeof(ref_recon));
+            for (int r = 0; r < bsh; ++r) {
+              for (int c = 0; c < bsw; ++c) {
+                ref_recon[r * 64 + c] = dst[r * dstride + c];
+              }
+            }
+            inv_ref(dqcoeff, ref_recon, 64, tx_type, 8);
+
+            int64_t ref_sse = 0;
+            for (int r = 0; r < bsh; ++r) {
+              for (int c = 0; c < bsw; ++c) {
+                const int64_t err = static_cast<int64_t>(src[r * sstride + c]) -
+                                    static_cast<int64_t>(ref_recon[r * 64 + c]);
+                ref_sse += err * err;
+              }
+            }
+            const int64_t ref_dist = 16 * ref_sse;
+            const uint32_t tx_info = static_cast<uint32_t>(tx_size) |
+                                     (static_cast<uint32_t>(tx_type) << 5) |
+                                     (static_cast<uint32_t>(actual_eob) << 9) |
+                                     (static_cast<uint32_t>(bsw) << 20) |
+                                     (static_cast<uint32_t>(bsh) << 26);
+            const int64_t got_dist = av1_dist_block_px_lbd_recon_avx2(
+                src, sstride, dst, dstride, dqcoeff, tx_info);
+            ASSERT_EQ(ref_dist, got_dist)
+                << bsw << "x" << bsh << " tx_type=" << t << " si=" << si
+                << " pat=" << pat << " eob=" << actual_eob;
+          }
+        }
+      }
+    }
+  }
+}
+#endif  // CONFIG_AV1_ENCODER && HAVE_AVX2 && !CONFIG_HIGHWAY && !CONFIG_SHARED
 
 }  // namespace
