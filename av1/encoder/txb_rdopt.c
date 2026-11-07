@@ -316,112 +316,218 @@ static AOM_FORCE_INLINE int get_br_ctx_simple_fast(const uint8_t *const levels,
   return mag + ((c < stride - TX_PAD_HOR) ? 7 : 14);
 }
 
+static AOM_FORCE_INLINE uint64_t pack_rate_cul(int rate, tran_low_t abs_val) {
+  const unsigned int capped = (unsigned int)AOMMIN(abs_val, COEFF_CONTEXT_MASK);
+  return (uint64_t)(uint32_t)rate | ((uint64_t)capped << 32);
+}
+
+static AOM_FORCE_INLINE int eval_better_qm_exact(tran_low_t tqc, tran_low_t dqc,
+                                                 tran_low_t dqc_low,
+                                                 int64_t scaled_qm, int rate,
+                                                 int rate_low, int64_t rdmult) {
+  const int64_t dist_diff = get_coeff_dist_scaled_qm(tqc, dqc, scaled_qm) -
+                            get_coeff_dist_scaled_qm(tqc, dqc_low, scaled_qm);
+  const int64_t rd_thresh =
+      RDCOST(rdmult, rate_low, 0) - RDCOST(rdmult, rate, 0);
+  return dist_diff * (1 << RDDIV_BITS) > rd_thresh;
+}
+
 #if defined(__GNUC__) || defined(__clang__)
 __attribute__((noinline))
 #endif
-static int update_coeff_simple_gt1_try_lower(intptr_t ci, tran_low_t abs_qc,
-                                             const int *base_cost4_ctx,
-                                             const TxbOptCtx *__restrict ctx) {
+static uint64_t finish_try_lower(intptr_t ci, unsigned int abs_qc, int rate,
+                                 int rate_low, tran_low_t dqc_low,
+                                 const TxbOptCtx *__restrict ctx) {
+  const tran_low_t tqc = ctx->tcoeff[ci];
+  const tran_low_t dqc = ctx->dqcoeff[ci];
+  const int sign_mask = tqc >> 31;
+  if (UNLIKELY(abs_qc >= 1 + NUM_BASE_LEVELS + COEFF_BASE_RANGE)) {
+    const tran_low_t full_abs = (tran_low_t)abs_qc;
+    const int br_ctx = get_br_ctx_simple_fast(
+        ctx->levels, ci, ctx->bhl, ctx->stride, (TX_CLASS)ctx->tx_class);
+    const int *const lps_flat = ctx->txb_costs->lps_cost[br_ctx];
+    const int base_rate = rate;
+    const int full_rate = base_rate + get_br_cost_fast(full_abs, lps_flat);
+    if ((dqc ^ sign_mask) < (tqc ^ sign_mask)) {
+      return pack_rate_cul(full_rate, full_abs);
+    }
+    const tran_low_t abs_qc_low = full_abs - 1;
+    const int full_rate_low =
+        base_rate + get_br_cost_fast(abs_qc_low, lps_flat);
+    int dqv = ctx->dequant_ac;
+    const qm_val_t *const iqmatrix = ctx->iqmatrix;
+    if (iqmatrix != NULL) {
+      dqv = ((iqmatrix[ci] * dqv) + (1 << (AOM_QM_BITS - 1))) >> AOM_QM_BITS;
+    }
+    const int shift = ctx->shift;
+    const tran_low_t abs_dqc_low = (abs_qc_low * dqv) >> shift;
+    const tran_low_t full_dqc_low = (abs_dqc_low ^ sign_mask) - sign_mask;
+    const qm_val_t *const qmatrix = ctx->qmatrix;
+    const int64_t rdmult = ctx->rdmult;
+    int better;
+    if (qmatrix != NULL) {
+      const int64_t scaled_qm = (int64_t)qmatrix[ci] << shift;
+      better = eval_better_qm_exact(tqc, dqc, full_dqc_low, scaled_qm,
+                                    full_rate, full_rate_low, rdmult);
+    } else {
+      const int64_t dist_diff = ((int64_t)(dqc - full_dqc_low) *
+                                 (dqc + full_dqc_low - ((int64_t)tqc * 2))) *
+                                (1LL << (2 * shift));
+      const int64_t rd_thresh =
+          RDCOST(rdmult, full_rate_low, 0) - RDCOST(rdmult, full_rate, 0);
+      better = dist_diff * (1 << RDDIV_BITS) > rd_thresh;
+    }
+    if (better) {
+      ctx->qcoeff[ci] = (abs_qc_low ^ sign_mask) - sign_mask;
+      ctx->dqcoeff[ci] = full_dqc_low;
+      ctx->levels[get_padded_idx((int)ci, ctx->bhl)] =
+          AOMMIN(abs_qc_low, INT8_MAX);
+      return pack_rate_cul(full_rate_low, abs_qc_low);
+    }
+    return pack_rate_cul(full_rate, full_abs);
+  }
+  if ((dqc ^ sign_mask) >= (tqc ^ sign_mask)) {
+    const int shift = ctx->shift;
+    const int64_t rdmult = ctx->rdmult;
+    const int64_t approx_rd =
+        ((int64_t)(rate - rate_low) * rdmult) >> AV1_PROB_COST_SHIFT;
+    const int64_t sum_term = (int64_t)tqc * 2 - (int64_t)dqc - (int64_t)dqc_low;
+    const qm_val_t *const qmatrix = ctx->qmatrix;
+    int better;
+    if (qmatrix != NULL) {
+      const int64_t scaled_qm = (int64_t)qmatrix[ci] << shift;
+      const int64_t sq_qm = scaled_qm * scaled_qm;
+      const int64_t approx_dd =
+          (((int64_t)(dqc - dqc_low) * sum_term) * sq_qm) >> (2 * AOM_QM_BITS);
+      const int64_t margin = approx_rd - (approx_dd * (1 << RDDIV_BITS));
+      better =
+          (margin >= 0) && (LIKELY(margin > (1 << RDDIV_BITS)) ||
+                            eval_better_qm_exact(tqc, dqc, dqc_low, scaled_qm,
+                                                 rate, rate_low, rdmult));
+    } else {
+      const int64_t dd_pos = ((int64_t)(dqc - dqc_low) * sum_term) *
+                             (1LL << (2 * shift + RDDIV_BITS));
+      better = (approx_rd >= dd_pos) && (LIKELY(approx_rd > dd_pos) ||
+                                         -dd_pos > RDCOST(rdmult, rate_low, 0) -
+                                                       RDCOST(rdmult, rate, 0));
+    }
+    if (better) {
+      const unsigned int abs_qc_low = abs_qc - 1;
+      ctx->qcoeff[ci] = ((tran_low_t)abs_qc_low ^ sign_mask) - sign_mask;
+      ctx->dqcoeff[ci] = dqc_low;
+      ctx->levels[ci + ((ci >> ctx->bhl) << TX_PAD_HOR_LOG2)] =
+          (uint8_t)abs_qc_low;
+      const int out_rate = (abs_qc <= 3)
+                               ? patch_ctx_neighbors((int)ci, ctx, rate_low)
+                               : rate_low;
+      return (uint64_t)(uint32_t)out_rate | ((uint64_t)abs_qc_low << 32);
+    }
+  }
+  return (uint64_t)(uint32_t)rate | ((uint64_t)abs_qc << 32);
+}
+
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
+static uint64_t update_coeff_simple_gt1_try_lower(
+    intptr_t ci, unsigned int abs_qc, const int *bc4,
+    const TxbOptCtx *__restrict ctx) {
+  if (UNLIKELY(abs_qc >= 1 + NUM_BASE_LEVELS + COEFF_BASE_RANGE)) {
+    return finish_try_lower(ci, abs_qc, bc4[3], 0, 0, ctx);
+  }
   const int br_ctx = get_br_ctx_simple_fast(
       ctx->levels, ci, ctx->bhl, ctx->stride, (TX_CLASS)ctx->tx_class);
   const int *const lps_flat = ctx->txb_costs->lps_cost[br_ctx];
-  const int base_rate = base_cost4_ctx[3];
-  const int cost2 = base_cost4_ctx[2];
-  int rate, rate_low;
-  if (LIKELY(abs_qc < 1 + NUM_BASE_LEVELS + COEFF_BASE_RANGE)) {
-    int rate_m1 = base_rate + lps_flat[(abs_qc - (2 + NUM_BASE_LEVELS)) & 15];
-    rate = base_rate + lps_flat[abs_qc - (1 + NUM_BASE_LEVELS)];
-    int c2 = cost2;
-    rate_low = (abs_qc == 3) ? c2 : rate_m1;
-  } else {
-    const tran_low_t tqc_chk = ctx->tcoeff[ci];
-    const tran_low_t dqc_chk = ctx->dqcoeff[ci];
-    const int sm = tqc_chk >> 31;
-    rate = base_rate + get_br_cost_fast(abs_qc, lps_flat);
-    if ((dqc_chk ^ sm) < (tqc_chk ^ sm)) return rate;
-    rate_low = base_rate + get_br_cost_fast(abs_qc - 1, lps_flat);
-  }
+  const int base_rate = bc4[3];
+  int rate_m1 =
+      base_rate + lps_flat[((int)abs_qc - (2 + NUM_BASE_LEVELS)) & 15];
+  const int rate = base_rate + lps_flat[abs_qc - (1 + NUM_BASE_LEVELS)];
+  int c2 = bc4[2];
+  const int rate_low = (abs_qc == 3) ? c2 : rate_m1;
 
-  const int64_t rdmult = ctx->rdmult;
-  const int64_t rd_thresh =
-      RDCOST(rdmult, rate_low, 0) - RDCOST(rdmult, rate, 0);
   const tran_low_t tqc = ctx->tcoeff[ci];
   const tran_low_t dqc = ctx->dqcoeff[ci];
-  const int sign_mask = tqc >> 31;
-  const int can_try = (dqc ^ sign_mask) >= (tqc ^ sign_mask);
-
   int dqv = ctx->dequant_ac;
   const qm_val_t *const iqmatrix = ctx->iqmatrix;
-  if (LIKELY(iqmatrix != NULL)) {
+  if (iqmatrix != NULL) {
     dqv = ((iqmatrix[ci] * dqv) + (1 << (AOM_QM_BITS - 1))) >> AOM_QM_BITS;
   }
   const int shift = ctx->shift;
-  const tran_low_t abs_qc_low = abs_qc - 1;
-  const tran_low_t abs_dqc_low = (abs_qc_low * dqv) >> shift;
+  const int sign_mask = tqc >> 31;
+  const tran_low_t abs_dqc_low =
+      (tran_low_t)(((int)(abs_qc - 1) * dqv) >> shift);
   const tran_low_t dqc_low = (abs_dqc_low ^ sign_mask) - sign_mask;
+  const int64_t sum_term = (int64_t)tqc * 2 - (int64_t)dqc - (int64_t)dqc_low;
+  const int64_t approx_rd =
+      ((int64_t)(rate - rate_low) * ctx->rdmult) >> AV1_PROB_COST_SHIFT;
   const qm_val_t *const qmatrix = ctx->qmatrix;
-  int64_t dist_diff;
-  if (LIKELY(qmatrix != NULL)) {
+  int64_t thresh_dd;
+  if (qmatrix != NULL) {
     const int64_t scaled_qm = (int64_t)qmatrix[ci] << shift;
-    dist_diff = get_coeff_dist_scaled_qm(tqc, dqc, scaled_qm) -
-                get_coeff_dist_scaled_qm(tqc, dqc_low, scaled_qm);
+    const int64_t sq_qm = scaled_qm * scaled_qm;
+    thresh_dd =
+        ((((int64_t)(dqc - dqc_low) * sum_term) * sq_qm) >> (2 * AOM_QM_BITS)) *
+        (1 << RDDIV_BITS);
   } else {
-    dist_diff =
-        ((int64_t)(dqc - dqc_low) * (dqc + dqc_low - ((int64_t)tqc * 2))) *
-        (1LL << (2 * shift));
+    thresh_dd = ((int64_t)(dqc - dqc_low) * sum_term) *
+                (1LL << (2 * shift + RDDIV_BITS));
   }
-  const int better = dist_diff * (1 << RDDIV_BITS) > rd_thresh;
-  if (UNLIKELY(can_try & better)) {
-    ctx->qcoeff[ci] = (abs_qc_low ^ sign_mask) - sign_mask;
-    ctx->dqcoeff[ci] = dqc_low;
-    ctx->levels[get_padded_idx((int)ci, ctx->bhl)] =
-        AOMMIN(abs_qc_low, INT8_MAX);
-    if (abs_qc == 3) {
-      return patch_ctx_neighbors((int)ci, ctx, rate_low);
-    }
-    return rate_low;
+  if (UNLIKELY(approx_rd >= thresh_dd)) {
+    return finish_try_lower(ci, abs_qc, rate, rate_low, dqc_low, ctx);
   }
-  return rate;
+  return (uint64_t)(uint32_t)rate | ((uint64_t)abs_qc << 32);
 }
 
-static AOM_FORCE_INLINE int update_coeff_simple_eq2_inline(
-    intptr_t ci, const int *base_cost4_ctx, const TxbOptCtx *__restrict ctx) {
-  const int rate = base_cost4_ctx[2];
-  const int rate_low = base_cost4_ctx[1];
-  const int64_t rdmult = ctx->rdmult;
-  const int64_t rd_thresh =
-      RDCOST(rdmult, rate_low, 0) - RDCOST(rdmult, rate, 0);
+static AOM_FORCE_INLINE uint64_t update_coeff_simple_eq2_qm(
+    intptr_t ci, const int *bc4, const TxbOptCtx *__restrict ctx) {
   const tran_low_t tqc = ctx->tcoeff[ci];
   const tran_low_t dqc = ctx->dqcoeff[ci];
+  const int raw_dqv =
+      (ctx->iqmatrix[ci] * ctx->dequant_ac) + (1 << (AOM_QM_BITS - 1));
+  const int shift = ctx->shift;
+  const int64_t scaled_qm = (int64_t)ctx->qmatrix[ci] << shift;
+  const int64_t sq_qm = scaled_qm * scaled_qm;
   const int sign_mask = tqc >> 31;
-  const int can_try = (dqc ^ sign_mask) >= (tqc ^ sign_mask);
+  const tran_low_t dqc_low =
+      ((raw_dqv >> (AOM_QM_BITS + shift)) ^ sign_mask) - sign_mask;
+  const int64_t sum_term = (int64_t)tqc * 2 - (int64_t)dqc - (int64_t)dqc_low;
+  const int64_t approx_dd =
+      (((int64_t)(dqc - dqc_low) * sum_term) * sq_qm) >> (2 * AOM_QM_BITS);
+  const int rate = bc4[2];
+  const int rate_low = bc4[1];
+  const int64_t approx_rd =
+      ((int64_t)(rate - rate_low) * ctx->rdmult) >> AV1_PROB_COST_SHIFT;
+  if (UNLIKELY(approx_rd >= approx_dd * (1 << RDDIV_BITS))) {
+    return finish_try_lower(ci, 2, rate, rate_low, dqc_low, ctx);
+  }
+  return (uint64_t)(uint32_t)rate | (2ULL << 32);
+}
+
+static AOM_FORCE_INLINE uint64_t update_coeff_simple_eq2_noqm(
+    intptr_t ci, const int *bc4, const TxbOptCtx *__restrict ctx) {
+  const tran_low_t tqc = ctx->tcoeff[ci];
+  const tran_low_t dqc = ctx->dqcoeff[ci];
   int dqv = ctx->dequant_ac;
-  const qm_val_t *const iqmatrix = ctx->iqmatrix;
-  if (LIKELY(iqmatrix != NULL)) {
-    dqv = ((iqmatrix[ci] * dqv) + (1 << (AOM_QM_BITS - 1))) >> AOM_QM_BITS;
+  if (UNLIKELY(ctx->iqmatrix != NULL)) {
+    dqv = ((ctx->iqmatrix[ci] * dqv) + (1 << (AOM_QM_BITS - 1))) >> AOM_QM_BITS;
   }
   const int shift = ctx->shift;
-  const tran_low_t abs_dqc_low = dqv >> shift;
-  const tran_low_t dqc_low = (abs_dqc_low ^ sign_mask) - sign_mask;
-  const qm_val_t *const qmatrix = ctx->qmatrix;
-  int64_t dist_diff;
-  if (LIKELY(qmatrix != NULL)) {
-    const int64_t scaled_qm = (int64_t)qmatrix[ci] << shift;
-    dist_diff = get_coeff_dist_scaled_qm(tqc, dqc, scaled_qm) -
-                get_coeff_dist_scaled_qm(tqc, dqc_low, scaled_qm);
-  } else {
-    dist_diff =
-        ((int64_t)(dqc - dqc_low) * (dqc + dqc_low - ((int64_t)tqc * 2))) *
-        (1LL << (2 * shift));
+  const int sign_mask = tqc >> 31;
+  const tran_low_t dqc_low = ((dqv >> shift) ^ sign_mask) - sign_mask;
+  const int rate = bc4[2];
+  const int rate_low = bc4[1];
+  if (UNLIKELY(ctx->qmatrix != NULL)) {
+    return finish_try_lower(ci, 2, rate, rate_low, dqc_low, ctx);
   }
-  const int better = dist_diff * (1 << RDDIV_BITS) > rd_thresh;
-  if (UNLIKELY(can_try & better)) {
-    ctx->qcoeff[ci] = sign_mask | 1;
-    ctx->dqcoeff[ci] = dqc_low;
-    ctx->levels[get_padded_idx((int)ci, ctx->bhl)] = 1;
-    return patch_ctx_neighbors((int)ci, ctx, rate_low);
+  const int64_t sum_term = (int64_t)tqc * 2 - (int64_t)dqc - (int64_t)dqc_low;
+  const int64_t dd_pos =
+      ((int64_t)(dqc - dqc_low) * sum_term) * (1LL << (2 * shift + RDDIV_BITS));
+  const int64_t approx_rd =
+      ((int64_t)(rate - rate_low) * ctx->rdmult) >> AV1_PROB_COST_SHIFT;
+  if (UNLIKELY(approx_rd >= dd_pos)) {
+    return finish_try_lower(ci, 2, rate, rate_low, dqc_low, ctx);
   }
-  return rate;
+  return (uint64_t)(uint32_t)rate | (2ULL << 32);
 }
 
 #if defined(__GNUC__) || defined(__clang__)
@@ -433,14 +539,13 @@ static int update_coeff_simple_nz(intptr_t ci, tran_low_t qc,
   const LV_MAP_COEFF_COST *__restrict txb_costs = ctx->txb_costs;
   const int *const base_cost = txb_costs->base_cost[coeff_ctx];
   if ((unsigned int)(qc + 1) > 2) {
-    const tran_low_t abs_qc = abs(qc);
+    const unsigned int abs_qc = (unsigned int)abs(qc);
     if (abs_qc == 2) {
-      const tran_low_t tqc = ctx->tcoeff[ci];
-      const tran_low_t dqc = ctx->dqcoeff[ci];
-      if (abs(dqc) < abs(tqc)) return base_cost[6];
-      return update_coeff_simple_eq2_inline(ci, &base_cost[4], ctx);
+      return (int)(uint32_t)update_coeff_simple_eq2_noqm(ci, &base_cost[4],
+                                                         ctx);
     }
-    return update_coeff_simple_gt1_try_lower(ci, abs_qc, &base_cost[4], ctx);
+    return (int)(uint32_t)update_coeff_simple_gt1_try_lower(ci, abs_qc,
+                                                            &base_cost[4], ctx);
   }
   const tran_low_t abs_tqc = abs(ctx->tcoeff[ci]);
   const tran_low_t abs_dqc = abs(ctx->dqcoeff[ci]);
@@ -789,6 +894,21 @@ static inline int get_tx_type_cost(const MACROBLOCK *x, const MACROBLOCKD *xd,
                                tx_size, tx_type, reduced_tx_set_used);
 }
 
+static AOM_FORCE_INLINE int64_t calc_coeff_dist0(intptr_t ci,
+                                                 const tran_low_t *tcoeff,
+                                                 const tran_low_t *dqcoeff,
+                                                 const qm_val_t *qmatrix,
+                                                 int shift) {
+  const tran_low_t tqc = tcoeff[ci];
+  const tran_low_t dqc = dqcoeff[ci];
+  if (LIKELY(qmatrix != NULL)) {
+    const int64_t scaled_qm = (int64_t)qmatrix[ci] << shift;
+    const int64_t dist0 = get_coeff_dist_scaled_qm(tqc, 0, scaled_qm);
+    return get_coeff_dist_scaled_qm(tqc, dqc, scaled_qm) - dist0;
+  }
+  return ((int64_t)dqc * (dqc - (int64_t)tqc * 2)) * (1LL << (2 * shift));
+}
+
 // Lower-level contexts are read from cc[] (precomputed by
 // av1_get_nz_map_contexts) and cc[] is kept in sync whenever
 // update_coeff_eob_nz() modifies levels[].
@@ -803,78 +923,89 @@ static AOM_FORCE_INLINE void update_coeff_eob_facade(
   const tran_low_t *local_qcoeff = qcoeff;
   if (LIKELY(sharpness != 0)) {
     const int min_s_phase1 = ctx->min_eob_cutoff - 1;
-    while (s >= min_s_phase1 && nz_num <= max_nz_num) {
-      intptr_t ci;
-      tran_low_t qc;
-      for (;;) {
-        ci = scan[s];
-        qc = local_qcoeff[ci];
-        if (qc != 0) break;
-        local_rate += local_base_cost4[(size_t)(uint8_t)cc[ci] << 3];
-        if (--s < min_s_phase1) goto phase1_done;
-      }
-      const int coeff_ctx = (uint8_t)cc[ci];
-      if (LIKELY((unsigned int)(qc + 1) <= 2)) {
-        const int coeff_ctx_new_eob = AOMMIN((s - 1) >> ctx->eob_shift, 2) + 1;
-        const int k = get_msb(s);
-        const int bit = (s >> (k - 1)) & 1;
-        const int rate_coeff_eob =
-            ctx->eob_cost[k + 1] + txb_costs->eob_extra_cost[k - 1][bit] +
-            txb_costs->base_eob_cost[coeff_ctx_new_eob][0] +
-            av1_cost_literal(k);
-        const int rate_keep =
-            local_rate + local_base_cost4[((size_t)coeff_ctx << 3) + 1];
-        const int64_t rdmult = ctx->rdmult;
-        const int64_t accu_dist = ctx->accu_dist;
-        if (LIKELY(RDCOST(rdmult, rate_coeff_eob, 0) >=
-                   RDCOST(rdmult, rate_keep, accu_dist))) {
-          if (nz_num < 2) {
-            const tran_low_t tqc = ctx->tcoeff[ci];
-            const tran_low_t dqc = ctx->dqcoeff[ci];
-            const int shift = ctx->shift;
-            const qm_val_t *const qmatrix = ctx->qmatrix;
-            int64_t dist;
-            if (LIKELY(qmatrix != NULL)) {
-              const int64_t scaled_qm = (int64_t)qmatrix[ci] << shift;
-              const int64_t dist0 = get_coeff_dist_scaled_qm(tqc, 0, scaled_qm);
-              dist = get_coeff_dist_scaled_qm(tqc, dqc, scaled_qm) - dist0;
-            } else {
-              dist = ((int64_t)dqc * (dqc - (int64_t)tqc * 2)) *
-                     (1LL << (2 * shift));
-            }
-            ctx->accu_dist = accu_dist + dist;
-          }
-          ctx->nz_ci[nz_num] = (int)ci;
-          ++nz_num;
-          local_rate = rate_keep;
-          --s;
-          continue;
+    const int16_t *scan_p = scan + s;
+    const int16_t *const p1_end = scan + min_s_phase1;
+    if (scan_p >= p1_end) {
+      int64_t local_dist = 0;
+      int need_last_dist = 1;
+      do {
+        intptr_t ci;
+        tran_low_t qc;
+        for (;;) {
+          ci = *scan_p;
+          qc = local_qcoeff[ci];
+          if (qc != 0) break;
+          local_rate += local_base_cost4[(size_t)(uint8_t)cc[ci] << 3];
+          if (--scan_p < p1_end) goto phase1_done;
         }
-      }
-      ctx->accu_rate = local_rate;
-      ctx->nz_num = nz_num;
-      local_rate = update_coeff_eob_nz(s, (int)ci, qc, coeff_ctx, ctx);
-      nz_num = ctx->nz_num;
-      --s;
+        if (need_last_dist) {
+          need_last_dist = 0;
+          local_dist = calc_coeff_dist0(ctx->nz_ci[0], ctx->tcoeff,
+                                        ctx->dqcoeff, ctx->qmatrix, ctx->shift);
+        }
+        const int cur_s = (int)(scan_p - scan);
+        const int coeff_ctx = (uint8_t)cc[ci];
+        if (LIKELY((unsigned int)(qc + 1) <= 2)) {
+          const int coeff_ctx_new_eob =
+              AOMMIN((cur_s - 1) >> ctx->eob_shift, 2) + 1;
+          const int k = get_msb(cur_s);
+          const int bit = (cur_s >> (k - 1)) & 1;
+          const int rate_coeff_eob =
+              ctx->eob_cost[k + 1] + txb_costs->eob_extra_cost[k - 1][bit] +
+              txb_costs->base_eob_cost[coeff_ctx_new_eob][0] +
+              av1_cost_literal(k);
+          const int rate_keep =
+              local_rate + local_base_cost4[((size_t)coeff_ctx << 3) + 1];
+          const int64_t rdmult = ctx->rdmult;
+          const int64_t approx_dr =
+              ((int64_t)(rate_coeff_eob - rate_keep) * rdmult) >>
+              AV1_PROB_COST_SHIFT;
+          const int64_t d_eob = approx_dr - local_dist * (1 << RDDIV_BITS);
+          if (LIKELY(d_eob >= 0) ||
+              (UNLIKELY(d_eob == -1) &&
+               RDCOST(rdmult, rate_coeff_eob, 0) >=
+                   RDCOST(rdmult, rate_keep, local_dist))) {
+            if (nz_num < 2 && scan_p > p1_end) {
+              local_dist += calc_coeff_dist0(ci, ctx->tcoeff, ctx->dqcoeff,
+                                             ctx->qmatrix, ctx->shift);
+            }
+            ctx->nz_ci[nz_num] = (int)ci;
+            ++nz_num;
+            local_rate = rate_keep;
+            --scan_p;
+            continue;
+          }
+        }
+        ctx->accu_rate = local_rate;
+        ctx->accu_dist = local_dist;
+        ctx->nz_num = nz_num;
+        local_rate = update_coeff_eob_nz(cur_s, (int)ci, qc, coeff_ctx, ctx);
+        local_dist = ctx->accu_dist;
+        nz_num = ctx->nz_num;
+        --scan_p;
+      } while (scan_p >= p1_end && nz_num <= max_nz_num);
     }
   phase1_done:;
+    const int16_t *const p2_end = scan + 1;
     int *const nz_ci = ctx->nz_ci;
-    while (s >= 1 && nz_num <= max_nz_num) {
-      const intptr_t ci = scan[s];
+    while (scan_p >= p2_end && nz_num <= max_nz_num) {
+      const intptr_t ci = *scan_p;
       const tran_low_t qc = local_qcoeff[ci];
       const unsigned int abs_qc = (unsigned int)abs(qc);
       if (UNLIKELY(abs_qc > 2)) {
         ctx->accu_rate = local_rate;
         ctx->nz_num = nz_num;
-        local_rate = update_coeff_eob_nz(s, (int)ci, qc, (uint8_t)cc[ci], ctx);
+        local_rate = update_coeff_eob_nz((int)(scan_p - scan), (int)ci, qc,
+                                         (uint8_t)cc[ci], ctx);
         nz_num = ctx->nz_num;
       } else {
         local_rate += local_base_cost4[((size_t)(uint8_t)cc[ci] << 3) + abs_qc];
         nz_ci[nz_num] = (int)ci;
         nz_num += (abs_qc != 0);
       }
-      --s;
+      --scan_p;
     }
+    s = (int)(scan_p - scan);
   } else {
     while (s >= 1 && nz_num <= max_nz_num) {
       intptr_t ci;
@@ -899,40 +1030,66 @@ static AOM_FORCE_INLINE void update_coeff_eob_facade(
 }
 
 // Lower-level contexts are read from cc[] and cc[] is kept in sync whenever a
-// coefficient level is lowered.
-static AOM_FORCE_INLINE void update_coeff_simple_facade(
+// coefficient level is lowered. Returns accumulated |qcoeff| over [1..si] for
+// cul_level (each >2 coeff clamped to COEFF_CONTEXT_MASK).
+static AOM_FORCE_INLINE unsigned int update_coeff_simple_facade(
     int si, const int16_t *scan, const LV_MAP_COEFF_COST *txb_costs,
-    const tran_low_t *qcoeff, int sharpness, const int8_t *cc,
-    const TxbOptCtx *ctx) {
+    const tran_low_t *qcoeff, int sharpness, const int8_t *cc, TxbOptCtx *ctx) {
   const int16_t *scan_p = scan + si;
   const int16_t *scan_end = scan + 1;
   int local_rate = ctx->accu_rate;
+  unsigned int simple_cul = 0;
   if (LIKELY(sharpness != 0)) {
     const int *local_base_cost4 = &txb_costs->base_cost[0][4];
     const tran_low_t *local_qcoeff = qcoeff;
-#if defined(__GNUC__) || defined(__clang__)
-    __asm__ volatile(""
-                     : "+r"(local_base_cost4), "+r"(local_qcoeff),
-                       "+r"(scan_end));
-#endif
-    for (;;) {
-      intptr_t ci;
-      tran_low_t qc;
+    if (LIKELY(ctx->iqmatrix != NULL && ctx->qmatrix != NULL)) {
       for (;;) {
-        ci = *scan_p;
-        qc = local_qcoeff[ci];
-        if (UNLIKELY((unsigned int)(qc + 1) > 2)) break;
-        local_rate +=
-            local_base_cost4[((size_t)(uint8_t)cc[ci] << 3) + (qc & 1)];
-        if (--scan_p < scan_end) goto simple_done;
+        intptr_t ci;
+        tran_low_t qc;
+        for (;;) {
+          ci = *scan_p;
+          qc = local_qcoeff[ci];
+          if (UNLIKELY((unsigned int)(qc + 1) > 2)) break;
+          const unsigned int is_nz = (unsigned int)(qc & 1);
+          simple_cul += is_nz;
+          local_rate +=
+              local_base_cost4[((size_t)(uint8_t)cc[ci] << 3) + is_nz];
+          if (--scan_p < scan_end) goto simple_done;
+        }
+        const int *const bc4 = &local_base_cost4[(size_t)(uint8_t)cc[ci] << 3];
+        const unsigned int abs_qc = (unsigned int)abs(qc);
+        const uint64_t packed =
+            LIKELY(abs_qc == 2)
+                ? update_coeff_simple_eq2_qm(ci, bc4, ctx)
+                : update_coeff_simple_gt1_try_lower(ci, abs_qc, bc4, ctx);
+        local_rate += (int)(uint32_t)packed;
+        simple_cul += (unsigned int)(packed >> 32);
+        if (--scan_p < scan_end) break;
       }
-      const int *const bc4 = &local_base_cost4[(size_t)(uint8_t)cc[ci] << 3];
-      const unsigned int abs_qc = (unsigned int)abs(qc);
-      local_rate += LIKELY(abs_qc == 2)
-                        ? update_coeff_simple_eq2_inline(ci, bc4, ctx)
-                        : update_coeff_simple_gt1_try_lower(
-                              ci, (tran_low_t)abs_qc, bc4, ctx);
-      if (--scan_p < scan_end) break;
+    } else {
+      for (;;) {
+        intptr_t ci;
+        tran_low_t qc;
+        for (;;) {
+          ci = *scan_p;
+          qc = local_qcoeff[ci];
+          if (UNLIKELY((unsigned int)(qc + 1) > 2)) break;
+          const unsigned int is_nz = (unsigned int)(qc & 1);
+          simple_cul += is_nz;
+          local_rate +=
+              local_base_cost4[((size_t)(uint8_t)cc[ci] << 3) + is_nz];
+          if (--scan_p < scan_end) goto simple_done;
+        }
+        const int *const bc4 = &local_base_cost4[(size_t)(uint8_t)cc[ci] << 3];
+        const unsigned int abs_qc = (unsigned int)abs(qc);
+        const uint64_t packed =
+            LIKELY(abs_qc == 2)
+                ? update_coeff_simple_eq2_noqm(ci, bc4, ctx)
+                : update_coeff_simple_gt1_try_lower(ci, abs_qc, bc4, ctx);
+        local_rate += (int)(uint32_t)packed;
+        simple_cul += (unsigned int)(packed >> 32);
+        if (--scan_p < scan_end) break;
+      }
     }
   } else {
     const int (*local_base_cost)[8] = txb_costs->base_cost;
@@ -948,12 +1105,42 @@ static AOM_FORCE_INLINE void update_coeff_simple_facade(
         if (--scan_p < scan_end) goto simple_done;
       }
       local_rate += update_coeff_simple_nz(ci, qc, (uint8_t)cc[ci], ctx);
+      const unsigned int final_abs = (unsigned int)abs(local_qcoeff[ci]);
+      simple_cul += AOMMIN(final_abs, COEFF_CONTEXT_MASK);
       if (--scan_p < scan_end) break;
     }
   }
 simple_done:
-  ((TxbOptCtx *)ctx)->accu_rate = local_rate;
+  ctx->accu_rate = local_rate;
+  return simple_cul;
 }
+
+#if CONFIG_AV1_HIGHBITDEPTH
+static inline int64_t get_txb_rdmult_hbd(const MACROBLOCK *x,
+                                         const MACROBLOCKD *xd,
+                                         const MB_MODE_INFO *mbmi, int plane,
+                                         int sharpness, int base_mult,
+                                         int is_iq_tune,
+                                         int *is_noise_pattern_out) {
+  int is_noise_pattern = 0;
+  if (sharpness == 3 && plane == AOM_PLANE_Y) {
+    int64_t src_var, rec_var;
+    av1_get_variance_stats(x, &src_var, &rec_var);
+    if (src_var > rec_var) {
+      const int num_pixels =
+          block_size_wide[mbmi->bsize] * block_size_high[mbmi->bsize];
+      if (src_var / num_pixels < 64) {
+        is_noise_pattern = 1;
+      }
+    }
+  }
+  if (is_noise_pattern_out != NULL) *is_noise_pattern_out = is_noise_pattern;
+  const int rshift = is_iq_tune ? 7 : (is_noise_pattern ? 6 : 5);
+  return ROUND_POWER_OF_TWO(
+      (int64_t)x->rdmult * (8 - sharpness) * (base_mult << (2 * (xd->bd - 8))),
+      rshift);
+}
+#endif
 
 static inline int64_t get_txb_rdmult_mbmi(
     const struct AV1_COMP *cpi, const MACROBLOCK *x, const MACROBLOCKD *xd,
@@ -967,23 +1154,8 @@ static inline int64_t get_txb_rdmult_mbmi(
                           cpi->oxcf.tune_cfg.tuning == AOM_TUNE_SSIMULACRA2);
 #if CONFIG_AV1_HIGHBITDEPTH
   if (UNLIKELY(xd->bd > 8)) {
-    int is_noise_pattern = 0;
-    if (sharpness == 3 && plane == AOM_PLANE_Y) {
-      int64_t src_var, rec_var;
-      av1_get_variance_stats(x, &src_var, &rec_var);
-      if (src_var > rec_var) {
-        const int num_pixels =
-            block_size_wide[mbmi->bsize] * block_size_high[mbmi->bsize];
-        if (src_var / num_pixels < 64) {
-          is_noise_pattern = 1;
-        }
-      }
-    }
-    if (is_noise_pattern_out != NULL) *is_noise_pattern_out = is_noise_pattern;
-    const int rshift = is_iq_tune ? 7 : (is_noise_pattern ? 6 : 5);
-    return ROUND_POWER_OF_TWO((int64_t)x->rdmult * (8 - sharpness) *
-                                  (base_mult << (2 * (xd->bd - 8))),
-                              rshift);
+    return get_txb_rdmult_hbd(x, xd, mbmi, plane, sharpness, base_mult,
+                              is_iq_tune, is_noise_pattern_out);
   }
 #else
   (void)xd;
@@ -1013,8 +1185,7 @@ int av1_optimize_txb_multi(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
   const int64_t rdmult =
       get_txb_rdmult_mbmi(cpi, x, xd, mbmi, is_inter, plane, plane_type,
                           sharpness, &is_noise_pattern);
-  const SCAN_ORDER *const scan_order = get_scan(tx_size, tx_type);
-  const int16_t *const scan = scan_order->scan;
+  const int16_t *const scan = get_scan(tx_size, tx_type)->scan;
   const int shift = av1_get_tx_scale(tx_size);
   const int16_t *const dequant = p->dequant_QTX;
   const qm_val_t *iqmatrix = NULL;
@@ -1031,7 +1202,6 @@ int av1_optimize_txb_multi(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
   const tran_low_t *const tcoeff = p->coeff + block_offset;
   const CoeffCosts *const coeff_costs = &x->coeff_costs;
 
-  const AV1_COMMON *const cm = &cpi->common;
   const TX_SIZE txs_ctx = get_txsize_entropy_ctx(tx_size);
   const TX_CLASS tx_class = tx_type_to_class[tx_type];
   const int bhl = get_txb_bhl(tx_size);
@@ -1047,11 +1217,10 @@ int av1_optimize_txb_multi(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
       txb_eob_costs->eob_cost[tx_class != TX_CLASS_2D];
 
   const int non_skip_cost = txb_costs->txb_skip_cost[txb_ctx->txb_skip_ctx][0];
-  const int skip_cost = txb_costs->txb_skip_cost[txb_ctx->txb_skip_ctx][1];
   const int non_skip_total_cost =
-      non_skip_cost + get_tx_type_cost_mbmi(x, xd, mbmi, is_inter, plane,
-                                            tx_size, tx_type,
-                                            cm->features.reduced_tx_set_used);
+      non_skip_cost +
+      get_tx_type_cost_mbmi(x, xd, mbmi, is_inter, plane, tx_size, tx_type,
+                            cpi->common.features.reduced_tx_set_used);
   int accu_rate = get_eob_cost_tab(eob, eob_cost_tab, txb_costs);
   int64_t accu_dist = 0;
   int si = eob - 1;
@@ -1060,7 +1229,7 @@ int av1_optimize_txb_multi(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
   tran_low_t last_abs_qc = abs(qc);
   const int sign = qc < 0;
   const int min_eob_cutoff = is_noise_pattern ? 8 : 5;
-  const int need_accu_dist = (eob > min_eob_cutoff || UNLIKELY(sharpness == 0));
+  const int need_accu_dist = (int)UNLIKELY(sharpness == 0);
   if (last_abs_qc >= 2) {
     last_abs_qc = update_coeff_last(&accu_rate, &accu_dist, si, ci, last_abs_qc,
                                     sign, tx_class, bhl, eob_shift, rdmult,
@@ -1071,16 +1240,7 @@ int av1_optimize_txb_multi(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
     const int coeff_ctx = AOMMIN((si - 1) >> eob_shift, 2) + 1;
     accu_rate += txb_costs->base_eob_cost[coeff_ctx][0] + av1_cost_literal(1);
     if (need_accu_dist) {
-      const tran_low_t tqc = tcoeff[ci];
-      const tran_low_t dqc = dqcoeff[ci];
-      if (LIKELY(qmatrix != NULL)) {
-        const int64_t scaled_qm = (int64_t)qmatrix[ci] << shift;
-        accu_dist += get_coeff_dist_scaled_qm(tqc, dqc, scaled_qm) -
-                     get_coeff_dist_scaled_qm(tqc, 0, scaled_qm);
-      } else {
-        accu_dist +=
-            ((int64_t)dqc * (dqc - (int64_t)tqc * 2)) * (1LL << (2 * shift));
-      }
+      accu_dist += calc_coeff_dist0(ci, tcoeff, dqcoeff, qmatrix, shift);
     }
   }
   --si;
@@ -1139,17 +1299,18 @@ int av1_optimize_txb_multi(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
   uint8_t levels_buf[TX_PAD_2D];
   uint8_t *const levels = set_levels(levels_buf, height);
   int ac_nz_num = 1;
-  int eob_facade_si = 0;
-  if (si == 0 && (qcoeff[0] == 0 ||
-                  (sharpness != 0 && (unsigned int)(qcoeff[0] + 2) <= 4))) {
-    if (tx_class != TX_CLASS_2D) {
-      av1_txb_init_levels(qcoeff, width, height, levels);
-    }
+  unsigned int simple_cul = 0;
+  if (UNLIKELY(si == 0 &&
+               (qcoeff[0] == 0 ||
+                (sharpness != 0 && (unsigned int)(qcoeff[0] + 2) <= 4)))) {
+    av1_txb_init_levels(qcoeff, width, height, levels);
     const int coeff_ctx = get_lower_levels_ctx_dc(levels, stride, tx_class);
     const tran_low_t qc_dc = qcoeff[0];
     if (qc_dc == 0) {
       accu_rate += txb_costs->base_cost[coeff_ctx][0];
       if (sharpness == 0) {
+        const int skip_cost =
+            txb_costs->txb_skip_cost[txb_ctx->txb_skip_ctx][1];
         update_skip(&accu_rate, accu_dist, &eob, 1, nz_ci, rdmult, skip_cost,
                     non_skip_cost, qcoeff, dqcoeff);
       }
@@ -1158,11 +1319,6 @@ int av1_optimize_txb_multi(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
                    txb_costs->dc_sign_cost[txb_ctx->dc_sign_ctx][qc_dc < 0];
     }
   } else {
-    if (si >= 1 || tx_class != TX_CLASS_2D ||
-        (unsigned int)(qcoeff[0] + 2) > 4) {
-      av1_txb_init_levels(qcoeff, width, height, levels);
-    }
-
     DECLARE_ALIGNED(16, int8_t, coeff_ctx_buf[32 * 32]);
     TxbOptCtx ctx = { rdmult,
                       accu_dist,
@@ -1192,16 +1348,16 @@ int av1_optimize_txb_multi(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
                       (uint8_t)eob_shift,
                       min_eob_cutoff };
     TxbOptCtx *ctx_ptr = &ctx;
+    av1_txb_init_levels(qcoeff, width, height, levels);
 
-    if (si >= 1) {
+    if (LIKELY(si >= 1)) {
       av1_get_nz_map_contexts(levels, scan, eob, tx_size, tx_class,
                               coeff_ctx_buf);
       update_coeff_eob_facade(&si, scan, txb_costs, qcoeff, max_nz_num,
                               sharpness, coeff_ctx_buf, ctx_ptr);
-      eob_facade_si = si;
       if (si >= 1) {
-        update_coeff_simple_facade(si, scan, txb_costs, qcoeff, sharpness,
-                                   coeff_ctx_buf, ctx_ptr);
+        simple_cul = update_coeff_simple_facade(
+            si, scan, txb_costs, qcoeff, sharpness, coeff_ctx_buf, ctx_ptr);
       }
       ac_nz_num = ctx_ptr->nz_num;
     }
@@ -1221,7 +1377,9 @@ int av1_optimize_txb_multi(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
         ctx_ptr->accu_rate =
             update_coeff_eob_nz(0, 0, qc_dc, coeff_ctx, ctx_ptr);
       }
-      if (ctx_ptr->sharpness == 0 && ctx_ptr->nz_num <= max_nz_num) {
+      if (UNLIKELY(ctx_ptr->sharpness == 0) && ctx_ptr->nz_num <= max_nz_num) {
+        const int skip_cost =
+            ctx_ptr->txb_costs->txb_skip_cost[txb_ctx->txb_skip_ctx][1];
         update_skip(&ctx_ptr->accu_rate, ctx_ptr->accu_dist, &ctx_ptr->eob,
                     ctx_ptr->nz_num, nz_ci, ctx_ptr->rdmult, skip_cost,
                     non_skip_cost, ctx_ptr->qcoeff, ctx_ptr->dqcoeff);
@@ -1233,8 +1391,8 @@ int av1_optimize_txb_multi(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
     eob = ctx_ptr->eob;
   }
 
-  if (eob == 0) {
-    accu_rate += skip_cost;
+  if (UNLIKELY(eob == 0)) {
+    accu_rate += txb_costs->txb_skip_cost[txb_ctx->txb_skip_ctx][1];
     p->eobs[block] = 0;
     p->txb_entropy_ctx[block] = 0;
   } else {
@@ -1243,17 +1401,11 @@ int av1_optimize_txb_multi(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
     const tran_low_t dc_val = qcoeff[0];
     const int dc_sign = ((dc_val < 0) + ((dc_val > 0) << 1))
                         << COEFF_CONTEXT_BITS;
-    int cul_level = abs(dc_val);
+    unsigned int cul_level = (unsigned int)abs(dc_val) + simple_cul;
     if (eob > 1 && cul_level < COEFF_CONTEXT_MASK) {
-      cul_level += abs(qcoeff[nz_ci[0]]);
-      if (ac_nz_num >= 2) cul_level += abs(qcoeff[nz_ci[1]]);
-      if (ac_nz_num >= 3) {
-        cul_level += abs(qcoeff[nz_ci[2]]);
-        for (int c = 1; c <= eob_facade_si && cul_level < COEFF_CONTEXT_MASK;
-             ++c) {
-          cul_level += abs(qcoeff[scan[c]]);
-        }
-      }
+      cul_level += (unsigned int)abs(qcoeff[nz_ci[0]]);
+      if (ac_nz_num >= 2) cul_level += (unsigned int)abs(qcoeff[nz_ci[1]]);
+      if (ac_nz_num >= 3) cul_level += (unsigned int)abs(qcoeff[nz_ci[2]]);
     }
     p->txb_entropy_ctx[block] =
         (uint8_t)(AOMMIN(cul_level, COEFF_CONTEXT_MASK) | dc_sign);
@@ -1429,40 +1581,92 @@ static int warehouse_efficients_txb_multi(
   const int16_t *const scan = scan_order->scan;
   const int height = get_txb_high(tx_size);
   const int bhl = get_txb_bhl(tx_size);
-  if (eob == 3 && LIKELY(tx_class == TX_CLASS_2D)) {
+  if (eob <= 4 && LIKELY(tx_class == TX_CLASS_2D)) {
     const int pos1 = scan[1];
     const tran_low_t v1 = qcoeff[pos1];
     const tran_low_t v0 = qcoeff[0];
     if (LIKELY((unsigned int)(v1 + 2) <= 4 && (unsigned int)(v0 + 2) <= 4)) {
+      if (eob == 3) {
+        const int pos2 = scan[2];
+        const tran_low_t v2 = qcoeff[pos2];
+        int ctx_val1 = 0;
+        if (LIKELY(v2 != 0)) {
+          const unsigned int level2 = (unsigned int)abs(v2);
+          if (LIKELY(level2 <= NUM_BASE_LEVELS)) {
+            cost +=
+                coeff_costs->base_eob_cost[1][level2 - 1] + av1_cost_literal(1);
+          } else {
+            const int br2 = get_br_ctx_eob(pos2, bhl, TX_CLASS_2D);
+            cost += coeff_costs->base_eob_cost[1][2] + av1_cost_literal(1) +
+                    get_br_cost_fast((tran_low_t)level2,
+                                     coeff_costs->lps_cost[br2]);
+          }
+          const int dc = (pos2 >> bhl) - (pos1 >> bhl);
+          const int dr = (pos2 & (height - 1)) - (pos1 & (height - 1));
+          if ((dc | dr) >= 0 && dc + dr <= 2) {
+            ctx_val1 = 1 + (level2 >= 3);
+          }
+        }
+        const int coeff_ctx1 = ctx_val1 + av1_nz_map_ctx_offset[tx_size][pos1];
+        cost += coeff_costs->base_cost[coeff_ctx1][4 + (unsigned int)abs(v1)];
+        if (!v0) {
+          cost += coeff_costs->base_cost[0][0];
+        } else {
+          cost += coeff_costs->dc_sign_cost[txb_ctx->dc_sign_ctx][v0 < 0] +
+                  coeff_costs->base_cost[0][(unsigned int)abs(v0)];
+        }
+        return cost;
+      }
       const int pos2 = scan[2];
       const tran_low_t v2 = qcoeff[pos2];
-      int ctx_val1 = 0;
-      if (LIKELY(v2 != 0)) {
+      if (LIKELY((unsigned int)(v2 + 2) <= 4)) {
+        const int pos3 = scan[3];
+        const tran_low_t v3 = qcoeff[pos3];
+        const int mask = height - 1;
+        const int c2 = pos2 >> bhl, r2 = pos2 & mask;
+        const int c1 = pos1 >> bhl, r1 = pos1 & mask;
+        int ctx_val2 = 0;
+        int mag1 = 0;
+        if (LIKELY(v3 != 0)) {
+          const unsigned int level3 = (unsigned int)abs(v3);
+          const int eob_ctx3 = (tx_size == TX_4X4) ? 2 : 1;
+          if (LIKELY(level3 <= NUM_BASE_LEVELS)) {
+            cost += coeff_costs->base_eob_cost[eob_ctx3][level3 - 1] +
+                    av1_cost_literal(1);
+          } else {
+            const int br3 = get_br_ctx_eob(pos3, bhl, TX_CLASS_2D);
+            cost += coeff_costs->base_eob_cost[eob_ctx3][2] +
+                    av1_cost_literal(1) +
+                    get_br_cost_fast((tran_low_t)level3,
+                                     coeff_costs->lps_cost[br3]);
+          }
+          const int c3 = pos3 >> bhl, r3 = pos3 & mask;
+          const int dc32 = c3 - c2, dr32 = r3 - r2;
+          if ((dc32 | dr32) >= 0 && dc32 + dr32 <= 2) {
+            ctx_val2 = 1 + (level3 >= 3);
+          }
+          const int dc31 = c3 - c1, dr31 = r3 - r1;
+          if ((dc31 | dr31) >= 0 && dc31 + dr31 <= 2) {
+            mag1 = (int)AOMMIN(level3, 3);
+          }
+        }
         const unsigned int level2 = (unsigned int)abs(v2);
-        if (LIKELY(level2 <= NUM_BASE_LEVELS)) {
-          cost +=
-              coeff_costs->base_eob_cost[1][level2 - 1] + av1_cost_literal(1);
+        const int dc21 = c2 - c1, dr21 = r2 - r1;
+        if (v2 != 0 && (dc21 | dr21) >= 0 && dc21 + dr21 <= 2) {
+          mag1 += (int)level2;
+        }
+        const int8_t *const nz_off = av1_nz_map_ctx_offset[tx_size];
+        cost += coeff_costs->base_cost[ctx_val2 + nz_off[pos2]][4 + level2] +
+                coeff_costs->base_cost[((mag1 + 1) >> 1) + nz_off[pos1]]
+                                      [4 + (unsigned int)abs(v1)];
+        if (!v0) {
+          cost += coeff_costs->base_cost[0][0];
         } else {
-          const int br2 = get_br_ctx_eob(pos2, bhl, TX_CLASS_2D);
-          cost +=
-              coeff_costs->base_eob_cost[1][2] + av1_cost_literal(1) +
-              get_br_cost_fast((tran_low_t)level2, coeff_costs->lps_cost[br2]);
+          cost += coeff_costs->dc_sign_cost[txb_ctx->dc_sign_ctx][v0 < 0] +
+                  coeff_costs->base_cost[0][(unsigned int)abs(v0)];
         }
-        const int dc = (pos2 >> bhl) - (pos1 >> bhl);
-        const int dr = (pos2 & (height - 1)) - (pos1 & (height - 1));
-        if ((dc | dr) >= 0 && dc + dr <= 2) {
-          ctx_val1 = 1 + (level2 >= 3);
-        }
+        return cost;
       }
-      const int coeff_ctx1 = ctx_val1 + av1_nz_map_ctx_offset[tx_size][pos1];
-      cost += coeff_costs->base_cost[coeff_ctx1][4 + (unsigned int)abs(v1)];
-      if (!v0) {
-        cost += coeff_costs->base_cost[0][0];
-      } else {
-        cost += coeff_costs->dc_sign_cost[txb_ctx->dc_sign_ctx][v0 < 0] +
-                coeff_costs->base_cost[0][(unsigned int)abs(v0)];
-      }
-      return cost;
     }
   }
 
@@ -1500,11 +1704,8 @@ static int warehouse_efficients_txb_multi(
   int cost2 = 0;
   for (; scan_p >= scan_end + 1; scan_p -= 2) {
     const intptr_t pos0 = scan_p[0];
-    const intptr_t pos1 = scan_p[-1];
     const size_t ctx8_0 = (size_t)(uint8_t)coeff_contexts[pos0] << 3;
-    const size_t ctx8_1 = (size_t)(uint8_t)coeff_contexts[pos1] << 3;
     const size_t level0 = (unsigned int)abs(qcoeff[pos0]);
-    const size_t level1 = (unsigned int)abs(qcoeff[pos1]);
     if (LIKELY(level0 <= NUM_BASE_LEVELS)) {
       cost += base_cost4[ctx8_0 + level0];
     } else {
@@ -1513,6 +1714,9 @@ static int warehouse_efficients_txb_multi(
       cost += base_cost4[ctx8_0 + 3] +
               get_br_cost_fast((tran_low_t)level0, lps_cost[ctx]);
     }
+    const intptr_t pos1 = scan_p[-1];
+    const size_t ctx8_1 = (size_t)(uint8_t)coeff_contexts[pos1] << 3;
+    const size_t level1 = (unsigned int)abs(qcoeff[pos1]);
     if (LIKELY(level1 <= NUM_BASE_LEVELS)) {
       cost2 += base_cost4[ctx8_1 + level1];
     } else {
