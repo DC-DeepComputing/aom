@@ -270,6 +270,10 @@ if(CONFIG_HIGHWAY)
               "${AOM_ROOT}/av1/encoder/av1_fwd_txfm2d_hwy.h"
               "${AOM_ROOT}/av1/encoder/av1_quantize_hwy.h"
               "${AOM_ROOT}/av1/encoder/encodetxb_hwy.h")
+  if(NOT CONFIG_REALTIME_ONLY)
+    list(APPEND AOM_AV1_ENCODER_SOURCES
+                "${AOM_ROOT}/av1/encoder/temporal_filter_hwy.h")
+  endif()
 endif()
 
 if(CONFIG_REALTIME_ONLY)
@@ -402,6 +406,10 @@ if(CONFIG_HIGHWAY)
               "${AOM_ROOT}/av1/encoder/x86/av1_fwd_txfm2d_hwy_avx512.cc"
               "${AOM_ROOT}/av1/encoder/x86/av1_quantize_hwy_avx512.cc"
               "${AOM_ROOT}/av1/encoder/x86/encodetxb_hwy_avx512.cc")
+  if(NOT CONFIG_REALTIME_ONLY)
+    list(APPEND AOM_AV1_ENCODER_INTRIN_AVX512
+                "${AOM_ROOT}/av1/encoder/x86/temporal_filter_hwy_avx512.cc")
+  endif()
 endif()
 
 list(APPEND AOM_AV1_ENCODER_INTRIN_NEON
