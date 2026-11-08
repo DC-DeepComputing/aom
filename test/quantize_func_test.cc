@@ -210,6 +210,9 @@ class QuantizeTestBase
       if (is_loop) FillCoeffRandom();
 
       memset(qcoeff_ref, 0, 5 * n_coeffs * sizeof(*qcoeff_ref));
+      constexpr uint16_t kEobCanary = 0x5a5a;
+      eob[0] = static_cast<uint16_t>(~kEobCanary);
+      for (int k = 1; k < 8; ++k) eob[k] = kEobCanary;
 
       RunQuantizeFunc(coeff_ptr, n_coeffs, zbin, round, quant, quant_shift,
                       qcoeff, qcoeff_ref, dqcoeff, dqcoeff_ref, dequant,
@@ -229,6 +232,10 @@ class QuantizeTestBase
 
       ASSERT_EQ(eob[0], eob[1])
           << "eobs mismatch on test: " << i << " Q: " << q;
+      for (int k = 2; k < 8; ++k) {
+        ASSERT_EQ(eob[k], kEobCanary)
+            << "eob_ptr overflow at word +" << (k - 1) << " on test: " << i;
+      }
     }
   }
 
