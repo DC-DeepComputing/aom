@@ -618,6 +618,14 @@ INSTANTIATE_TEST_SUITE_P(AVX2, SSE_Sum_Test,
                                  ValuesIn(kValidBlockSize)));
 #endif  // HAVE_AVX2
 
+#if CONFIG_HIGHWAY && HAVE_AVX512
+TestSSE_SumFuncs sse_sum_avx512[] = { TestSSE_SumFuncs(
+    &aom_get_blk_sse_sum_c, &aom_get_blk_sse_sum_avx512) };
+INSTANTIATE_TEST_SUITE_P(AVX512, SSE_Sum_Test,
+                         Combine(ValuesIn(sse_sum_avx512),
+                                 ValuesIn(kValidBlockSize)));
+#endif  // CONFIG_HIGHWAY && HAVE_AVX512
+
 #if HAVE_NEON
 TestSSE_SumFuncs sse_sum_neon[] = { TestSSE_SumFuncs(
     &aom_get_blk_sse_sum_c, &aom_get_blk_sse_sum_neon) };
