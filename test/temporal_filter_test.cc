@@ -317,6 +317,16 @@ INSTANTIATE_TEST_SUITE_P(AVX2, TemporalFilterTest,
                                  Values(0, 1)));
 #endif  // HAVE_AVX2
 
+#if CONFIG_HIGHWAY && HAVE_AVX512
+TemporalFilterFuncParam temporal_filter_test_avx512[] = {
+  TemporalFilterFuncParam(&av1_apply_temporal_filter_c,
+                          &av1_apply_temporal_filter_avx512)
+};
+INSTANTIATE_TEST_SUITE_P(AVX512, TemporalFilterTest,
+                         Combine(ValuesIn(temporal_filter_test_avx512),
+                                 Values(0, 1)));
+#endif  // CONFIG_HIGHWAY && HAVE_AVX512
+
 #if HAVE_SSE2
 TemporalFilterFuncParam temporal_filter_test_sse2[] = { TemporalFilterFuncParam(
     &av1_apply_temporal_filter_c, &av1_apply_temporal_filter_sse2) };
@@ -343,12 +353,12 @@ INSTANTIATE_TEST_SUITE_P(NEON_DOTPROD, TemporalFilterTest,
                                  Values(0, 1)));
 #endif  // HAVE_NEON_DOTPROD
 
-#if HAVE_AVX2 || HAVE_NEON
+#if HAVE_AVX2 || HAVE_AVX512 || HAVE_NEON
 // Width and height for which av1_estimate_noise_from_single_plane() will be
 // tested.
 const int kWidths[] = { 3840, 1920, 1280, 800, 640, 360, 357 };
 const int kHeights[] = { 2160, 1080, 720, 600, 480, 240, 237 };
-#endif  // HAVE_AVX2 || HAVE_NEON
+#endif  // HAVE_AVX2 || HAVE_AVX512 || HAVE_NEON
 
 using EstimateNoiseFunc = double (*)(const uint8_t *src, int height, int width,
                                      int stride, int edge_thresh);
@@ -436,6 +446,15 @@ INSTANTIATE_TEST_SUITE_P(
         ::testing::Values(av1_estimate_noise_from_single_plane_avx2),
         ::testing::ValuesIn(kWidths), ::testing::ValuesIn(kHeights)));
 #endif  // HAVE_AVX2
+
+#if CONFIG_HIGHWAY && HAVE_AVX512
+INSTANTIATE_TEST_SUITE_P(
+    AVX512, EstimateNoiseTest,
+    ::testing::Combine(
+        ::testing::Values(av1_estimate_noise_from_single_plane_c),
+        ::testing::Values(av1_estimate_noise_from_single_plane_avx512),
+        ::testing::ValuesIn(kWidths), ::testing::ValuesIn(kHeights)));
+#endif  // CONFIG_HIGHWAY && HAVE_AVX512
 
 #if HAVE_NEON
 INSTANTIATE_TEST_SUITE_P(
@@ -737,6 +756,16 @@ INSTANTIATE_TEST_SUITE_P(AVX2, HBDTemporalFilterTest,
                                  Values(0, 1)));
 #endif  // HAVE_AVX2
 
+#if CONFIG_HIGHWAY && HAVE_AVX512
+HBDTemporalFilterFuncParam HBDtemporal_filter_test_avx512[] = {
+  HBDTemporalFilterFuncParam(&av1_highbd_apply_temporal_filter_c,
+                             &av1_highbd_apply_temporal_filter_avx512)
+};
+INSTANTIATE_TEST_SUITE_P(AVX512, HBDTemporalFilterTest,
+                         Combine(ValuesIn(HBDtemporal_filter_test_avx512),
+                                 Values(0, 1)));
+#endif  // CONFIG_HIGHWAY && HAVE_AVX512
+
 #if HAVE_NEON
 HBDTemporalFilterFuncParam HBDtemporal_filter_test_neon[] = {
   HBDTemporalFilterFuncParam(&av1_highbd_apply_temporal_filter_c,
@@ -824,6 +853,16 @@ GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(HBDEstimateNoiseTest);
 TEST_P(HBDEstimateNoiseTest, RandomValues) { RunTest(); }
 
 TEST_P(HBDEstimateNoiseTest, DISABLED_Speed) { SpeedTest(2000); }
+
+#if CONFIG_HIGHWAY && HAVE_AVX512
+INSTANTIATE_TEST_SUITE_P(
+    AVX512, HBDEstimateNoiseTest,
+    ::testing::Combine(
+        ::testing::Values(av1_highbd_estimate_noise_from_single_plane_c),
+        ::testing::Values(av1_highbd_estimate_noise_from_single_plane_avx512),
+        ::testing::ValuesIn(kWidths), ::testing::ValuesIn(kHeights),
+        ::testing::ValuesIn({ 8, 10, 12 })));
+#endif  // CONFIG_HIGHWAY && HAVE_AVX512
 
 #if HAVE_NEON
 INSTANTIATE_TEST_SUITE_P(
