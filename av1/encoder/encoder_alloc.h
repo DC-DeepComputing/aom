@@ -30,8 +30,6 @@ static inline void dealloc_context_buffers_ext(
     MBMIExtFrameBufferInfo *mbmi_ext_info) {
   aom_free(mbmi_ext_info->frame_base);
   mbmi_ext_info->frame_base = NULL;
-  aom_free(mbmi_ext_info->cb_offset_base);
-  mbmi_ext_info->cb_offset_base = NULL;
   mbmi_ext_info->alloc_size = 0;
 }
 
@@ -51,9 +49,6 @@ static inline void alloc_context_buffers_ext(
     CHECK_MEM_ERROR(
         cm, mbmi_ext_info->frame_base,
         aom_malloc(new_ext_mi_size * sizeof(*mbmi_ext_info->frame_base)));
-    CHECK_MEM_ERROR(
-        cm, mbmi_ext_info->cb_offset_base,
-        aom_malloc(new_ext_mi_size * sizeof(*mbmi_ext_info->cb_offset_base)));
     mbmi_ext_info->alloc_size = new_ext_mi_size;
   }
   // The stride needs to be updated regardless of whether new allocation
