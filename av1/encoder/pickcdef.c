@@ -761,6 +761,14 @@ static void cdef_alloc_data(AV1_COMMON *cm, CdefSearchCtx *cdef_search_ctx) {
                   aom_malloc(sizeof(**cdef_search_ctx->mse) * nvfb * nhfb));
   CHECK_MEM_ERROR(cm, cdef_search_ctx->mse[1],
                   aom_malloc(sizeof(**cdef_search_ctx->mse) * nvfb * nhfb));
+  // Fault the MSE pages in here, on the calling thread. Every entry is written
+  // before it is read, but with multi-threaded CDEF search neighboring
+  // superblocks' 512-byte entries share pages, so first touch from several
+  // workers at once multiplies (contended) page faults.
+  memset(cdef_search_ctx->mse[0], 0,
+         sizeof(**cdef_search_ctx->mse) * nvfb * nhfb);
+  memset(cdef_search_ctx->mse[1], 0,
+         sizeof(**cdef_search_ctx->mse) * nvfb * nhfb);
 }
 
 // Deallocates the memory allocated for members of CdefSearchCtx.
