@@ -197,6 +197,11 @@ INSTANTIATE_TEST_SUITE_P(SSE2, EncodeTxbTest,
                          ::testing::Values(av1_get_nz_map_contexts_sse2));
 #endif
 
+#if CONFIG_HIGHWAY && HAVE_AVX512
+INSTANTIATE_TEST_SUITE_P(AVX512, EncodeTxbTest,
+                         ::testing::Values(av1_get_nz_map_contexts_avx512));
+#endif
+
 #if HAVE_NEON
 INSTANTIATE_TEST_SUITE_P(NEON, EncodeTxbTest,
                          ::testing::Values(av1_get_nz_map_contexts_neon));
@@ -293,6 +298,12 @@ INSTANTIATE_TEST_SUITE_P(
 INSTANTIATE_TEST_SUITE_P(
     AVX2, EncodeTxbInitLevelTest,
     ::testing::Combine(::testing::Values(&av1_txb_init_levels_avx2),
+                       ::testing::Range(0, static_cast<int>(TX_SIZES_ALL), 1)));
+#endif
+#if CONFIG_HIGHWAY && HAVE_AVX512
+INSTANTIATE_TEST_SUITE_P(
+    AVX512, EncodeTxbInitLevelTest,
+    ::testing::Combine(::testing::Values(&av1_txb_init_levels_avx512),
                        ::testing::Range(0, static_cast<int>(TX_SIZES_ALL), 1)));
 #endif
 #if HAVE_NEON
