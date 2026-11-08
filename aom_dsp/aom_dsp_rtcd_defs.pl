@@ -1061,7 +1061,11 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
   foreach (@encoder_block_sizes) {
     ($w, $h) = @$_;
     add_proto qw/unsigned int/, "aom_masked_sad${w}x${h}", "const uint8_t *src, int src_stride, const uint8_t *ref, int ref_stride, const uint8_t *second_pred, const uint8_t *msk, int msk_stride, int invert_mask";
-    specialize "aom_masked_sad${w}x${h}", qw/ssse3 avx2 neon/;
+    if (aom_config("CONFIG_HIGHWAY") eq "yes" && $w >= 16) {
+      specialize "aom_masked_sad${w}x${h}", qw/ssse3 avx2 avx512 neon/;
+    } else {
+      specialize "aom_masked_sad${w}x${h}", qw/ssse3 avx2 neon/;
+    }
   }
 
   if (aom_config("CONFIG_AV1_HIGHBITDEPTH") eq "yes") {
@@ -1080,7 +1084,11 @@ if (aom_config("CONFIG_AV1_ENCODER") eq "yes") {
       ($w, $h) = @$_;
       add_proto qw/unsigned int/, "aom_obmc_sad${w}x${h}", "const uint8_t *pre, int pre_stride, const int32_t *wsrc, const int32_t *mask";
       if (! (($w == 128 && $h == 32) || ($w == 32 && $h == 128))) {
-        specialize "aom_obmc_sad${w}x${h}", qw/sse4_1 avx2 neon/;
+        if (aom_config("CONFIG_HIGHWAY") eq "yes" && $w >= 16) {
+          specialize "aom_obmc_sad${w}x${h}", qw/sse4_1 avx2 avx512 neon/;
+        } else {
+          specialize "aom_obmc_sad${w}x${h}", qw/sse4_1 avx2 neon/;
+        }
       }
     }
 
