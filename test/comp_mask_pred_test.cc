@@ -193,6 +193,13 @@ INSTANTIATE_TEST_SUITE_P(
                        ::testing::ValuesIn(kCompMaskPredParams)));
 #endif
 
+#if CONFIG_HIGHWAY && HAVE_AVX512
+INSTANTIATE_TEST_SUITE_P(
+    AVX512, AV1CompMaskPredTest,
+    ::testing::Combine(::testing::Values(&aom_comp_mask_pred_avx512),
+                       ::testing::ValuesIn(kCompMaskPredParams)));
+#endif
+
 #if HAVE_NEON
 INSTANTIATE_TEST_SUITE_P(
     NEON, AV1CompMaskPredTest,
@@ -200,7 +207,7 @@ INSTANTIATE_TEST_SUITE_P(
                        ::testing::ValuesIn(kCompMaskPredParams)));
 #endif
 
-#if HAVE_SSSE3 || HAVE_SSE2 || HAVE_AVX2 || HAVE_NEON
+#if HAVE_SSSE3 || HAVE_SSE2 || HAVE_AVX2 || HAVE_AVX512 || HAVE_NEON
 const BLOCK_SIZE kValidBlockSize[] = {
   BLOCK_4X4,     BLOCK_8X8,   BLOCK_8X16,  BLOCK_8X32,   BLOCK_16X8,
   BLOCK_16X16,   BLOCK_16X32, BLOCK_32X8,  BLOCK_32X16,  BLOCK_32X32,
@@ -413,6 +420,13 @@ INSTANTIATE_TEST_SUITE_P(
                        ::testing::ValuesIn(kValidBlockSize)));
 #endif
 
+#if CONFIG_HIGHWAY && HAVE_AVX512
+INSTANTIATE_TEST_SUITE_P(
+    AVX512, AV1CompAvgPredTest,
+    ::testing::Combine(::testing::Values(&aom_comp_avg_pred_avx512),
+                       ::testing::ValuesIn(kValidBlockSize)));
+#endif
+
 #if HAVE_NEON
 INSTANTIATE_TEST_SUITE_P(
     NEON, AV1CompAvgPredTest,
@@ -598,6 +612,14 @@ INSTANTIATE_TEST_SUITE_P(
 INSTANTIATE_TEST_SUITE_P(
     AVX2, AV1HighbdCompMaskPredTest,
     ::testing::Combine(::testing::Values(&aom_highbd_comp_mask_pred_avx2),
+                       ::testing::ValuesIn(kCompMaskPredParams),
+                       ::testing::Range(8, 13, 2)));
+#endif
+
+#if CONFIG_HIGHWAY && HAVE_AVX512
+INSTANTIATE_TEST_SUITE_P(
+    AVX512, AV1HighbdCompMaskPredTest,
+    ::testing::Combine(::testing::Values(&aom_highbd_comp_mask_pred_avx512),
                        ::testing::ValuesIn(kCompMaskPredParams),
                        ::testing::Range(8, 13, 2)));
 #endif
