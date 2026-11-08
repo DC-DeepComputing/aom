@@ -9,6 +9,7 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <cstdlib>
@@ -606,6 +607,80 @@ TEST_P(CDEFFindDirDualTest, TestSIMDNoMismatch) {
   test_finddir_dual(finddir_, ref_finddir_);
 }
 
+TEST_P(CDEFFindDirDualTest, TestCdefBStride) {
+  ACMRandom rnd(ACMRandom::DeterministicSeed());
+  DECLARE_ALIGNED(32, uint16_t, inbuf[CDEF_INBUF_SIZE]);
+  struct BlockPair {
+    int r1, c1, r2, c2;
+  };
+  static const BlockPair kPairs[] = {
+    { CDEF_VBORDER, CDEF_HBORDER, CDEF_VBORDER, CDEF_HBORDER + 16 },
+    { CDEF_VBORDER, CDEF_HBORDER + 1, CDEF_VBORDER + 16, CDEF_HBORDER + 25 },
+    { CDEF_VBORDER + 8, CDEF_HBORDER + 56, CDEF_VBORDER + 24,
+      CDEF_HBORDER + 8 },
+  };
+  for (int shift = 0; shift <= 4; shift += 2) {
+    const int depth = 8 + shift;
+    const uint16_t max_val = static_cast<uint16_t>((1 << depth) - 1);
+    for (size_t pair = 0; pair < sizeof(kPairs) / sizeof(kPairs[0]); ++pair) {
+      const BlockPair &bp = kPairs[pair];
+      for (int pat = 0; pat < 10; ++pat) {
+        for (size_t idx = 0; idx < static_cast<size_t>(CDEF_INBUF_SIZE);
+             ++idx) {
+          inbuf[idx] = CDEF_VERY_LARGE;
+        }
+        uint16_t *const img1 = inbuf + bp.r1 * CDEF_BSTRIDE + bp.c1;
+        uint16_t *const img2 = inbuf + bp.r2 * CDEF_BSTRIDE + bp.c2;
+        for (int r = 0; r < 8; ++r) {
+          for (int c = 0; c < 8; ++c) {
+            uint16_t v1 = 0;
+            uint16_t v2 = 0;
+            if (pat == 0) {
+              v1 = 0;
+              v2 = max_val;
+            } else if (pat == 1) {
+              v1 = max_val;
+              v2 = 0;
+            } else if (pat == 2) {
+              v1 = ((r ^ c) & 1) ? max_val : 0;
+              v2 = ((r ^ c) & 1) ? 0 : max_val;
+            } else if (pat == 3) {
+              const uint16_t lo = static_cast<uint16_t>((1 << shift) - 1);
+              v1 = (c < 4) ? lo : static_cast<uint16_t>(max_val - lo);
+              v2 = (r < 4) ? static_cast<uint16_t>(max_val - lo) : lo;
+            } else if (pat == 4) {
+              v1 = static_cast<uint16_t>(((r * 31 + c * 3) << shift) & max_val);
+              v2 = static_cast<uint16_t>(((c * 29 + r * 5) << shift) & max_val);
+            } else {
+              v1 = static_cast<uint16_t>(rnd.Rand16() & max_val);
+              v2 = static_cast<uint16_t>(rnd.Rand16() & max_val);
+            }
+            img1[r * CDEF_BSTRIDE + c] = v1;
+            img2[r * CDEF_BSTRIDE + c] = v2;
+          }
+        }
+        int32_t ref_var[2] = { -1, -1 };
+        int32_t tst_var[2] = { -2, -2 };
+        int ref_dir[2] = { -1, -1 };
+        int tst_dir[2] = { -2, -2 };
+        ref_finddir_(img1, img2, CDEF_BSTRIDE, &ref_var[0], &ref_var[1], shift,
+                     &ref_dir[0], &ref_dir[1]);
+        API_REGISTER_STATE_CHECK(finddir_(img1, img2, CDEF_BSTRIDE, &tst_var[0],
+                                          &tst_var[1], shift, &tst_dir[0],
+                                          &tst_dir[1]));
+        for (int j = 0; j < 2; ++j) {
+          ASSERT_EQ(ref_dir[j], tst_dir[j])
+              << "shift=" << shift << " pair=" << pair << " pat=" << pat
+              << " blk=" << j;
+          ASSERT_EQ(ref_var[j], tst_var[j])
+              << "shift=" << shift << " pair=" << pair << " pat=" << pat
+              << " blk=" << j;
+        }
+      }
+    }
+  }
+}
+
 TEST_P(CDEFFindDirDualSpeedTest, DISABLED_TestSpeed) {
   test_finddir_dual_speed(finddir_, ref_finddir_);
 }
@@ -806,6 +881,161 @@ TEST_P(CDEFMseCalcBlockLvl4Test, TestSIMDNoMismatch) {
     }
   }
 }
+
+TEST_P(CDEFMseCalcBlockLvl4Test, TestCoverageAndAlignments) {
+  const int damping = GetParam();
+  ACMRandom rnd(ACMRandom::DeterministicSeed() + 77 + damping);
+  DECLARE_ALIGNED(32, uint16_t, inbuf[CDEF_INBUF_SIZE]);
+  uint16_t *const in = inbuf + CDEF_VBORDER * CDEF_BSTRIDE + CDEF_HBORDER;
+  constexpr int kRefStride = 197;
+  constexpr int kRefRows = 160;
+  constexpr size_t kRefSize = static_cast<size_t>(kRefStride) * kRefRows;
+  std::vector<uint8_t> ref_raw(kRefSize + 16);
+  cdef_list dlist[MI_SIZE_128X128 * MI_SIZE_128X128];
+
+  // 1. Chroma 4x4 (mi_wide_l2=1) with CDEF_VERY_LARGE boundaries at +32,
+  // cycling all 8 directions and unaligned ref_buffer (+1, +2, +3 bytes).
+  for (int boundary = 0; boundary < 16; ++boundary) {
+    for (int align_off = 1; align_off <= 3; ++align_off) {
+      for (size_t idx = 0; idx < static_cast<size_t>(CDEF_INBUF_SIZE); ++idx) {
+        inbuf[idx] = rnd.Rand8();
+      }
+      if (boundary & 1) {
+        for (int r = 0; r < 32 + 2 * CDEF_VBORDER; ++r)
+          for (int c = 0; c < CDEF_HBORDER; ++c)
+            inbuf[r * CDEF_BSTRIDE + c] = CDEF_VERY_LARGE;
+      }
+      if (boundary & 2) {
+        for (int r = 0; r < 32 + 2 * CDEF_VBORDER; ++r)
+          for (int c = CDEF_HBORDER + 32; c < CDEF_BSTRIDE; ++c)
+            inbuf[r * CDEF_BSTRIDE + c] = CDEF_VERY_LARGE;
+      }
+      if (boundary & 4) {
+        for (int r = 0; r < CDEF_VBORDER; ++r)
+          for (int c = 0; c < CDEF_BSTRIDE; ++c)
+            inbuf[r * CDEF_BSTRIDE + c] = CDEF_VERY_LARGE;
+      }
+      if (boundary & 8) {
+        for (int r = CDEF_VBORDER + 32; r < 32 + 2 * CDEF_VBORDER; ++r)
+          for (int c = 0; c < CDEF_BSTRIDE; ++c)
+            inbuf[r * CDEF_BSTRIDE + c] = CDEF_VERY_LARGE;
+      }
+      uint8_t *const ref_ptr = ref_raw.data() + align_off;
+      for (size_t idx = 0; idx < kRefSize; ++idx) {
+        ref_ptr[idx] = rnd.Rand8();
+      }
+      const int cdef_count = 64;
+      int dir_ref[CDEF_NBLOCKS][CDEF_NBLOCKS] = { { 0 } };
+      int var_ref[CDEF_NBLOCKS][CDEF_NBLOCKS] = { { 0 } };
+      int dir_tst[CDEF_NBLOCKS][CDEF_NBLOCKS] = { { 0 } };
+      int var_tst[CDEF_NBLOCKS][CDEF_NBLOCKS] = { { 0 } };
+      for (int bi = 0; bi < cdef_count; ++bi) {
+        dlist[bi].by = static_cast<uint8_t>((bi / 8) & 7);
+        dlist[bi].bx = static_cast<uint8_t>(bi & 7);
+        dir_ref[dlist[bi].by][dlist[bi].bx] = (bi + boundary + align_off) & 7;
+        dir_tst[dlist[bi].by][dlist[bi].bx] = (bi + boundary + align_off) & 7;
+      }
+      uint64_t mse_ref[4] = { 17, 29, 43, 61 };
+      uint64_t mse_tst[4] = { 17, 29, 43, 61 };
+      const int row = align_off * 3;
+      const int col = align_off * 5;
+      for (int pli = 1; pli <= 2; ++pli) {
+        CalcMseLvl4Ref(in, ref_ptr, kRefStride, row, col, dlist, cdef_count,
+                       dir_ref, var_ref, damping, pli, 1, mse_ref);
+        API_REGISTER_STATE_CHECK(av1_cdef_mse_calc_block_lvl4_avx2(
+            in, ref_ptr, kRefStride, row, col, dlist, cdef_count, dir_tst,
+            var_tst, damping, pli, 1, mse_tst));
+        for (int gi = 0; gi < 4; ++gi) {
+          ASSERT_EQ(mse_ref[gi], mse_tst[gi])
+              << "Chroma4x4+32 damp=" << damping << " bnd=" << boundary
+              << " align=" << align_off << " pli=" << pli << " gi=" << gi;
+        }
+      }
+    }
+  }
+
+  // 2. Explicit patterns triggering luma t == 0 with (d & 3) == 0 (d = 0, 4)
+  // and contrast levels spanning all t/shift thresholds across damping 3..6,
+  // tested with unaligned ref_buffer (+1, +2, +3 bytes).
+  for (size_t idx = 0; idx < static_cast<size_t>(CDEF_INBUF_SIZE); ++idx) {
+    inbuf[idx] = 128;
+  }
+  const int cdef_count = 16;
+  for (int bi = 0; bi < cdef_count; ++bi) {
+    const int by = bi / 8;
+    const int bx = bi & 7;
+    dlist[bi].by = static_cast<uint8_t>(by);
+    dlist[bi].bx = static_cast<uint8_t>(bx);
+    uint16_t *const blk = &in[8 * by * CDEF_BSTRIDE + 8 * bx];
+    if (bi == 0) {
+      // Non-flat pattern giving dir == 0 and var == 0 -> t == 0, (d & 3) == 0.
+      blk[2 * CDEF_BSTRIDE + 5] = 129;
+      blk[3 * CDEF_BSTRIDE + 4] = 129;
+      blk[4 * CDEF_BSTRIDE + 3] = 129;
+    } else if (bi == 1) {
+      // Non-flat pattern giving dir == 4 and var == 0 -> t == 0, (d & 3) == 0.
+      blk[2 * CDEF_BSTRIDE + 2] = 129;
+      blk[3 * CDEF_BSTRIDE + 3] = 129;
+      blk[4 * CDEF_BSTRIDE + 4] = 129;
+    } else {
+      static const int kAmps[14] = { 1,  2,  4,  8,  12,  16,  24,
+                                     32, 48, 64, 96, 128, 192, 255 };
+      const int amp = kAmps[bi - 2];
+      const uint16_t lo = static_cast<uint16_t>((255 - amp) / 2);
+      const uint16_t hi = static_cast<uint16_t>(lo + amp);
+      for (int r = 0; r < 8; ++r) {
+        for (int c = 0; c < 8; ++c) {
+          const int diag = ((bi & 1) ? c : r) < 4;
+          blk[r * CDEF_BSTRIDE + c] = diag ? lo : hi;
+        }
+      }
+    }
+  }
+  for (int align_off = 1; align_off <= 3; ++align_off) {
+    uint8_t *const ref_ptr = ref_raw.data() + align_off;
+    for (size_t idx = 0; idx < kRefSize; ++idx) {
+      ref_ptr[idx] = rnd.Rand8();
+    }
+    int dir_ref[CDEF_NBLOCKS][CDEF_NBLOCKS] = { { 0 } };
+    int var_ref[CDEF_NBLOCKS][CDEF_NBLOCKS] = { { 0 } };
+    int dir_tst[CDEF_NBLOCKS][CDEF_NBLOCKS] = { { 0 } };
+    int var_tst[CDEF_NBLOCKS][CDEF_NBLOCKS] = { { 0 } };
+    uint64_t mse_ref[4] = { 0 };
+    uint64_t mse_tst[4] = { 0 };
+    CalcMseLvl4Ref(in, ref_ptr, kRefStride, 3, 5, dlist, cdef_count, dir_ref,
+                   var_ref, damping, 0, 2, mse_ref);
+    API_REGISTER_STATE_CHECK(av1_cdef_mse_calc_block_lvl4_avx2(
+        in, ref_ptr, kRefStride, 3, 5, dlist, cdef_count, dir_tst, var_tst,
+        damping, 0, 2, mse_tst));
+    ASSERT_EQ(0, dir_ref[0][0]);
+    ASSERT_EQ(0, var_ref[0][0]);
+    ASSERT_EQ(4, dir_ref[0][1]);
+    ASSERT_EQ(0, var_ref[0][1]);
+    for (int gi = 0; gi < 4; ++gi) {
+      ASSERT_EQ(mse_ref[gi], mse_tst[gi])
+          << "Luma explicit t/shift damp=" << damping << " align=" << align_off
+          << " gi=" << gi;
+    }
+    for (int bi = 0; bi < cdef_count; ++bi) {
+      const int by = dlist[bi].by;
+      const int bx = dlist[bi].bx;
+      ASSERT_EQ(dir_ref[by][bx], dir_tst[by][bx]);
+      ASSERT_EQ(var_ref[by][bx], var_tst[by][bx]);
+    }
+    for (int pli = 1; pli <= 2; ++pli) {
+      CalcMseLvl4Ref(in, ref_ptr, kRefStride, 3, 5, dlist, cdef_count, dir_ref,
+                     var_ref, damping, pli, 2, mse_ref);
+      API_REGISTER_STATE_CHECK(av1_cdef_mse_calc_block_lvl4_avx2(
+          in, ref_ptr, kRefStride, 3, 5, dlist, cdef_count, dir_tst, var_tst,
+          damping, pli, 2, mse_tst));
+      for (int gi = 0; gi < 4; ++gi) {
+        ASSERT_EQ(mse_ref[gi], mse_tst[gi])
+            << "Chroma8x8 explicit align=" << align_off << " pli=" << pli
+            << " gi=" << gi;
+      }
+    }
+  }
+}
 #endif  // CONFIG_AV1_ENCODER && HAVE_AVX2
 
 using std::make_tuple;
@@ -950,6 +1180,56 @@ INSTANTIATE_TEST_SUITE_P(
     AVX2, CDEFCopyRect8to16Test,
     ::testing::Values(make_tuple(&cdef_copy_rect8_8bit_to_16bit_c,
                                  &cdef_copy_rect8_8bit_to_16bit_avx2)));
+
+TEST(AVX2, CDEFCopyRect8to16WidthsAndAlignments) {
+  ACMRandom rnd(ACMRandom::DeterministicSeed());
+  static const int kWidths[] = { 1,  2,  3,  4,  5,  6,  7,  8,   12, 15,
+                                 16, 31, 32, 63, 64, 79, 95, 127, 135 };
+  static const int kHeights[] = { 2, 4, 6, 8 };
+  constexpr int kSrcStride = 157;
+  constexpr int kDstStride = 163;
+  constexpr int kMaxRows = 12;
+  constexpr uint16_t kCanary = 0x5aa5;
+  std::vector<uint8_t> src_buf(static_cast<size_t>(kSrcStride) * kMaxRows + 32);
+  std::vector<uint16_t> ref_buf(static_cast<size_t>(kDstStride) * kMaxRows +
+                                32);
+  std::vector<uint16_t> tst_buf(static_cast<size_t>(kDstStride) * kMaxRows +
+                                32);
+
+  for (int src_off : { 0, 1, 3, 7 }) {
+    for (int dst_off : { 0, 1, 3 }) {
+      for (int height : kHeights) {
+        for (int width : kWidths) {
+          for (size_t idx = 0; idx < src_buf.size(); ++idx) {
+            src_buf[idx] = rnd.Rand8();
+          }
+          std::fill(ref_buf.begin(), ref_buf.end(), kCanary);
+          std::fill(tst_buf.begin(), tst_buf.end(), kCanary);
+          const uint8_t *const src_ptr = src_buf.data() + src_off;
+          uint16_t *const ref_ptr = ref_buf.data() + dst_off;
+          uint16_t *const tst_ptr = tst_buf.data() + dst_off;
+          cdef_copy_rect8_8bit_to_16bit_c(ref_ptr, kDstStride, src_ptr,
+                                          kSrcStride, width, height);
+          API_REGISTER_STATE_CHECK(cdef_copy_rect8_8bit_to_16bit_avx2(
+              tst_ptr, kDstStride, src_ptr, kSrcStride, width, height));
+          for (size_t idx = 0; idx < ref_buf.size(); ++idx) {
+            const bool in_dst = idx >= static_cast<size_t>(dst_off);
+            const size_t rel = in_dst ? idx - static_cast<size_t>(dst_off) : 0;
+            const size_t r = rel / static_cast<size_t>(kDstStride);
+            const size_t c = rel % static_cast<size_t>(kDstStride);
+            const bool in_rect = in_dst && r < static_cast<size_t>(height) &&
+                                 c < static_cast<size_t>(width);
+            ASSERT_EQ(ref_buf[idx], tst_buf[idx])
+                << (in_rect ? "mismatch" : "canary overwrite") << " idx=" << idx
+                << " r=" << r << " c=" << c << " width=" << width
+                << " height=" << height << " src_off=" << src_off
+                << " dst_off=" << dst_off;
+          }
+        }
+      }
+    }
+  }
+}
 
 #if CONFIG_AV1_HIGHBITDEPTH
 INSTANTIATE_TEST_SUITE_P(
