@@ -254,8 +254,6 @@ typedef struct {
   int_mv global_mvs[REF_FRAMES];
   //! \copydoc MB_MODE_INFO_EXT::mode_context
   int16_t mode_context;
-  //! Offset of current coding block's coeff buffer relative to the sb.
-  uint16_t cb_offset[PLANE_TYPES];
 } MB_MODE_INFO_EXT_FRAME;
 
 /*! \brief Inter-mode txfm results for a partition block.
@@ -928,6 +926,12 @@ typedef struct macroblock {
    * for bitstream packing.
    */
   MB_MODE_INFO_EXT_FRAME *mbmi_ext_frame;
+
+  /*! \brief Offsets of the current coding block's coeff buffers relative to
+   * the sb, at frame level (cb_offset_base[] entry of the block). Kept apart
+   * from mbmi_ext_frame so all-intra encodes only touch this dense array.
+   */
+  uint16_t *cb_offset_frame;
 
   //! Entropy context for the current row.
   FRAME_CONTEXT *row_ctx;

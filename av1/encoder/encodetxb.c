@@ -1108,7 +1108,7 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
   MACROBLOCKD *const xd = &x->e_mbd;
   const CB_COEFF_BUFFER *const cb_coef_buff = x->cb_coef_buff;
   const PLANE_TYPE plane_type = get_plane_type(plane);
-  const int cb_offset = x->mbmi_ext_frame->cb_offset[plane_type];
+  const int cb_offset = x->cb_offset_frame[plane_type];
   const int txb_idx = (cb_offset >> 4) + block;
   const uint16_t eob_raw = cb_coef_buff->eobs[plane][txb_idx];
   const uint8_t ent_ctx = cb_coef_buff->entropy_ctx[plane][txb_idx];
@@ -1438,7 +1438,7 @@ void av1_write_intra_coeffs_mb(const AV1_COMMON *const cm, MACROBLOCK *x,
   int block[MAX_MB_PLANE] = { 0 };
   FRAME_CONTEXT *const ec_ctx = xd->tile_ctx;
   const CB_COEFF_BUFFER *const cb_buf = x->cb_coef_buff;
-  const uint16_t *const cb_offsets = x->mbmi_ext_frame->cb_offset;
+  const uint16_t *const cb_offsets = x->cb_offset_frame;
 #if defined(__GNUC__) || defined(__clang__)
   if (active_planes > 1) {
     const int uv_idx = cb_offsets[PLANE_TYPE_UV] >> 4;
@@ -2651,7 +2651,7 @@ TXB_COLD_FN static void update_and_record_txb_context_output(
   }
 
   CB_COEFF_BUFFER *cb_coef_buff = x->cb_coef_buff;
-  const int cb_offset = x->mbmi_ext_frame->cb_offset[plane_type];
+  const int cb_offset = x->cb_offset_frame[plane_type];
   const int txb_idx = (cb_offset >> 4) + block;
 
   if (eob == 0) {
@@ -2981,7 +2981,7 @@ TXB_NOINLINE_FN static void update_intra_mb_txb_context_output(
     const TX_SIZE txsize_ctx = get_txsize_entropy_ctx(tx_size);
     const PLANE_TYPE plane_type = (plane == 0) ? PLANE_TYPE_Y : PLANE_TYPE_UV;
     CB_COEFF_BUFFER *const cb_coef_buff = x->cb_coef_buff;
-    const int cb_off = x->mbmi_ext_frame->cb_offset[plane_type];
+    const int cb_off = x->cb_offset_frame[plane_type];
     uint16_t *const eobs_out = cb_coef_buff->eobs[plane] + (cb_off >> 4);
     uint8_t *const ent_out = cb_coef_buff->entropy_ctx[plane] + (cb_off >> 4);
     tran_low_t *const tc_base = cb_coef_buff->tcoeff[plane] + cb_off;

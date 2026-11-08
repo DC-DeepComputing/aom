@@ -1710,10 +1710,10 @@ static inline void write_modes_b(AV1_COMP *cpi, ThreadData *const td,
   FRAME_CONTEXT *tile_ctx = xd->tile_ctx;
   const int grid_idx = mi_row * mi_params->mi_stride + mi_col;
   xd->mi = mi_params->mi_grid_base + grid_idx;
-  td->mb.mbmi_ext_frame =
-      cpi->mbmi_ext_info.frame_base +
-      get_mi_ext_idx(mi_row, mi_col, cm->mi_params.mi_alloc_bsize,
-                     cpi->mbmi_ext_info.stride);
+  const int ext_idx = get_mi_ext_idx(
+      mi_row, mi_col, cm->mi_params.mi_alloc_bsize, cpi->mbmi_ext_info.stride);
+  td->mb.mbmi_ext_frame = cpi->mbmi_ext_info.frame_base + ext_idx;
+  td->mb.cb_offset_frame = cpi->mbmi_ext_info.cb_offset_base[ext_idx];
   xd->tx_type_map = mi_params->tx_type_map + grid_idx;
   xd->tx_type_map_stride = mi_params->mi_stride;
 

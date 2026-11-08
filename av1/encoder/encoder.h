@@ -1928,6 +1928,11 @@ typedef struct {
    */
   MB_MODE_INFO_EXT_FRAME *frame_base;
   /*!
+   * cb_offset_base[mi_row * stride + mi_col] stores the coeff buffer offsets
+   * (one per plane type) of block (mi_row,mi_col).
+   */
+  uint16_t (*cb_offset_base)[PLANE_TYPES];
+  /*!
    * Size of frame_base buffer.
    */
   int alloc_size;
@@ -4335,6 +4340,7 @@ static inline void set_mode_info_offsets(
   const int ext_idx = get_mi_ext_idx(mi_row, mi_col, mi_params->mi_alloc_bsize,
                                      mbmi_ext_info->stride);
   x->mbmi_ext_frame = mbmi_ext_info->frame_base + ext_idx;
+  x->cb_offset_frame = mbmi_ext_info->cb_offset_base[ext_idx];
 }
 
 // Check to see if the given partition size is allowed for a specified number

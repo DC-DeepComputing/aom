@@ -924,6 +924,10 @@ static void set_offsets_sub_intra(const AV1_COMP *const cpi,
   }
   x->mbmi_ext_frame = cpi->mbmi_ext_info.frame_base +
                       (mi_alloc_row * cpi->mbmi_ext_info.stride + mi_alloc_col);
+  x->cb_offset_frame =
+      cpi->mbmi_ext_info
+          .cb_offset_base[mi_alloc_row * cpi->mbmi_ext_info.stride +
+                          mi_alloc_col];
 
   const int left_idx = mi_row & MAX_MIB_MASK;
   xd->plane[0].above_entropy_context = &xd->above_entropy_context[0][mi_col];
@@ -1115,6 +1119,10 @@ static AOM_FORCE_INLINE void set_offsets_core(const AV1_COMP *const cpi,
   xd->tx_type_map_stride = mi_stride;
   x->mbmi_ext_frame = cpi->mbmi_ext_info.frame_base +
                       (mi_alloc_row * cpi->mbmi_ext_info.stride + mi_alloc_col);
+  x->cb_offset_frame =
+      cpi->mbmi_ext_info
+          .cb_offset_base[mi_alloc_row * cpi->mbmi_ext_info.stride +
+                          mi_alloc_col];
 
   const int left_idx = mi_row & MAX_MIB_MASK;
   xd->plane[0].above_entropy_context = &xd->above_entropy_context[0][mi_col];
@@ -2151,7 +2159,7 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
   av1_update_state(cpi, td, ctx, mi_row, mi_col, bsize, dry_run);
 
   if (UNLIKELY(!dry_run)) {
-    set_cb_offsets(x->mbmi_ext_frame->cb_offset, x->cb_offset[PLANE_TYPE_Y],
+    set_cb_offsets(x->cb_offset_frame, x->cb_offset[PLANE_TYPE_Y],
                    x->cb_offset[PLANE_TYPE_UV]);
     assert(x->cb_offset[PLANE_TYPE_Y] <
            (1 << num_pels_log2_lookup[cpi->common.seq_params->sb_size]));
@@ -2881,7 +2889,7 @@ static void encode_b_nonrd(const AV1_COMP *const cpi, TileDataEnc *tile_data,
   const int subsampling_x = cpi->common.seq_params->subsampling_x;
   const int subsampling_y = cpi->common.seq_params->subsampling_y;
   if (!dry_run) {
-    set_cb_offsets(x->mbmi_ext_frame->cb_offset, x->cb_offset[PLANE_TYPE_Y],
+    set_cb_offsets(x->cb_offset_frame, x->cb_offset[PLANE_TYPE_Y],
                    x->cb_offset[PLANE_TYPE_UV]);
     assert(x->cb_offset[PLANE_TYPE_Y] <
            (1 << num_pels_log2_lookup[cpi->common.seq_params->sb_size]));
