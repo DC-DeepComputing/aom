@@ -403,8 +403,381 @@ HWY_ATTR HWY_INLINE int64_t HighbdCalcVarianceStat(const uint16_t *src,
 }
 #endif  // CONFIG_AV1_HIGHBITDEPTH
 
+// -----------------------------------------------------------------------------
+// Group B (CL 5): Subpixel Variance & Subpixel Avg Variance
+// -----------------------------------------------------------------------------
+
+template <class DI8>
+HWY_ATTR HWY_INLINE hn::VFromD<DI8> BilinearFilter(DI8 di8, int offset) {
+  constexpr hn::Repartition<int16_t, DI8> di16;
+  const int f0 = 16 - 2 * offset;
+  const int f1 = 2 * offset;
+  return hn::BitCast(di8, hn::Set(di16, static_cast<int16_t>(f0 | (f1 << 8))));
+}
+
+template <class DU8, class DI16>
+HWY_ATTR HWY_INLINE void FilterPair(
+    DU8 du8, DI16 di16, hn::VFromD<DU8> s0, hn::VFromD<DU8> s1,
+    hn::VFromD<hn::Repartition<int8_t, DU8>> filt, hn::VFromD<DI16> *out_lo,
+    hn::VFromD<DI16> *out_hi) {
+  const auto pw8 = hn::Set(di16, int16_t{ 8 });
+  const auto lo =
+      hn::SatWidenMulPairwiseAdd(di16, hn::InterleaveLower(du8, s0, s1), filt);
+  const auto hi =
+      hn::SatWidenMulPairwiseAdd(di16, hn::InterleaveUpper(du8, s0, s1), filt);
+  *out_lo = hn::ShiftRight<4>(hn::Add(lo, pw8));
+  *out_hi = hn::ShiftRight<4>(hn::Add(hi, pw8));
+}
+
+template <class DU8>
+HWY_ATTR HWY_INLINE hn::VFromD<DU8> FilterPairPack(
+    DU8 du8, hn::VFromD<DU8> s0, hn::VFromD<DU8> s1,
+    hn::VFromD<hn::Repartition<int8_t, DU8>> filt) {
+  constexpr hn::Repartition<int16_t, DU8> di16;
+  hn::VFromD<decltype(di16)> lo, hi;
+  FilterPair(du8, di16, s0, s1, filt, &lo, &hi);
+  return hn::ReorderDemote2To(du8, lo, hi);
+}
+
+template <class DU8, class DI16, class DI32>
+HWY_ATTR HWY_INLINE void AccumDiff(DU8 du8, DI16 di16, DI32 di32,
+                                   hn::VFromD<DI16> exp_src_lo,
+                                   hn::VFromD<DI16> exp_src_hi,
+                                   hn::VFromD<DU8> dst_reg,
+                                   hn::VFromD<DI32> *sse_reg,
+                                   hn::VFromD<DI16> *sum_reg) {
+  const auto zero = hn::Zero(du8);
+  const auto exp_dst_lo =
+      hn::BitCast(di16, hn::InterleaveLower(du8, dst_reg, zero));
+  const auto exp_dst_hi =
+      hn::BitCast(di16, hn::InterleaveUpper(du8, dst_reg, zero));
+  const auto d_lo = hn::Sub(exp_src_lo, exp_dst_lo);
+  const auto d_hi = hn::Sub(exp_src_hi, exp_dst_hi);
+  *sum_reg = hn::Add(*sum_reg, hn::Add(d_lo, d_hi));
+  const auto madd_lo = hn::WidenMulPairwiseAdd(di32, d_lo, d_lo);
+  const auto madd_hi = hn::WidenMulPairwiseAdd(di32, d_hi, d_hi);
+  *sse_reg = hn::Add(*sse_reg, hn::Add(madd_lo, madd_hi));
+}
+
+template <int Width, class D>
+HWY_ATTR HWY_INLINE hn::VFromD<D> SubPelLoad(D d, const uint8_t *ptr,
+                                             ptrdiff_t half_stride) {
+  HWY_IF_CONSTEXPR(Width == 32 && hn::MaxLanes(d) == 64) {
+    constexpr hn::Half<D> d_half;
+    return Combine2Rows(d, hn::LoadU(d_half, ptr),
+                        hn::LoadU(d_half, ptr + half_stride));
+  }
+  return hn::LoadU(d, ptr);
+}
+
+template <int Width, bool HasSec>
+HWY_ATTR HWY_INLINE int SubPixelVarianceWxHImp(
+    const uint8_t *src, int src_stride, int x_offset, int y_offset,
+    const uint8_t *dst, int dst_stride, const uint8_t *sec, int sec_stride,
+    int height, unsigned int *sse) {
+  constexpr hn::ScalableTag<uint8_t> du8;
+  constexpr hn::Repartition<int8_t, decltype(du8)> di8;
+  constexpr hn::Repartition<int16_t, decltype(du8)> di16;
+  constexpr hn::Repartition<int32_t, decltype(du8)> di32;
+  constexpr int vw = hn::MaxLanes(du8);
+  constexpr int kRowsPerIter = (Width == 32 && vw == 64) ? 2 : 1;
+  constexpr int kColStep = (Width == 32 && vw == 64) ? 32 : vw;
+
+  const int loop_h = height / kRowsPerIter;
+  const ptrdiff_t half_src_stride = static_cast<ptrdiff_t>(loop_h) * src_stride;
+  const ptrdiff_t half_dst_stride = static_cast<ptrdiff_t>(loop_h) * dst_stride;
+  const ptrdiff_t half_sec_stride = static_cast<ptrdiff_t>(loop_h) * sec_stride;
+
+  const auto one = hn::Set(di16, int16_t{ 1 });
+  auto sum32_reg = hn::Zero(di32);
+  auto sse_reg = hn::Zero(di32);
+
+  for (int col = 0; col < Width; col += kColStep) {
+    auto sum_reg = hn::Zero(di16);
+    const uint8_t *s_ptr = src + col;
+    const uint8_t *d_ptr = dst + col;
+    const uint8_t *sec_ptr = HasSec ? (sec + col) : nullptr;
+
+    if (x_offset == 0) {
+      if (y_offset == 0) {
+        for (int i = 0; i < loop_h; ++i) {
+          auto s = SubPelLoad<Width>(du8, s_ptr, half_src_stride);
+          if (HasSec) {
+            s = hn::AverageRound(
+                s, SubPelLoad<Width>(du8, sec_ptr, half_sec_stride));
+            sec_ptr += sec_stride;
+          }
+          const auto d = SubPelLoad<Width>(du8, d_ptr, half_dst_stride);
+          VarianceKernel(du8, di32, di16, s, d, &sse_reg, &sum_reg);
+          s_ptr += src_stride;
+          d_ptr += dst_stride;
+        }
+      } else if (y_offset == 4) {
+        auto s_prev = SubPelLoad<Width>(du8, s_ptr, half_src_stride);
+        for (int i = 0; i < loop_h; ++i) {
+          s_ptr += src_stride;
+          const auto s_curr = SubPelLoad<Width>(du8, s_ptr, half_src_stride);
+          auto s = hn::AverageRound(s_prev, s_curr);
+          if (HasSec) {
+            s = hn::AverageRound(
+                s, SubPelLoad<Width>(du8, sec_ptr, half_sec_stride));
+            sec_ptr += sec_stride;
+          }
+          const auto d = SubPelLoad<Width>(du8, d_ptr, half_dst_stride);
+          VarianceKernel(du8, di32, di16, s, d, &sse_reg, &sum_reg);
+          s_prev = s_curr;
+          d_ptr += dst_stride;
+        }
+      } else {
+        const auto filter = BilinearFilter(di8, y_offset);
+        auto s_prev = SubPelLoad<Width>(du8, s_ptr, half_src_stride);
+        for (int i = 0; i < loop_h; ++i) {
+          s_ptr += src_stride;
+          const auto s_curr = SubPelLoad<Width>(du8, s_ptr, half_src_stride);
+          const auto d = SubPelLoad<Width>(du8, d_ptr, half_dst_stride);
+          HWY_IF_CONSTEXPR(HasSec) {
+            const auto s = hn::AverageRound(
+                FilterPairPack(du8, s_prev, s_curr, filter),
+                SubPelLoad<Width>(du8, sec_ptr, half_sec_stride));
+            VarianceKernel(du8, di32, di16, s, d, &sse_reg, &sum_reg);
+            sec_ptr += sec_stride;
+          }
+          HWY_IF_CONSTEXPR(!HasSec) {
+            hn::VFromD<decltype(di16)> exp_lo, exp_hi;
+            FilterPair(du8, di16, s_prev, s_curr, filter, &exp_lo, &exp_hi);
+            AccumDiff(du8, di16, di32, exp_lo, exp_hi, d, &sse_reg, &sum_reg);
+          }
+          s_prev = s_curr;
+          d_ptr += dst_stride;
+        }
+      }
+    } else if (x_offset == 4) {
+      if (y_offset == 0) {
+        for (int i = 0; i < loop_h; ++i) {
+          auto s = hn::AverageRound(
+              SubPelLoad<Width>(du8, s_ptr, half_src_stride),
+              SubPelLoad<Width>(du8, s_ptr + 1, half_src_stride));
+          if (HasSec) {
+            s = hn::AverageRound(
+                s, SubPelLoad<Width>(du8, sec_ptr, half_sec_stride));
+            sec_ptr += sec_stride;
+          }
+          const auto d = SubPelLoad<Width>(du8, d_ptr, half_dst_stride);
+          VarianceKernel(du8, di32, di16, s, d, &sse_reg, &sum_reg);
+          s_ptr += src_stride;
+          d_ptr += dst_stride;
+        }
+      } else if (y_offset == 4) {
+        auto s_prev = hn::AverageRound(
+            SubPelLoad<Width>(du8, s_ptr, half_src_stride),
+            SubPelLoad<Width>(du8, s_ptr + 1, half_src_stride));
+        for (int i = 0; i < loop_h; ++i) {
+          s_ptr += src_stride;
+          const auto s_curr = hn::AverageRound(
+              SubPelLoad<Width>(du8, s_ptr, half_src_stride),
+              SubPelLoad<Width>(du8, s_ptr + 1, half_src_stride));
+          auto s_avg = hn::AverageRound(s_prev, s_curr);
+          if (HasSec) {
+            s_avg = hn::AverageRound(
+                s_avg, SubPelLoad<Width>(du8, sec_ptr, half_sec_stride));
+            sec_ptr += sec_stride;
+          }
+          const auto d = SubPelLoad<Width>(du8, d_ptr, half_dst_stride);
+          VarianceKernel(du8, di32, di16, s_avg, d, &sse_reg, &sum_reg);
+          s_prev = s_curr;
+          d_ptr += dst_stride;
+        }
+      } else {
+        const auto filter = BilinearFilter(di8, y_offset);
+        auto s_prev = hn::AverageRound(
+            SubPelLoad<Width>(du8, s_ptr, half_src_stride),
+            SubPelLoad<Width>(du8, s_ptr + 1, half_src_stride));
+        for (int i = 0; i < loop_h; ++i) {
+          s_ptr += src_stride;
+          const auto s_curr = hn::AverageRound(
+              SubPelLoad<Width>(du8, s_ptr, half_src_stride),
+              SubPelLoad<Width>(du8, s_ptr + 1, half_src_stride));
+          const auto d = SubPelLoad<Width>(du8, d_ptr, half_dst_stride);
+          HWY_IF_CONSTEXPR(HasSec) {
+            const auto s_avg = hn::AverageRound(
+                FilterPairPack(du8, s_prev, s_curr, filter),
+                SubPelLoad<Width>(du8, sec_ptr, half_sec_stride));
+            VarianceKernel(du8, di32, di16, s_avg, d, &sse_reg, &sum_reg);
+            sec_ptr += sec_stride;
+          }
+          HWY_IF_CONSTEXPR(!HasSec) {
+            hn::VFromD<decltype(di16)> exp_lo, exp_hi;
+            FilterPair(du8, di16, s_prev, s_curr, filter, &exp_lo, &exp_hi);
+            AccumDiff(du8, di16, di32, exp_lo, exp_hi, d, &sse_reg, &sum_reg);
+          }
+          s_prev = s_curr;
+          d_ptr += dst_stride;
+        }
+      }
+    } else {
+      const auto xfilter = BilinearFilter(di8, x_offset);
+      if (y_offset == 0) {
+        for (int i = 0; i < loop_h; ++i) {
+          const auto s0 = SubPelLoad<Width>(du8, s_ptr, half_src_stride);
+          const auto s1 = SubPelLoad<Width>(du8, s_ptr + 1, half_src_stride);
+          const auto d = SubPelLoad<Width>(du8, d_ptr, half_dst_stride);
+          HWY_IF_CONSTEXPR(HasSec) {
+            const auto s = hn::AverageRound(
+                FilterPairPack(du8, s0, s1, xfilter),
+                SubPelLoad<Width>(du8, sec_ptr, half_sec_stride));
+            VarianceKernel(du8, di32, di16, s, d, &sse_reg, &sum_reg);
+            sec_ptr += sec_stride;
+          }
+          HWY_IF_CONSTEXPR(!HasSec) {
+            hn::VFromD<decltype(di16)> exp_lo, exp_hi;
+            FilterPair(du8, di16, s0, s1, xfilter, &exp_lo, &exp_hi);
+            AccumDiff(du8, di16, di32, exp_lo, exp_hi, d, &sse_reg, &sum_reg);
+          }
+          s_ptr += src_stride;
+          d_ptr += dst_stride;
+        }
+      } else if (y_offset == 4) {
+        auto src_pack = FilterPairPack(
+            du8, SubPelLoad<Width>(du8, s_ptr, half_src_stride),
+            SubPelLoad<Width>(du8, s_ptr + 1, half_src_stride), xfilter);
+        for (int i = 0; i < loop_h; ++i) {
+          s_ptr += src_stride;
+          const auto src_curr = FilterPairPack(
+              du8, SubPelLoad<Width>(du8, s_ptr, half_src_stride),
+              SubPelLoad<Width>(du8, s_ptr + 1, half_src_stride), xfilter);
+          auto src_avg = hn::AverageRound(src_pack, src_curr);
+          if (HasSec) {
+            src_avg = hn::AverageRound(
+                src_avg, SubPelLoad<Width>(du8, sec_ptr, half_sec_stride));
+            sec_ptr += sec_stride;
+          }
+          const auto d = SubPelLoad<Width>(du8, d_ptr, half_dst_stride);
+          VarianceKernel(du8, di32, di16, src_avg, d, &sse_reg, &sum_reg);
+          src_pack = src_curr;
+          d_ptr += dst_stride;
+        }
+      } else {
+        const auto yfilter = BilinearFilter(di8, y_offset);
+        auto src_pack = FilterPairPack(
+            du8, SubPelLoad<Width>(du8, s_ptr, half_src_stride),
+            SubPelLoad<Width>(du8, s_ptr + 1, half_src_stride), xfilter);
+        for (int i = 0; i < loop_h; ++i) {
+          s_ptr += src_stride;
+          const auto src_curr = FilterPairPack(
+              du8, SubPelLoad<Width>(du8, s_ptr, half_src_stride),
+              SubPelLoad<Width>(du8, s_ptr + 1, half_src_stride), xfilter);
+          const auto d = SubPelLoad<Width>(du8, d_ptr, half_dst_stride);
+          HWY_IF_CONSTEXPR(HasSec) {
+            const auto src_avg = hn::AverageRound(
+                FilterPairPack(du8, src_pack, src_curr, yfilter),
+                SubPelLoad<Width>(du8, sec_ptr, half_sec_stride));
+            VarianceKernel(du8, di32, di16, src_avg, d, &sse_reg, &sum_reg);
+            sec_ptr += sec_stride;
+          }
+          HWY_IF_CONSTEXPR(!HasSec) {
+            hn::VFromD<decltype(di16)> v_lo, v_hi;
+            FilterPair(du8, di16, src_pack, src_curr, yfilter, &v_lo, &v_hi);
+            AccumDiff(du8, di16, di32, v_lo, v_hi, d, &sse_reg, &sum_reg);
+          }
+          src_pack = src_curr;
+          d_ptr += dst_stride;
+        }
+      }
+    }
+    sum32_reg = hn::Add(sum32_reg, hn::WidenMulPairwiseAdd(di32, sum_reg, one));
+  }
+  return VarianceFinalFrom32BitSum(di32, sse_reg, sum32_reg, sse);
+}
+
+template <int BlockHeight, int Log2H>
+HWY_ATTR HWY_INLINE unsigned int SubPixelVariance32xH(
+    const uint8_t *src, int src_stride, int x_offset, int y_offset,
+    const uint8_t *dst, int dst_stride, unsigned int *sse) {
+  const int sum = SubPixelVarianceWxHImp<32, false>(
+      src, src_stride, x_offset, y_offset, dst, dst_stride, nullptr, 0,
+      BlockHeight, sse);
+  return *sse - static_cast<unsigned int>((static_cast<int64_t>(sum) * sum) >>
+                                          (5 + Log2H));
+}
+
+template <int BlockHeight, int Log2H>
+HWY_ATTR HWY_INLINE unsigned int SubPixelAvgVariance32xH(
+    const uint8_t *src, int src_stride, int x_offset, int y_offset,
+    const uint8_t *dst, int dst_stride, unsigned int *sse,
+    const uint8_t *sec_ptr) {
+  const int sum = SubPixelVarianceWxHImp<32, true>(
+      src, src_stride, x_offset, y_offset, dst, dst_stride, sec_ptr, 32,
+      BlockHeight, sse);
+  return *sse - static_cast<unsigned int>((static_cast<int64_t>(sum) * sum) >>
+                                          (5 + Log2H));
+}
+
+template <int BlockWidth, int BlockHeight, int ChunkHeight, int WLog2,
+          int HLog2>
+HWY_ATTR HWY_INLINE unsigned int SubPixelVariance64Or128(
+    const uint8_t *src, int src_stride, int x_offset, int y_offset,
+    const uint8_t *dst, int dst_stride, unsigned int *sse_ptr) {
+  unsigned int sse = 0;
+  int se = 0;
+  for (int i = 0; i < BlockWidth / 64; ++i) {
+    const uint8_t *src_ptr = src;
+    const uint8_t *dst_ptr = dst;
+    for (int j = 0; j < BlockHeight / ChunkHeight; ++j) {
+      unsigned int sse2;
+      const int se2 = SubPixelVarianceWxHImp<64, false>(
+          src_ptr, src_stride, x_offset, y_offset, dst_ptr, dst_stride, nullptr,
+          0, ChunkHeight, &sse2);
+      dst_ptr += ChunkHeight * dst_stride;
+      src_ptr += ChunkHeight * src_stride;
+      se += se2;
+      sse += sse2;
+    }
+    src += 64;
+    dst += 64;
+  }
+  *sse_ptr = sse;
+  return sse - static_cast<unsigned int>((static_cast<int64_t>(se) * se) >>
+                                         (WLog2 + HLog2));
+}
+
+template <int BlockWidth, int BlockHeight, int ChunkHeight, int WLog2,
+          int HLog2>
+HWY_ATTR HWY_INLINE unsigned int SubPixelAvgVariance64Or128(
+    const uint8_t *src, int src_stride, int x_offset, int y_offset,
+    const uint8_t *dst, int dst_stride, unsigned int *sse_ptr,
+    const uint8_t *sec) {
+  unsigned int sse = 0;
+  int se = 0;
+  for (int i = 0; i < BlockWidth / 64; ++i) {
+    const uint8_t *src_ptr = src;
+    const uint8_t *dst_ptr = dst;
+    const uint8_t *sec_ptr = sec;
+    for (int j = 0; j < BlockHeight / ChunkHeight; ++j) {
+      unsigned int sse2;
+      const int se2 = SubPixelVarianceWxHImp<64, true>(
+          src_ptr, src_stride, x_offset, y_offset, dst_ptr, dst_stride, sec_ptr,
+          BlockWidth, ChunkHeight, &sse2);
+      dst_ptr += ChunkHeight * dst_stride;
+      src_ptr += ChunkHeight * src_stride;
+      sec_ptr += ChunkHeight * BlockWidth;
+      se += se2;
+      sse += sse2;
+    }
+    src += 64;
+    dst += 64;
+    sec += 64;
+  }
+  *sse_ptr = sse;
+  return sse - static_cast<unsigned int>((static_cast<int64_t>(se) * se) >>
+                                         (WLog2 + HLog2));
+}
+
 }  // namespace HWY_NAMESPACE
 }  // namespace
+
+// -----------------------------------------------------------------------------
+// Export Macros
+// -----------------------------------------------------------------------------
 
 #define FVAR(w, h, bits, suffix)                                              \
   extern "C" unsigned int aom_variance##w##x##h##_##suffix(                   \
@@ -484,6 +857,72 @@ HWY_ATTR HWY_INLINE int64_t HighbdCalcVarianceStat(const uint16_t *src,
   X(16, 16, 8, suffix)                     \
   X(16, 8, 7, suffix)                      \
   FOR_EACH_VAR_RECT_BLOCK_SIZE(X, suffix)
+
+#define FSUBPIX_VAR_32XH(h, log2h, suffix)                                   \
+  extern "C" unsigned int aom_sub_pixel_variance32x##h##_##suffix(           \
+      const uint8_t *src, int src_stride, int x_offset, int y_offset,        \
+      const uint8_t *dst, int dst_stride, unsigned int *sse);                \
+  HWY_ATTR unsigned int aom_sub_pixel_variance32x##h##_##suffix(             \
+      const uint8_t *src, int src_stride, int x_offset, int y_offset,        \
+      const uint8_t *dst, int dst_stride, unsigned int *sse) {               \
+    return HWY_NAMESPACE::SubPixelVariance32xH<h, log2h>(                    \
+        src, src_stride, x_offset, y_offset, dst, dst_stride, sse);          \
+  }                                                                          \
+  extern "C" unsigned int aom_sub_pixel_avg_variance32x##h##_##suffix(       \
+      const uint8_t *src, int src_stride, int x_offset, int y_offset,        \
+      const uint8_t *dst, int dst_stride, unsigned int *sse,                 \
+      const uint8_t *sec_ptr);                                               \
+  HWY_ATTR unsigned int aom_sub_pixel_avg_variance32x##h##_##suffix(         \
+      const uint8_t *src, int src_stride, int x_offset, int y_offset,        \
+      const uint8_t *dst, int dst_stride, unsigned int *sse,                 \
+      const uint8_t *sec_ptr) {                                              \
+    return HWY_NAMESPACE::SubPixelAvgVariance32xH<h, log2h>(                 \
+        src, src_stride, x_offset, y_offset, dst, dst_stride, sse, sec_ptr); \
+  }
+
+#define FSUBPIX_VAR_64_128(w, h, hf, wlog2, hlog2, suffix)                    \
+  extern "C" unsigned int aom_sub_pixel_variance##w##x##h##_##suffix(         \
+      const uint8_t *src, int src_stride, int x_offset, int y_offset,         \
+      const uint8_t *dst, int dst_stride, unsigned int *sse_ptr);             \
+  HWY_ATTR unsigned int aom_sub_pixel_variance##w##x##h##_##suffix(           \
+      const uint8_t *src, int src_stride, int x_offset, int y_offset,         \
+      const uint8_t *dst, int dst_stride, unsigned int *sse_ptr) {            \
+    return HWY_NAMESPACE::SubPixelVariance64Or128<w, h, hf, wlog2, hlog2>(    \
+        src, src_stride, x_offset, y_offset, dst, dst_stride, sse_ptr);       \
+  }                                                                           \
+  extern "C" unsigned int aom_sub_pixel_avg_variance##w##x##h##_##suffix(     \
+      const uint8_t *src, int src_stride, int x_offset, int y_offset,         \
+      const uint8_t *dst, int dst_stride, unsigned int *sse_ptr,              \
+      const uint8_t *sec);                                                    \
+  HWY_ATTR unsigned int aom_sub_pixel_avg_variance##w##x##h##_##suffix(       \
+      const uint8_t *src, int src_stride, int x_offset, int y_offset,         \
+      const uint8_t *dst, int dst_stride, unsigned int *sse_ptr,              \
+      const uint8_t *sec) {                                                   \
+    return HWY_NAMESPACE::SubPixelAvgVariance64Or128<w, h, hf, wlog2, hlog2>( \
+        src, src_stride, x_offset, y_offset, dst, dst_stride, sse_ptr, sec);  \
+  }
+
+#if !CONFIG_REALTIME_ONLY
+#define FOR_EACH_SUBPIX_VAR_32XH_RECT(X, suffix) X(8, 3, suffix)
+#define FOR_EACH_SUBPIX_VAR_64_128_RECT(X, suffix) X(64, 16, 16, 6, 4, suffix)
+#else
+#define FOR_EACH_SUBPIX_VAR_32XH_RECT(X, suffix)
+#define FOR_EACH_SUBPIX_VAR_64_128_RECT(X, suffix)
+#endif
+
+#define FOR_EACH_SUBPIX_VAR_32XH(X, suffix) \
+  X(64, 6, suffix)                          \
+  X(32, 5, suffix)                          \
+  X(16, 4, suffix)                          \
+  FOR_EACH_SUBPIX_VAR_32XH_RECT(X, suffix)
+
+#define FOR_EACH_SUBPIX_VAR_64_128(X, suffix) \
+  X(128, 128, 64, 7, 7, suffix)               \
+  X(128, 64, 64, 7, 6, suffix)                \
+  X(64, 128, 64, 6, 7, suffix)                \
+  X(64, 64, 64, 6, 6, suffix)                 \
+  X(64, 32, 32, 6, 5, suffix)                 \
+  FOR_EACH_SUBPIX_VAR_64_128_RECT(X, suffix)
 
 HWY_AFTER_NAMESPACE();
 
