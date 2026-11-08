@@ -3752,10 +3752,16 @@ static inline void dec_alloc_cb_buf(AV1Decoder *pbi) {
              ((cm->mi_params.mi_cols >> cm->seq_params->mib_size_log2) + 1);
 
   if (pbi->cb_buffer_alloc_size < size) {
+    const uint64_t alloc_size = (uint64_t)sizeof(*pbi->cb_buffer_base) * size;
+    if (alloc_size != (size_t)alloc_size) {
+      aom_internal_error(cm->error, AOM_CODEC_MEM_ERROR,
+                         "CB buffer allocation size overflow");
+      return;
+    }
     av1_dec_free_cb_buf(pbi);
     CHECK_MEM_ERROR(cm, pbi->cb_buffer_base,
-                    aom_memalign(32, sizeof(*pbi->cb_buffer_base) * size));
-    memset(pbi->cb_buffer_base, 0, sizeof(*pbi->cb_buffer_base) * size);
+                    aom_memalign(32, (size_t)alloc_size));
+    memset(pbi->cb_buffer_base, 0, (size_t)alloc_size);
     pbi->cb_buffer_alloc_size = size;
   }
 }
