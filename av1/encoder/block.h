@@ -882,6 +882,42 @@ typedef struct SetOffsetsLoc {
 } SetOffsetsLoc;
 #endif  // NDEBUG
 
+//! Max mi units per side of a block that may use CfL (32x32).
+#define CFL_LUMA_LIVE_MAX_MI 8
+
+// Snapshot of the luma reconstruction (pixels, coefficients, eobs and contexts
+// in the PICK_MODE_CONTEXT buffers) produced by the CfL luma re-encode in
+// av1_rd_pick_intra_sbuv_mode(). When the DRY_RUN_NORMAL encode of the same
+// block follows with identical inputs and nothing has touched the luma state
+// in between, encode_superblock() can reuse it instead of re-encoding.
+typedef struct CflLumaLive {
+  const MB_MODE_INFO *mbmi;
+  const uint16_t *eobs;
+  const uint8_t *dst;
+  const int16_t *quant_fp;
+  const int16_t *round_fp;
+  const int16_t *dequant;
+  const qm_val_t *qmatrix;
+  const qm_val_t *iqmatrix;
+  const ENTROPY_CONTEXT *above_ctx;
+  const ENTROPY_CONTEXT *left_ctx;
+  int rdmult;
+  int buf_width;
+  int buf_height;
+  uint8_t valid;
+  uint8_t bsize;
+  uint8_t mode;
+  int8_t angle_delta;
+  uint8_t use_filter_intra;
+  uint8_t filter_intra_mode;
+  uint8_t tx_size;
+  uint8_t skip_txfm;
+  uint8_t segment_id;
+  ENTROPY_CONTEXT above[CFL_LUMA_LIVE_MAX_MI];
+  ENTROPY_CONTEXT left[CFL_LUMA_LIVE_MAX_MI];
+  uint8_t tx_type_map[CFL_LUMA_LIVE_MAX_MI * CFL_LUMA_LIVE_MAX_MI];
+} CflLumaLive;
+
 /*!\endcond */
 
 //! Maximum number of estimated RD Cost records for compound average.
@@ -1475,6 +1511,9 @@ typedef struct macroblock {
    *  right edge of the frame.
    */
   int pix_to_right_edge;
+
+  /*!\brief Luma state left by the CfL luma re-encode of the current block. */
+  CflLumaLive cfl_luma_live;
 } MACROBLOCK;
 #undef SINGLE_REF_MODES
 

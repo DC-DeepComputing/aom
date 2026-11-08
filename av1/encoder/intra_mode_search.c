@@ -1374,6 +1374,20 @@ static void pick_palette_intra_sbuv_cold(const AV1_COMP *const cpi,
   *mbmi = best_mbmi;
 }
 
+// Records the luma state of the CfL luma re-encode for reuse by the
+// DRY_RUN_NORMAL encode of the same block, unless the re-encode rewrote tx
+// types (eob == 0) relative to tx_type_map, the map it started from.
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
+static void cfl_luma_live_arm(MACROBLOCK *x, BLOCK_SIZE bsize,
+                              const uint8_t *tx_type_map) {
+  const int n = mi_size_wide[bsize] * mi_size_high[bsize];
+  if (!memcmp(tx_type_map, x->e_mbd.tx_type_map, n)) {
+    av1_cfl_luma_live_store(x, bsize);
+  }
+}
+
 int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
                                     int *rate, int *rate_tokenonly,
                                     int64_t *distortion, uint8_t *skippable,
@@ -1403,10 +1417,27 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
     // this function everytime we search through uv modes. There is some
     // potential speed up here if we cache the result to avoid redundant
     // computation.
+    // In intra-only RD search nothing touches the luma state between here and
+    // a DRY_RUN_NORMAL encode of this block, so it can be reused there unless
+    // this pass rewrites tx types (eob == 0) or the block uses palette.
+    const int bw = mi_size_wide[mbmi->bsize];
+    const int bh = mi_size_high[mbmi->bsize];
+    const int can_reuse = frame_is_intra_only(cm) && !av1_allow_intrabc(cm) &&
+                          !cpi->sf.rt_sf.use_nonrd_pick_mode && bw >= 2 &&
+                          bh >= 2 && bw <= CFL_LUMA_LIVE_MAX_MI &&
+                          bh <= CFL_LUMA_LIVE_MAX_MI &&
+                          xd->tx_type_map_stride == bw &&
+                          mbmi->palette_mode_info.palette_size[0] == 0;
+    uint8_t tx_type_map[CFL_LUMA_LIVE_MAX_MI * CFL_LUMA_LIVE_MAX_MI];
+    if (can_reuse) {
+      memcpy(tx_type_map, xd->tx_type_map,
+             (size_t)(bw * bh) * sizeof(tx_type_map[0]));
+    }
     av1_encode_intra_block_plane(cpi, x, mbmi->bsize, AOM_PLANE_Y,
                                  DRY_RUN_NORMAL,
                                  cpi->optimize_seg_arr[mbmi->segment_id]);
     xd->cfl.store_y = 0;
+    if (can_reuse) cfl_luma_live_arm(x, mbmi->bsize, tx_type_map);
   }
 
   const ModeCosts *const mode_costs = &x->mode_costs;

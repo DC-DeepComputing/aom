@@ -12,6 +12,8 @@
 #ifndef AOM_AV1_ENCODER_ENCODEMB_H_
 #define AOM_AV1_ENCODER_ENCODEMB_H_
 
+#include <string.h>
+
 #include "config/aom_config.h"
 #include "config/aom_dsp_rtcd.h"
 
@@ -325,6 +327,79 @@ static inline void av1_set_txb_context(MACROBLOCK *x, int plane, int block,
 void av1_encode_intra_block_plane(const struct AV1_COMP *cpi, MACROBLOCK *x,
                                   BLOCK_SIZE bsize, int plane, RUN_TYPE dry_run,
                                   TRELLIS_OPT_TYPE enable_optimize_b);
+
+// Records the inputs of the luma pass of av1_encode_intra_block_plane() that
+// just ran for the current block (see CflLumaLive). The caller guarantees
+// the block is at most 32x32 and xd->tx_type_map has stride mi_size_wide.
+static inline void av1_cfl_luma_live_store(MACROBLOCK *x, BLOCK_SIZE bsize) {
+  const MACROBLOCKD *const xd = &x->e_mbd;
+  const MB_MODE_INFO *const mbmi = xd->mi[0];
+  const struct macroblock_plane *const p = &x->plane[AOM_PLANE_Y];
+  const struct macroblockd_plane *const pd = &xd->plane[AOM_PLANE_Y];
+  CflLumaLive *const k = &x->cfl_luma_live;
+  const int bw = mi_size_wide[bsize];
+  const int bh = mi_size_high[bsize];
+  k->mbmi = mbmi;
+  k->eobs = p->eobs;
+  k->dst = pd->dst.buf;
+  k->quant_fp = p->quant_fp_QTX;
+  k->round_fp = p->round_fp_QTX;
+  k->dequant = p->dequant_QTX;
+  k->qmatrix = pd->seg_qmatrix[mbmi->segment_id][mbmi->tx_size];
+  k->iqmatrix = pd->seg_iqmatrix[mbmi->segment_id][mbmi->tx_size];
+  k->above_ctx = pd->above_entropy_context;
+  k->left_ctx = pd->left_entropy_context;
+  k->rdmult = x->rdmult;
+  k->buf_width = xd->cfl.buf_width;
+  k->buf_height = xd->cfl.buf_height;
+  k->bsize = (uint8_t)bsize;
+  k->mode = (uint8_t)mbmi->mode;
+  k->angle_delta = mbmi->angle_delta[PLANE_TYPE_Y];
+  k->use_filter_intra = mbmi->filter_intra_mode_info.use_filter_intra;
+  k->filter_intra_mode =
+      (uint8_t)mbmi->filter_intra_mode_info.filter_intra_mode;
+  k->tx_size = (uint8_t)mbmi->tx_size;
+  k->skip_txfm = mbmi->skip_txfm;
+  k->segment_id = mbmi->segment_id;
+  memcpy(k->above, pd->above_entropy_context, bw);
+  memcpy(k->left, pd->left_entropy_context, bh);
+  memcpy(k->tx_type_map, xd->tx_type_map, bw * bh);
+  k->valid = 1;
+}
+
+// Returns 1 if the luma state recorded by av1_cfl_luma_live_store() is still
+// live and the luma pass of a DRY_RUN_NORMAL encode of the current block would
+// recompute it from identical inputs.
+static inline int av1_cfl_luma_live_match(const MACROBLOCK *x,
+                                          BLOCK_SIZE bsize) {
+  const CflLumaLive *const k = &x->cfl_luma_live;
+  const MACROBLOCKD *const xd = &x->e_mbd;
+  const MB_MODE_INFO *const mbmi = xd->mi[0];
+  const struct macroblock_plane *const p = &x->plane[AOM_PLANE_Y];
+  const struct macroblockd_plane *const pd = &xd->plane[AOM_PLANE_Y];
+  const int bw = mi_size_wide[bsize];
+  const int bh = mi_size_high[bsize];
+  if (k->mbmi != mbmi || k->bsize != bsize || k->eobs != p->eobs ||
+      k->dst != pd->dst.buf || k->rdmult != x->rdmult ||
+      k->mode != mbmi->mode ||
+      k->angle_delta != mbmi->angle_delta[PLANE_TYPE_Y] ||
+      k->use_filter_intra != mbmi->filter_intra_mode_info.use_filter_intra ||
+      k->filter_intra_mode != mbmi->filter_intra_mode_info.filter_intra_mode ||
+      k->tx_size != mbmi->tx_size || k->skip_txfm != mbmi->skip_txfm ||
+      k->segment_id != mbmi->segment_id ||
+      mbmi->palette_mode_info.palette_size[0] != 0 ||
+      k->quant_fp != p->quant_fp_QTX || k->round_fp != p->round_fp_QTX ||
+      k->dequant != p->dequant_QTX ||
+      k->qmatrix != pd->seg_qmatrix[mbmi->segment_id][mbmi->tx_size] ||
+      k->iqmatrix != pd->seg_iqmatrix[mbmi->segment_id][mbmi->tx_size] ||
+      k->above_ctx != pd->above_entropy_context ||
+      k->left_ctx != pd->left_entropy_context || xd->tx_type_map_stride != bw) {
+    return 0;
+  }
+  return !memcmp(k->above, pd->above_entropy_context, bw) &&
+         !memcmp(k->left, pd->left_entropy_context, bh) &&
+         !memcmp(k->tx_type_map, xd->tx_type_map, bw * bh);
+}
 
 static inline int is_trellis_used(TRELLIS_OPT_TYPE optimize_b,
                                   RUN_TYPE dry_run) {
