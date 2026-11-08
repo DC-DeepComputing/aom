@@ -1994,6 +1994,8 @@ static inline void write_modes(AV1_COMP *const cpi, ThreadData *const td,
     for (int mi_col = mi_col_start; mi_col < mi_col_end;
          mi_col += cm->seq_params->mib_size) {
       td->mb.cb_coef_buff = av1_get_cb_coeff_buffer(cpi, mi_row, mi_col);
+      memset(td->mb.cb_coef_buff->tc_pos, 0,
+             sizeof(td->mb.cb_coef_buff->tc_pos));
       write_modes_sb(cpi, td, tile, w, &tok, tok_end, mi_row, mi_col,
                      cm->seq_params->sb_size);
     }
