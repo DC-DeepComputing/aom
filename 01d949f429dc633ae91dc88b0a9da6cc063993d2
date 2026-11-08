@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "8bbf52a6_fe50e16d",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 31322
+      },
+      "writtenOn": "2026-11-08T06:46:47Z",
+      "side": 1,
+      "message": "We have submitted the patch to add pyramid motion estimation (PME) performed on source input frames. The buffer management of frames and data structures used in PME is made similar to TPL module. Currently, the PME is invoked before performing TPL at the beginning of each sub-GOP.\n\nThe implementation is guarded with a configurable `CONFIG_PYRAMID_ME` flag and disabled by default. Also, the flag is forced to disable when `CONFIG_REALTIME_ONLY` flag is enabled. When `CONFIG_PYRAMID_ME` flag is enabled, PME algorithm is configured for speed 1, 2, and 3 with corresponding speed feature settings.\n\nWe plan to add the AVX2 support of motion estimation functions used in PME once this CL gets merged. We shall share the complexity data of PME along with AVX2 support in the subsequent CL.\n\nPlease review.",
+      "revId": "01d949f429dc633ae91dc88b0a9da6cc063993d2",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
