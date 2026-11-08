@@ -120,16 +120,23 @@ void av1_alloc_txb_buf(AV1_COMP *cpi) {
                              num_tcoeffs / txb_unit_size));
 
   tran_low_t *tcoeff_ptr = coeff_buf_pool->tcoeff;
+  for (int plane = 0; plane < num_planes; plane++) {
+    const int max_sb_square =
+        (plane == AOM_PLANE_Y) ? luma_max_sb_square : chroma_max_sb_square;
+    coeff_buf_pool->plane_tcoeff[plane] = tcoeff_ptr;
+    coeff_buf_pool->plane_sb_square[plane] = max_sb_square;
+    tcoeff_ptr += (size_t)size * max_sb_square;
+  }
   uint16_t *eob_ptr = coeff_buf_pool->eobs;
   uint8_t *entropy_ctx_ptr = coeff_buf_pool->entropy_ctx;
   for (int i = 0; i < size; i++) {
     for (int plane = 0; plane < num_planes; plane++) {
       const int max_sb_square =
           (plane == AOM_PLANE_Y) ? luma_max_sb_square : chroma_max_sb_square;
-      cpi->coeff_buffer_base[i].tcoeff[plane] = tcoeff_ptr;
+      cpi->coeff_buffer_base[i].tcoeff[plane] =
+          coeff_buf_pool->plane_tcoeff[plane] + (size_t)i * max_sb_square;
       cpi->coeff_buffer_base[i].eobs[plane] = eob_ptr;
       cpi->coeff_buffer_base[i].entropy_ctx[plane] = entropy_ctx_ptr;
-      tcoeff_ptr += max_sb_square;
       eob_ptr += max_sb_square / txb_unit_size;
       entropy_ctx_ptr += max_sb_square / txb_unit_size;
     }

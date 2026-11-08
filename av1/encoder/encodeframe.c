@@ -1352,6 +1352,32 @@ static void copy_skip_sbs_of_row(const AV1_COMP *cpi, const TileInfo *tile_info,
   }
 }
 
+// Starts the packed coefficient streams of a superblock where those of the
+// previous superblock of the same tile row ended (the tcoeff pool is
+// plane-major, so the slots of consecutive superblocks are contiguous). Each
+// superblock uses at most its own slot size, so a stream never runs past the
+// end of the current superblock's slot, and only the used part of the pool is
+// touched. The bitstream writer reads back through the same tcoeff pointers.
+static inline void set_cb_coeff_stream_start(const AV1_COMP *cpi,
+                                             CB_COEFF_BUFFER *cb,
+                                             int first_in_tile_row) {
+  const int num_planes = av1_num_planes(&cpi->common);
+  if (first_in_tile_row) {
+    const CoeffBufferPool *const pool = &cpi->coeff_buffer_pool;
+    const size_t sb_idx = (size_t)(cb - cpi->coeff_buffer_base);
+    for (int plane = 0; plane < num_planes; ++plane) {
+      cb->tcoeff[plane] =
+          pool->plane_tcoeff[plane] + sb_idx * pool->plane_sb_square[plane];
+    }
+  } else {
+    const CB_COEFF_BUFFER *const prev = cb - 1;
+    for (int plane = 0; plane < num_planes; ++plane) {
+      cb->tcoeff[plane] = prev->tcoeff[plane] + prev->tc_pos[plane];
+    }
+  }
+  memset(cb->tc_pos, 0, sizeof(cb->tc_pos));
+}
+
 /*!\brief Encode a superblock row by breaking it into superblocks
  *
  * \ingroup partition_search
@@ -1473,6 +1499,7 @@ static inline void encode_sb_row(AV1_COMP *cpi, ThreadData *td,
     xd->cur_frame_force_integer_mv = cm->features.cur_frame_force_integer_mv;
     x->source_variance = UINT_MAX;
     td->mb.cb_coef_buff = av1_get_cb_coeff_buffer(cpi, mi_row, mi_col);
+    set_cb_coeff_stream_start(cpi, td->mb.cb_coef_buff, sb_col_in_tile == 0);
 
     // Get segment id and skip flag
     int seg_skip = 0;
