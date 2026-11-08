@@ -331,6 +331,18 @@ INSTANTIATE_TEST_SUITE_P(AVX2, ErrorBlockTest,
                          ::testing::ValuesIn(kErrorBlockTestParamsAvx2));
 #endif  // HAVE_AVX2
 
+#if CONFIG_HIGHWAY && HAVE_AVX512
+const ErrorBlockParam kErrorBlockTestParamsAvx512[] = {
+  make_tuple(&BlockError8BitWrapper<av1_block_error_avx512>,
+             &BlockError8BitWrapper<av1_block_error_c>, AOM_BITS_8),
+  make_tuple(&BlockErrorLpWrapper<av1_block_error_lp_avx512>,
+             &BlockErrorLpWrapper<av1_block_error_lp_c>, AOM_BITS_8)
+};
+
+INSTANTIATE_TEST_SUITE_P(AVX512, ErrorBlockTest,
+                         ::testing::ValuesIn(kErrorBlockTestParamsAvx512));
+#endif  // CONFIG_HIGHWAY && HAVE_AVX512
+
 #if HAVE_NEON
 const ErrorBlockParam kErrorBlockTestParamsNeon[] = {
 #if CONFIG_AV1_HIGHBITDEPTH
