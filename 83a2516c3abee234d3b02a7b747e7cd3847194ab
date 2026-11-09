@@ -1,0 +1,94 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "159533bf_e0a47271",
+        "filename": "aom_dsp/aom_dsp_rtcd_defs.pl",
+        "patchSetId": 3
+      },
+      "lineNbr": 882,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-09T19:40:00Z",
+      "side": 1,
+      "message": "`aom_sad32x64` is missing `avx512` specialization here (and in `avx512_tests` in `test/sad_test.cc`), even though `FOR_EACH_SAD_SMALL_SKIP_BLOCK_SIZE(FSAD, avx512)` in `sad_hwy_avx512.cc` defines `aom_sad32x64_avx512` and all other `32x64` variants (`sad_skip`, `sad_avg`, `x4d`, `skip_x4d`, `x3d`) are enabled. Please either wire `aom_sad32x64` into RTCD and `sad_test.cc` or avoid emitting the unused symbol.",
+      "isAi": true,
+      "revId": "83a2516c3abee234d3b02a7b747e7cd3847194ab",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "5801cd0a_29aaa378",
+        "filename": "aom_dsp/aom_dsp_rtcd_defs.pl",
+        "patchSetId": 3
+      },
+      "lineNbr": 889,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-09T19:40:00Z",
+      "side": 1,
+      "message": "In the commit message benchmarks, single-ref `sad 16x4` is `0.88x` (slower than SSE2 due to the 6 `vinserti32x4` row-packing shuffles + 512-bit horizontal reduction for a single iteration) and `sad 16x8/16x32/16x64` are `1.00x`. Should we skip specializing `aom_sad16x4` (or single-ref `aom_sad16xN` where there is no gain) for `avx512` and only enable `16xN` where it wins (`sad_avg`, `x3d`/`x4d`)?",
+      "isAi": true,
+      "revId": "83a2516c3abee234d3b02a7b747e7cd3847194ab",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "1f54cd80_870d8d33",
+        "filename": "aom_dsp/sad_hwy.h",
+        "patchSetId": 3
+      },
+      "lineNbr": 14,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-09T19:40:00Z",
+      "side": 1,
+      "message": "Please `#include \"config/aom_config.h\"` and `#include \"config/aom_dsp_rtcd.h\"` (consistent with `convolve_2d_sr_hwy.h` and `av1_fwd_txfm2d_hwy.h`), so build config macros like `CONFIG_REALTIME_ONLY` are defined and the generated functions are checked against the RTCD prototypes.",
+      "isAi": true,
+      "revId": "83a2516c3abee234d3b02a7b747e7cd3847194ab",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "063e58de_e29f1d6d",
+        "filename": "aom_dsp/sad_hwy.h",
+        "patchSetId": 3
+      },
+      "lineNbr": 50,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-09T19:40:00Z",
+      "side": 1,
+      "message": "`LoadRowsU` only supports `RowsPerVec` in `{1, 2, 4}` and silently falls back to a single-row `LoadU` for any other ratio (e.g., if `BlockWidth \u003d 8` is ever instantiated). Please add `static_assert(RowsPerVec \u003d\u003d 1 || RowsPerVec \u003d\u003d 2 || RowsPerVec \u003d\u003d 4, ...)` here and `assert(h % kRowsPerVec \u003d\u003d 0)` in `SumOfAbsoluteDiff` / `SumOfAbsoluteDiffND`.",
+      "isAi": true,
+      "revId": "83a2516c3abee234d3b02a7b747e7cd3847194ab",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "3d6f0401_1eafc6c6",
+        "filename": "aom_dsp/sad_hwy.h",
+        "patchSetId": 3
+      },
+      "lineNbr": 241,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-09T19:40:00Z",
+      "side": 1,
+      "message": "Please guard the 4:1 / 1:4 block sizes (`64x16`, `16x64`, `32x8`, `16x4`) with `#if !CONFIG_REALTIME_ONLY` here and in `sad_hwy_avx512.cc`. Currently, building with `-DCONFIG_REALTIME_ONLY\u003d1` still compiles and links all 19 4:1/1:4 AVX-512 functions as unused symbols.",
+      "isAi": true,
+      "revId": "83a2516c3abee234d3b02a7b747e7cd3847194ab",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
