@@ -1,0 +1,58 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "3162a9c8_8fbb8290",
+        "filename": "av1/encoder/encodeframe_utils.c",
+        "patchSetId": 12
+      },
+      "lineNbr": 14,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-09T22:18:09Z",
+      "side": 1,
+      "message": "Nit: `#include \u003cstdlib.h\u003e` appears unused by the changes in this file (and is placed after project headers); please remove it.",
+      "isAi": true,
+      "revId": "32659ff1ea4f93449caf70ac9c382f57766763f9",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "4b35e958_b39f269b",
+        "filename": "av1/encoder/encodeframe_utils.c",
+        "patchSetId": 12
+      },
+      "lineNbr": 1110,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-09T22:18:09Z",
+      "side": 1,
+      "message": "Nit: Two implicit preconditions introduced by this fast path worth making explicit:\n- `(uint16_t)(a + b)` relies on `a, b \u003c CDF_PROB_TOP` (`32768`) so `a + b \u003c\u003d 65534` does not wrap `uint16_t` (the `assert(... \u003c CDF_PROB_TOP)` on line 1090 now only runs in the cold `avg_cdf_symbol_general` fallback)—worth noting in the comment above.\n- Since `avg_cdf_symbol` qualifies `cdf_ptr_left` and `cdf_ptr_tr` with `restrict` while `av1_avg_cdf_symbols` (line 1165) does not, consider adding `assert(ctx_left !\u003d ctx_tr);` at the entry of `av1_avg_cdf_symbols`.",
+      "isAi": true,
+      "revId": "32659ff1ea4f93449caf70ac9c382f57766763f9",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "fb71fe75_3424c7b9",
+        "filename": "av1/encoder/txb_rdopt.c",
+        "patchSetId": 12
+      },
+      "lineNbr": 156,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-09T22:18:09Z",
+      "side": 1,
+      "message": "Nit: Consider adding `assert(ci \u003e 0);` (here or right after `const int ci \u003d scan[si];` on line 100) to directly guard the non-DC index assumption that replacing `get_dqv()`\u0027s `dequant[!!ci]` with `dequant[1]` relies on.",
+      "isAi": true,
+      "revId": "32659ff1ea4f93449caf70ac9c382f57766763f9",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
