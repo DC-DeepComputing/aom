@@ -75,6 +75,30 @@
     {
       "unresolved": true,
       "key": {
+        "uuid": "08b62d4a_d3952a95",
+        "filename": "aom_dsp/sad_hwy.h",
+        "patchSetId": 3
+      },
+      "lineNbr": 64,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-11-09T20:42:36Z",
+      "side": 1,
+      "message": "nit: Since lines 80, 89, and 118 already use C++17 `if constexpr`, prefer `if constexpr (...) { ... } else if constexpr (...) { ... } else { ... }` here (and `if constexpr (...) { ... } else { ... }` in `Combine2Rows` and `Combine4Rows`) so the fallback `return` statements are in a discarded branch and are not instantiated when the condition is true.",
+      "range": {
+        "startLine": 48,
+        "startChar": 0,
+        "endLine": 64,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "83a2516c3abee234d3b02a7b747e7cd3847194ab",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
         "uuid": "3d6f0401_1eafc6c6",
         "filename": "aom_dsp/sad_hwy.h",
         "patchSetId": 3
