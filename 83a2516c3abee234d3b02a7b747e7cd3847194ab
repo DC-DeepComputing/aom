@@ -21,6 +21,24 @@
     {
       "unresolved": true,
       "key": {
+        "uuid": "8cc774e8_20a092a1",
+        "filename": "aom_dsp/aom_dsp_rtcd_defs.pl",
+        "patchSetId": 3
+      },
+      "lineNbr": 882,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-10T21:40:38Z",
+      "side": 1,
+      "message": "Done. Removed (32, 64) from FOR_EACH_SAD_SMALL_SKIP_BLOCK_SIZE (and the 32x64 AVX-512 SAD specializations/tests) so no unused aom_sad32x64_avx512 symbol is emitted and 32x64 falls back to AVX2.",
+      "parentUuid": "159533bf_e0a47271",
+      "revId": "83a2516c3abee234d3b02a7b747e7cd3847194ab",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
         "uuid": "5801cd0a_29aaa378",
         "filename": "aom_dsp/aom_dsp_rtcd_defs.pl",
         "patchSetId": 3
@@ -33,6 +51,24 @@
       "side": 1,
       "message": "In the commit message benchmarks, single-ref `sad 16x4` is `0.88x` (slower than SSE2 due to the 6 `vinserti32x4` row-packing shuffles + 512-bit horizontal reduction for a single iteration) and `sad 16x8/16x32/16x64` are `1.00x`. Should we skip specializing `aom_sad16x4` (or single-ref `aom_sad16xN` where there is no gain) for `avx512` and only enable `16xN` where it wins (`sad_avg`, `x3d`/`x4d`)?",
       "isAi": true,
+      "revId": "83a2516c3abee234d3b02a7b747e7cd3847194ab",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "e520be4a_34f4ed5b",
+        "filename": "aom_dsp/aom_dsp_rtcd_defs.pl",
+        "patchSetId": 3
+      },
+      "lineNbr": 889,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-10T21:40:38Z",
+      "side": 1,
+      "message": "Done. Skipped single-ref aom_sad16x4 for avx512 (in RTCD, sad_hwy_avx512.cc, and sad_test.cc) while keeping 16x4x3d/16x4x4d and aom_sad16x8–16x64 enabled. Updated the commit message table accordingly.",
+      "parentUuid": "5801cd0a_29aaa378",
       "revId": "83a2516c3abee234d3b02a7b747e7cd3847194ab",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
@@ -57,6 +93,24 @@
     {
       "unresolved": true,
       "key": {
+        "uuid": "9c01c566_6308e119",
+        "filename": "aom_dsp/sad_hwy.h",
+        "patchSetId": 3
+      },
+      "lineNbr": 14,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-10T21:40:38Z",
+      "side": 1,
+      "message": "Done. Added #include \"config/aom_config.h\" and #include \"config/aom_dsp_rtcd.h\" (along with \u003cassert.h\u003e).",
+      "parentUuid": "1f54cd80_870d8d33",
+      "revId": "83a2516c3abee234d3b02a7b747e7cd3847194ab",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
         "uuid": "063e58de_e29f1d6d",
         "filename": "aom_dsp/sad_hwy.h",
         "patchSetId": 3
@@ -69,6 +123,24 @@
       "side": 1,
       "message": "`LoadRowsU` only supports `RowsPerVec` in `{1, 2, 4}` and silently falls back to a single-row `LoadU` for any other ratio (e.g., if `BlockWidth \u003d 8` is ever instantiated). Please add `static_assert(RowsPerVec \u003d\u003d 1 || RowsPerVec \u003d\u003d 2 || RowsPerVec \u003d\u003d 4, ...)` here and `assert(h % kRowsPerVec \u003d\u003d 0)` in `SumOfAbsoluteDiff` / `SumOfAbsoluteDiffND`.",
       "isAi": true,
+      "revId": "83a2516c3abee234d3b02a7b747e7cd3847194ab",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "42ea9b10_8300932c",
+        "filename": "aom_dsp/sad_hwy.h",
+        "patchSetId": 3
+      },
+      "lineNbr": 50,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-10T21:40:38Z",
+      "side": 1,
+      "message": "Done. Added static_assert(RowsPerVec \u003d\u003d 1 || RowsPerVec \u003d\u003d 2 || RowsPerVec \u003d\u003d 4, ...) in LoadRowsU and assert(h % kRowsPerVec \u003d\u003d 0) in SumOfAbsoluteDiff and SumOfAbsoluteDiffND.",
+      "parentUuid": "063e58de_e29f1d6d",
       "revId": "83a2516c3abee234d3b02a7b747e7cd3847194ab",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
@@ -99,6 +171,30 @@
     {
       "unresolved": true,
       "key": {
+        "uuid": "da47dd61_25891a9c",
+        "filename": "aom_dsp/sad_hwy.h",
+        "patchSetId": 3
+      },
+      "lineNbr": 64,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-10T21:40:38Z",
+      "side": 1,
+      "message": "Done. Updated Combine2Rows, Combine4Rows, and LoadRowsU to use if constexpr / else if constexpr / else so fallback branches are discarded.",
+      "parentUuid": "08b62d4a_d3952a95",
+      "range": {
+        "startLine": 48,
+        "startChar": 0,
+        "endLine": 64,
+        "endChar": 9999
+      },
+      "revId": "83a2516c3abee234d3b02a7b747e7cd3847194ab",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
         "uuid": "3d6f0401_1eafc6c6",
         "filename": "aom_dsp/sad_hwy.h",
         "patchSetId": 3
@@ -111,6 +207,24 @@
       "side": 1,
       "message": "Please guard the 4:1 / 1:4 block sizes (`64x16`, `16x64`, `32x8`, `16x4`) with `#if !CONFIG_REALTIME_ONLY` here and in `sad_hwy_avx512.cc`. Currently, building with `-DCONFIG_REALTIME_ONLY\u003d1` still compiles and links all 19 4:1/1:4 AVX-512 functions as unused symbols.",
       "isAi": true,
+      "revId": "83a2516c3abee234d3b02a7b747e7cd3847194ab",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "d3cb60cd_b352a9f0",
+        "filename": "aom_dsp/sad_hwy.h",
+        "patchSetId": 3
+      },
+      "lineNbr": 241,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-10T21:40:38Z",
+      "side": 1,
+      "message": "Done. Guarded the 4:1 / 1:4 block sizes (64x16, 16x64, 32x8, 16x4) with #if !CONFIG_REALTIME_ONLY in both sad_hwy.h and sad_hwy_avx512.cc.",
+      "parentUuid": "3d6f0401_1eafc6c6",
       "revId": "83a2516c3abee234d3b02a7b747e7cd3847194ab",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
