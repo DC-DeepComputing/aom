@@ -37,6 +37,25 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "043eea1e_76d87eb4",
+        "filename": "aom_dsp/aom_dsp_rtcd_defs.pl",
+        "patchSetId": 3
+      },
+      "lineNbr": 882,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-10T22:08:19Z",
+      "side": 1,
+      "message": "Ack",
+      "parentUuid": "8cc774e8_20a092a1",
+      "isAi": true,
+      "revId": "83a2516c3abee234d3b02a7b747e7cd3847194ab",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "5801cd0a_29aaa378",
@@ -69,6 +88,25 @@
       "side": 1,
       "message": "Done. Skipped single-ref aom_sad16x4 for avx512 (in RTCD, sad_hwy_avx512.cc, and sad_test.cc) while keeping 16x4x3d/16x4x4d and aom_sad16x8–16x64 enabled. Updated the commit message table accordingly.",
       "parentUuid": "5801cd0a_29aaa378",
+      "revId": "83a2516c3abee234d3b02a7b747e7cd3847194ab",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "1b85039e_ad6bf1de",
+        "filename": "aom_dsp/aom_dsp_rtcd_defs.pl",
+        "patchSetId": 3
+      },
+      "lineNbr": 889,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-10T22:08:19Z",
+      "side": 1,
+      "message": "Ack",
+      "parentUuid": "e520be4a_34f4ed5b",
+      "isAi": true,
       "revId": "83a2516c3abee234d3b02a7b747e7cd3847194ab",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
@@ -109,6 +147,25 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "36768a06_652c7164",
+        "filename": "aom_dsp/sad_hwy.h",
+        "patchSetId": 3
+      },
+      "lineNbr": 14,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-10T22:08:19Z",
+      "side": 1,
+      "message": "Ack",
+      "parentUuid": "9c01c566_6308e119",
+      "isAi": true,
+      "revId": "83a2516c3abee234d3b02a7b747e7cd3847194ab",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "063e58de_e29f1d6d",
@@ -141,6 +198,25 @@
       "side": 1,
       "message": "Done. Added static_assert(RowsPerVec \u003d\u003d 1 || RowsPerVec \u003d\u003d 2 || RowsPerVec \u003d\u003d 4, ...) in LoadRowsU and assert(h % kRowsPerVec \u003d\u003d 0) in SumOfAbsoluteDiff and SumOfAbsoluteDiffND.",
       "parentUuid": "063e58de_e29f1d6d",
+      "revId": "83a2516c3abee234d3b02a7b747e7cd3847194ab",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "8d58364f_36d1fb3f",
+        "filename": "aom_dsp/sad_hwy.h",
+        "patchSetId": 3
+      },
+      "lineNbr": 50,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-10T22:08:19Z",
+      "side": 1,
+      "message": "Ack",
+      "parentUuid": "42ea9b10_8300932c",
+      "isAi": true,
       "revId": "83a2516c3abee234d3b02a7b747e7cd3847194ab",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
@@ -225,6 +301,25 @@
       "side": 1,
       "message": "Done. Guarded the 4:1 / 1:4 block sizes (64x16, 16x64, 32x8, 16x4) with #if !CONFIG_REALTIME_ONLY in both sad_hwy.h and sad_hwy_avx512.cc.",
       "parentUuid": "3d6f0401_1eafc6c6",
+      "revId": "83a2516c3abee234d3b02a7b747e7cd3847194ab",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "0780c342_b4357c77",
+        "filename": "aom_dsp/sad_hwy.h",
+        "patchSetId": 3
+      },
+      "lineNbr": 241,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-10T22:08:19Z",
+      "side": 1,
+      "message": "Ack",
+      "parentUuid": "d3cb60cd_b352a9f0",
+      "isAi": true,
       "revId": "83a2516c3abee234d3b02a7b747e7cd3847194ab",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
