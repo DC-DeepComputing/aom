@@ -192,6 +192,8 @@ void cfl_subtract_average_8x8_sse2(const uint16_t *src, int16_t *dst);
 void cfl_subtract_average_8x16_sse2(const uint16_t *src, int16_t *dst);
 void cfl_subtract_average_8x32_sse2(const uint16_t *src, int16_t *dst);
 
+// Contract: SIMD LBD CfL predictors (SSSE3/AVX2) read only dst[0] as the
+// broadcast DC value (whereas C reads every dst pixel).
 void cfl_predict_lbd_4x4_ssse3(const int16_t *pred_buf_q3, uint8_t *dst,
                                int dst_stride, int alpha_q3);
 void cfl_predict_lbd_4x8_ssse3(const int16_t *pred_buf_q3, uint8_t *dst,
