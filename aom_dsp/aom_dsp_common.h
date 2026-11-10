@@ -13,6 +13,7 @@
 #define AOM_AOM_DSP_AOM_DSP_COMMON_H_
 
 #include <limits.h>
+#include <stddef.h>
 
 #include "config/aom_config.h"
 
@@ -105,6 +106,12 @@ static inline int saturate_cast_double_to_int(double d) {
   if (d > INT_MAX) return INT_MAX;
   return (int)d;
 }
+
+#if HAVE_AVX2
+int aom_hadamard_sub_satd_avx2(int tx_size, const uint8_t *src,
+                               ptrdiff_t src_stride, const uint8_t *dst,
+                               ptrdiff_t dst_stride);
+#endif  // HAVE_AVX2
 
 #ifdef __cplusplus
 }  // extern "C"

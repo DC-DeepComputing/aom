@@ -11,10 +11,18 @@
 
 #include <algorithm>
 #include <ostream>
+#include <vector>
 
 #include "gtest/gtest.h"
 
+#include "config/aom_config.h"
 #include "config/aom_dsp_rtcd.h"
+
+#if HAVE_AVX2
+#include "aom_dsp/aom_dsp_common.h"
+#include "aom_ports/mem.h"
+#include "aom_ports/x86.h"
+#endif  // HAVE_AVX2
 
 #include "test/acm_random.h"
 #include "test/register_state_check.h"
@@ -544,5 +552,61 @@ INSTANTIATE_TEST_SUITE_P(NEON, HadamardLowbdLP8x8DualTest,
                          ::testing::Values(HadamardLP8x8DualFuncWithSize(
                              &aom_hadamard_lp_8x8_dual_neon, 8, 16)));
 #endif  // HAVE_NEON
+
+#if HAVE_AVX2
+class HadamardSubSatdTest : public ::testing::TestWithParam<int> {};
+
+TEST_P(HadamardSubSatdTest, MatchesReference) {
+  if (!(x86_simd_caps() & HAS_AVX2)) GTEST_SKIP();
+  const int tx_size = GetParam();
+  const int size = 4 << tx_size;
+  const int count = size * size;
+  const ptrdiff_t strides[] = { size, size + 1, size + 7, size + 16, 64, 128 };
+  ACMRandom rnd(ACMRandom::DeterministicSeed());
+  std::vector<int16_t> diff(count);
+  DECLARE_ALIGNED(32, tran_low_t, coeff[1024]);
+
+  for (int trial = 0; trial < 20; ++trial) {
+    const ptrdiff_t src_stride = strides[trial % 6];
+    const ptrdiff_t dst_stride = strides[(trial + 2) % 6];
+    std::vector<uint8_t> src(size * src_stride + 16, 0);
+    std::vector<uint8_t> dst(size * dst_stride + 16, 0);
+    for (int r = 0; r < size; ++r) {
+      for (int c = 0; c < size; ++c) {
+        if (trial == 0) {
+          src[r * src_stride + c] = 255;
+          dst[r * dst_stride + c] = 0;
+        } else if (trial == 1) {
+          src[r * src_stride + c] = 0;
+          dst[r * dst_stride + c] = 255;
+        } else if (trial == 2) {
+          src[r * src_stride + c] = 128;
+          dst[r * dst_stride + c] = 128;
+        } else {
+          src[r * src_stride + c] = rnd.Rand8();
+          dst[r * dst_stride + c] = rnd.Rand8();
+        }
+      }
+    }
+    aom_subtract_block_c(size, size, diff.data(), size, src.data(),
+                         static_cast<int>(src_stride), dst.data(),
+                         static_cast<int>(dst_stride));
+    switch (tx_size) {
+      case 0: aom_hadamard_4x4_c(diff.data(), size, coeff); break;
+      case 1: aom_hadamard_8x8_c(diff.data(), size, coeff); break;
+      case 2: aom_hadamard_16x16_c(diff.data(), size, coeff); break;
+      default: aom_hadamard_32x32_c(diff.data(), size, coeff); break;
+    }
+    const int ref_satd = aom_satd_c(coeff, count);
+    const int simd_satd = aom_hadamard_sub_satd_avx2(
+        tx_size, src.data(), src_stride, dst.data(), dst_stride);
+    EXPECT_EQ(ref_satd, simd_satd)
+        << "tx_size=" << tx_size << " trial=" << trial;
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(AVX2, HadamardSubSatdTest,
+                         ::testing::Values(0, 1, 2, 3));
+#endif  // HAVE_AVX2
 
 }  // namespace
