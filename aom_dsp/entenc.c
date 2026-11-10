@@ -48,6 +48,65 @@
    URL="http://researchcommons.waikato.ac.nz/bitstream/handle/10289/78/content.pdf"
   }*/
 
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
+void od_ec_enc_normalize_flush(od_ec_enc *enc, od_ec_enc_window low,
+                               unsigned rng, int d, int c, int s) {
+  if (UNLIKELY(enc->error)) {
+    enc->cnt = -9;
+    enc->rng = 0x8000;
+    return;
+  }
+  unsigned char *out = enc->buf;
+  uint32_t storage = enc->storage;
+  uint32_t offs = enc->offs;
+  if (UNLIKELY(offs + 8 > storage)) {
+    storage = 2 * storage + 8;
+    out = (unsigned char *)realloc(out, sizeof(*out) * storage);
+    if (out == NULL) {
+      enc->low = 0;
+      enc->cnt = -9;
+      enc->rng = 0x8000;
+      enc->error = -1;
+      return;
+    }
+    enc->buf = out;
+    enc->storage = storage;
+  }
+  // Need to add 1 byte here since enc->cnt always counts 1 byte less
+  // (enc->cnt = -9) to ensure correct operation
+  uint8_t num_bytes_ready = (s >> 3) + 1;
+
+  // Update "c" to contain the number of non-ready bits in "low". Since "low"
+  // has 64-bit capacity, we need to add the (64 - 40) cushion bits and take
+  // off the number of ready bits.
+  c += 24 - (num_bytes_ready << 3);
+
+  // Prepare "output" and update "low"
+  uint64_t output = low >> c;
+  low = low & (((uint64_t)1 << c) - 1);
+
+  // Prepare data and carry mask
+  uint64_t mask = (uint64_t)1 << (num_bytes_ready << 3);
+  uint64_t carry = output & mask;
+
+  mask = mask - 0x01;
+  output = output & mask;
+
+  // Write data in a single operation
+  write_enc_data_to_out_buf(out, offs, output, carry, &enc->offs,
+                            num_bytes_ready);
+
+  // Update state of the encoder: enc->cnt to contain the number of residual
+  // bits
+  s = c + d - 24;
+  enc->low = low << d;
+  enc->rng = rng << d;
+  enc->cnt = s;
+}
+
+#if OD_MEASURE_EC_OVERHEAD
 /*Takes updated low and range values, renormalizes them so that
    32768 <= rng < 65536 (flushing bytes from low to the output buffer if
    necessary), and stores them back in the encoder context.
@@ -64,63 +123,15 @@ static void od_ec_enc_normalize(od_ec_enc *enc, od_ec_enc_window low,
   /*The number of leading zeros in the 16-bit binary representation of rng.*/
   d = 16 - OD_ILOG_NZ(rng);
   s = c + d;
-
-  /* We flush every time "low" cannot safely and efficiently accommodate any
-     more data. Overall, c must not exceed 63 at the time of byte flush out. To
-     facilitate this, "s" cannot exceed 56-bits because we have to keep 1 byte
-     for carry. Also, we need to subtract 16 because we want to keep room for
-     the next symbol worth "d"-bits (max 15). An alternate condition would be if
-     (e < d), where e = number of leading zeros in "low", indicating there is
-     not enough rooom to accommodate "rng" worth of "d"-bits in "low". However,
-     this approach needs additional computations: (i) compute "e", (ii) push
-     the leading 0x00's as a special case.
-  */
-  if (s >= 40) {  // 56 - 16
-    unsigned char *out = enc->buf;
-    uint32_t storage = enc->storage;
-    uint32_t offs = enc->offs;
-    if (offs + 8 > storage) {
-      storage = 2 * storage + 8;
-      out = (unsigned char *)realloc(out, sizeof(*out) * storage);
-      if (out == NULL) {
-        enc->error = -1;
-        return;
-      }
-      enc->buf = out;
-      enc->storage = storage;
-    }
-    // Need to add 1 byte here since enc->cnt always counts 1 byte less
-    // (enc->cnt = -9) to ensure correct operation
-    uint8_t num_bytes_ready = (s >> 3) + 1;
-
-    // Update "c" to contain the number of non-ready bits in "low". Since "low"
-    // has 64-bit capacity, we need to add the (64 - 40) cushion bits and take
-    // off the number of ready bits.
-    c += 24 - (num_bytes_ready << 3);
-
-    // Prepare "output" and update "low"
-    uint64_t output = low >> c;
-    low = low & (((uint64_t)1 << c) - 1);
-
-    // Prepare data and carry mask
-    uint64_t mask = (uint64_t)1 << (num_bytes_ready << 3);
-    uint64_t carry = output & mask;
-
-    mask = mask - 0x01;
-    output = output & mask;
-
-    // Write data in a single operation
-    write_enc_data_to_out_buf(out, offs, output, carry, &enc->offs,
-                              num_bytes_ready);
-
-    // Update state of the encoder: enc->cnt to contain the number of residual
-    // bits
-    s = c + d - 24;
+  if (s >= 40) {
+    od_ec_enc_normalize_flush(enc, low, rng, d, c, s);
+    return;
   }
   enc->low = low << d;
   enc->rng = rng << d;
   enc->cnt = s;
 }
+#endif  // OD_MEASURE_EC_OVERHEAD
 
 /*Initializes the encoder.
   size: The initial size of the buffer, in bytes.*/
@@ -152,6 +163,7 @@ void od_ec_enc_reset(od_ec_enc *enc) {
 /*Frees the buffers used by the encoder.*/
 void od_ec_enc_clear(od_ec_enc *enc) { free(enc->buf); }
 
+#if OD_MEASURE_EC_OVERHEAD
 /*Encodes a symbol given its frequency in Q15.
   fl: CDF_PROB_TOP minus the cumulative frequency of all symbols that come
   before the one to be encoded.
@@ -182,10 +194,8 @@ static void od_ec_encode_q15(od_ec_enc *enc, unsigned fl, unsigned fh, int s,
          EC_MIN_PROB * (N - (s + 0));
   }
   od_ec_enc_normalize(enc, l, r);
-#if OD_MEASURE_EC_OVERHEAD
   enc->entropy -= OD_LOG2((double)(OD_ICDF(fh) - OD_ICDF(fl)) / CDF_PROB_TOP.);
   enc->nb_symbols++;
-#endif
 }
 
 /*Encode a single binary value.
@@ -205,10 +215,8 @@ void od_ec_encode_bool_q15(od_ec_enc *enc, int val, unsigned f) {
   if (val) l += r - v;
   r = val ? v : r - v;
   od_ec_enc_normalize(enc, l, r);
-#if OD_MEASURE_EC_OVERHEAD
   enc->entropy -= OD_LOG2((double)(val ? f : (32768 - f)) / 32768.);
   enc->nb_symbols++;
-#endif
 }
 
 /*Encodes a symbol given a cumulative distribution function (CDF) table in Q15.
@@ -227,6 +235,7 @@ void od_ec_encode_cdf_q15(od_ec_enc *enc, int s, const uint16_t *icdf,
   assert(icdf[nsyms - 1] == OD_ICDF(CDF_PROB_TOP));
   od_ec_encode_q15(enc, s > 0 ? icdf[s - 1] : OD_ICDF(0), icdf[s], s, nsyms);
 }
+#endif  // OD_MEASURE_EC_OVERHEAD
 
 #if OD_MEASURE_EC_OVERHEAD
 #include <stdio.h>
