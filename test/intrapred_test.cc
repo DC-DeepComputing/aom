@@ -15,6 +15,7 @@
 
 #include "config/aom_config.h"
 #include "config/aom_dsp_rtcd.h"
+#include "config/av1_rtcd.h"
 
 #include "test/acm_random.h"
 #include "test/register_state_check.h"
@@ -582,4 +583,65 @@ INSTANTIATE_TEST_SUITE_P(SSE2, HighbdIntraPredTest,
                          ::testing::ValuesIn(HighbdIntraPredTestVectorSse2));
 #endif  // HAVE_SSE2
 #endif  // CONFIG_AV1_HIGHBITDEPTH
+
+#if HAVE_SSE2
+TEST(LowbdPredictDcBlockTest, Sse2MatchesC) {
+  ACMRandom rnd(ACMRandom::DeterministicSeed());
+  constexpr int kBufSize = 256 * 128;
+  uint8_t ref_buf[kBufSize];
+  uint8_t dst_c[kBufSize];
+  uint8_t dst_sse2[kBufSize];
+
+  for (int tx = 0; tx < TX_SIZES_ALL; ++tx) {
+    const TX_SIZE tx_size = static_cast<TX_SIZE>(tx);
+    const int txwpx = tx_size_wide[tx_size];
+    const int txhpx = tx_size_high[tx_size];
+    const int ref_stride = txwpx + 19;
+    const int dst_stride = txwpx + 23;
+    const int top_cases[] = { 0, 1, txwpx > 1 ? txwpx / 2 : 1, txwpx };
+    const int left_cases[] = { 0, 1, txhpx > 1 ? txhpx / 2 : 1, txhpx };
+
+    for (int align_off = 0; align_off <= 3; ++align_off) {
+      const uint8_t *ref = ref_buf + ref_stride + 16 + align_off;
+      for (int n_top_px : top_cases) {
+        for (int n_left_px : left_cases) {
+          for (int pat = 0; pat < 3; ++pat) {
+            if (pat == 0) {
+              memset(ref_buf, 0, sizeof(ref_buf));
+            } else if (pat == 1) {
+              memset(ref_buf, 255, sizeof(ref_buf));
+            } else {
+              for (int idx = 0; idx < kBufSize; ++idx) {
+                ref_buf[idx] = rnd.Rand8();
+              }
+            }
+            memset(dst_c, 0xA5, sizeof(dst_c));
+            memset(dst_sse2, 0xA5, sizeof(dst_sse2));
+            uint8_t *out_c = dst_c + 16 + align_off;
+            uint8_t *out_sse2 = dst_sse2 + 16 + align_off;
+
+            API_REGISTER_STATE_CHECK(av1_predict_dc_block_lbd_c(
+                ref, ref_stride, out_c, dst_stride, tx_size, txwpx, txhpx,
+                n_top_px, n_left_px));
+            API_REGISTER_STATE_CHECK(av1_predict_dc_block_lbd_sse2(
+                ref, ref_stride, out_sse2, dst_stride, tx_size, txwpx, txhpx,
+                n_top_px, n_left_px));
+
+            for (int r = 0; r < txhpx; ++r) {
+              for (int c = 0; c < txwpx; ++c) {
+                ASSERT_EQ(out_c[r * dst_stride + c],
+                          out_sse2[r * dst_stride + c])
+                    << "tx_size=" << tx << " align=" << align_off
+                    << " n_top=" << n_top_px << " n_left=" << n_left_px
+                    << " pat=" << pat << " r=" << r << " c=" << c;
+              }
+              ASSERT_EQ(out_sse2[r * dst_stride + txwpx], 0xA5);
+            }
+          }
+        }
+      }
+    }
+  }
+}
+#endif  // HAVE_SSE2
 }  // namespace

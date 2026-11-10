@@ -12,7 +12,15 @@
 #ifndef AOM_AV1_COMMON_RECONINTRA_H_
 #define AOM_AV1_COMMON_RECONINTRA_H_
 
+#include <assert.h>
+#include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
+
+#if defined(__SSE2__) || defined(_M_X64) || \
+    (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
+#include <emmintrin.h>
+#endif
 
 #include "aom/aom_integer.h"
 #include "av1/common/av1_common_int.h"
@@ -155,6 +163,144 @@ static inline int av1_use_intra_edge_upsample(int bs0, int bs1, int delta,
   const int blk_wh = bs0 + bs1;
   if (d == 0 || d >= 40) return 0;
   return type ? (blk_wh <= 8) : (blk_wh <= 16);
+}
+
+static AOM_FORCE_INLINE uint32_t av1_sum_left_col_lbd(const uint8_t *left_ref,
+                                                      int ref_stride,
+                                                      int txhpx) {
+  assert(txhpx >= 4 && (txhpx & 3) == 0);
+  const int s2 = ref_stride * 2;
+  const int s3 = ref_stride * 3;
+  const int s4 = ref_stride * 4;
+  uint32_t sum0 = 0, sum1 = 0;
+  for (int i = 0; i < txhpx; i += 4) {
+    sum0 += (uint32_t)left_ref[0] + (uint32_t)left_ref[ref_stride];
+    sum1 += (uint32_t)left_ref[s2] + (uint32_t)left_ref[s3];
+    left_ref += s4;
+  }
+  return sum0 + sum1;
+}
+
+static AOM_FORCE_INLINE void av1_fill_block_lbd(uint8_t *dst,
+                                                ptrdiff_t dst_stride,
+                                                uint8_t val, int txwpx,
+                                                int txhpx) {
+  assert(txhpx >= 4);
+  int i = 0;
+  if (txwpx == 4) {
+    assert((txhpx & 3) == 0);
+    const uint32_t v = (uint32_t)val * 0x01010101u;
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC unroll 1
+#endif
+    do {
+      memcpy(dst, &v, 4);
+      memcpy(dst + dst_stride, &v, 4);
+      dst += dst_stride * 2;
+      memcpy(dst, &v, 4);
+      memcpy(dst + dst_stride, &v, 4);
+      dst += dst_stride * 2;
+      i += 4;
+    } while (i < txhpx);
+  } else if (txwpx == 8) {
+    assert((txhpx & 3) == 0);
+    const uint64_t v = (uint64_t)val * 0x0101010101010101ULL;
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC unroll 1
+#endif
+    do {
+      memcpy(dst, &v, 8);
+      memcpy(dst + dst_stride, &v, 8);
+      dst += dst_stride * 2;
+      memcpy(dst, &v, 8);
+      memcpy(dst + dst_stride, &v, 8);
+      dst += dst_stride * 2;
+      i += 4;
+    } while (i < txhpx);
+  } else {
+#if defined(__SSE2__) || defined(_M_X64) || \
+    (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
+    const __m128i v = _mm_set1_epi8((char)val);
+    if (txwpx == 16) {
+      assert((txhpx & 3) == 0);
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC unroll 1
+#endif
+      do {
+        _mm_storeu_si128((__m128i *)dst, v);
+        _mm_storeu_si128((__m128i *)(dst + dst_stride), v);
+        dst += dst_stride * 2;
+        _mm_storeu_si128((__m128i *)dst, v);
+        _mm_storeu_si128((__m128i *)(dst + dst_stride), v);
+        dst += dst_stride * 2;
+        i += 4;
+      } while (i < txhpx);
+    } else if (txwpx == 32) {
+      assert((txhpx & 1) == 0);
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC unroll 1
+#endif
+      do {
+        _mm_storeu_si128((__m128i *)dst, v);
+        _mm_storeu_si128((__m128i *)(dst + 16), v);
+        _mm_storeu_si128((__m128i *)(dst + dst_stride), v);
+        _mm_storeu_si128((__m128i *)(dst + dst_stride + 16), v);
+        dst += dst_stride * 2;
+        i += 2;
+      } while (i < txhpx);
+    } else {
+      assert(txwpx == 64);
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC unroll 1
+#endif
+      do {
+        _mm_storeu_si128((__m128i *)dst, v);
+        _mm_storeu_si128((__m128i *)(dst + 16), v);
+        _mm_storeu_si128((__m128i *)(dst + 32), v);
+        _mm_storeu_si128((__m128i *)(dst + 48), v);
+        dst += dst_stride;
+        ++i;
+      } while (i < txhpx);
+    }
+#else
+    for (; i < txhpx; ++i) {
+      memset(dst, val, txwpx);
+      dst += dst_stride;
+    }
+#endif
+  }
+}
+
+static AOM_FORCE_INLINE uint8_t av1_dc_val_from_sums_lbd(
+    TX_SIZE tx_size, int txwpx, int txhpx, uint32_t sum_top, uint32_t sum_left,
+    int n_top_px, int n_left_px) {
+  if (n_top_px > 0 && n_left_px > 0) {
+    // Reciprocal multiplication tables to divide by (txwpx + txhpx) for square,
+    // 1:2 / 2:1, and 1:4 / 4:1 transform blocks.
+    static const uint8_t dc_shift1_tab[TX_SIZES_ALL] = {
+      2, 3, 4, 5, 6,  // 4x4, 8x8, 16x16, 32x32, 64x64
+      2, 2, 3, 3, 4, 4,
+      5, 5,             // 4x8, 8x4, 8x16, 16x8, 16x32, 32x16, 32x64, 64x32
+      2, 2, 3, 3, 4, 4  // 4x16, 16x4, 8x32, 32x8, 16x64, 64x16
+    };
+    static const uint16_t dc_mult_tab[TX_SIZES_ALL] = {
+      0x8000, 0x8000, 0x8000, 0x8000, 0x8000, 0x5556, 0x5556,
+      0x5556, 0x5556, 0x5556, 0x5556, 0x5556, 0x5556, 0x3334,
+      0x3334, 0x3334, 0x3334, 0x3334, 0x3334
+    };
+    const uint32_t total =
+        sum_top + sum_left + (uint32_t)((txwpx + txhpx) >> 1);
+    return (
+        uint8_t)(((total >> dc_shift1_tab[tx_size]) * dc_mult_tab[tx_size]) >>
+                 16);
+  } else if (n_top_px > 0) {
+    const int log2_w = tx_size_wide_log2[tx_size];
+    return (uint8_t)((sum_top + (uint32_t)(txwpx >> 1)) >> log2_w);
+  } else if (n_left_px > 0) {
+    const int log2_h = tx_size_high_log2[tx_size];
+    return (uint8_t)((sum_left + (uint32_t)(txhpx >> 1)) >> log2_h);
+  }
+  return 128;
 }
 #if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
 #pragma GCC visibility pop
