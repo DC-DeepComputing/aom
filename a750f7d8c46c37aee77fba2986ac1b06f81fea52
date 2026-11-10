@@ -1,0 +1,76 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "e8f66034_67fa5014",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 4
+      },
+      "lineNbr": 5,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-10T23:13:39Z",
+      "side": 1,
+      "message": "With `masked_sad 16x8` at `1.02x`, could you also check `masked_sad 16x4` and `32x8` against AVX2 (and include the 4:1/1:4 sizes—plus `32x64` if restored—in the benchmark table)?",
+      "isAi": true,
+      "revId": "a750f7d8c46c37aee77fba2986ac1b06f81fea52",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "9f7a673f_cba82f92",
+        "filename": "aom_dsp/aom_dsp_rtcd_defs.pl",
+        "patchSetId": 4
+      },
+      "lineNbr": 1060,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-10T23:13:39Z",
+      "side": 1,
+      "message": "Why is `!($w \u003d\u003d 32 \u0026\u0026 $h \u003d\u003d 64)` excluded here and in `aom_obmc_sad` below (and removed from `FOR_EACH_MASKED_OBMC_SAD_BLOCK_SIZE` / tests in PS4)? Unlike `sad`/`sad_avg` in the parent CL, `32x64` is a standard 1:2 size already tested for both `masked_sad` and `obmc_sad`; unless it regressed against AVX2, please restore `32x64` across RTCD, `sad_hwy.h`, and both tests.",
+      "isAi": true,
+      "revId": "a750f7d8c46c37aee77fba2986ac1b06f81fea52",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "050c3d9f_bb53de93",
+        "filename": "aom_dsp/sad_hwy.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 189,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-10T23:13:39Z",
+      "side": 1,
+      "message": "Please add `assert(h % kRowsPerVec \u003d\u003d 0);` here for consistency with `SumOfAbsoluteDiff` / `SumOfAbsoluteDiffND`, since `LoadRowsU\u003ckRowsPerVec\u003e` reads `kRowsPerVec` rows per iteration.",
+      "isAi": true,
+      "revId": "a750f7d8c46c37aee77fba2986ac1b06f81fea52",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "84809af9_765487e1",
+        "filename": "aom_dsp/sad_hwy.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 254,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-10T23:13:39Z",
+      "side": 1,
+      "message": "Please add `assert(h % kRowsPerVec \u003d\u003d 0);` and a brief comment noting that `WidenMulPairwiseAdd` on `BitCast(d16, ...)` relies on `pre` and `mask` fitting in signed 15 bits (matching `obmc_sad_avx2.c`).",
+      "isAi": true,
+      "revId": "a750f7d8c46c37aee77fba2986ac1b06f81fea52",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
