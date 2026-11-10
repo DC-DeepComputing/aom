@@ -13,12 +13,17 @@
 #define AOM_AOM_MEM_AOM_MEM_H_
 
 #include <assert.h>
+#include <string.h>
 
 #include "aom/aom_integer.h"
 #include "config/aom_config.h"
 
 #if defined(__uClinux__)
 #include <lddk.h>
+#endif
+
+#ifdef AOM_MEM_PLTFRM
+#include AOM_MEM_PLTFRM
 #endif
 
 #if defined(__cplusplus)
@@ -49,12 +54,6 @@ static inline void *aom_memset16(void *dest, int val, size_t length) {
 /*returns an addr aligned to the byte boundary specified by align*/
 #define aom_align_addr(addr, align) \
   (void *)(((uintptr_t)(addr) + ((align) - 1)) & ~(uintptr_t)((align) - 1))
-
-#include <string.h>
-
-#ifdef AOM_MEM_PLTFRM
-#include AOM_MEM_PLTFRM
-#endif
 
 #if CONFIG_DEBUG
 #define AOM_CHECK_MEM_ERROR(error_info, lval, expr)                         \
