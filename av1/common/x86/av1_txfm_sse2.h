@@ -12,6 +12,9 @@
 #define AOM_AV1_COMMON_X86_AV1_TXFM_SSE2_H_
 
 #include <emmintrin.h>  // SSE2
+#ifdef __SSE4_1__
+#include <smmintrin.h>  // SSE4.1
+#endif
 
 #include "config/aom_config.h"
 #include "config/av1_rtcd.h"
@@ -23,6 +26,16 @@
 
 #ifdef __cplusplus
 extern "C" {
+#endif
+
+#ifndef AOM_NOINLINE
+#if defined(__GNUC__) || defined(__clang__)
+#define AOM_NOINLINE __attribute__((noinline))
+#elif defined(_MSC_VER)
+#define AOM_NOINLINE __declspec(noinline)
+#else
+#define AOM_NOINLINE
+#endif
 #endif
 
 static inline void btf_16_w4_sse2(
@@ -40,6 +53,26 @@ static inline void btf_16_w4_sse2(
   *out0 = _mm_packs_epi32(c0, c0);
   *out1 = _mm_packs_epi32(d0, c0);
 }
+
+#define btf_16_lat9_sse2(w0, w1, in0, in1, out0, out1)  \
+  do {                                                  \
+    const __m128i _t0 = _mm_unpacklo_epi16(in0, in1);   \
+    const __m128i _t1 = _mm_unpackhi_epi16(in0, in1);   \
+    const __m128i _u0 = _mm_madd_epi16(_t0, w0);        \
+    const __m128i _u1 = _mm_madd_epi16(_t1, w0);        \
+    const __m128i _v0 = _mm_madd_epi16(_t0, w1);        \
+    const __m128i _v1 = _mm_madd_epi16(_t1, w1);        \
+    const __m128i _a0 = _mm_add_epi32(_u0, __rounding); \
+    const __m128i _a1 = _mm_add_epi32(_u1, __rounding); \
+    const __m128i _b0 = _mm_add_epi32(_v0, __rounding); \
+    const __m128i _b1 = _mm_add_epi32(_v1, __rounding); \
+    const __m128i _c0 = _mm_srai_epi32(_a0, cos_bit);   \
+    const __m128i _c1 = _mm_srai_epi32(_a1, cos_bit);   \
+    const __m128i _d0 = _mm_srai_epi32(_b0, cos_bit);   \
+    const __m128i _d1 = _mm_srai_epi32(_b1, cos_bit);   \
+    out0 = _mm_packs_epi32(_c0, _c1);                   \
+    out1 = _mm_packs_epi32(_d0, _d1);                   \
+  } while (0)
 
 #define btf_16_4p_sse2(w0, w1, in0, in1, out0, out1) \
   do {                                               \
@@ -96,19 +129,31 @@ static inline __m128i load_32bit_to_16bit_w4(const int32_t *a) {
 
 // Store 4 16 bit values. Sign extend the values.
 static inline void store_16bit_to_32bit_w4(const __m128i a, int32_t *const b) {
+#ifdef __SSE4_1__
+  _mm_store_si128((__m128i *)b, _mm_cvtepi16_epi32(a));
+#else
   const __m128i a_lo = _mm_unpacklo_epi16(a, a);
   const __m128i a_1 = _mm_srai_epi32(a_lo, 16);
   _mm_store_si128((__m128i *)b, a_1);
+#endif
 }
 
 // Store 8 16 bit values. Sign extend the values.
 static inline void store_16bit_to_32bit(__m128i a, int32_t *b) {
+#ifdef __SSE4_1__
+  const __m128i a_1 = _mm_cvtepi16_epi32(a);
+  const __m128i a_hi = _mm_unpackhi_epi16(a, a);
+  const __m128i a_2 = _mm_srai_epi32(a_hi, 16);
+  _mm_store_si128((__m128i *)b, a_1);
+  _mm_store_si128((__m128i *)(b + 4), a_2);
+#else
   const __m128i a_lo = _mm_unpacklo_epi16(a, a);
   const __m128i a_hi = _mm_unpackhi_epi16(a, a);
   const __m128i a_1 = _mm_srai_epi32(a_lo, 16);
   const __m128i a_2 = _mm_srai_epi32(a_hi, 16);
   _mm_store_si128((__m128i *)b, a_1);
   _mm_store_si128((__m128i *)(b + 4), a_2);
+#endif
 }
 
 static inline __m128i scale_round_sse2(const __m128i a, const int scale) {

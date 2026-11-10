@@ -104,7 +104,7 @@ static inline void fdct8x8_new_sse2(const __m128i *input, __m128i *output,
   x2[1] = _mm_adds_epi16(x1[1], x1[2]);
   x2[2] = _mm_subs_epi16(x1[1], x1[2]);
   x2[4] = x1[4];
-  btf_16_sse2(cospi_m32_p32, cospi_p32_p32, x1[5], x1[6], x2[5], x2[6]);
+  btf_16_lat9_sse2(cospi_m32_p32, cospi_p32_p32, x1[5], x1[6], x2[5], x2[6]);
   x2[7] = x1[7];
 
   // stage 3
@@ -160,9 +160,9 @@ static inline void fadst8x8_new_sse2(const __m128i *input, __m128i *output,
   __m128i x2[8];
   x2[0] = x1[0];
   x2[1] = x1[1];
-  btf_16_sse2(cospi_p32_p32, cospi_p32_m32, x1[2], x1[3], x2[2], x2[3]);
   x2[4] = x1[4];
   x2[5] = x1[5];
+  btf_16_sse2(cospi_p32_p32, cospi_p32_m32, x1[2], x1[3], x2[2], x2[3]);
   btf_16_sse2(cospi_p32_p32, cospi_p32_m32, x1[6], x1[7], x2[6], x2[7]);
 
   // stage 3
