@@ -1222,13 +1222,9 @@ int av1_optimize_txb_multi(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
   const MB_MODE_INFO *const mbmi = xd->mi[0];
   const int is_inter = is_inter_block(mbmi);
   const int seg_id = mbmi->segment_id;
-  int is_noise_pattern = 0;
-  const int64_t rdmult =
-      get_txb_rdmult_mbmi(cpi, x, xd, mbmi, is_inter, plane, plane_type,
-                          sharpness, &is_noise_pattern);
-  const int16_t *const scan = get_scan(tx_size, tx_type)->scan;
-  const int shift = av1_get_tx_scale(tx_size);
-  const int16_t *const dequant = p->dequant_QTX;
+  // Resolve the segment's qmatrix pointers right after loading seg_id to
+  // shorten its live range and avoid spilling it across
+  // get_txb_rdmult_mbmi().
   const qm_val_t *iqmatrix = NULL;
   const qm_val_t *qmatrix = NULL;
   if (LIKELY(tx_type < IDTX)) {
@@ -1237,6 +1233,13 @@ int av1_optimize_txb_multi(const struct AV1_COMP *cpi, MACROBLOCK *x, int plane,
       qmatrix = xd->plane[plane].seg_qmatrix[seg_id][tx_size];
     }
   }
+  int is_noise_pattern = 0;
+  const int64_t rdmult =
+      get_txb_rdmult_mbmi(cpi, x, xd, mbmi, is_inter, plane, plane_type,
+                          sharpness, &is_noise_pattern);
+  const int16_t *const scan = get_scan(tx_size, tx_type)->scan;
+  const int shift = av1_get_tx_scale(tx_size);
+  const int16_t *const dequant = p->dequant_QTX;
   const int block_offset = BLOCK_OFFSET(block);
   tran_low_t *const qcoeff = p->qcoeff + block_offset;
   tran_low_t *const dqcoeff = p->dqcoeff + block_offset;
