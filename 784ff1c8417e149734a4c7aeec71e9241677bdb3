@@ -25,6 +25,30 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "6c830878_44652381",
+        "filename": "av1/encoder/encoder.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 4602,
+      "author": {
+        "id": 5216012
+      },
+      "writtenOn": "2026-11-11T19:05:11Z",
+      "side": 1,
+      "message": "Done. init_seq_coding_tools() passes \u0026ppi-\u003eerror and av1_encode() passes cm-\u003eerror. I could hit this path with tier 1 and target level 4.0 set before the first frame, then the target set back to 31 and an upsize from 320x240 to 640x480. In PS1 cm-\u003eerror-\u003esetjmp stayed 1 after the failed call. In PS2 it is 0, and the call returns the same error.",
+      "parentUuid": "04a9cca8_c761be4b",
+      "range": {
+        "startLine": 4600,
+        "startChar": 0,
+        "endLine": 4602,
+        "endChar": 9999
+      },
+      "revId": "784ff1c8417e149734a4c7aeec71e9241677bdb3",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "00ccb726_5b00a77e",
@@ -45,6 +69,30 @@
         "endChar": 9999
       },
       "isAi": true,
+      "revId": "784ff1c8417e149734a4c7aeec71e9241677bdb3",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "86ee43e3_7bc00d7f",
+        "filename": "test/frame_size_tests.cc",
+        "patchSetId": 1
+      },
+      "lineNbr": 309,
+      "author": {
+        "id": 5216012
+      },
+      "writtenOn": "2026-11-11T19:05:11Z",
+      "side": 1,
+      "message": "Thanks for review. Done. Reproduced with FORCE_HIGHBITDEPTH_DECODING\u003d1: all 20 Realtime UpscalePastMaxFrameSize cases failed in ImagesEqual(). They pass now.",
+      "parentUuid": "00ccb726_5b00a77e",
+      "range": {
+        "startLine": 308,
+        "startChar": 0,
+        "endLine": 309,
+        "endChar": 9999
+      },
       "revId": "784ff1c8417e149734a4c7aeec71e9241677bdb3",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
