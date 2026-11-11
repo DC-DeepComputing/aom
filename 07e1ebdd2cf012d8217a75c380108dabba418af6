@@ -1,0 +1,40 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "3ae6b61a_e653096b",
+        "filename": "aom_dsp/subtract_hwy.h",
+        "patchSetId": 7
+      },
+      "lineNbr": 29,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-11T17:20:29Z",
+      "side": 1,
+      "message": "SubtractBlock4xN, SubtractBlock8xN, and SubtractBlock16xN step rows by 2, so an odd `rows` value would read/store one row out of bounds. Unlike `aom_dsp/sad_hwy.h` (`assert(h % kRowsPerVec \u003d\u003d 0)`), neither an assertion nor a single-row tail is present here, whereas `aom_subtract_block_c`/`neon` support arbitrary `rows`. Please either add `assert(rows \u003e\u003d 0 \u0026\u0026 rows % 2 \u003d\u003d 0)` or handle the trailing odd row.",
+      "isAi": true,
+      "revId": "07e1ebdd2cf012d8217a75c380108dabba418af6",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "8dc17ef8_2fbadce8",
+        "filename": "aom_dsp/subtract_hwy.h",
+        "patchSetId": 7
+      },
+      "lineNbr": 182,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-11T17:20:29Z",
+      "side": 1,
+      "message": "The commit message shows `128x128` regressing vs AVX2 (`0.90x`; also measured slower locally at `128x128` and `128x64`), likely because 64-byte `vmovdqu64` stores split cache lines when `diff_ptr` is only 32-byte aligned (as in `test/subtract_test.cc`) and stress L1D at `128x128`. Have you checked whether 256-bit `CappedTag\u003cint16_t, 16\u003e` (or dispatching `cols \u003d\u003d 128` / `128x128` to AVX2) avoids the regression? Also, please include the `4xN` and `8xN` block sizes enabled by `SubtractBlock4xN`/`8xN` in the commit message table.",
+      "isAi": true,
+      "revId": "07e1ebdd2cf012d8217a75c380108dabba418af6",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
