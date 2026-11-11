@@ -440,6 +440,7 @@ static inline void get_16_coeff_contexts_2d_fast(
   int8_t *cc = coeff_contexts;
   int col =
       (last_idx <= 36) ? AOMMIN(width, kLastIdxToCols16n[last_idx]) : width;
+  assert(col >= 1);
   const __m128i const_3 = _mm_set1_epi8(3);
   __m128i pos_to_offset[5];
   __m128i pos_to_offset_large[3];
@@ -530,6 +531,7 @@ static inline void get_16n_coeff_contexts_2d(
   __m128i level[5];
 
   assert(!(height % 16));
+  assert(col >= 1);
 
   pos_to_offset_large[2] = _mm_set1_epi8(21);
   if (real_width == real_height) {
@@ -613,6 +615,7 @@ static inline void get_16n_coeff_contexts_ver(const uint8_t *levels,
   const int h_rows = (height == 32 && last_idx > (width << 4)) ? 32 : 16;
 
   assert(!(height % 16));
+  assert(col >= 1);
 
   do {
     __m128i pos_to_offset =
@@ -658,6 +661,7 @@ static inline void get_16n_coeff_contexts_hor(const uint8_t *levels,
       width, (height == 16) ? ((last_idx + 15) >> 4) : ((last_idx + 31) >> 5));
 
   assert(!(height % 16));
+  assert(col >= 1);
 
   pos_to_offset[0] = _mm_set1_epi8(SIG_COEF_CONTEXTS_2D + 0);
   pos_to_offset[1] = _mm_set1_epi8(SIG_COEF_CONTEXTS_2D + 5);
@@ -725,8 +729,9 @@ void av1_get_nz_map_contexts_sse2(const uint8_t *const levels,
     return;
   }
 
-  /* coeff_contexts must be 16 byte aligned. */
+  /* coeff_contexts must be 16 byte aligned and padding assumptions hold. */
   assert(!((intptr_t)coeff_contexts & 0xf));
+  assert(TX_PAD_HOR == 4 && TX_PAD_BOTTOM >= 4);
 
   const int width = get_txb_wide(tx_size);
   const int height = get_txb_high(tx_size);
