@@ -1,0 +1,28 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "48f86784_3bc709f4",
+        "filename": "aom_dsp/sad_hwy.h",
+        "patchSetId": 6
+      },
+      "lineNbr": 226,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-11-11T01:37:27Z",
+      "side": 1,
+      "message": "optional: Since `second_pred` is always packed with stride `BlockWidth` (`kRowsPerVec` rows are contiguous in memory, as in `SumOfAbsoluteDiff` at line 92), loading `second_pred` directly with `hn::LoadU(pixel_tag, \u0026second_pred[x])` instead of routing it through `LoadRowsU\u003ckRowsPerVec\u003e` avoids 4 separate 128-bit loads + 3 `InsertBlock`s per iteration for `BlockWidth \u003d\u003d 16` (and 2 loads + `ConcatLowerLower` for `BlockWidth \u003d\u003d 32`), which may also eliminate the small-block regression on `16x4` / `16x8` / `16x16`:\n\n```cpp\n      auto src \u003d LoadRowsU\u003ckRowsPerVec\u003e(pixel_tag, \u0026src_ptr[x], src_stride);\n      auto ref \u003d LoadRowsU\u003ckRowsPerVec\u003e(pixel_tag, \u0026ref_ptr[x], ref_stride);\n      auto sec \u003d hn::LoadU(pixel_tag, \u0026second_pred[x]);\n      auto m \u003d LoadRowsU\u003ckRowsPerVec\u003e(pixel_tag, \u0026msk_ptr[x], msk_stride);\n      auto m_inv \u003d hn::Sub(mask_max, m);\n      auto a \u003d invert_mask ? sec : ref;\n      auto b \u003d invert_mask ? ref : sec;\n```",
+      "range": {
+        "startLine": 178,
+        "startChar": 0,
+        "endLine": 226,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "aa9775e3d61a3f19629a0fecde92a70895509d1c",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
