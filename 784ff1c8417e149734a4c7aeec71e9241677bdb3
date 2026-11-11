@@ -1,0 +1,52 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "04a9cca8_c761be4b",
+        "filename": "av1/encoder/encoder.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 4602,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-11T17:22:05Z",
+      "side": 1,
+      "message": "`set_bitstream_level_tier()` calls `aom_internal_error(\u0026ppi-\u003eerror, ...)` (`encoder.c:559`) if the new `(profile, level, tier)` combination is invalid. Because `av1_encode()` runs inside `av1_get_compressed_data()` where `cm-\u003eerror-\u003esetjmp \u003d\u003d 1`, jumping directly to `ppi-\u003eerror.jmp` skips resetting `cm-\u003eerror-\u003esetjmp \u003d 0` and leaves `cm-\u003eerror-\u003ejmp` pointing at a dead stack frame. Consider passing `struct aom_internal_error_info *error` to `set_bitstream_level_tier()` (`\u0026ppi-\u003eerror` in `init_seq_coding_tools()` and `cm-\u003eerror` here) so errors go through `av1_get_compressed_data()`\u0027s handler.",
+      "range": {
+        "startLine": 4600,
+        "startChar": 0,
+        "endLine": 4602,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "784ff1c8417e149734a4c7aeec71e9241677bdb3",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "00ccb726_5b00a77e",
+        "filename": "test/frame_size_tests.cc",
+        "patchSetId": 1
+      },
+      "lineNbr": 309,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-11T17:22:05Z",
+      "side": 1,
+      "message": "Pass `aom_codec_dec_cfg_t dec_cfg \u003d {}; dec_cfg.allow_lowbitdepth \u003d 1;` to `aom_codec_dec_init()` here. Otherwise nightly `FORCE_HIGHBITDEPTH_DECODING\u003d1` builds decode 8-bit frames with `AOM_IMG_FMT_HIGHBITDEPTH` set while `AV1_GET_NEW_FRAME_IMAGE` returns an 8-bit `recon`, failing `ImagesEqual()`.",
+      "range": {
+        "startLine": 308,
+        "startChar": 0,
+        "endLine": 309,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "784ff1c8417e149734a4c7aeec71e9241677bdb3",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
