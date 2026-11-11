@@ -2466,6 +2466,15 @@ typedef struct {
    * Pointer to the entropy_ctx buffer.
    */
   uint8_t *entropy_ctx;
+  /*!
+   * Per-plane start of the tcoeff buffer. The pool is plane-major, so the
+   * tcoeff slots of consecutive superblocks of a plane are contiguous.
+   */
+  tran_low_t *plane_tcoeff[MAX_MB_PLANE];
+  /*!
+   * Per-plane tcoeff slot size of one superblock.
+   */
+  int plane_sb_square[MAX_MB_PLANE];
 } CoeffBufferPool;
 
 #if !CONFIG_REALTIME_ONLY
