@@ -23,6 +23,30 @@
       "isAi": true,
       "revId": "aa9775e3d61a3f19629a0fecde92a70895509d1c",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "85063ea6_398323d5",
+        "filename": "aom_dsp/sad_hwy.h",
+        "patchSetId": 6
+      },
+      "lineNbr": 226,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-11T14:48:30Z",
+      "side": 1,
+      "message": "Done, thanks for catching this! Loading second_pred directly with hn::LoadU(pixel_tag, \u0026second_pred[x]) eliminated the small-block overhead (masked_sad 16x4 is now 1.29x, 16x8 is 1.08x, 16x16 is 1.16x, and 32x16 improved from 1.12x to 1.43x), so I also re-enabled aom_masked_sad16x4_avx512 and updated the benchmark table in the commit message.",
+      "parentUuid": "48f86784_3bc709f4",
+      "range": {
+        "startLine": 178,
+        "startChar": 0,
+        "endLine": 226,
+        "endChar": 9999
+      },
+      "revId": "aa9775e3d61a3f19629a0fecde92a70895509d1c",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
