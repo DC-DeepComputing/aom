@@ -37,6 +37,25 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "0b7eb41c_ac4c545a",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 4
+      },
+      "lineNbr": 5,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-11T16:07:18Z",
+      "side": 1,
+      "message": "Thanks for updating the table and re-enabling 16x4!",
+      "parentUuid": "610feb64_c102a6b5",
+      "isAi": true,
+      "revId": "a750f7d8c46c37aee77fba2986ac1b06f81fea52",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "9f7a673f_cba82f92",
@@ -69,6 +88,25 @@
       "side": 1,
       "message": "Good catch — 32x64 was inadvertently dropped here when cleaning up 32x64 in the parent SAD CL. Restored 32x64 across aom_dsp_rtcd_defs.pl, sad_hwy.h, masked_sad_test.cc, and obmc_sad_test.cc (1.23x for masked_sad and 2.26x for obmc_sad), and excluded 16x4 for aom_masked_sad instead (!($w \u003d\u003d 16 \u0026\u0026 $h \u003d\u003d 4)).",
       "parentUuid": "9f7a673f_cba82f92",
+      "revId": "a750f7d8c46c37aee77fba2986ac1b06f81fea52",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "b8f4f14d_c0831cab",
+        "filename": "aom_dsp/aom_dsp_rtcd_defs.pl",
+        "patchSetId": 4
+      },
+      "lineNbr": 1060,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-11T16:07:18Z",
+      "side": 1,
+      "message": "Ack, thanks!",
+      "parentUuid": "e38c8c27_ff62e255",
+      "isAi": true,
       "revId": "a750f7d8c46c37aee77fba2986ac1b06f81fea52",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
@@ -109,6 +147,25 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "2a5c3cdc_ec0f4636",
+        "filename": "aom_dsp/sad_hwy.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 189,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-11T16:07:18Z",
+      "side": 1,
+      "message": "Done.",
+      "parentUuid": "bd53963a_8f72b6ab",
+      "isAi": true,
+      "revId": "a750f7d8c46c37aee77fba2986ac1b06f81fea52",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "84809af9_765487e1",
@@ -141,6 +198,25 @@
       "side": 1,
       "message": "Done. Added assert(h % kRowsPerVec \u003d\u003d 0); and the comment explaining the signed 15-bit input range for WidenMulPairwiseAdd.",
       "parentUuid": "84809af9_765487e1",
+      "revId": "a750f7d8c46c37aee77fba2986ac1b06f81fea52",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "910e733f_99ad05ae",
+        "filename": "aom_dsp/sad_hwy.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 254,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-11T16:07:18Z",
+      "side": 1,
+      "message": "Done.",
+      "parentUuid": "c615e530_3a8f4704",
+      "isAi": true,
       "revId": "a750f7d8c46c37aee77fba2986ac1b06f81fea52",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
