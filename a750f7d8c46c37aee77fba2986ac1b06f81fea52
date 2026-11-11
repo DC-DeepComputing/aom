@@ -21,6 +21,24 @@
     {
       "unresolved": true,
       "key": {
+        "uuid": "610feb64_c102a6b5",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 4
+      },
+      "lineNbr": 5,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-11T00:18:01Z",
+      "side": 1,
+      "message": "Done. Checked 16x4, 32x8, 16x64, 64x16, and 32x64: masked_sad 32x8 (1.24x), 32x64 (1.23x), 16x64 (1.03x), 64x16 (1.81x), and all obmc_sad sizes (1.51x–2.40x, including 16x4 at 1.51x) show speedups or parity, whereas masked_sad 16x4 regresses on AVX512_DL targets (0.88x–0.94x due to single-iteration 4-row packing overhead). Skipped aom_masked_sad16x4_avx512 (and avoided emitting the unused symbol) and updated the commit message table to include 32x64 and all enabled 4:1 / 1:4 sizes.",
+      "parentUuid": "e8f66034_67fa5014",
+      "revId": "a750f7d8c46c37aee77fba2986ac1b06f81fea52",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
         "uuid": "9f7a673f_cba82f92",
         "filename": "aom_dsp/aom_dsp_rtcd_defs.pl",
         "patchSetId": 4
@@ -33,6 +51,24 @@
       "side": 1,
       "message": "Why is `!($w \u003d\u003d 32 \u0026\u0026 $h \u003d\u003d 64)` excluded here and in `aom_obmc_sad` below (and removed from `FOR_EACH_MASKED_OBMC_SAD_BLOCK_SIZE` / tests in PS4)? Unlike `sad`/`sad_avg` in the parent CL, `32x64` is a standard 1:2 size already tested for both `masked_sad` and `obmc_sad`; unless it regressed against AVX2, please restore `32x64` across RTCD, `sad_hwy.h`, and both tests.",
       "isAi": true,
+      "revId": "a750f7d8c46c37aee77fba2986ac1b06f81fea52",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "e38c8c27_ff62e255",
+        "filename": "aom_dsp/aom_dsp_rtcd_defs.pl",
+        "patchSetId": 4
+      },
+      "lineNbr": 1060,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-11T00:18:01Z",
+      "side": 1,
+      "message": "Good catch — 32x64 was inadvertently dropped here when cleaning up 32x64 in the parent SAD CL. Restored 32x64 across aom_dsp_rtcd_defs.pl, sad_hwy.h, masked_sad_test.cc, and obmc_sad_test.cc (1.23x for masked_sad and 2.26x for obmc_sad), and excluded 16x4 for aom_masked_sad instead (!($w \u003d\u003d 16 \u0026\u0026 $h \u003d\u003d 4)).",
+      "parentUuid": "9f7a673f_cba82f92",
       "revId": "a750f7d8c46c37aee77fba2986ac1b06f81fea52",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
@@ -57,6 +93,24 @@
     {
       "unresolved": true,
       "key": {
+        "uuid": "bd53963a_8f72b6ab",
+        "filename": "aom_dsp/sad_hwy.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 189,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-11T00:18:01Z",
+      "side": 1,
+      "message": "Done. Added assert(h % kRowsPerVec \u003d\u003d 0); in MaskedSumOfAbsoluteDiff.",
+      "parentUuid": "050c3d9f_bb53de93",
+      "revId": "a750f7d8c46c37aee77fba2986ac1b06f81fea52",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
         "uuid": "84809af9_765487e1",
         "filename": "aom_dsp/sad_hwy.h",
         "patchSetId": 4
@@ -69,6 +123,24 @@
       "side": 1,
       "message": "Please add `assert(h % kRowsPerVec \u003d\u003d 0);` and a brief comment noting that `WidenMulPairwiseAdd` on `BitCast(d16, ...)` relies on `pre` and `mask` fitting in signed 15 bits (matching `obmc_sad_avx2.c`).",
       "isAi": true,
+      "revId": "a750f7d8c46c37aee77fba2986ac1b06f81fea52",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "c615e530_3a8f4704",
+        "filename": "aom_dsp/sad_hwy.h",
+        "patchSetId": 4
+      },
+      "lineNbr": 254,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-11T00:18:01Z",
+      "side": 1,
+      "message": "Done. Added assert(h % kRowsPerVec \u003d\u003d 0); and the comment explaining the signed 15-bit input range for WidenMulPairwiseAdd.",
+      "parentUuid": "84809af9_765487e1",
       "revId": "a750f7d8c46c37aee77fba2986ac1b06f81fea52",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
