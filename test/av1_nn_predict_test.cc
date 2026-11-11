@@ -9,16 +9,27 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
+#include <algorithm>
+#include <memory>
 #include <tuple>
+#include <vector>
 
 #include "gtest/gtest.h"
 
+#include "config/aom_config.h"
+
 #include "aom/aom_integer.h"
+#include "aom_mem/aom_mem.h"
 #include "aom_ports/aom_timer.h"
 #include "av1/encoder/ml.h"
-#include "config/aom_config.h"
 #include "config/aom_dsp_rtcd.h"
 #include "config/av1_rtcd.h"
+#if HAVE_AVX2
+#include "aom_ports/x86.h"
+#if !CONFIG_REALTIME_ONLY
+#include "av1/encoder/block.h"
+#endif  // !CONFIG_REALTIME_ONLY
+#endif  // HAVE_AVX2
 #include "test/util.h"
 #include "test/register_state_check.h"
 #include "test/acm_random.h"
@@ -215,6 +226,66 @@ INSTANTIATE_TEST_SUITE_P(SSE3, NnPredictTest,
 #if HAVE_AVX2
 INSTANTIATE_TEST_SUITE_P(AVX2, NnPredictTest,
                          ::testing::Values(av1_nn_predict_avx2));
+
+#if !CONFIG_REALTIME_ONLY
+TEST(LowbdGradientInfoSbAvx2Test, EquivalenceWithC) {
+  if (!(x86_simd_caps() & HAS_AVX2)) GTEST_SKIP();
+  libaom_test::ACMRandom rnd(libaom_test::ACMRandom::DeterministicSeed());
+  const BLOCK_SIZE sb_sizes[] = { BLOCK_32X32, BLOCK_64X64, BLOCK_128X128 };
+  const int strides[] = { 32, 64, 128, 160 };
+  std::unique_ptr<MACROBLOCK, decltype(&aom_free)> x(
+      static_cast<MACROBLOCK *>(aom_calloc(1, sizeof(MACROBLOCK))), &aom_free);
+  ASSERT_NE(x.get(), nullptr);
+  std::vector<PixelLevelGradientInfo> grad_ref(MAX_SB_SQUARE * 3);
+  std::vector<PixelLevelGradientInfo> grad_avx2(MAX_SB_SQUARE * 3);
+  std::vector<uint8_t> src(128 * 160 + 32);
+
+  for (BLOCK_SIZE sb_size : sb_sizes) {
+    const int sb_h = block_size_high[sb_size];
+    const int sb_w = block_size_wide[sb_size];
+    for (int stride : strides) {
+      if (stride < sb_w) continue;
+      for (int iter = 0; iter < 5; ++iter) {
+        for (int r = 0; r < sb_h; ++r) {
+          for (int c = 0; c < sb_w; ++c) {
+            src[r * stride + c] =
+                (iter == 0) ? 128 : static_cast<uint8_t>(rnd.Rand8());
+          }
+        }
+        std::fill(grad_ref.begin(), grad_ref.end(),
+                  PixelLevelGradientInfo{ 0, 0, false });
+        std::fill(grad_avx2.begin(), grad_avx2.end(),
+                  PixelLevelGradientInfo{ 0, 0, false });
+        x->plane[0].src.buf = src.data();
+        x->plane[0].src.stride = stride;
+        x->e_mbd.plane[0].subsampling_x = 0;
+        x->e_mbd.plane[0].subsampling_y = 0;
+        x->pixel_gradient_info = grad_ref.data();
+        av1_lowbd_compute_gradient_info_sb_c(x.get(), sb_size, PLANE_TYPE_Y);
+        av1_lowbd_compute_gradient_info_sb_avx2(src.data(), stride,
+                                                grad_avx2.data(), sb_h, sb_w);
+        for (int r = 1; r < sb_h - 1; ++r) {
+          for (int c = 1; c < sb_w - 1; ++c) {
+            const int idx = r * sb_w + c;
+            ASSERT_EQ(grad_avx2[idx].abs_dx_abs_dy_sum,
+                      grad_ref[idx].abs_dx_abs_dy_sum)
+                << "sb=" << sb_size << " stride=" << stride << " r=" << r
+                << " c=" << c;
+            if (grad_ref[idx].abs_dx_abs_dy_sum > 0) {
+              ASSERT_EQ(grad_avx2[idx].hist_bin_idx, grad_ref[idx].hist_bin_idx)
+                  << "sb=" << sb_size << " stride=" << stride << " r=" << r
+                  << " c=" << c;
+            } else {
+              ASSERT_GE(grad_avx2[idx].hist_bin_idx, 0);
+              ASSERT_LE(grad_avx2[idx].hist_bin_idx, 32);
+            }
+          }
+        }
+      }
+    }
+  }
+}
+#endif  // !CONFIG_REALTIME_ONLY
 #endif
 
 #if HAVE_NEON

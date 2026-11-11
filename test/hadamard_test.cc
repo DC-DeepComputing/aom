@@ -14,7 +14,12 @@
 
 #include "gtest/gtest.h"
 
+#include "config/aom_config.h"
 #include "config/aom_dsp_rtcd.h"
+
+#if HAVE_AVX2
+#include "aom_ports/x86.h"
+#endif
 
 #include "test/acm_random.h"
 #include "test/register_state_check.h"
@@ -544,5 +549,63 @@ INSTANTIATE_TEST_SUITE_P(NEON, HadamardLowbdLP8x8DualTest,
                          ::testing::Values(HadamardLP8x8DualFuncWithSize(
                              &aom_hadamard_lp_8x8_dual_neon, 8, 16)));
 #endif  // HAVE_NEON
+
+#if HAVE_AVX2
+extern "C" int aom_hadamard_sub_satd_avx2(int tx_size, const uint8_t *src,
+                                          ptrdiff_t src_stride,
+                                          const uint8_t *dst,
+                                          ptrdiff_t dst_stride);
+
+TEST(HadamardSubSatdAvx2Test, EquivalenceWithC) {
+  if (!(x86_simd_caps() & HAS_AVX2)) GTEST_SKIP();
+  ACMRandom rnd(ACMRandom::DeterministicSeed());
+  const int sizes[] = { 4, 8, 16, 32 };
+  const ptrdiff_t strides[] = { 4, 8, 17, 32, 65, 128 };
+  uint8_t src[32 * 128 + 32];
+  uint8_t dst[32 * 128 + 32];
+  DECLARE_ALIGNED(32, int16_t, diff[32 * 32]);
+  DECLARE_ALIGNED(32, tran_low_t, coeff[32 * 32]);
+
+  for (int tx_size = 0; tx_size < 4; ++tx_size) {
+    const int bw = sizes[tx_size];
+    for (ptrdiff_t src_stride : strides) {
+      if (src_stride < bw) continue;
+      for (ptrdiff_t dst_stride : strides) {
+        if (dst_stride < bw) continue;
+        for (int iter = 0; iter < 50; ++iter) {
+          for (int r = 0; r < bw; ++r) {
+            for (int c = 0; c < bw; ++c) {
+              if (iter == 0) {
+                src[r * src_stride + c] = 255;
+                dst[r * dst_stride + c] = 0;
+              } else if (iter == 1) {
+                src[r * src_stride + c] = 0;
+                dst[r * dst_stride + c] = 255;
+              } else {
+                src[r * src_stride + c] = rnd.Rand8();
+                dst[r * dst_stride + c] = rnd.Rand8();
+              }
+              diff[r * bw + c] = static_cast<int16_t>(src[r * src_stride + c]) -
+                                 static_cast<int16_t>(dst[r * dst_stride + c]);
+            }
+          }
+          switch (tx_size) {
+            case 0: aom_hadamard_4x4_c(diff, bw, coeff); break;
+            case 1: aom_hadamard_8x8_c(diff, bw, coeff); break;
+            case 2: aom_hadamard_16x16_c(diff, bw, coeff); break;
+            default: aom_hadamard_32x32_c(diff, bw, coeff); break;
+          }
+          const int ref = aom_satd_c(coeff, bw * bw);
+          const int got = aom_hadamard_sub_satd_avx2(tx_size, src, src_stride,
+                                                     dst, dst_stride);
+          EXPECT_EQ(got, ref)
+              << "tx_size=" << tx_size << " src_stride=" << src_stride
+              << " dst_stride=" << dst_stride << " iter=" << iter;
+        }
+      }
+    }
+  }
+}
+#endif  // HAVE_AVX2
 
 }  // namespace
