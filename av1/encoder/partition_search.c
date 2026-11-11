@@ -432,6 +432,23 @@ static AOM_FORCE_INLINE bool is_prediction_copied(const MACROBLOCK *x,
          mbmi->motion_mode == SIMPLE_TRANSLATION && mbmi->mv[0].as_int == 0;
 }
 
+// Returns 1 if the luma pass of the DRY_RUN_NORMAL encode of the current block
+// can be skipped because the CfL luma re-encode of the block left identical
+// results in place (see CflLumaLive); then also redoes its CfL side effects.
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
+static int cfl_luma_live_reuse(MACROBLOCK *x, BLOCK_SIZE bsize) {
+  if (!av1_cfl_luma_live_match(x, bsize)) return 0;
+  CFL_CTX *const cfl = &x->e_mbd.cfl;
+  if (cfl->store_y) {
+    cfl->are_parameters_computed = 0;
+    cfl->buf_width = x->cfl_luma_live.buf_width;
+    cfl->buf_height = x->cfl_luma_live.buf_height;
+  }
+  return 1;
+}
+
 static void encode_superblock(const AV1_COMP *const cpi, TileDataEnc *tile_data,
                               ThreadData *td, TokenExtra **t, RUN_TYPE dry_run,
                               BLOCK_SIZE bsize, int *rate) {
@@ -442,6 +459,8 @@ static void encode_superblock(const AV1_COMP *const cpi, TileDataEnc *tile_data,
   MB_MODE_INFO **mi_4x4 = xd->mi;
   MB_MODE_INFO *mbmi = mi_4x4[0];
   const int is_inter = is_inter_block(mbmi);
+  const int cfl_luma_live = x->cfl_luma_live.valid;
+  x->cfl_luma_live.valid = 0;
 
   // Initialize tx_mode and tx_size_search_method
   TxfmSearchParams *txfm_params = &x->txfm_search_params;
@@ -458,7 +477,12 @@ static void encode_superblock(const AV1_COMP *const cpi, TileDataEnc *tile_data,
     const int max_planes = LIKELY(is_chroma_ref) ? num_planes : 1;
     const TRELLIS_OPT_TYPE enable_trellis =
         cpi->optimize_seg_arr[mbmi->segment_id];
-    for (int plane = 0; plane < max_planes; ++plane) {
+    int start_plane = 0;
+    if (cfl_luma_live && dry_run == DRY_RUN_NORMAL &&
+        cfl_luma_live_reuse(x, bsize)) {
+      start_plane = 1;
+    }
+    for (int plane = start_plane; plane < max_planes; ++plane) {
       av1_encode_intra_block_plane(cpi, x, bsize, plane, dry_run,
                                    enable_trellis);
     }
@@ -1437,6 +1461,7 @@ static void pick_sb_modes_ex(AV1_COMP *const cpi, TileDataEnc *tile_data,
                              BLOCK_SIZE bsize, PICK_MODE_CONTEXT *ctx,
                              const RD_STATS *best_rd_in, int fast_intra_sb) {
   RD_STATS best_rd = *best_rd_in;
+  x->cfl_luma_live.valid = 0;
   if (cpi->sf.part_sf.use_best_rd_for_pruning && best_rd.rdcost < 0) {
     ctx->rd_stats.rdcost = INT64_MAX;
     ctx->rd_stats.skip_txfm = 0;
@@ -7734,6 +7759,7 @@ bool av1_rd_pick_partition(AV1_COMP *const cpi, ThreadData *td,
   const BLOCK_SIZE sb_size = cm->seq_params->sb_size;
   const MACROBLOCKD *const xd = &td->mb.e_mbd;
   const int is_sb_root = (bsize == sb_size);
+  td->mb.cfl_luma_live.valid = 0;
 
   PcTreeArena *arena = NULL;
   if (LIKELY(is_sb_root && pc_tree == td->pc_root)) {
