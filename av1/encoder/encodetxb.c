@@ -81,14 +81,18 @@ void av1_alloc_txb_buf(AV1_COMP *cpi) {
       1 << num_pels_log2_lookup[cm->seq_params->sb_size];
   const int chroma_max_sb_square =
       luma_max_sb_square >> (subsampling_x + subsampling_y);
-  const int total_max_sb_square =
-      (luma_max_sb_square + (num_planes - 1) * chroma_max_sb_square);
-  if ((size_t)size > SIZE_MAX / (size_t)total_max_sb_square) {
+  const int txb_unit_size = TX_SIZE_W_MIN * TX_SIZE_H_MIN;
+  // Each superblock slot of a plane also holds one header entry per
+  // transform block (at most one per 4x4 unit).
+  const int luma_slot = luma_max_sb_square + luma_max_sb_square / txb_unit_size;
+  const int chroma_slot =
+      chroma_max_sb_square + chroma_max_sb_square / txb_unit_size;
+  const int total_slot = luma_slot + (num_planes - 1) * chroma_slot;
+  if ((size_t)size > SIZE_MAX / (size_t)total_slot) {
     aom_internal_error(cm->error, AOM_CODEC_ERROR,
                        "A multiplication would overflow size_t");
   }
-  const size_t num_tcoeffs = (size_t)size * (size_t)total_max_sb_square;
-  const int txb_unit_size = TX_SIZE_W_MIN * TX_SIZE_H_MIN;
+  const size_t num_tcoeffs = (size_t)size * (size_t)total_slot;
 
   av1_free_txb_buf(cpi);
   // TODO(jingning): This should be further reduced.
@@ -102,41 +106,19 @@ void av1_alloc_txb_buf(AV1_COMP *cpi) {
   CHECK_MEM_ERROR(
       cm, coeff_buf_pool->tcoeff,
       aom_memalign(32, sizeof(*coeff_buf_pool->tcoeff) * num_tcoeffs));
-  if (sizeof(*coeff_buf_pool->eobs) > SIZE_MAX / num_tcoeffs) {
-    aom_internal_error(cm->error, AOM_CODEC_ERROR,
-                       "A multiplication would overflow size_t");
-  }
-  CHECK_MEM_ERROR(
-      cm, coeff_buf_pool->eobs,
-      aom_malloc(sizeof(*coeff_buf_pool->eobs) * num_tcoeffs / txb_unit_size));
-  if (sizeof(*coeff_buf_pool->entropy_ctx) > SIZE_MAX / num_tcoeffs) {
-    aom_internal_error(cm->error, AOM_CODEC_ERROR,
-                       "A multiplication would overflow size_t");
-  }
-  CHECK_MEM_ERROR(cm, coeff_buf_pool->entropy_ctx,
-                  aom_malloc(sizeof(*coeff_buf_pool->entropy_ctx) *
-                             num_tcoeffs / txb_unit_size));
 
   tran_low_t *tcoeff_ptr = coeff_buf_pool->tcoeff;
   for (int plane = 0; plane < num_planes; plane++) {
-    const int max_sb_square =
-        (plane == AOM_PLANE_Y) ? luma_max_sb_square : chroma_max_sb_square;
+    const int slot = (plane == AOM_PLANE_Y) ? luma_slot : chroma_slot;
     coeff_buf_pool->plane_tcoeff[plane] = tcoeff_ptr;
-    coeff_buf_pool->plane_sb_square[plane] = max_sb_square;
-    tcoeff_ptr += (size_t)size * max_sb_square;
+    coeff_buf_pool->plane_sb_square[plane] = slot;
+    tcoeff_ptr += (size_t)size * slot;
   }
-  uint16_t *eob_ptr = coeff_buf_pool->eobs;
-  uint8_t *entropy_ctx_ptr = coeff_buf_pool->entropy_ctx;
   for (int i = 0; i < size; i++) {
     for (int plane = 0; plane < num_planes; plane++) {
-      const int max_sb_square =
-          (plane == AOM_PLANE_Y) ? luma_max_sb_square : chroma_max_sb_square;
       cpi->coeff_buffer_base[i].tcoeff[plane] =
-          coeff_buf_pool->plane_tcoeff[plane] + (size_t)i * max_sb_square;
-      cpi->coeff_buffer_base[i].eobs[plane] = eob_ptr;
-      cpi->coeff_buffer_base[i].entropy_ctx[plane] = entropy_ctx_ptr;
-      eob_ptr += max_sb_square / txb_unit_size;
-      entropy_ctx_ptr += max_sb_square / txb_unit_size;
+          coeff_buf_pool->plane_tcoeff[plane] +
+          (size_t)i * coeff_buf_pool->plane_sb_square[plane];
     }
   }
 }
@@ -150,10 +132,6 @@ void av1_free_txb_buf(AV1_COMP *cpi) {
   coeff_buf_pool->tcoeff = NULL;
   av1_zero(coeff_buf_pool->plane_tcoeff);
   av1_zero(coeff_buf_pool->plane_sb_square);
-  aom_free(coeff_buf_pool->eobs);
-  coeff_buf_pool->eobs = NULL;
-  aom_free(coeff_buf_pool->entropy_ctx);
-  coeff_buf_pool->entropy_ctx = NULL;
 }
 
 static void write_golomb(aom_writer *w, int level) {
@@ -565,19 +543,33 @@ static AOM_FORCE_INLINE tran_low_t pack_txb_coeff_token(tran_low_t level,
 #define ENCODETXB_FAST_PACK 0
 #endif
 
-// Number of tran_low_t entries reserved in the superblock's tcoeff[] stream
-// for a transform block with eob > 0 covering area coefficients. Every
-// packed form (16-bit stream or tran_low_t tokens) uses at most 2 * eob
-// entries, and never more than the area.
+#define TXB_EOB_MASK 0x07FFu
+
+// Number of tran_low_t entries a transform block takes in the superblock's
+// tcoeff[] stream: one header entry (see txb_header()), then the packed
+// coefficients. Every packed form uses at most 2 * eob entries (only one
+// when eob == 1), and never more than the area.
 static inline int txb_tc_size(int eob, int area) {
-  assert(eob > 0 && eob <= 1024);
+  assert(eob >= 0 && eob <= 1024);
   assert(area >= 16);
-  const int n = eob << 1;
-  return n < area ? n : area;
+  const int n = (eob > 1) ? (eob << 1) : eob;
+  return 1 + (n < area ? n : area);
+}
+
+// Header entry of a transform block record: eob (with the packing flags) in
+// bits 0~15 and the entropy context bit field in bits 16~23.
+static inline tran_low_t txb_header(uint32_t eob_raw, uint32_t ent_ctx) {
+  assert(eob_raw <= 0xFFFFu && ent_ctx <= 0xFFu);
+  return (tran_low_t)(eob_raw | (ent_ctx << 16));
+}
+
+// eob of a transform block from the eob field of its header (the fast packing
+// keeps flags above bit 10; eob itself is at most 1024).
+static inline int txb_stored_eob(uint32_t eob_raw) {
+  return (int)(eob_raw & TXB_EOB_MASK);
 }
 
 #if ENCODETXB_FAST_PACK
-#define TXB_EOB_MASK 0x07FFu
 #define TXB_FAST_MULTI_FLAG 0x0800u
 #define TXB_HAS_GOLOMB_FLAG 0x1000u
 #define TXB_EOB1_LVL_SHIFT 12
@@ -1146,14 +1138,19 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
   MACROBLOCKD *const xd = &x->e_mbd;
   CB_COEFF_BUFFER *const cb_coef_buff = x->cb_coef_buff;
   const PLANE_TYPE plane_type = get_plane_type(plane);
-  const int cb_offset = x->mbmi_ext_frame->cb_offset[plane_type];
-  const int txb_idx = (cb_offset >> 4) + block;
-  const uint16_t eob_raw = cb_coef_buff->eobs[plane][txb_idx];
-  const uint8_t ent_ctx = cb_coef_buff->entropy_ctx[plane][txb_idx];
+  (void)block;
+  const tran_low_t *const txb_rec =
+      cb_coef_buff->tcoeff[plane] + cb_coef_buff->tc_pos[plane];
+  const uint32_t header = (uint32_t)txb_rec[0];
+  const uint16_t eob_raw = (uint16_t)header;
+  const uint8_t ent_ctx = (uint8_t)(header >> 16);
   const int txb_skip_ctx = ent_ctx & TXB_SKIP_CTX_MASK;
   const TX_SIZE txs_ctx = get_txsize_entropy_ctx(tx_size);
   FRAME_CONTEXT *const ec_ctx = xd->tile_ctx;
   aom_cdf_prob *const skip_cdf = ec_ctx->txb_skip_cdf[txs_ctx][txb_skip_ctx];
+  const tran_low_t *const tcoeff = txb_rec + 1;
+  cb_coef_buff->tc_pos[plane] +=
+      (uint16_t)txb_tc_size(txb_stored_eob(eob_raw), tx_size_2d[tx_size]);
 
 #if ENCODETXB_FAST_PACK
   od_ec_enc *const enc = &w->ec;
@@ -1177,10 +1174,6 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
   }
 
   const int eob = (int)(eob_raw & TXB_EOB_MASK);
-  const tran_low_t *const tcoeff =
-      cb_coef_buff->tcoeff[plane] + cb_coef_buff->tc_pos[plane];
-  cb_coef_buff->tc_pos[plane] +=
-      (uint16_t)txb_tc_size(eob, tx_size_2d[tx_size]);
 #if defined(__GNUC__) || defined(__clang__)
   if (eob > 1) __builtin_prefetch(tcoeff, 0, 3);
 #endif
@@ -1371,10 +1364,6 @@ void av1_write_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCK *const x,
     }
   }
 
-  const tran_low_t *const tcoeff =
-      cb_coef_buff->tcoeff[plane] + cb_coef_buff->tc_pos[plane];
-  cb_coef_buff->tc_pos[plane] +=
-      (uint16_t)txb_tc_size(eob, tx_size_2d[tx_size]);
   if (eob == 1) {
     const tran_low_t v = tcoeff[0];
     const tran_low_t level = abs(v);
@@ -1472,17 +1461,13 @@ void av1_write_intra_coeffs_mb(const AV1_COMMON *const cm, MACROBLOCK *x,
       (num_planes > 1 && xd->is_chroma_ref) ? MAX_MB_PLANE : 1;
   const TX_SIZE y_tx = av1_get_tx_size(0, xd);
   const TX_SIZE uv_tx = (active_planes > 1) ? av1_get_tx_size(1, xd) : y_tx;
-  int block[MAX_MB_PLANE] = { 0 };
   FRAME_CONTEXT *const ec_ctx = xd->tile_ctx;
   CB_COEFF_BUFFER *const cb_buf = x->cb_coef_buff;
-  const uint16_t *const cb_offsets = x->mbmi_ext_frame->cb_offset;
+
 #if defined(__GNUC__) || defined(__clang__)
   if (active_planes > 1) {
-    const int uv_idx = cb_offsets[PLANE_TYPE_UV] >> 4;
-    __builtin_prefetch(cb_buf->eobs[1] + uv_idx, 0, 1);
-    __builtin_prefetch(cb_buf->entropy_ctx[1] + uv_idx, 0, 1);
-    __builtin_prefetch(cb_buf->eobs[2] + uv_idx, 0, 1);
-    __builtin_prefetch(cb_buf->entropy_ctx[2] + uv_idx, 0, 1);
+    __builtin_prefetch(cb_buf->tcoeff[1] + cb_buf->tc_pos[1], 0, 1);
+    __builtin_prefetch(cb_buf->tcoeff[2] + cb_buf->tc_pos[2], 0, 1);
   }
 #endif
   aom_cdf_prob *y_ext_cdf = NULL;
@@ -1534,10 +1519,6 @@ void av1_write_intra_coeffs_mb(const AV1_COMMON *const cm, MACROBLOCK *x,
         const int unit_height = ROUND_POWER_OF_TWO(y_unit_h, ss_y);
         const int unit_width = ROUND_POWER_OF_TWO(y_unit_w, ss_x);
         const PLANE_TYPE pt = (plane == 0) ? PLANE_TYPE_Y : PLANE_TYPE_UV;
-        const int cb_off = cb_offsets[pt];
-        const uint16_t *const eob_arr = cb_buf->eobs[plane] + (cb_off >> 4);
-        const uint8_t *const ent_arr =
-            cb_buf->entropy_ctx[plane] + (cb_off >> 4);
         const tran_low_t *const tc_base = cb_buf->tcoeff[plane];
         int tc_pos = cb_buf->tc_pos[plane];
         const TX_SIZE txs_ctx = get_txsize_entropy_ctx(tx_size);
@@ -1546,13 +1527,13 @@ void av1_write_intra_coeffs_mb(const AV1_COMMON *const cm, MACROBLOCK *x,
         aom_cdf_prob(*const skip_cdfs)[CDF_SIZE(2)] =
             ec_ctx->txb_skip_cdf[txs_ctx];
         aom_cdf_prob *const eob_cdf0 = get_eob_flag_cdf(ec_ctx, eob_s, pt, 0);
-        int p_blk = block[plane];
         for (int blk_row = row >> ss_y; blk_row < unit_height;
              blk_row += stepr) {
           for (int blk_col = col >> ss_x; blk_col < unit_width;
                blk_col += stepc) {
-            const uint16_t eob_raw = eob_arr[p_blk];
-            const uint8_t ent_ctx = ent_arr[p_blk];
+            const uint32_t header = (uint32_t)tc_base[tc_pos];
+            const uint16_t eob_raw = (uint16_t)header;
+            const uint8_t ent_ctx = (uint8_t)(header >> 16);
             aom_cdf_prob *const skip_cdf =
                 skip_cdfs[ent_ctx & TXB_SKIP_CTX_MASK];
             if (eob_raw == 0) {
@@ -1564,11 +1545,11 @@ void av1_write_intra_coeffs_mb(const AV1_COMMON *const cm, MACROBLOCK *x,
               rng = u;
               EC_NORMALIZE_LOCAL(enc, low, rng, cnt);
               update_cdf_2_local(skip_cdf, 1);
-              p_blk += step;
+              tc_pos += 1;
               continue;
             }
             const int eob = (int)(eob_raw & TXB_EOB_MASK);
-            const tran_low_t *const tcoeff = tc_base + tc_pos;
+            const tran_low_t *const tcoeff = tc_base + tc_pos + 1;
             tc_pos += txb_tc_size(eob, step << 4);
 #if defined(__GNUC__) || defined(__clang__)
             if (eob > 1) __builtin_prefetch(tcoeff, 0, 3);
@@ -1646,7 +1627,6 @@ void av1_write_intra_coeffs_mb(const AV1_COMMON *const cm, MACROBLOCK *x,
                 EC_ENCODE_BIN_LOCAL(enc, low, rng, cnt, sign, dc_cdf);
                 update_cdf_2_local(dc_cdf, sign);
               }
-              p_blk += step;
               continue;
             }
             int eob_pt, eob_extra;
@@ -1685,10 +1665,8 @@ void av1_write_intra_coeffs_mb(const AV1_COMMON *const cm, MACROBLOCK *x,
             low = enc->low;
             rng = enc->rng;
             cnt = enc->cnt;
-            p_blk += step;
           }
         }
-        block[plane] = p_blk;
         cb_buf->tc_pos[plane] = (uint16_t)tc_pos;
       }
     }
@@ -2715,22 +2693,20 @@ TXB_NOINLINE_FN static void update_and_record_txb_context_output(
   }
 
   CB_COEFF_BUFFER *cb_coef_buff = x->cb_coef_buff;
-  const int cb_offset = x->mbmi_ext_frame->cb_offset[plane_type];
-  const int txb_idx = (cb_offset >> 4) + block;
+  tran_low_t *const txb_rec =
+      cb_coef_buff->tcoeff[plane] + cb_coef_buff->tc_pos[plane];
+  cb_coef_buff->tc_pos[plane] +=
+      (uint16_t)txb_tc_size(eob, tx_size_2d[tx_size]);
 
   if (eob == 0) {
-    cb_coef_buff->entropy_ctx[plane][txb_idx] = (uint8_t)txb_ctx.txb_skip_ctx;
-    cb_coef_buff->eobs[plane][txb_idx] = 0;
+    txb_rec[0] = txb_header(0, (uint32_t)txb_ctx.txb_skip_ctx);
     av1_set_entropy_contexts(xd, pd, plane, plane_bsize, tx_size, 0, blk_col,
                              blk_row);
     return;
   }
   const int block_offset = BLOCK_OFFSET(block);
   tran_low_t *qcoeff = p->qcoeff + block_offset;
-  tran_low_t *const tc =
-      cb_coef_buff->tcoeff[plane] + cb_coef_buff->tc_pos[plane];
-  cb_coef_buff->tc_pos[plane] +=
-      (uint16_t)txb_tc_size(eob, tx_size_2d[tx_size]);
+  tran_low_t *const tc = txb_rec + 1;
   const TX_TYPE tx_type =
       av1_get_tx_type(xd, plane_type, blk_row, blk_col, tx_size,
                       cm->features.reduced_tx_set_used);
@@ -2785,7 +2761,6 @@ TXB_NOINLINE_FN static void update_and_record_txb_context_output(
     ent_byte |= (uint8_t)(dc_sign_ctx << DC_SIGN_CTX_SHIFT);
 #endif
   }
-  cb_coef_buff->entropy_ctx[plane][txb_idx] = ent_byte;
 
   const uint8_t cul_level = p->txb_entropy_ctx[block];
   av1_set_entropy_contexts(xd, pd, plane, plane_bsize, tx_size, cul_level,
@@ -2799,10 +2774,9 @@ TXB_NOINLINE_FN static void update_and_record_txb_context_output(
       code_lvl = 15u;
       tc[0] = level;
     }
-    cb_coef_buff->eobs[plane][txb_idx] =
-        (uint16_t)(1u | (code_lvl << TXB_EOB1_LVL_SHIFT));
+    txb_rec[0] = txb_header(1u | (code_lvl << TXB_EOB1_LVL_SHIFT), ent_byte);
 #else
-    cb_coef_buff->eobs[plane][txb_idx] = 1;
+    txb_rec[0] = txb_header(1, ent_byte);
     tc[0] = dc_val;
 #endif
 #if CONFIG_ENTROPY_STATS
@@ -2856,7 +2830,7 @@ TXB_NOINLINE_FN static void update_and_record_txb_context_output(
     const uint32_t packed_tx = (uint32_t)plane_type | ((uint32_t)tx_size << 4) |
                                ((uint32_t)txsize_ctx << 12) |
                                ((uint32_t)tx_class << 20);
-    cb_coef_buff->eobs[plane][txb_idx] = (uint16_t)eob;
+    txb_rec[0] = txb_header((uint32_t)eob, ent_byte);
     const int abs_sum = update_and_record_txb_context_multi(
         cpi, td, ec_ctx, qcoeff, tcoeff, eob, scan_order->scan, packed_tx,
         allow_update_cdf);
@@ -2888,19 +2862,20 @@ TXB_NOINLINE_FN static void update_and_record_txb_context_output(
                                                   scan_order->scan, packed_tx);
       }
 #if ENCODETXB_FAST_PACK
-      cb_coef_buff->eobs[plane][txb_idx] =
-          (uint16_t)((uint32_t)eob | ((ret >> 19) & (TXB_FAST_MULTI_FLAG |
-                                                     TXB_HAS_GOLOMB_FLAG)));
+      txb_rec[0] = txb_header(
+          (uint32_t)eob |
+              ((ret >> 19) & (TXB_FAST_MULTI_FLAG | TXB_HAS_GOLOMB_FLAG)),
+          ent_byte);
       abs_sum = (int)(ret & TXB_RET_SUM_MASK);
 #else
-      cb_coef_buff->eobs[plane][txb_idx] = (uint16_t)eob;
+      txb_rec[0] = txb_header((uint32_t)eob, ent_byte);
       abs_sum = (int)ret;
 #endif
     } else {
       const uint32_t ret = record_txb_context_multi(
           qcoeff, tcoeff, eob, scan_order->scan,
           (uint32_t)tx_size | ((uint32_t)tx_class << 8));
-      cb_coef_buff->eobs[plane][txb_idx] = (uint16_t)eob;
+      txb_rec[0] = txb_header((uint32_t)eob, ent_byte);
       abs_sum = (int)ret;
     }
 #endif
@@ -3082,9 +3057,7 @@ TXB_NOINLINE_FN static void update_intra_mb_txb_context_output(
     const TX_SIZE txsize_ctx = get_txsize_entropy_ctx(tx_size);
     const PLANE_TYPE plane_type = (plane == 0) ? PLANE_TYPE_Y : PLANE_TYPE_UV;
     CB_COEFF_BUFFER *const cb_coef_buff = x->cb_coef_buff;
-    const int cb_off = x->mbmi_ext_frame->cb_offset[plane_type];
-    uint16_t *const eobs_out = cb_coef_buff->eobs[plane] + (cb_off >> 4);
-    uint8_t *const ent_out = cb_coef_buff->entropy_ctx[plane] + (cb_off >> 4);
+
     tran_low_t *const tc_base = cb_coef_buff->tcoeff[plane];
     int tc_pos = cb_coef_buff->tc_pos[plane];
     const int step_w = tx_size_wide_unit[tx_size];
@@ -3170,10 +3143,11 @@ TXB_NOINLINE_FN static void update_intra_mb_txb_context_output(
             }
 
             const int eob = p->eobs[block];
+            tran_low_t *const txb_rec = tc_base + tc_pos;
             if (eob == 0) {
               update_cdf_2_local(skip_cdfs[txb_skip_ctx], 1);
-              ent_out[block] = (uint8_t)txb_skip_ctx;
-              eobs_out[block] = 0;
+              txb_rec[0] = txb_header(0, (uint32_t)txb_skip_ctx);
+              tc_pos += 1;
               av1_fill_entropy_ctx_pow2(a_ptr, 0, step_w);
               av1_fill_entropy_ctx_pow2(l_ptr, 0, step_h);
               block += step;
@@ -3183,7 +3157,7 @@ TXB_NOINLINE_FN static void update_intra_mb_txb_context_output(
             update_cdf_2_local(skip_cdfs[txb_skip_ctx], 0);
             const int block_offset = BLOCK_OFFSET(block);
             const tran_low_t *const qcoeff = p->qcoeff + block_offset;
-            tran_low_t *const tc = tc_base + tc_pos;
+            tran_low_t *const tc = txb_rec + 1;
             tc_pos += txb_tc_size(eob, step << 4);
             TX_TYPE tx_type;
             TX_CLASS tx_class;
@@ -3236,7 +3210,6 @@ TXB_NOINLINE_FN static void update_intra_mb_txb_context_output(
               ent_byte |= (uint8_t)(dc_sign_ctx << DC_SIGN_CTX_SHIFT);
 #endif
             }
-            ent_out[block] = ent_byte;
 
             const uint8_t cul_level = p->txb_entropy_ctx[block];
             if (LIKELY(non_edge || cul_level == 0)) {
@@ -3260,10 +3233,10 @@ TXB_NOINLINE_FN static void update_intra_mb_txb_context_output(
                 code_lvl = 15u;
                 tc[0] = level;
               }
-              eobs_out[block] =
-                  (uint16_t)(1u | (code_lvl << TXB_EOB1_LVL_SHIFT));
+              txb_rec[0] =
+                  txb_header(1u | (code_lvl << TXB_EOB1_LVL_SHIFT), ent_byte);
 #else
-              eobs_out[block] = 1;
+              txb_rec[0] = txb_header(1, ent_byte);
               tc[0] = dc_val;
 #endif
               const uint32_t symb = AOMMIN((uint32_t)level, 3u) - 1u;
@@ -3331,13 +3304,13 @@ TXB_NOINLINE_FN static void update_intra_mb_txb_context_output(
                     ec_ctx, qcoeff, tcoeff, eob, scan, packed_tx);
               }
 #if ENCODETXB_FAST_PACK
-              eobs_out[block] =
-                  (uint16_t)((uint32_t)eob |
-                             ((ret >> 19) &
-                              (TXB_FAST_MULTI_FLAG | TXB_HAS_GOLOMB_FLAG)));
+              txb_rec[0] = txb_header(
+                  (uint32_t)eob | ((ret >> 19) &
+                                   (TXB_FAST_MULTI_FLAG | TXB_HAS_GOLOMB_FLAG)),
+                  ent_byte);
               abs_sum_acc += (int)(ret & TXB_RET_SUM_MASK);
 #else
-              eobs_out[block] = (uint16_t)eob;
+              txb_rec[0] = txb_header((uint32_t)eob, ent_byte);
               abs_sum_acc += (int)ret;
 #endif
             }

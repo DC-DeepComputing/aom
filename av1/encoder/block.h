@@ -207,22 +207,19 @@ typedef struct {
 /*! \brief Stores the transforms coefficients for the whole superblock.
  */
 typedef struct {
-  //! The transformed coefficients.
-  tran_low_t *tcoeff[MAX_MB_PLANE];
-  //! Where the transformed coefficients end.
-  uint16_t *eobs[MAX_MB_PLANE];
-  /*! \brief Transform block entropy contexts.
+  /*! \brief The transformed coefficients.
    *
-   * Each element is used as a bit field.
-   * - Bits 0~3: txb_skip_ctx
-   * - Bits 4~5: dc_sign_ctx.
+   * Every transform block of the superblock, in coding order, stores one
+   * header entry (bits 0~15: eob, bits 16~23: entropy context bit field with
+   * txb_skip_ctx in bits 0~3 and dc_sign_ctx in bits 4~5) followed by its
+   * packed coefficients.
    */
-  uint8_t *entropy_ctx[MAX_MB_PLANE];
+  tran_low_t *tcoeff[MAX_MB_PLANE];
   /*! \brief Per-plane cursor (in tran_low_t units) into tcoeff[].
    *
-   * The packed coefficient streams of the superblock's transform blocks are
-   * stored back to back in coding order (reset at the first coded block of
-   * the superblock), so blocks with few coefficients touch fewer pages.
+   * The transform block records of the superblock are stored back to back in
+   * coding order (reset at the first coded block of the superblock), so
+   * blocks with few coefficients touch fewer pages.
    */
   uint16_t tc_pos[MAX_MB_PLANE];
 } CB_COEFF_BUFFER;
@@ -261,8 +258,6 @@ typedef struct {
   int_mv global_mvs[REF_FRAMES];
   //! \copydoc MB_MODE_INFO_EXT::mode_context
   int16_t mode_context;
-  //! Offset of current coding block's coeff buffer relative to the sb.
-  uint16_t cb_offset[PLANE_TYPES];
 } MB_MODE_INFO_EXT_FRAME;
 
 /*! \brief Inter-mode txfm results for a partition block.

@@ -2160,8 +2160,6 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
   av1_update_state(cpi, td, ctx, mi_row, mi_col, bsize, dry_run);
 
   if (UNLIKELY(!dry_run)) {
-    set_cb_offsets(x->mbmi_ext_frame->cb_offset, x->cb_offset[PLANE_TYPE_Y],
-                   x->cb_offset[PLANE_TYPE_UV]);
     if (x->cb_offset[PLANE_TYPE_Y] == 0) {
       memset(x->cb_coef_buff->tc_pos, 0, sizeof(x->cb_coef_buff->tc_pos));
     }
@@ -2893,8 +2891,6 @@ static void encode_b_nonrd(const AV1_COMP *const cpi, TileDataEnc *tile_data,
   const int subsampling_x = cpi->common.seq_params->subsampling_x;
   const int subsampling_y = cpi->common.seq_params->subsampling_y;
   if (!dry_run) {
-    set_cb_offsets(x->mbmi_ext_frame->cb_offset, x->cb_offset[PLANE_TYPE_Y],
-                   x->cb_offset[PLANE_TYPE_UV]);
     if (x->cb_offset[PLANE_TYPE_Y] == 0) {
       memset(x->cb_coef_buff->tc_pos, 0, sizeof(x->cb_coef_buff->tc_pos));
     }
