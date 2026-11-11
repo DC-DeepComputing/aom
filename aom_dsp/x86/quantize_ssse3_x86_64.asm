@@ -292,8 +292,8 @@ cglobal quantize_%1, 0, %2, 15, coeff, ncoeff, zbin, round, quant, \
   pmaxsw                          m8, m7
   pshuflw                         m7, m8, 0x1
   pmaxsw                          m8, m7
-  pextrw                          r6, m8, 0
-  mov                             [r2], r6
+  pextrw                         r6d, m8, 0
+  mov                             [r2], r6w
   RET
 %endmacro
 
