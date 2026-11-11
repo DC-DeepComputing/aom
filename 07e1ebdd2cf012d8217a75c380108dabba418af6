@@ -21,6 +21,24 @@
     {
       "unresolved": true,
       "key": {
+        "uuid": "ee1d3538_30b6e73a",
+        "filename": "aom_dsp/subtract_hwy.h",
+        "patchSetId": 7
+      },
+      "lineNbr": 29,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-11T18:28:13Z",
+      "side": 1,
+      "message": "Done. Added `assert(rows \u003e\u003d 0 \u0026\u0026 rows % 2 \u003d\u003d 0)` to `SubtractBlock4xN`, `SubtractBlock8xN`, and `SubtractBlock16xN` (and simplified `SubtractBlock4xN` to a 2-row loop).",
+      "parentUuid": "3ae6b61a_e653096b",
+      "revId": "07e1ebdd2cf012d8217a75c380108dabba418af6",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
         "uuid": "8dc17ef8_2fbadce8",
         "filename": "aom_dsp/subtract_hwy.h",
         "patchSetId": 7
@@ -33,6 +51,24 @@
       "side": 1,
       "message": "The commit message shows `128x128` regressing vs AVX2 (`0.90x`; also measured slower locally at `128x128` and `128x64`), likely because 64-byte `vmovdqu64` stores split cache lines when `diff_ptr` is only 32-byte aligned (as in `test/subtract_test.cc`) and stress L1D at `128x128`. Have you checked whether 256-bit `CappedTag\u003cint16_t, 16\u003e` (or dispatching `cols \u003d\u003d 128` / `128x128` to AVX2) avoids the regression? Also, please include the `4xN` and `8xN` block sizes enabled by `SubtractBlock4xN`/`8xN` in the commit message table.",
       "isAi": true,
+      "revId": "07e1ebdd2cf012d8217a75c380108dabba418af6",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "6479b65c_abdfeff1",
+        "filename": "aom_dsp/subtract_hwy.h",
+        "patchSetId": 7
+      },
+      "lineNbr": 182,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-11T18:28:13Z",
+      "side": 1,
+      "message": "Done. Switched `SubtractBlockWide` to use 256-bit `CappedTag\u003cint16_t, 16\u003e` when `Cols \u003d\u003d 128` (while keeping `CappedTag\u003cint16_t, 32\u003e` for `Cols \u003d\u003d 32` and `64`), which avoids 64-byte split-cache-line stores when `diff_ptr` is 32-byte aligned and eliminates the regression at `128x64` / `128x128`. Also updated the commit message table to include the `4xN` and `8xN` block sizes.",
+      "parentUuid": "8dc17ef8_2fbadce8",
       "revId": "07e1ebdd2cf012d8217a75c380108dabba418af6",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
