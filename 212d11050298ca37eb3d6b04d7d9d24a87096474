@@ -23,6 +23,30 @@
       "isAi": true,
       "revId": "212d11050298ca37eb3d6b04d7d9d24a87096474",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "ad8e621d_a949a894",
+        "filename": "av1/encoder/encoder.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 5394,
+      "author": {
+        "id": 5216012
+      },
+      "writtenOn": "2026-11-11T17:56:58Z",
+      "side": 1,
+      "message": "Thanks for the review. The SEGV also happens without this change. On the parent 05acd5cd25, GQ with the default lag crashes in update_firstpass_stats() (firstpass.c:1024) on the call after the failed one in about half the runs, and in the other runs every later frame fails. The LAP stage pushes a stats entry on every call, the failed frame never uses its entry, and the overflow branch then reads cpi_lap-\u003etwopass_frame.stats_in, which is NULL.\n\nI tried also dropping the LAP stats entry and moving firstpass_info. The next frame then asserts in init_gop_frames_for_tpl(), because gf_frame_index, show_frame_count and frame_number would have to move too, and the GF group can still point at the dropped frame. A proper drop with lag is most of av1_post_encode_updates() for a frame that stopped half way. So PS3 drops the frame only in one pass mode with lag 0, where the lookahead holds just that frame. Other modes behave as before.",
+      "parentUuid": "6a3dd48c_a158abd1",
+      "range": {
+        "startLine": 5391,
+        "startChar": 0,
+        "endLine": 5394,
+        "endChar": 9999
+      },
+      "revId": "212d11050298ca37eb3d6b04d7d9d24a87096474",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
