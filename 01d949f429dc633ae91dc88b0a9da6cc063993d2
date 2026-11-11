@@ -16,6 +16,58 @@
       "message": "We have submitted the patch to add pyramid motion estimation (PME) performed on source input frames. The buffer management of frames and data structures used in PME is made similar to TPL module. Currently, the PME is invoked before performing TPL at the beginning of each sub-GOP.\n\nThe implementation is guarded with a configurable `CONFIG_PYRAMID_ME` flag and disabled by default. Also, the flag is forced to disable when `CONFIG_REALTIME_ONLY` flag is enabled. When `CONFIG_PYRAMID_ME` flag is enabled, PME algorithm is configured for speed 1, 2, and 3 with corresponding speed feature settings.\n\nWe plan to add the AVX2 support of motion estimation functions used in PME once this CL gets merged. We shall share the complexity data of PME along with AVX2 support in the subsequent CL.\n\nPlease review.",
       "revId": "01d949f429dc633ae91dc88b0a9da6cc063993d2",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "bc7515f6_457ce802",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5185
+      },
+      "writtenOn": "2026-11-11T00:41:59Z",
+      "side": 1,
+      "message": "Overall looks good. Thanks! Did you run tests to verify that this commit doesn\u0027t change anything for default encoding (i.e. pme \u003d 0)?",
+      "revId": "01d949f429dc633ae91dc88b0a9da6cc063993d2",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "d8506a6a_4fb32bba",
+        "filename": "av1/encoder/pyramid_me.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 1614,
+      "author": {
+        "id": 5185
+      },
+      "writtenOn": "2026-11-11T00:41:59Z",
+      "side": 1,
+      "message": "Could you explain the difference between this function and pyramid_me_level2()? Are they both doing ME on level 2 frame?",
+      "fixSuggestions": [
+        {
+          "fixId": "e13401a4_60798d8e",
+          "description": "prompt_to_edit API",
+          "replacements": [
+            {
+              "path": "av1/encoder/pyramid_me.c",
+              "range": {
+                "startLine": 1019,
+                "startChar": 0,
+                "endLine": 1020,
+                "endChar": 0
+              },
+              "replacement": "// Pre-pyramid motion estimation performed at 16x16 block size (level 2).\n//\n// Both pre_pyramid_me() and pyramid_me_level2() perform motion estimation (ME)\n// at level 2 (16x16 block resolution).\n//\n// Key differences:\n// - pre_pyramid_me() performs an initial ME pass over coarse search zones,\n//   mirrors motion vectors for backward reference frames from forward refs,\n//   and performs reference pruning/early exit based on SAD.\n// - pyramid_me_level2() searches across grid-divided search zones and replaces\n//   its worst search zone result with the best candidate from pre_pyramid_me().\n"
+            }
+          ]
+        }
+      ],
+      "revId": "01d949f429dc633ae91dc88b0a9da6cc063993d2",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
