@@ -2162,6 +2162,9 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
   if (UNLIKELY(!dry_run)) {
     set_cb_offsets(x->mbmi_ext_frame->cb_offset, x->cb_offset[PLANE_TYPE_Y],
                    x->cb_offset[PLANE_TYPE_UV]);
+    if (x->cb_offset[PLANE_TYPE_Y] == 0) {
+      memset(x->cb_coef_buff->tc_pos, 0, sizeof(x->cb_coef_buff->tc_pos));
+    }
     assert(x->cb_offset[PLANE_TYPE_Y] <
            (1 << num_pels_log2_lookup[cpi->common.seq_params->sb_size]));
     assert(x->cb_offset[PLANE_TYPE_UV] <
@@ -2892,6 +2895,9 @@ static void encode_b_nonrd(const AV1_COMP *const cpi, TileDataEnc *tile_data,
   if (!dry_run) {
     set_cb_offsets(x->mbmi_ext_frame->cb_offset, x->cb_offset[PLANE_TYPE_Y],
                    x->cb_offset[PLANE_TYPE_UV]);
+    if (x->cb_offset[PLANE_TYPE_Y] == 0) {
+      memset(x->cb_coef_buff->tc_pos, 0, sizeof(x->cb_coef_buff->tc_pos));
+    }
     assert(x->cb_offset[PLANE_TYPE_Y] <
            (1 << num_pels_log2_lookup[cpi->common.seq_params->sb_size]));
     assert(x->cb_offset[PLANE_TYPE_UV] <

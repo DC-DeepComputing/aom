@@ -218,6 +218,13 @@ typedef struct {
    * - Bits 4~5: dc_sign_ctx.
    */
   uint8_t *entropy_ctx[MAX_MB_PLANE];
+  /*! \brief Per-plane cursor (in tran_low_t units) into tcoeff[].
+   *
+   * The packed coefficient streams of the superblock's transform blocks are
+   * stored back to back in coding order (reset at the first coded block of
+   * the superblock), so blocks with few coefficients touch fewer pages.
+   */
+  uint16_t tc_pos[MAX_MB_PLANE];
 } CB_COEFF_BUFFER;
 
 /*! \brief Extended mode info derived from mbmi.
