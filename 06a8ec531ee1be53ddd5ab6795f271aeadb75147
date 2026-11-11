@@ -1,0 +1,52 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "0a50dcdc_278975b2",
+        "filename": "aom_dsp/variance_hwy.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 23,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-11-11T22:57:49Z",
+      "side": 1,
+      "message": "nit: `\"aom_dsp/aom_dsp_common.h\"` and `\"aom_ports/mem.h\"` are unused here and can be removed (and `\u003cstddef.h\u003e` can be included for `ptrdiff_t` on line 60).",
+      "range": {
+        "startLine": 21,
+        "startChar": 0,
+        "endLine": 23,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "06a8ec531ee1be53ddd5ab6795f271aeadb75147",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "ed314f43_41c22635",
+        "filename": "aom_dsp/variance_hwy.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 375,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-11-11T22:57:49Z",
+      "side": 1,
+      "message": "nit: If `u16_H_out` (and `H_curr`, `H_top`, `H_bot` in `HighbdCalcVarianceStat`) is typed as `hn::Vec\u003chn::ScalableTag\u003cuint16_t\u003e\u003e`, you can avoid bit-casting `u16_H` to `di16` here and immediately bit-casting `H_top`, `H_bot`, and `H_curr` back to `du16` on lines 408-409 and 422-423.",
+      "range": {
+        "startLine": 373,
+        "startChar": 0,
+        "endLine": 375,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "06a8ec531ee1be53ddd5ab6795f271aeadb75147",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
