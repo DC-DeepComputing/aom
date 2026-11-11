@@ -757,10 +757,14 @@ static void cdef_alloc_data(AV1_COMMON *cm, CdefSearchCtx *cdef_search_ctx) {
       cm, cdef_search_ctx->sb_index,
       aom_malloc(nvfb * nhfb * sizeof(cdef_search_ctx->sb_index[0])));
   cdef_search_ctx->sb_count = 0;
-  CHECK_MEM_ERROR(cm, cdef_search_ctx->mse[0],
-                  aom_malloc(sizeof(**cdef_search_ctx->mse) * nvfb * nhfb));
-  CHECK_MEM_ERROR(cm, cdef_search_ctx->mse[1],
-                  aom_malloc(sizeof(**cdef_search_ctx->mse) * nvfb * nhfb));
+  const size_t mse_size =
+      sizeof(**cdef_search_ctx->mse) * (size_t)nvfb * (size_t)nhfb;
+  CHECK_MEM_ERROR(cm, cdef_search_ctx->mse[0], aom_malloc(mse_size));
+  CHECK_MEM_ERROR(cm, cdef_search_ctx->mse[1], aom_malloc(mse_size));
+  // Eagerly fault MSE pages on the allocating thread rather than using
+  // aom_calloc(), which leaves mmap zero pages unfaulted for worker threads.
+  memset(cdef_search_ctx->mse[0], 0, mse_size);
+  memset(cdef_search_ctx->mse[1], 0, mse_size);
 }
 
 // Deallocates the memory allocated for members of CdefSearchCtx.
