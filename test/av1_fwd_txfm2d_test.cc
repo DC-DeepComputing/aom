@@ -742,8 +742,14 @@ TEST(AVX2, Av1LowbdFwdTxfm2dFuncAndNlMatchC) {
 
       for (int si = 0; si < 4; ++si) {
         const int stride = strides[si];
-        int16_t *const input =
-            diff_buf + ((si & 1) && cols <= 64 ? AOMMAX(cols, 16) : 0);
+        // Test non-32B-aligned src_diff rows on odd stride cases: 8B (+4, AV1
+        // 4x4 sub-block offset) and 2B (+3) for all AVX2 and 4xH SSE2 kernels;
+        // 16B (+8, addr % 32 == 16) for legacy 8/16/32-wide SSE2 delegates.
+        const bool sse2_16b_aligned = tx_size == TX_8X4 || tx_size == TX_16X4 ||
+                                      tx_size == TX_8X32 || tx_size == TX_32X8;
+        const int in_off =
+            (si & 1) ? (sse2_16b_aligned ? 8 : (si == 1 ? 4 : 3)) : 0;
+        int16_t *const input = diff_buf + in_off;
         for (int pat = 0; pat < 6; ++pat) {
           for (size_t i = 0; i < sizeof(diff_buf) / sizeof(diff_buf[0]); ++i) {
             diff_buf[i] = static_cast<int16_t>(rnd.Rand8()) -
@@ -814,17 +820,18 @@ TEST(AVX2, Av1SubSumSseLbdMatchC) {
     const int bsw = kDims[wi];
     for (int hi = 0; hi < 4; ++hi) {
       const int bsh = kDims[hi];
-      const int sstrides[4] = { bsw, bsw + 1, 67, 99 };
-      const int dstrides[4] = { bsw, bsw + 3, 73, 64 };
-      const int fstrides[4] = { bsw, bsw + 5, 32 < bsw ? bsw : 32, 71 };
+      const int sstrides[5] = { bsw, bsw + 1, 67, 99, bsw + 3 };
+      const int dstrides[5] = { bsw, bsw + 3, 73, 64, bsw + 1 };
+      const int fstrides[5] = { bsw, bsw + 5, 32 < bsw ? bsw : 32, 71, bsw };
 
-      for (int si = 0; si < 4; ++si) {
+      for (int si = 0; si < 5; ++si) {
         const int sstride = sstrides[si];
         const int dstride = dstrides[si];
         const int fstride = fstrides[si];
         constexpr size_t kGuard = 37;
-        uint8_t *const src = src_buf.data() + (si & 1 ? 3 : 16);
-        uint8_t *const dst = dst_buf.data() + (si & 1 ? 7 : 16);
+        const bool unaligned = (si & 1) != 0 || si == 4;
+        uint8_t *const src = src_buf.data() + (unaligned ? 3 : 16);
+        uint8_t *const dst = dst_buf.data() + (unaligned ? 7 : 16);
         int16_t *const diff = diff_buf.data() + kGuard;
         const uint32_t dims_pack = static_cast<uint32_t>(fstride) |
                                    (static_cast<uint32_t>(bsw) << 16) |
