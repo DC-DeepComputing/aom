@@ -1,0 +1,76 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "0bf9173b_8cd5cd21",
+        "filename": "aom_dsp/variance_hwy.h",
+        "patchSetId": 7
+      },
+      "lineNbr": 159,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-11T21:42:09Z",
+      "side": 1,
+      "message": "- In `GetBlockVar` / `VarianceBlock`, please `static_assert(BlockHeight % kRowsPerVec \u003d\u003d 0)` and `static_assert(BlockHeight % kChunkHeight \u003d\u003d 0)` so invalid heights or wider future vector targets fail at compile time.\n- In `LoadRowHorizFilterU8` / `HighbdLoadRowHorizFilterU16`, add `static_assert(kCols \u003d\u003d 16 || kCols \u003d\u003d 32)` alongside `(kCols \u003d\u003d 32) ? kRightIdx32 : kRightIdx16`.\n- In `HighbdCalcVarianceStat`, please document/assert the `\u003c\u003d 4095` (12-bit) pixel bound required for `u16_V \u003c\u003d 65520` not to overflow `uint16_t`.",
+      "isAi": true,
+      "revId": "6ae2604d5303a5b3f9614db9db63f4fb47d8f583",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "3ab2c9c3_b52e67ca",
+        "filename": "aom_dsp/variance_hwy.h",
+        "patchSetId": 7
+      },
+      "lineNbr": 203,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-11T21:42:09Z",
+      "side": 1,
+      "message": "`GetBlkSseSum` (here), `CalcVarianceStat` (line 276), and `HighbdCalcVarianceStat` (line 362) only guard `bw \u003c kLanes`/`kCols` (`32`), so any `bw \u003e 32` not divisible by `32` (e.g., `bw \u003d 48`) reads out of bounds on the last vector load—and `*CalcVarianceStat` clamps the right border at `x + 31` instead of `bw - 1`. In addition, `bh \u003c\u003d 0` in `*CalcVarianceStat` still reads row `0`. Please fall back to `_c` (for `bw % kLanes !\u003d 0` / `bh \u003c\u003d 0`) or assert these preconditions.",
+      "isAi": true,
+      "revId": "6ae2604d5303a5b3f9614db9db63f4fb47d8f583",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "b97e132a_e7051178",
+        "filename": "aom_dsp/variance_hwy.h",
+        "patchSetId": 7
+      },
+      "lineNbr": 216,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-11T21:42:09Z",
+      "side": 1,
+      "message": "`WidenMulPairwiseAdd(di32, d, d)` produces `0x80000000` when two adjacent elements are `-32768` (`INT16_MIN`), and `PromoteLowerTo(di64, sq)` (`vpmovsxdq`) sign-extends that to `-2147483648LL` instead of `+2147483648LL` (whereas `aom_get_blk_sse_sum_c` and `blk_sse_sum_avx2.c` zero-extend). Please `BitCast` `sq` to `ScalableTag\u003cuint32_t\u003e` and promote via `ScalableTag\u003cuint64_t\u003e` (`vpmovzxdq`), or assert the 12-bit input range if `INT16_MIN` is not supported.",
+      "isAi": true,
+      "revId": "6ae2604d5303a5b3f9614db9db63f4fb47d8f583",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "85cc5d4d_4e9d0508",
+        "filename": "test/variance_test.cc",
+        "patchSetId": 7
+      },
+      "lineNbr": 3983,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-11T21:42:09Z",
+      "side": 1,
+      "message": "`CalcVarianceStatTest` and `CalcVarianceStatHbdTest` (line 3871) are inside `#if HAVE_AVX2` while these `AVX512` instantiations are outside under `#if CONFIG_HIGHWAY \u0026\u0026 HAVE_AVX512` (same pattern for `kValidBlockSize` in `test/sum_squares_test.cc:597`). Please add `|| (CONFIG_HIGHWAY \u0026\u0026 HAVE_AVX512)` to those guard conditions so they don\u0027t rely on `HAVE_AVX512` implying `HAVE_AVX2`.",
+      "isAi": true,
+      "revId": "6ae2604d5303a5b3f9614db9db63f4fb47d8f583",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
