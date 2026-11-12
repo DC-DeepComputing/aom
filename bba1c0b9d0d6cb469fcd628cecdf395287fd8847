@@ -1,0 +1,94 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "295ee3fb_102987ae",
+        "filename": "av1/common/txb_common.h",
+        "patchSetId": 13
+      },
+      "lineNbr": 346,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-12T18:09:11Z",
+      "side": 1,
+      "message": "Nit: Consider writing `(TX_PAD_HOR + 1)` instead of `5` here (and in `get_lower_levels_ctx_simple_fast` at line 366) to match lines 130, 144, 172, and 182 and make the `stride \u003d\u003d (1 \u003c\u003c bhl) + TX_PAD_HOR` assumption explicit.",
+      "isAi": true,
+      "revId": "bba1c0b9d0d6cb469fcd628cecdf395287fd8847",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "e6f93eb0_f5b6b319",
+        "filename": "av1/common/x86/av1_inv_txfm_avx2.c",
+        "patchSetId": 13
+      },
+      "lineNbr": 1914,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-12T18:09:11Z",
+      "side": 1,
+      "message": "Optional (can be a follow-up): `av1_lowbd_inv_txfm2d_add_v_identity_ssse3` fused the `rect_type \u003d\u003d ±1` scaling with `load_32bit_to_16bit`, whereas `lowbd_inv_txfm2d_add_v_identity_avx2` here still runs a separate `round_shift_avx2` pass (and `lowbd_inv_txfm2d_add_h_identity_avx2` at lines 1876-1879 / `iidentity_col_16xn_avx2` at lines 1795-1809 are the last single-row callers of `write_recon_w16_avx2`). Applying the same fusion there would allow retiring `round_shift_avx2` and `write_recon_w16_avx2` too.",
+      "range": {
+        "startLine": 1910,
+        "startChar": 0,
+        "endLine": 1914,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "bba1c0b9d0d6cb469fcd628cecdf395287fd8847",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "9a984272_79a4f813",
+        "filename": "av1/common/x86/av1_inv_txfm_avx2.h",
+        "patchSetId": 13
+      },
+      "lineNbr": 77,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-12T18:09:11Z",
+      "side": 1,
+      "message": "Nit: Inlining the fused reconstruction loop into `lowbd_inv_txfm2d_add_no_identity_avx2` removed the last caller of `lowbd_write_buffer_16xn_avx2` across the repo (similar to `lowbd_write_buffer_16xn_sse2`, which was deleted in `av1_inv_txfm_ssse3.c`). Consider removing it as well, or adding `assert((height \u0026 1) \u003d\u003d 0);` if keeping it since stepping by `i +\u003d 2` now assumes an even `height`.",
+      "range": {
+        "startLine": 68,
+        "startChar": 0,
+        "endLine": 77,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "bba1c0b9d0d6cb469fcd628cecdf395287fd8847",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "999860be_5e47d33d",
+        "filename": "av1/encoder/txb_rdopt_utils.h",
+        "patchSetId": 13
+      },
+      "lineNbr": 40,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-12T18:09:11Z",
+      "side": 1,
+      "message": "Nit: All callers in `txb_rdopt.c` have been migrated to `get_coeff_dist_scaled_qm`, leaving `get_coeff_dist_qm` with no callers in the repo. Consider removing `get_coeff_dist_qm`.",
+      "range": {
+        "startLine": 36,
+        "startChar": 0,
+        "endLine": 40,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "bba1c0b9d0d6cb469fcd628cecdf395287fd8847",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
