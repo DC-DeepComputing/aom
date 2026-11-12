@@ -1,0 +1,22 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "6ced2e4f_5852efcc",
+        "filename": "aom_dsp/variance_hwy.h",
+        "patchSetId": 7
+      },
+      "lineNbr": 513,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-12T18:20:46Z",
+      "side": 1,
+      "message": "Nit: For consistency with `GetBlockVar` / `VarianceBlock` above, please add precondition guards to the subpixel helpers:\n- In `BilinearFilter` (line 438): `assert(offset \u003e\u003d 0 \u0026\u0026 offset \u003c 8)` so `f0 | (f1 \u003c\u003c 8)` stays in range.\n- In `SubPixelVarianceWxHImp` (line 513): `static_assert(Width \u003d\u003d 32 || Width % kColStep \u003d\u003d 0, ...)` and `assert(height \u003e 0 \u0026\u0026 height % kRowsPerIter \u003d\u003d 0 \u0026\u0026 loop_h \u003c\u003d 64)` (since each `int16_t` lane in `sum_reg` sums 2 diffs per iteration and overflows beyond 64 iterations).\n- In `SubPixelVariance32xH` / `SubPixelAvgVariance32xH` and `SubPixelVariance64Or128` / `SubPixelAvgVariance64Or128` (lines 719-800): `static_assert` `BlockWidth % 64 \u003d\u003d 0`, `BlockHeight % ChunkHeight \u003d\u003d 0`, `ChunkHeight \u003c\u003d 64` (with a brief note on the `int16_t` accumulator bound), and `(1 \u003c\u003c (WLog2 + HLog2)) \u003d\u003d BlockWidth * BlockHeight` (or `(1 \u003c\u003c (5 + Log2H)) \u003d\u003d 32 * BlockHeight`).",
+      "isAi": true,
+      "revId": "3cd6e280ed30af1087e22e025a2b17ec357dfb07",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
