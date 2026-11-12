@@ -335,62 +335,75 @@ static AOM_FORCE_INLINE int eval_better_qm_exact(tran_low_t tqc, tran_low_t dqc,
 #if defined(__GNUC__) || defined(__clang__)
 __attribute__((noinline))
 #endif
-static uint64_t finish_try_lower(intptr_t ci, unsigned int abs_qc, int rate,
-                                 int rate_low, tran_low_t dqc_low,
-                                 const TxbOptCtx *__restrict ctx) {
+static uint64_t finish_try_lower_ge15(intptr_t ci, unsigned int abs_qc,
+                                      int base_rate,
+                                      const TxbOptCtx *__restrict ctx) {
+  assert(ctx != NULL);
+  assert(ci > 0 && ci < 1024);
+  assert(abs_qc >= 1 + NUM_BASE_LEVELS + COEFF_BASE_RANGE);
   const tran_low_t tqc = ctx->tcoeff[ci];
   const tran_low_t dqc = ctx->dqcoeff[ci];
   const int sign_mask = tqc >> 31;
-  if (UNLIKELY(abs_qc >= 1 + NUM_BASE_LEVELS + COEFF_BASE_RANGE)) {
-    const tran_low_t full_abs = (tran_low_t)abs_qc;
-    const int br_ctx = get_br_ctx_simple_fast(
-        ctx->levels, ci, ctx->bhl, ctx->stride, (TX_CLASS)ctx->tx_class);
-    const int *const lps_flat = ctx->txb_costs->lps_cost[br_ctx];
-    const int base_rate = rate;
-    const int full_rate = base_rate + get_br_cost_fast(full_abs, lps_flat);
-    if ((dqc ^ sign_mask) < (tqc ^ sign_mask)) {
-      return pack_rate_cul(full_rate, full_abs);
-    }
-    const tran_low_t abs_qc_low = full_abs - 1;
-    const int full_rate_low =
-        base_rate + get_br_cost_fast(abs_qc_low, lps_flat);
-    int dqv = ctx->dequant_ac;
-    const qm_val_t *const iqmatrix = ctx->iqmatrix;
-    if (iqmatrix != NULL) {
-      dqv = ((iqmatrix[ci] * dqv) + (1 << (AOM_QM_BITS - 1))) >> AOM_QM_BITS;
-    }
-    const int shift = ctx->shift;
-    const tran_low_t abs_dqc_low = (abs_qc_low * dqv) >> shift;
-    const tran_low_t full_dqc_low = (abs_dqc_low ^ sign_mask) - sign_mask;
-    const qm_val_t *const qmatrix = ctx->qmatrix;
-    const int64_t rdmult = ctx->rdmult;
-    int better;
-    if (qmatrix != NULL) {
-      const int64_t scaled_qm = (int64_t)qmatrix[ci] << shift;
-      better = eval_better_qm_exact(tqc, dqc, full_dqc_low, scaled_qm,
-                                    full_rate, full_rate_low, rdmult);
-    } else {
-      const int64_t dist_diff = ((int64_t)(dqc - full_dqc_low) *
-                                 (dqc + full_dqc_low - ((int64_t)tqc * 2))) *
-                                (1LL << (2 * shift));
-      const int64_t rd_thresh =
-          RDCOST(rdmult, full_rate_low, 0) - RDCOST(rdmult, full_rate, 0);
-      better = dist_diff * (1 << RDDIV_BITS) > rd_thresh;
-    }
-    if (better) {
-      ctx->qcoeff[ci] = (abs_qc_low ^ sign_mask) - sign_mask;
-      ctx->dqcoeff[ci] = full_dqc_low;
-      ctx->levels[get_padded_idx((int)ci, ctx->bhl)] =
-          AOMMIN(abs_qc_low, INT8_MAX);
-      return pack_rate_cul(full_rate_low, abs_qc_low);
-    }
+  const tran_low_t full_abs = (tran_low_t)abs_qc;
+  const int br_ctx = get_br_ctx_simple_fast(
+      ctx->levels, ci, ctx->bhl, ctx->stride, (TX_CLASS)ctx->tx_class);
+  assert((unsigned)br_ctx < LEVEL_CONTEXTS);
+  const int *const lps_flat = ctx->txb_costs->lps_cost[br_ctx];
+  const int full_rate = base_rate + get_br_cost_fast(full_abs, lps_flat);
+  if ((dqc ^ sign_mask) < (tqc ^ sign_mask)) {
     return pack_rate_cul(full_rate, full_abs);
   }
+  const tran_low_t abs_qc_low = full_abs - 1;
+  const int full_rate_low = base_rate + get_br_cost_fast(abs_qc_low, lps_flat);
+  int dqv = ctx->dequant_ac;
+  const qm_val_t *const iqmatrix = ctx->iqmatrix;
+  if (iqmatrix != NULL) {
+    dqv = ((iqmatrix[ci] * dqv) + (1 << (AOM_QM_BITS - 1))) >> AOM_QM_BITS;
+  }
+  const int shift = ctx->shift;
+  const tran_low_t abs_dqc_low = (abs_qc_low * dqv) >> shift;
+  const tran_low_t full_dqc_low = (abs_dqc_low ^ sign_mask) - sign_mask;
+  const qm_val_t *const qmatrix = ctx->qmatrix;
+  const int64_t rdmult = ctx->rdmult;
+  int better;
+  if (qmatrix != NULL) {
+    const int64_t scaled_qm = (int64_t)qmatrix[ci] << shift;
+    better = eval_better_qm_exact(tqc, dqc, full_dqc_low, scaled_qm, full_rate,
+                                  full_rate_low, rdmult);
+  } else {
+    const int64_t dist_diff = ((int64_t)(dqc - full_dqc_low) *
+                               (dqc + full_dqc_low - ((int64_t)tqc * 2))) *
+                              (1LL << (2 * shift));
+    const int64_t rd_thresh =
+        RDCOST(rdmult, full_rate_low, 0) - RDCOST(rdmult, full_rate, 0);
+    better = dist_diff * (1 << RDDIV_BITS) > rd_thresh;
+  }
+  if (better) {
+    ctx->qcoeff[ci] = (abs_qc_low ^ sign_mask) - sign_mask;
+    ctx->dqcoeff[ci] = full_dqc_low;
+    ctx->levels[get_padded_idx((int)ci, ctx->bhl)] =
+        AOMMIN(abs_qc_low, INT8_MAX);
+    return pack_rate_cul(full_rate_low, abs_qc_low);
+  }
+  return pack_rate_cul(full_rate, full_abs);
+}
+
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
+static uint64_t finish_try_lower(intptr_t ci, unsigned int abs_qc, int rate,
+                                 int rate_low, tran_low_t dqc_low,
+                                 const TxbOptCtx *__restrict ctx) {
+  assert(ctx != NULL);
+  assert(ci > 0 && ci < 1024);
+  assert(abs_qc >= 2 && abs_qc < 1 + NUM_BASE_LEVELS + COEFF_BASE_RANGE);
+  const tran_low_t tqc = ctx->tcoeff[ci];
+  const tran_low_t dqc = ctx->dqcoeff[ci];
+  const int sign_mask = tqc >> 31;
   if ((dqc ^ sign_mask) >= (tqc ^ sign_mask)) {
     const int shift = ctx->shift;
-    const int64_t rdmult = ctx->rdmult;
     const int64_t approx_rd =
-        ((int64_t)(rate - rate_low) * rdmult) >> AV1_PROB_COST_SHIFT;
+        ((int64_t)(rate - rate_low) * ctx->rdmult) >> AV1_PROB_COST_SHIFT;
     const int64_t sum_term = (int64_t)tqc * 2 - (int64_t)dqc - (int64_t)dqc_low;
     const qm_val_t *const qmatrix = ctx->qmatrix;
     int better;
@@ -400,16 +413,30 @@ static uint64_t finish_try_lower(intptr_t ci, unsigned int abs_qc, int rate,
       const int64_t approx_dd =
           (((int64_t)(dqc - dqc_low) * sum_term) * sq_qm) >> (2 * AOM_QM_BITS);
       const int64_t margin = approx_rd - (approx_dd * (1 << RDDIV_BITS));
-      better =
-          (margin >= 0) && (LIKELY(margin > (1 << RDDIV_BITS)) ||
-                            eval_better_qm_exact(tqc, dqc, dqc_low, scaled_qm,
-                                                 rate, rate_low, rdmult));
+      if (margin >= 0) {
+        if (LIKELY(margin > (1 << RDDIV_BITS))) {
+          better = 1;
+        } else {
+          better = eval_better_qm_exact(tqc, dqc, dqc_low, scaled_qm, rate,
+                                        rate_low, ctx->rdmult);
+        }
+      } else {
+        better = 0;
+      }
     } else {
       const int64_t dd_pos = ((int64_t)(dqc - dqc_low) * sum_term) *
                              (1LL << (2 * shift + RDDIV_BITS));
-      better = (approx_rd >= dd_pos) && (LIKELY(approx_rd > dd_pos) ||
-                                         -dd_pos > RDCOST(rdmult, rate_low, 0) -
-                                                       RDCOST(rdmult, rate, 0));
+      if (approx_rd >= dd_pos) {
+        if (LIKELY(approx_rd > dd_pos)) {
+          better = 1;
+        } else {
+          const int64_t rdmult = ctx->rdmult;
+          better =
+              -dd_pos > RDCOST(rdmult, rate_low, 0) - RDCOST(rdmult, rate, 0);
+        }
+      } else {
+        better = 0;
+      }
     }
     if (better) {
       const unsigned int abs_qc_low = abs_qc - 1;
@@ -433,7 +460,7 @@ static uint64_t update_coeff_simple_gt1_try_lower(
     intptr_t ci, unsigned int abs_qc, const int *bc4,
     const TxbOptCtx *__restrict ctx) {
   if (UNLIKELY(abs_qc >= 1 + NUM_BASE_LEVELS + COEFF_BASE_RANGE)) {
-    return finish_try_lower(ci, abs_qc, bc4[3], 0, 0, ctx);
+    return finish_try_lower_ge15(ci, abs_qc, bc4[3], ctx);
   }
   const int br_ctx = get_br_ctx_simple_fast(
       ctx->levels, ci, ctx->bhl, ctx->stride, (TX_CLASS)ctx->tx_class);

@@ -721,20 +721,22 @@ static inline __m256i combine_pri_branchless(__m256i pn, __m256i pf,
   return _mm256_add_epi16(base, corr);
 }
 
+// load_u16_8x2() + _mm256_packs_epi16(r_01, r_23) places rows {1, 3} in the
+// low 128-bit lane and rows {0, 2} in the high 128-bit lane.
 static inline __m256i unpack_i8_lo_s16(__m256i v8) {
-  return _mm256_srai_epi16(_mm256_unpacklo_epi8(v8, v8), 8);
+  return _mm256_cvtepi8_epi16(_mm256_castsi256_si128(v8));
 }
 
 static inline __m256i unpack_i8_hi_s16(__m256i v8) {
-  return _mm256_srai_epi16(_mm256_unpackhi_epi8(v8, v8), 8);
+  return _mm256_cvtepi8_epi16(_mm256_extracti128_si256(v8, 1));
 }
 
 static inline __m256i unpack_u8_lo_u16(__m256i v8) {
-  return _mm256_srli_epi16(_mm256_unpacklo_epi8(v8, v8), 8);
+  return _mm256_cvtepu8_epi16(_mm256_castsi256_si128(v8));
 }
 
 static inline __m256i unpack_u8_hi_u16(__m256i v8) {
-  return _mm256_srli_epi16(_mm256_unpackhi_epi8(v8, v8), 8);
+  return _mm256_cvtepu8_epi16(_mm256_extracti128_si256(v8, 1));
 }
 
 /* For damping <= 4, sec_damp <= 3 so |diff| >= 16 maps to 0 in vpshufb;
@@ -1248,6 +1250,13 @@ static inline __m256i sec_diag26_lut_4r(const uint16_t *p, __m256i r_01,
   return acc;
 }
 
+static inline __m256i load_ref16_pair_4r(const uint8_t *row_lo,
+                                         const uint8_t *row_hi) {
+  const __m128i r_lo = _mm_loadl_epi64((const __m128i *)row_lo);
+  const __m128i r_hi = _mm_loadl_epi64((const __m128i *)row_hi);
+  return _mm256_cvtepu8_epi16(_mm_unpacklo_epi64(r_lo, r_hi));
+}
+
 static inline void finish_split_4r_i8(__m256i r_01, __m256i r_23,
                                       const uint8_t *rr, intptr_t ref_stride,
                                       __m256i sum_sec0, __m256i sum_pri,
@@ -1255,8 +1264,12 @@ static inline void finish_split_4r_i8(__m256i r_01, __m256i r_23,
                                       __m256i min_u8, __m256i *v_sse0,
                                       __m256i *v_sse1, __m256i *v_sse2,
                                       __m256i *v_sse3) {
+  const __m256i r_13 = _mm256_permute2x128_si256(r_01, r_23, 0x20);
+  const __m256i r_02 = _mm256_permute2x128_si256(r_01, r_23, 0x31);
   {
-    const __m256i d0 = _mm256_sub_epi16(r_01, load_ref16_8x2(rr, ref_stride));
+    const __m256i ref13 =
+        load_ref16_pair_4r(rr + ref_stride, rr + 3 * ref_stride);
+    const __m256i d0 = _mm256_sub_epi16(r_13, ref13);
     *v_sse0 = _mm256_add_epi32(*v_sse0, _mm256_madd_epi16(d0, d0));
     const __m256i d1 =
         _mm256_add_epi16(d0, finish_delta_fast(unpack_i8_lo_s16(sum_sec0)));
@@ -1265,15 +1278,15 @@ static inline void finish_split_4r_i8(__m256i r_01, __m256i r_23,
     const __m256i d2 = _mm256_add_epi16(d0, finish_delta_fast(pri16));
     *v_sse2 = _mm256_add_epi32(*v_sse2, _mm256_madd_epi16(d2, d2));
     const __m256i tot16 = _mm256_add_epi16(pri16, unpack_i8_lo_s16(sum_sec3));
-    __m256i res3 = _mm256_add_epi16(r_01, finish_delta_fast(tot16));
+    __m256i res3 = _mm256_add_epi16(r_13, finish_delta_fast(tot16));
     res3 = _mm256_min_epi16(_mm256_max_epi16(res3, unpack_u8_lo_u16(min_u8)),
                             unpack_u8_lo_u16(max_u8));
-    const __m256i d3 = _mm256_add_epi16(d0, _mm256_sub_epi16(res3, r_01));
+    const __m256i d3 = _mm256_sub_epi16(res3, ref13);
     *v_sse3 = _mm256_add_epi32(*v_sse3, _mm256_madd_epi16(d3, d3));
   }
   {
-    const __m256i ref23 = load_ref16_8x2(rr + 2 * ref_stride, ref_stride);
-    const __m256i d0 = _mm256_sub_epi16(r_23, ref23);
+    const __m256i ref02 = load_ref16_pair_4r(rr, rr + 2 * ref_stride);
+    const __m256i d0 = _mm256_sub_epi16(r_02, ref02);
     *v_sse0 = _mm256_add_epi32(*v_sse0, _mm256_madd_epi16(d0, d0));
     const __m256i d1 =
         _mm256_add_epi16(d0, finish_delta_fast(unpack_i8_hi_s16(sum_sec0)));
@@ -1282,10 +1295,10 @@ static inline void finish_split_4r_i8(__m256i r_01, __m256i r_23,
     const __m256i d2 = _mm256_add_epi16(d0, finish_delta_fast(pri16));
     *v_sse2 = _mm256_add_epi32(*v_sse2, _mm256_madd_epi16(d2, d2));
     const __m256i tot16 = _mm256_add_epi16(pri16, unpack_i8_hi_s16(sum_sec3));
-    __m256i res3 = _mm256_add_epi16(r_23, finish_delta_fast(tot16));
+    __m256i res3 = _mm256_add_epi16(r_02, finish_delta_fast(tot16));
     res3 = _mm256_min_epi16(_mm256_max_epi16(res3, unpack_u8_hi_u16(min_u8)),
                             unpack_u8_hi_u16(max_u8));
-    const __m256i d3 = _mm256_sub_epi16(res3, ref23);
+    const __m256i d3 = _mm256_sub_epi16(res3, ref02);
     *v_sse3 = _mm256_add_epi32(*v_sse3, _mm256_madd_epi16(d3, d3));
   }
 }
@@ -1296,8 +1309,12 @@ static inline void finish_all_same_4r_i8(__m256i r_01, __m256i r_23,
                                          __m256i max_u8, __m256i min_u8,
                                          __m256i *v_sse0, __m256i *v_sse1,
                                          __m256i *v_sse2, __m256i *v_sse3) {
+  const __m256i r_13 = _mm256_permute2x128_si256(r_01, r_23, 0x20);
+  const __m256i r_02 = _mm256_permute2x128_si256(r_01, r_23, 0x31);
   {
-    const __m256i d0 = _mm256_sub_epi16(r_01, load_ref16_8x2(rr, ref_stride));
+    const __m256i ref13 =
+        load_ref16_pair_4r(rr + ref_stride, rr + 3 * ref_stride);
+    const __m256i d0 = _mm256_sub_epi16(r_13, ref13);
     *v_sse0 = _mm256_add_epi32(*v_sse0, _mm256_madd_epi16(d0, d0));
     const __m256i sec16 = unpack_i8_lo_s16(sum_sec);
     const __m256i d1 = _mm256_add_epi16(d0, finish_delta_fast(sec16));
@@ -1306,15 +1323,15 @@ static inline void finish_all_same_4r_i8(__m256i r_01, __m256i r_23,
     const __m256i d2 = _mm256_add_epi16(d0, finish_delta_fast(pri16));
     *v_sse2 = _mm256_add_epi32(*v_sse2, _mm256_madd_epi16(d2, d2));
     const __m256i tot16 = _mm256_add_epi16(pri16, sec16);
-    __m256i res3 = _mm256_add_epi16(r_01, finish_delta_fast(tot16));
+    __m256i res3 = _mm256_add_epi16(r_13, finish_delta_fast(tot16));
     res3 = _mm256_min_epi16(_mm256_max_epi16(res3, unpack_u8_lo_u16(min_u8)),
                             unpack_u8_lo_u16(max_u8));
-    const __m256i d3 = _mm256_add_epi16(d0, _mm256_sub_epi16(res3, r_01));
+    const __m256i d3 = _mm256_sub_epi16(res3, ref13);
     *v_sse3 = _mm256_add_epi32(*v_sse3, _mm256_madd_epi16(d3, d3));
   }
   {
-    const __m256i ref23 = load_ref16_8x2(rr + 2 * ref_stride, ref_stride);
-    const __m256i d0 = _mm256_sub_epi16(r_23, ref23);
+    const __m256i ref02 = load_ref16_pair_4r(rr, rr + 2 * ref_stride);
+    const __m256i d0 = _mm256_sub_epi16(r_02, ref02);
     *v_sse0 = _mm256_add_epi32(*v_sse0, _mm256_madd_epi16(d0, d0));
     const __m256i sec16 = unpack_i8_hi_s16(sum_sec);
     const __m256i d1 = _mm256_add_epi16(d0, finish_delta_fast(sec16));
@@ -1323,10 +1340,10 @@ static inline void finish_all_same_4r_i8(__m256i r_01, __m256i r_23,
     const __m256i d2 = _mm256_add_epi16(d0, finish_delta_fast(pri16));
     *v_sse2 = _mm256_add_epi32(*v_sse2, _mm256_madd_epi16(d2, d2));
     const __m256i tot16 = _mm256_add_epi16(pri16, sec16);
-    __m256i res3 = _mm256_add_epi16(r_23, finish_delta_fast(tot16));
+    __m256i res3 = _mm256_add_epi16(r_02, finish_delta_fast(tot16));
     res3 = _mm256_min_epi16(_mm256_max_epi16(res3, unpack_u8_hi_u16(min_u8)),
                             unpack_u8_hi_u16(max_u8));
-    const __m256i d3 = _mm256_sub_epi16(res3, ref23);
+    const __m256i d3 = _mm256_sub_epi16(res3, ref02);
     *v_sse3 = _mm256_add_epi32(*v_sse3, _mm256_madd_epi16(d3, d3));
   }
 }
@@ -1336,20 +1353,23 @@ static inline void finish_t0_same_4r_i8(__m256i r_01, __m256i r_23,
                                         __m256i sum_sec0, __m256i *v_sse0,
                                         __m256i *v_sse1, __m256i *v_sse2,
                                         __m256i *v_sse3) {
-  const __m256i d0_01 = _mm256_sub_epi16(r_01, load_ref16_8x2(rr, ref_stride));
-  const __m256i d0_23 =
-      _mm256_sub_epi16(r_23, load_ref16_8x2(rr + 2 * ref_stride, ref_stride));
-  const __m256i s0 = _mm256_add_epi32(_mm256_madd_epi16(d0_01, d0_01),
-                                      _mm256_madd_epi16(d0_23, d0_23));
+  const __m256i r_13 = _mm256_permute2x128_si256(r_01, r_23, 0x20);
+  const __m256i r_02 = _mm256_permute2x128_si256(r_01, r_23, 0x31);
+  const __m256i d0_13 = _mm256_sub_epi16(
+      r_13, load_ref16_pair_4r(rr + ref_stride, rr + 3 * ref_stride));
+  const __m256i d0_02 =
+      _mm256_sub_epi16(r_02, load_ref16_pair_4r(rr, rr + 2 * ref_stride));
+  const __m256i s0 = _mm256_add_epi32(_mm256_madd_epi16(d0_13, d0_13),
+                                      _mm256_madd_epi16(d0_02, d0_02));
   *v_sse0 = _mm256_add_epi32(*v_sse0, s0);
   *v_sse2 = _mm256_add_epi32(*v_sse2, s0);
 
-  const __m256i d1_01 =
-      _mm256_add_epi16(d0_01, finish_delta_fast(unpack_i8_lo_s16(sum_sec0)));
-  const __m256i d1_23 =
-      _mm256_add_epi16(d0_23, finish_delta_fast(unpack_i8_hi_s16(sum_sec0)));
-  const __m256i s1 = _mm256_add_epi32(_mm256_madd_epi16(d1_01, d1_01),
-                                      _mm256_madd_epi16(d1_23, d1_23));
+  const __m256i d1_13 =
+      _mm256_add_epi16(d0_13, finish_delta_fast(unpack_i8_lo_s16(sum_sec0)));
+  const __m256i d1_02 =
+      _mm256_add_epi16(d0_02, finish_delta_fast(unpack_i8_hi_s16(sum_sec0)));
+  const __m256i s1 = _mm256_add_epi32(_mm256_madd_epi16(d1_13, d1_13),
+                                      _mm256_madd_epi16(d1_02, d1_02));
   *v_sse1 = _mm256_add_epi32(*v_sse1, s1);
   *v_sse3 = _mm256_add_epi32(*v_sse3, s1);
 }
@@ -1359,8 +1379,11 @@ static inline void finish_t0_split_4r_i8(__m256i r_01, __m256i r_23,
                                          __m256i sum_sec0, __m256i sum_secd,
                                          __m256i *v_sse0, __m256i *v_sse1,
                                          __m256i *v_sse2, __m256i *v_sse3) {
+  const __m256i r_13 = _mm256_permute2x128_si256(r_01, r_23, 0x20);
+  const __m256i r_02 = _mm256_permute2x128_si256(r_01, r_23, 0x31);
   {
-    const __m256i d0 = _mm256_sub_epi16(r_01, load_ref16_8x2(rr, ref_stride));
+    const __m256i d0 = _mm256_sub_epi16(
+        r_13, load_ref16_pair_4r(rr + ref_stride, rr + 3 * ref_stride));
     const __m256i s0 = _mm256_madd_epi16(d0, d0);
     *v_sse0 = _mm256_add_epi32(*v_sse0, s0);
     *v_sse2 = _mm256_add_epi32(*v_sse2, s0);
@@ -1373,7 +1396,7 @@ static inline void finish_t0_split_4r_i8(__m256i r_01, __m256i r_23,
   }
   {
     const __m256i d0 =
-        _mm256_sub_epi16(r_23, load_ref16_8x2(rr + 2 * ref_stride, ref_stride));
+        _mm256_sub_epi16(r_02, load_ref16_pair_4r(rr, rr + 2 * ref_stride));
     const __m256i s0 = _mm256_madd_epi16(d0, d0);
     *v_sse0 = _mm256_add_epi32(*v_sse0, s0);
     *v_sse2 = _mm256_add_epi32(*v_sse2, s0);
