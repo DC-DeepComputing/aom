@@ -1,0 +1,22 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "62da7f54_536943f0",
+        "filename": "aom_dsp/bitwriter_buffer.h",
+        "patchSetId": 13
+      },
+      "lineNbr": 25,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-12T17:47:09Z",
+      "side": 1,
+      "message": "Wrapping `bitwriter_buffer.h` in `#pragma GCC visibility push(hidden)` marks `aom_wb_write_unsigned_literal` as `STV_HIDDEN`, which breaks ELF `-DBUILD_SHARED_LIBS\u003d1` builds when linking `svc_encoder_rtc` (`examples/svc_encoder_rtc.cc:1433` calls `aom_wb_write_unsigned_literal` and previously resolved it via `libaom_av1_rc.so`). Either inline `aom_wb_write_unsigned_literal` in this header alongside `aom_wb_write_literal`, or drop the `visibility push(hidden)` pragma here (`libaom.so` already hides `aom_wb_*` via its version script).",
+      "isAi": true,
+      "revId": "6649059584100663bc6842647ad915891386ac41",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
