@@ -1,0 +1,28 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "e3878593_e6e3ae85",
+        "filename": "av1/encoder/encoder.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 984,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-12T21:06:20Z",
+      "side": 1,
+      "message": "The `mv_costs` changes look good, thanks! Auditing the other `key_freq_max \u003d\u003d 0` paths when `kf_max_dist` changes via `aom_codec_enc_config_set()` turned up a few remaining ASan crashes—could we address those as well?\n- `av1_change_config()` (`encoder.c:992`) allocates `comp_rd_buffer` and `tmp_pred_bufs` on `0 -\u003e \u003e0`, but omits `obmc_buffer` (crashing `REALTIME` speeds 5–6) and `av1_setup_sms_tree()` (crashing RD mode); and `av1_free_sms_tree()` (`context_tree.c:301`) leaves `td-\u003esms_root` dangling when `av1_setup_sms_tree()` skips `key_freq_max \u003d\u003d 0` (same UAF pattern as `mv_costs`).\n- Worker threads (`ethread.c:1002, 1027`) keep `NULL` `tmp_pred_bufs`/`comp_rd_buffer`/`obmc_buffer`/`sms_tree` on `0 -\u003e \u003e0` when `num_workers` doesn\u0027t grow, and `ppi-\u003elookahead` (`av1_cx_iface.c:3548`) keeps `max_pre_frames \u003d\u003d 0` when `lag_in_frames \u003e 0`.\\n- With `AOM_KF_DISABLED` or `kf_min_dist \u003d\u003d kf_max_dist`, `0 -\u003e \u003e0` codes an inter frame (`border_in_pixels` \u003d 96/160) against a 64-px `AOM_ENC_ALLINTRA_BORDER` reference (which CL 219901 fixes, unless `encoder_set_config()` also forces a keyframe on `0 -\u003e \u003e0`).",
+      "range": {
+        "startLine": 977,
+        "startChar": 0,
+        "endLine": 984,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "9e051b790a302885b34c148621b2530d7a39e727",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
