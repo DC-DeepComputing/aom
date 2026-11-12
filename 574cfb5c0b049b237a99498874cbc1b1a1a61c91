@@ -19,6 +19,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "0d2a2cc3_d3d99c4e",
+        "filename": "av1/common/reconintra.c",
+        "patchSetId": 13
+      },
+      "lineNbr": 1180,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-11-12T00:56:32Z",
+      "side": 1,
+      "message": "Done. Started the tail memset at above_row + num_top_pixels_needed and left_col + num_left_pixels_needed (gated on need_above / need_left, zeroing through txwpx + txhpx + tail_zero) in both build_directional_and_filter_intra_predictors and highbd_build_directional_and_filter_intra_predictors, and verified under Clang MemorySanitizer (-fsanitize\u003dmemory).",
+      "parentUuid": "cad4577c_da0f849b",
+      "revId": "574cfb5c0b049b237a99498874cbc1b1a1a61c91",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "9cbc4f13_6bd84594",
@@ -33,6 +51,24 @@
       "side": 1,
       "message": "Changing this to `else if` skips `prune_tx_2D` when `prune_tx_type_est_rd \u003d\u003d 1`, `num_allowed \u003d\u003d 2`, `is_inter \u003d\u003d 1`, and `prune_2d_txfm_mode \u003e\u003d TX_TYPE_PRUNE_4` (`allowed_tx_count \u003d\u003d 1`). Previously (`if (num_allowed \u003e 2 \u0026\u0026 prune_tx_type_est_rd) ... else ...`), `num_allowed \u003d\u003d 2` fell through to the `else` branch and invoked `prune_tx_2D`—which happens in good-quality speed 4 on `\u003e\u003d 480p` inter frames when `prune_tx_type_using_stats` leaves 2 candidates and `winner_mode_tx_type_pruning \u003d\u003d 2` sets `TX_TYPE_PRUNE_4`, breaking bit-exactness on inter video. Please allow the `num_allowed \u003c\u003d 2` case to fall through to the `prune_tx_2D` check.",
       "isAi": true,
+      "revId": "574cfb5c0b049b237a99498874cbc1b1a1a61c91",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "2a5450aa_65c5d84c",
+        "filename": "av1/encoder/tx_search.c",
+        "patchSetId": 13
+      },
+      "lineNbr": 1925,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-11-12T00:56:32Z",
+      "side": 1,
+      "message": "Done. Combined the outer guard so num_allowed is computed once when either prune_tx_type_est_rd or (prune_2d_txfm_mode \u003e\u003d TX_TYPE_PRUNE_1 \u0026\u0026 is_inter) is active, allowing num_allowed \u003c\u003d 2 to fall through to the prune_tx_2D check on inter frames.",
+      "parentUuid": "9cbc4f13_6bd84594",
       "revId": "574cfb5c0b049b237a99498874cbc1b1a1a61c91",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
