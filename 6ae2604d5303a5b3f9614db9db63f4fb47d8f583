@@ -37,6 +37,25 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "408cbba2_6e9f65d0",
+        "filename": "aom_dsp/variance_hwy.h",
+        "patchSetId": 7
+      },
+      "lineNbr": 159,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-12T17:59:23Z",
+      "side": 1,
+      "message": "Verified, thanks!",
+      "parentUuid": "bfc762b2_afe8fe9a",
+      "isAi": true,
+      "revId": "6ae2604d5303a5b3f9614db9db63f4fb47d8f583",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "3ab2c9c3_b52e67ca",
@@ -69,6 +88,25 @@
       "side": 1,
       "message": "Done. Added `bw \u003c\u003d 0 || bh \u003c\u003d 0` and `bw % kLanes !\u003d 0` / `bw % kCols !\u003d 0` fallback checks in `GetBlkSseSum`, `CalcVarianceStat`, and `HighbdCalcVarianceStat`.",
       "parentUuid": "3ab2c9c3_b52e67ca",
+      "revId": "6ae2604d5303a5b3f9614db9db63f4fb47d8f583",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "5524cbf5_4c7e88a4",
+        "filename": "aom_dsp/variance_hwy.h",
+        "patchSetId": 7
+      },
+      "lineNbr": 203,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-12T17:59:23Z",
+      "side": 1,
+      "message": "Verified, thanks!",
+      "parentUuid": "b7e52891_f36e1c12",
+      "isAi": true,
       "revId": "6ae2604d5303a5b3f9614db9db63f4fb47d8f583",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
@@ -109,6 +147,25 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "c957f576_affc7607",
+        "filename": "aom_dsp/variance_hwy.h",
+        "patchSetId": 7
+      },
+      "lineNbr": 216,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-12T17:59:23Z",
+      "side": 1,
+      "message": "Verified, thanks!",
+      "parentUuid": "c17e4643_7a2babbe",
+      "isAi": true,
+      "revId": "6ae2604d5303a5b3f9614db9db63f4fb47d8f583",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "85cc5d4d_4e9d0508",
@@ -141,6 +198,25 @@
       "side": 1,
       "message": "Done. Added `|| (CONFIG_HIGHWAY \u0026\u0026 HAVE_AVX512)` to the guards in `test/variance_test.cc` and `test/sum_squares_test.cc`.",
       "parentUuid": "85cc5d4d_4e9d0508",
+      "revId": "6ae2604d5303a5b3f9614db9db63f4fb47d8f583",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "f8dbdbe4_5de8a0c9",
+        "filename": "test/variance_test.cc",
+        "patchSetId": 7
+      },
+      "lineNbr": 3983,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-12T17:59:23Z",
+      "side": 1,
+      "message": "Verified, thanks!",
+      "parentUuid": "a4ec0bf1_be8535d5",
+      "isAi": true,
       "revId": "6ae2604d5303a5b3f9614db9db63f4fb47d8f583",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
