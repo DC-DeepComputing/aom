@@ -977,6 +977,23 @@ static inline tran_low_t *sby_cfl_qcoeff_buf(SbyCflState *s) {
   return (tran_low_t *)(((uintptr_t)s->qcoeff_raw + 31) & ~(uintptr_t)31);
 }
 
+/*!\brief Zero-copy in-place chroma state left by the winning candidate of
+ * av1_rd_pick_intra_sbuv_mode() for reuse by encode_block_intra().
+ */
+typedef struct SbuvLiveState {
+  int16_t mi_row;
+  int16_t mi_col;
+  // 0: invalid, 1: armed for U/V reuse, 2: validated for current block.
+  uint8_t valid;
+  // Bit 0..1: has_coeff[U/V - 1], 2..4: cfl_alpha_signs, 5..7: segment_id.
+  uint8_t has_coeff_mask;
+  uint8_t bsize;
+  uint8_t tx_size;
+  uint8_t uv_mode;
+  int8_t angle_delta;
+  uint8_t cfl_alpha_idx;
+} SbuvLiveState;
+
 /*!\endcond */
 
 //! Maximum number of estimated RD Cost records for compound average.
@@ -1612,6 +1629,9 @@ typedef struct macroblock {
   CflLumaLive out_reuse_sub1_cfl;
   /*!\brief State captured from WINNER_MODE_EVAL for CfL Pass-1 reuse. */
   SbyCflState sby_cfl;
+  /*!\brief Zero-copy in-place chroma state from
+   * av1_rd_pick_intra_sbuv_mode(). */
+  SbuvLiveState sbuv_live;
 } MACROBLOCK;
 #undef SINGLE_REF_MODES
 

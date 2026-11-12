@@ -463,6 +463,12 @@ static inline int av1_cfl_luma_live_match(const MACROBLOCK *x,
   return av1_cfl_luma_live_match_k(x, &x->cfl_luma_live, bsize);
 }
 
+/*!\cond */
+struct intra_b_args;
+int av1_sbuv_live_prepare(struct intra_b_args *args, int sub_blk,
+                          TX_TYPE *tx_type_out);
+/*!\endcond */
+
 static inline int is_trellis_used(TRELLIS_OPT_TYPE optimize_b,
                                   RUN_TYPE dry_run) {
   if (optimize_b == NO_TRELLIS_OPT) return false;

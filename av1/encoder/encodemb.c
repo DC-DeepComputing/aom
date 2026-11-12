@@ -674,10 +674,19 @@ static void encode_block_intra(struct intra_b_args *const args, int block,
   uint16_t *eob = &p->eobs[block];
   const int dst_stride = pd->dst.stride;
   uint8_t *dst = &pd->dst.buf[(blk_row * dst_stride + blk_col) << MI_SIZE_LOG2];
+  TX_TYPE tx_type = DCT_DCT;
+
+  if (UNLIKELY(
+          plane != 0 && x->sbuv_live.valid &&
+          av1_sbuv_live_prepare(args, block | blk_row | blk_col, &tx_type))) {
+    if (!xd->mi[0]->skip_txfm) goto SBUV_QUANT;
+    *eob = 0;
+    p->txb_entropy_ctx[block] = 0;
+    return;
+  }
 
   av1_predict_intra_block_facade(cm, xd, plane, blk_col, blk_row, tx_size);
 
-  TX_TYPE tx_type = DCT_DCT;
   if (xd->mi[0]->skip_txfm) {
     *eob = 0;
     p->txb_entropy_ctx[block] = 0;
@@ -702,6 +711,7 @@ static void encode_block_intra(struct intra_b_args *const args, int block,
 
     av1_fwd_txfm(src_diff, p->coeff + BLOCK_OFFSET(block), diff_stride,
                  &args->txfm_param);
+  SBUV_QUANT:
     av1_quant(x, plane, block, &args->txfm_param, &args->quant_param);
     if (args->use_trellis) {
       TXB_CTX txb_ctx;
@@ -819,4 +829,96 @@ void av1_encode_intra_block_plane(const struct AV1_COMP *cpi, MACROBLOCK *x,
       }
     }
   }
+}
+
+int av1_sbuv_live_prepare(struct intra_b_args *args, int sub_blk,
+                          TX_TYPE *tx_type_out) {
+  assert(args != NULL && args->x != NULL && tx_type_out != NULL);
+#if HAVE_AVX2 && !CONFIG_HIGHWAY && !CONFIG_REALTIME_ONLY && \
+    !CONFIG_COLLECT_RD_STATS &&                              \
+    (!defined(COLLECT_TX_SIZE_DATA) || !COLLECT_TX_SIZE_DATA)
+  MACROBLOCK *const x = args->x;
+  SbuvLiveState *const s = &x->sbuv_live;
+  const MACROBLOCKD *const xd = &x->e_mbd;
+  const MB_MODE_INFO *const mbmi = xd->mi[0];
+  const int plane = args->plane;
+  const BLOCK_SIZE plane_bsize = args->plane_bsize;
+  const TX_SIZE tx_size = args->tx_size;
+  assert(args->cpi != NULL && mbmi != NULL);
+  assert(plane == AOM_PLANE_U || plane == AOM_PLANE_V);
+  assert((unsigned)plane_bsize < BLOCK_SIZES_ALL);
+  assert((unsigned)tx_size < TX_SIZES_ALL);
+  if (sub_blk != 0 || plane_bsize != txsize_to_bsize[tx_size] ||
+      s->tx_size != (uint8_t)tx_size) {
+    s->valid = 0;
+    return 0;
+  }
+  if (s->valid != 2) {
+    const AV1_COMP *const cpi = args->cpi;
+    const AV1_COMMON *const cm = &cpi->common;
+    const TxfmSearchParams *const tp = &x->txfm_search_params;
+    int simd_fast = 1;
+#if CONFIG_RUNTIME_CPU_DETECT && !defined(aom_subtract_block)
+    simd_fast &= (aom_subtract_block == aom_subtract_block_avx2);
+#endif
+#if CONFIG_RUNTIME_CPU_DETECT && !defined(aom_sum_sse_2d_i16)
+    simd_fast &= (aom_sum_sse_2d_i16 == aom_sum_sse_2d_i16_avx2);
+#endif
+#if CONFIG_RUNTIME_CPU_DETECT && !defined(cfl_get_subtract_average_fn)
+    simd_fast &=
+        (cfl_get_subtract_average_fn == cfl_get_subtract_average_fn_avx2);
+#endif
+#if CONFIG_RUNTIME_CPU_DETECT && !defined(cfl_get_predict_lbd_fn)
+    simd_fast &= (cfl_get_predict_lbd_fn == cfl_get_predict_lbd_fn_avx2);
+#endif
+#if CONFIG_RUNTIME_CPU_DETECT && !defined(av1_lowbd_fwd_txfm)
+    simd_fast &= (av1_lowbd_fwd_txfm == av1_lowbd_fwd_txfm_avx2);
+#endif
+#if CONFIG_RUNTIME_CPU_DETECT && !defined(aom_satd)
+    simd_fast &= (aom_satd == aom_satd_avx2);
+#endif
+    if (!simd_fast || !frame_is_intra_only(cm) || av1_allow_intrabc(cm) ||
+        cpi->sf.rt_sf.use_nonrd_pick_mode || is_stat_generation_stage(cpi) ||
+        cpi->oxcf.pass != AOM_RC_ONE_PASS || is_cur_buf_hbd(xd) ||
+        xd->bd != 8 || xd->lossless[mbmi->segment_id] || x->seg_skip_block ||
+        cpi->do_border_pad || tp->predict_dc_level > 1 ||
+        x->rd_model == LOW_TXFM_RD ||
+        cpi->sf.rt_sf.dct_only_palette_nonrd == 1 ||
+        cpi->oxcf.txfm_cfg.use_intra_dct_only ||
+        cpi->sf.tx_sf.tx_type_search.use_reduced_intra_txset == 2 ||
+        s->mi_row != (int16_t)xd->mi_row || s->mi_col != (int16_t)xd->mi_col ||
+        s->bsize != (uint8_t)mbmi->bsize ||
+        ((tx_size_wide[tx_size] | tx_size_high[tx_size]) & 64) != 0 ||
+        s->uv_mode != (uint8_t)mbmi->uv_mode ||
+        s->angle_delta != mbmi->angle_delta[PLANE_TYPE_UV] ||
+        s->cfl_alpha_idx != mbmi->cfl_alpha_idx ||
+        (s->has_coeff_mask >> 2) != (uint8_t)((mbmi->cfl_alpha_signs & 7) |
+                                              ((mbmi->segment_id & 7) << 3)) ||
+        mbmi->palette_mode_info.palette_size[1] != 0 ||
+        (x->pix_to_bottom_edge | x->pix_to_right_edge) < 0) {
+      s->valid = 0;
+      return 0;
+    }
+    s->valid = 2;
+  }
+  if (mbmi->skip_txfm) return 1;
+  const TX_TYPE tx_type = (txsize_sqr_up_map[tx_size] == TX_32X32)
+                              ? DCT_DCT
+                              : intra_mode_to_tx_type(mbmi, PLANE_TYPE_UV);
+  *tx_type_out = tx_type;
+  args->txfm_param.tx_type = tx_type;
+  args->quant_param.qmatrix = (tx_type < IDTX) ? args->seg_qmatrix : NULL;
+  args->quant_param.iqmatrix = (tx_type < IDTX) ? args->seg_iqmatrix : NULL;
+  if (!((s->has_coeff_mask >> (plane - 1)) & 1u)) {
+    struct macroblock_plane *const p = &x->plane[plane];
+    av1_fwd_txfm(p->src_diff, p->coeff, block_size_wide[plane_bsize],
+                 &args->txfm_param);
+  }
+  return 1;
+#else
+  (void)sub_blk;
+  (void)tx_type_out;
+  args->x->sbuv_live.valid = 0;
+  return 0;
+#endif
 }

@@ -527,10 +527,14 @@ static void encode_superblock(const AV1_COMP *const cpi, TileDataEnc *tile_data,
       start_plane = 1;
 #endif
     }
+    if (start_plane == 0 && mbmi->uv_mode == UV_CFL_PRED) {
+      x->sbuv_live.valid = 0;
+    }
     for (int plane = start_plane; plane < max_planes; ++plane) {
       av1_encode_intra_block_plane(cpi, x, bsize, plane, dry_run,
                                    enable_trellis);
     }
+    x->sbuv_live.valid = 0;
 
     // If there is at least one lossless segment, force the skip for intra
     // block to be 0, in order to avoid the segment_id to be changed by in
@@ -1509,6 +1513,7 @@ static void pick_sb_modes_ex(AV1_COMP *const cpi, TileDataEnc *tile_data,
                              const RD_STATS *best_rd_in, int fast_intra_sb) {
   RD_STATS best_rd = *best_rd_in;
   x->cfl_luma_live.valid = 0;
+  x->sbuv_live.valid = 0;
   ++x->live_epoch;
   if (cpi->sf.part_sf.use_best_rd_for_pruning && best_rd.rdcost < 0) {
     ctx->rd_stats.rdcost = INT64_MAX;
@@ -2697,6 +2702,7 @@ void av1_rd_use_partition(AV1_COMP *cpi, ThreadData *td, TileDataEnc *tile_data,
   x->out_reuse_sub1_cfl.valid = 0;
   x->sby_cfl.valid = 0;
   x->sby_cfl.track = 0;
+  x->sbuv_live.valid = 0;
   for (int i = 0; i < 3; ++i) {
     x->cfl_luma_snap[i].k.valid = 0;
     x->cfl_luma_snap[i].open = 0;
@@ -6505,6 +6511,7 @@ static RD_STATS rd_search_for_fixed_partition(
   x->out_reuse_sub1_cfl.valid = 0;
   x->sby_cfl.valid = 0;
   x->sby_cfl.track = 0;
+  x->sbuv_live.valid = 0;
   for (int i = 0; i < 3; ++i) {
     x->cfl_luma_snap[i].k.valid = 0;
     x->cfl_luma_snap[i].open = 0;
@@ -8375,6 +8382,7 @@ BEGIN_PARTITION_SEARCH:
       x->out_reuse_rect = NULL;
       x->out_reuse_cfl = 0;
       x->out_reuse_sub1_cfl.valid = 0;
+      x->sbuv_live.valid = 0;
       x->cfl_luma_snap[0].k.valid = 0;
       x->cfl_luma_snap[1].k.valid = 0;
       x->cfl_luma_snap[2].k.valid = 0;
@@ -8460,6 +8468,7 @@ static void release_sb_arena_tree(const PartSearchFixedCtx *sctx) {
   td->mb.out_reuse_sub1_cfl.valid = 0;
   td->mb.sby_cfl.valid = 0;
   td->mb.sby_cfl.track = 0;
+  memset(&td->mb.sbuv_live, 0, sizeof(td->mb.sbuv_live));
   for (int i = 0; i < 3; ++i) {
     td->mb.cfl_luma_snap[i].k.valid = 0;
     td->mb.cfl_luma_snap[i].deferred_epoch = 0;
@@ -8580,6 +8589,7 @@ bool av1_rd_pick_partition(AV1_COMP *const cpi, ThreadData *td,
   td->mb.cfl_luma_live.valid = 0;
   td->mb.sby_cfl.valid = 0;
   td->mb.sby_cfl.track = 0;
+  memset(&td->mb.sbuv_live, 0, sizeof(td->mb.sbuv_live));
   for (int i = 0; i < 3; ++i) {
     td->mb.cfl_luma_snap[i].k.valid = 0;
     td->mb.cfl_luma_snap[i].deferred_epoch = 0;
