@@ -19,6 +19,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "7f75637a_b526f0a6",
+        "filename": "aom_dsp/variance_hwy.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 434,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-12T19:22:48Z",
+      "side": 1,
+      "message": "Done.",
+      "parentUuid": "f91f8e88_be389fc4",
+      "revId": "3e2391e9732ad68e3c568a25ab06cd0796cb1203",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "fa781397_12196788",
@@ -43,6 +61,30 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "47722105_9453d158",
+        "filename": "aom_dsp/variance_hwy.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 719,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-12T19:22:48Z",
+      "side": 1,
+      "message": "Done. Extracted SubPelVertLoop parameterized by the horizontal row loader lambda and used HWY_IF_CONSTEXPR(HasSec) consistently across all branches.",
+      "parentUuid": "fa781397_12196788",
+      "range": {
+        "startLine": 534,
+        "startChar": 0,
+        "endLine": 719,
+        "endChar": 9999
+      },
+      "revId": "3e2391e9732ad68e3c568a25ab06cd0796cb1203",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "faa99f05_d9d5112e",
@@ -63,6 +105,30 @@
         "endChar": 9999
       },
       "isAi": true,
+      "revId": "3e2391e9732ad68e3c568a25ab06cd0796cb1203",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "2bf3297b_0a13e43d",
+        "filename": "aom_dsp/variance_hwy.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 836,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-12T19:22:48Z",
+      "side": 1,
+      "message": "Done. Unified SubPixel{Avg}Variance32xH and SubPixel{Avg}Variance64Or128 into a single SubPixelVarianceWxH\u003cBlockWidth, BlockHeight, ChunkHeight, WLog2, HLog2, HasSec\u003e template.",
+      "parentUuid": "faa99f05_d9d5112e",
+      "range": {
+        "startLine": 760,
+        "startChar": 0,
+        "endLine": 836,
+        "endChar": 9999
+      },
       "revId": "3e2391e9732ad68e3c568a25ab06cd0796cb1203",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
