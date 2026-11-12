@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "f26370fb_738147d2",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 4810955
+      },
+      "writtenOn": "2026-11-12T20:38:15Z",
+      "side": 1,
+      "message": "Done. Each ISA\u0027s tests are now wrapped in #if HAVE_SSE4_1 / #if HAVE_AVX2\nwith no else branch.",
+      "revId": "063dff348d33f59b1126a029221eb2e03f70c066",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
