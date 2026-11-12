@@ -1,0 +1,46 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "07bd5304_41910f13",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-12T21:34:01Z",
+      "side": 1,
+      "message": "Nit: Moving `#include \u003cstring.h\u003e` (and `AOM_MEM_PLTFRM`) to the top of `aom_mem/aom_mem.h` also avoids including standard headers inside `extern \"C\" { ... }` in C++ translation units. Also, if you have `Benchmarking results` matching the preceding CLs in this stack (219188-219203), consider including them here for consistency.",
+      "isAi": true,
+      "revId": "3f93f2bcf18f91df39434edb4f05f2616cd7329e",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "7c304675_c7c4a65b",
+        "filename": "aom_mem/aom_mem.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 78,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-12T21:34:01Z",
+      "side": 1,
+      "message": "Nit: Lines 74-78 duplicate the post-allocation alignment and header-pointer storage logic from `aom_memalign` (lines 59-62). Consider factoring out a small helper (e.g. `align_and_set_malloc_addr(void *addr, size_t align)`) so the `ADDRESS_STORAGE_SIZE` / `SetActualMallocAddress` layout stays in one place. Also consider adding a positive `aom_calloc` test in `test/aom_mem_test.cc` (which currently only tests overflow/`nullptr` cases) checking alignment, zero-initialization across `num * size` bytes, and `aom_free`.",
+      "range": {
+        "startLine": 74,
+        "startChar": 0,
+        "endLine": 78,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "3f93f2bcf18f91df39434edb4f05f2616cd7329e",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
