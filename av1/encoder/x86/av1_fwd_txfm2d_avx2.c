@@ -5239,6 +5239,7 @@ uint64_t av1_sub_sum_sse_lbd_avx2(const uint8_t *src, int src_stride,
   const intptr_t fs = (intptr_t)(dims_pack & 0xffffu);
   int r = (int)(dims_pack >> 24);
   const uint8_t bsw = (uint8_t)((dims_pack >> 16) & 0xffu);
+  assert(src != NULL && dst != NULL && diff != NULL);
   assert(bsw == 4 || bsw == 8 || bsw == 16 || bsw == 32);
   assert(r == 4 || r == 8 || r == 16 || r == 32);
   assert(fs >= (intptr_t)bsw);
@@ -5400,10 +5401,11 @@ uint64_t av1_sub_sum_sse_lbd_avx2(const uint8_t *src, int src_stride,
       diff += 2 * fs;
     } while ((r -= 2) > 0);
   }
-  const __m256i one = _mm256_srli_epi16(_mm256_cmpeq_epi16(v_sse, v_sse), 15);
-  const __m256i v_sum = _mm256_madd_epi16(v_sum16, one);
-  const __m128i sum128 = _mm_add_epi32(_mm256_castsi256_si128(v_sum),
-                                       _mm256_extracti128_si256(v_sum, 1));
+  // Max 32x32 block accumulates 128 diffs per int16 lane after 256->128 fold;
+  // 128 * 255 = 32640 <= 32767 fits in signed int16 without overflow.
+  const __m128i sum16 = _mm_add_epi16(_mm256_castsi256_si128(v_sum16),
+                                      _mm256_extracti128_si256(v_sum16, 1));
+  const __m128i sum128 = _mm_madd_epi16(sum16, _mm_set1_epi16(1));
   const __m128i sse128 = _mm_add_epi32(_mm256_castsi256_si128(v_sse),
                                        _mm256_extracti128_si256(v_sse, 1));
   __m128i p = _mm_add_epi32(_mm_unpacklo_epi32(sse128, sum128),

@@ -9,6 +9,7 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
+#include <assert.h>
 #include <immintrin.h>
 
 #include "config/av1_rtcd.h"
@@ -265,23 +266,30 @@ void av1_quantize_fp_avx2(const tran_low_t *coeff_ptr, intptr_t n_coeffs,
   (void)scan_ptr;
   (void)zbin_ptr;
   (void)quant_shift_ptr;
+  assert(coeff_ptr != NULL && round_ptr != NULL && quant_ptr != NULL);
+  assert(qcoeff_ptr != NULL && dqcoeff_ptr != NULL && dequant_ptr != NULL);
+  assert(eob_ptr != NULL && iscan_ptr != NULL);
+  assert(n_coeffs >= 16 && (n_coeffs & 15) == 0);
 
   const __m256i v_zero = _mm256_setzero_si256();
-  const __m128i rnd128 = _mm_loadu_si128((const __m128i *)round_ptr);
-  const __m128i q128 = _mm_loadu_si128((const __m128i *)quant_ptr);
-  const __m128i dq128 = _mm_loadu_si128((const __m128i *)dequant_ptr);
   __m256i qp[3];
-  init_one_qp(&rnd128, &qp[0]);
-  init_one_qp(&q128, &qp[1]);
-  init_one_qp(&dq128, &qp[2]);
+  qp[0] = _mm256_permute4x64_epi64(
+      _mm256_castsi128_si256(_mm_loadu_si128((const __m128i *)round_ptr)),
+      0x54);
+  qp[1] = _mm256_permute4x64_epi64(
+      _mm256_castsi128_si256(_mm_loadu_si128((const __m128i *)quant_ptr)),
+      0x54);
+  qp[2] = _mm256_permute4x64_epi64(
+      _mm256_castsi128_si256(_mm_loadu_si128((const __m128i *)dequant_ptr)),
+      0x54);
 
   __m256i eob = quantize_fp_16_dc(qp, v_zero, coeff_ptr, iscan_ptr, qcoeff_ptr,
                                   dqcoeff_ptr);
 
   if (n_coeffs > 16) {
-    qp[0] = _mm256_set1_epi16(round_ptr[1]);
-    qp[1] = _mm256_set1_epi16(quant_ptr[1]);
-    qp[2] = _mm256_set1_epi16(dequant_ptr[1]);
+    qp[0] = _mm256_permute4x64_epi64(qp[0], 0x55);
+    qp[1] = _mm256_permute4x64_epi64(qp[1], 0x55);
+    qp[2] = _mm256_permute4x64_epi64(qp[2], 0x55);
     const __m256i thr =
         _mm256_sub_epi16(_mm256_srai_epi16(qp[2], 1), _mm256_set1_epi16(1));
     intptr_t idx = 16;
@@ -562,7 +570,9 @@ static AOM_FORCE_INLINE __m256i quantize_fp_qm_8_log0_avx2(
       _mm256_add_epi32(_mm256_madd_epi16(v_dequant_base, v_iwt),
                        v_dequant_bias),
       AOM_QM_BITS);
-  const __m256i v_dqcoeff = _mm256_mullo_epi32(v_qcoeff, v_dequant);
+  // In 8-bit QM, v_dequant <= 14567 (high 16-bit halfword is 0) and |v_qcoeff|
+  // <= 32767 (high 16-bit sign-extension is 0 or -1, and (-1) * 0 == 0).
+  const __m256i v_dqcoeff = _mm256_madd_epi16(v_qcoeff, v_dequant);
   _mm256_storeu_si256((__m256i *)dqcoeff_ptr, v_dqcoeff);
 
   const __m256i v_nz = _mm256_cmpgt_epi32(v_tmp32, v_zero);
@@ -580,6 +590,13 @@ void av1_quantize_fp_qm_avx2(const tran_low_t *coeff_ptr, intptr_t n_coeffs,
                              const qm_val_t *qm_ptr, const qm_val_t *iqm_ptr,
                              int log_scale) {
   (void)scan_ptr;
+  assert(coeff_ptr != NULL && round_ptr != NULL && quant_ptr != NULL);
+  assert(qcoeff_ptr != NULL && dqcoeff_ptr != NULL && dequant_ptr != NULL);
+  assert(eob_ptr != NULL && iscan != NULL && qm_ptr != NULL && iqm_ptr != NULL);
+  assert(n_coeffs >= 16 && (n_coeffs & 7) == 0);
+  // 8-bit dequant_QTX <= 1828 ensures v_dequant <= 14567 <= INT16_MAX.
+  assert(dequant_ptr[0] >= 0 && dequant_ptr[0] <= 2047);
+  assert(dequant_ptr[1] >= 0 && dequant_ptr[1] <= 2047);
   const __m256i v_r_raw =
       _mm256_cvtepi16_epi32(_mm_loadu_si128((const __m128i *)round_ptr));
   const __m256i v_q_raw =
@@ -879,7 +896,9 @@ static AOM_FORCE_INLINE __m256i quantize_b_qm_8_log0_avx2(
       _mm256_add_epi32(_mm256_madd_epi16(v_dequant_base, v_iwt),
                        v_dequant_bias),
       AOM_QM_BITS);
-  const __m256i v_dqcoeff = _mm256_mullo_epi32(v_qcoeff, v_dequant);
+  // In 8-bit QM, v_dequant <= 14567 (high 16-bit halfword is 0) and |v_qcoeff|
+  // <= 32767 (high 16-bit sign-extension is 0 or -1, and (-1) * 0 == 0).
+  const __m256i v_dqcoeff = _mm256_madd_epi16(v_qcoeff, v_dequant);
   _mm256_storeu_si256((__m256i *)dqcoeff_ptr, v_dqcoeff);
 
   const __m256i v_nz = _mm256_cmpgt_epi32(v_tmp32, v_zero);
@@ -899,6 +918,14 @@ void av1_quantize_b_qm_avx2(const tran_low_t *coeff_ptr, intptr_t n_coeffs,
                             const qm_val_t *qm_ptr, const qm_val_t *iqm_ptr,
                             int log_scale) {
   (void)scan_ptr;
+  assert(coeff_ptr != NULL && round_ptr != NULL && quant_ptr != NULL);
+  assert(zbin_ptr != NULL && quant_shift_ptr != NULL);
+  assert(qcoeff_ptr != NULL && dqcoeff_ptr != NULL && dequant_ptr != NULL);
+  assert(eob_ptr != NULL && iscan != NULL && qm_ptr != NULL && iqm_ptr != NULL);
+  assert(n_coeffs >= 16 && (n_coeffs & 7) == 0);
+  // 8-bit dequant_QTX <= 1828 ensures v_dequant <= 14567 <= INT16_MAX.
+  assert(dequant_ptr[0] >= 0 && dequant_ptr[0] <= 2047);
+  assert(dequant_ptr[1] >= 0 && dequant_ptr[1] <= 2047);
   const __m256i v_z_raw =
       _mm256_cvtepi16_epi32(_mm_loadu_si128((const __m128i *)zbin_ptr));
   const __m256i v_r_raw =

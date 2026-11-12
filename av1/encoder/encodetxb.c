@@ -169,9 +169,10 @@ static AOM_FORCE_INLINE void update_cdf_2_local(aom_cdf_prob *cdf, int val) {
   if (LIKELY(count == 32)) {
     cdf[0] = (aom_cdf_prob)(c - mask + (((mask | CDF_PROB_TOP) - c) >> 6));
   } else {
+    assert((unsigned)count < 32);
     const int rate = 4 + (count >> 4);
     cdf[0] = (aom_cdf_prob)(c - mask + (((mask | CDF_PROB_TOP) - c) >> rate));
-    cdf[2] = (aom_cdf_prob)(count + (count < 32));
+    cdf[2] = (aom_cdf_prob)(count + 1);
   }
 }
 #endif  // !CONFIG_ENTROPY_STATS
@@ -190,8 +191,9 @@ static AOM_FORCE_INLINE void update_cdf_3_mask(aom_cdf_prob *cdf, uint32_t val,
   if (LIKELY(count == 32)) {
     delta = _mm_srai_epi16(diff, 6);
   } else {
+    assert((unsigned)count < 32);
     delta = _mm_sra_epi16(diff, _mm_cvtsi32_si128(4 + (count >> 4)));
-    cdf[3] = (aom_cdf_prob)(count + (count < 32));
+    cdf[3] = (aom_cdf_prob)(count + 1);
   }
   c0 = _mm_add_epi16(_mm_sub_epi16(c0, m0), delta);
   cdf32 = _mm_cvtsi128_si32(c0);
@@ -209,8 +211,9 @@ static AOM_FORCE_INLINE void update_cdf_4_mask(aom_cdf_prob *cdf, uint32_t val,
   if (LIKELY(count == 32)) {
     delta = _mm_srai_epi16(diff, 7);
   } else {
+    assert((unsigned)count < 32);
     delta = _mm_sra_epi16(diff, _mm_cvtsi32_si128(5 + (count >> 4)));
-    cdf[4] = (aom_cdf_prob)(count + (count < 32));
+    cdf[4] = (aom_cdf_prob)(count + 1);
   }
   c0 = _mm_add_epi16(_mm_sub_epi16(c0, m0), delta);
   _mm_storel_epi64((__m128i *)cdf, c0);
@@ -230,8 +233,9 @@ TXB_NOINLINE_FN static void update_cdf_eob_sse2(aom_cdf_prob *cdf, int8_t val,
     if (LIKELY(count == 32)) {
       delta = _mm_srai_epi16(diff, 7);
     } else {
+      assert((unsigned)count < 32);
       delta = _mm_sra_epi16(diff, _mm_cvtsi32_si128(5 + (count >> 4)));
-      cdf[5] = (aom_cdf_prob)(count + (count < 32));
+      cdf[5] = (aom_cdf_prob)(count + 1);
     }
     c0 = _mm_add_epi16(_mm_sub_epi16(c0, m0), delta);
     _mm_storel_epi64((__m128i *)cdf, c0);
@@ -898,6 +902,7 @@ static void write_coeffs_txb_multi(aom_writer *TXB_RESTRICT w,
     return;
   }
   const intptr_t eob = (intptr_t)(eob_and_flags & (int)TXB_EOB_MASK);
+  assert(eob >= 2 && eob <= 1024);
   const uint16_t *TXB_RESTRICT const tp = (const uint16_t *)tcoeff;
   const uint16_t *TXB_RESTRICT hi_ptr = tp + eob;
   od_ec_enc *TXB_RESTRICT const enc = &w->ec;
@@ -948,13 +953,11 @@ static void write_coeffs_txb_multi(aom_writer *TXB_RESTRICT w,
       }
     }
   }
-  const uint16_t *TXB_RESTRICT cur = tp + 1;
+  const uint16_t *cur = tp + 1;
   const uint16_t *const end = tp + eob;
-  uint16_t last_tok;
   uint32_t last_br = 0;
   do {
     const uint16_t tok = *cur++;
-    last_tok = tok;
     const uint32_t symb = tok & 3u;
     aom_cdf_prob *TXB_RESTRICT const base_cdf = base_cdfs[(tok >> 2) & 0x3Fu];
     EC_ENCODE_CDF4_LOCAL(enc, low, rng, cnt, symb, base_cdf);
@@ -988,6 +991,8 @@ static void write_coeffs_txb_multi(aom_writer *TXB_RESTRICT w,
       }
     }
   } while (cur != end);
+
+  const uint16_t last_tok = end[-1];
 
   if ((last_tok & 3u) != 0) {
     const int sign0 = (plane_and_ctx >> (8 + TXB_ENT_DC_SIGN_SHIFT)) & 1;
