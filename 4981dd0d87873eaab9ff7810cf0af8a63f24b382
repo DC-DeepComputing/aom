@@ -23,6 +23,30 @@
       "isAi": true,
       "revId": "4981dd0d87873eaab9ff7810cf0af8a63f24b382",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "4455b30d_52265e89",
+        "filename": "av1/encoder/encoder.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 1085,
+      "author": {
+        "id": 5220824
+      },
+      "writtenOn": "2026-11-12T22:41:41Z",
+      "side": 1,
+      "message": "Thanks for the review.\n\nYour first case reproduced on PS3: map set once at 384x256, one frame\ncoded at half size with AOME_SET_SCALEMODE, then g_w/g_h set to\n192x128. From then on every block was skipped. Main doesn\u0027t do this, so\nPS3 introduced it. The new ActiveMapScaledConfigTest covers this case.\nIt fails in all 10 cases on PS3 and passes on PS4.\n\nYour second case: the scaled frame no longer fits the map, so\nav1_apply_active_map() turns the map off on that frame. After an\ninternally scaled frame the app has to set the map again, the same as\non main today.",
+      "parentUuid": "b7c8de8e_0c943cf3",
+      "range": {
+        "startLine": 1083,
+        "startChar": 0,
+        "endLine": 1085,
+        "endChar": 9999
+      },
+      "revId": "4981dd0d87873eaab9ff7810cf0af8a63f24b382",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
