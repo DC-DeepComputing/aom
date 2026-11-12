@@ -373,12 +373,35 @@ static inline void av1_cfl_luma_live_store(MACROBLOCK *x, BLOCK_SIZE bsize) {
   k->valid = 1;
 }
 
-// Returns 1 if the luma state recorded by av1_cfl_luma_live_store() is still
-// live and the luma pass of a DRY_RUN_NORMAL encode of the current block would
-// recompute it from identical inputs.
-static inline int av1_cfl_luma_live_match(const MACROBLOCK *x,
-                                          BLOCK_SIZE bsize) {
-  const CflLumaLive *const k = &x->cfl_luma_live;
+// Copies the CflLumaLive just recorded for a square 16x16 or 32x32 block that
+// lies inside the frame, together with its luma pixels, to its snapshot slot.
+static inline void av1_cfl_luma_snap_store(MACROBLOCK *x, BLOCK_SIZE bsize) {
+  assert(x != NULL);
+  assert(bsize == BLOCK_16X16 || bsize == BLOCK_32X32);
+  const MACROBLOCKD *const xd = &x->e_mbd;
+  CflLumaSnap *const s = &x->cfl_luma_snap[bsize == BLOCK_32X32];
+  if (!s->open || xd->mb_to_right_edge < 0 || xd->mb_to_bottom_edge < 0 ||
+      is_cur_buf_hbd(xd)) {
+    return;
+  }
+  const int w = block_size_wide[bsize];
+  assert(w > 0 && w <= CFL_BUF_LINE);
+  assert(block_size_high[bsize] == w);
+  const int stride = xd->plane[AOM_PLANE_Y].dst.stride;
+  const uint8_t *const src = xd->plane[AOM_PLANE_Y].dst.buf;
+  assert(src != NULL);
+  s->k = x->cfl_luma_live;
+  for (int r = 0; r < w; ++r) {
+    memcpy(s->pix + r * w, src + r * stride, (size_t)w * sizeof(s->pix[0]));
+  }
+}
+
+// Returns 1 if the luma state recorded in k would be recomputed from identical
+// inputs by the luma pass of a DRY_RUN_NORMAL encode of the current block.
+static inline int av1_cfl_luma_live_match_k(const MACROBLOCK *x,
+                                            const CflLumaLive *k,
+                                            BLOCK_SIZE bsize) {
+  assert(x != NULL && k != NULL);
   const MACROBLOCKD *const xd = &x->e_mbd;
   const MB_MODE_INFO *const mbmi = xd->mi[0];
   if (!k->valid || k->mbmi != mbmi || k->bsize != bsize) return 0;
@@ -411,6 +434,14 @@ static inline int av1_cfl_luma_live_match(const MACROBLOCK *x,
                  (size_t)bh * sizeof(k->left[0])) &&
          !memcmp(k->tx_type_map, xd->tx_type_map,
                  (size_t)(bw * bh) * sizeof(k->tx_type_map[0]));
+}
+
+// Returns 1 if the luma state recorded by av1_cfl_luma_live_store() is still
+// live and the luma pass of a DRY_RUN_NORMAL encode of the current block would
+// recompute it from identical inputs.
+static inline int av1_cfl_luma_live_match(const MACROBLOCK *x,
+                                          BLOCK_SIZE bsize) {
+  return av1_cfl_luma_live_match_k(x, &x->cfl_luma_live, bsize);
 }
 
 static inline int is_trellis_used(TRELLIS_OPT_TYPE optimize_b,

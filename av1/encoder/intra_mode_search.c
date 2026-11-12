@@ -1387,6 +1387,9 @@ static void cfl_luma_live_arm(MACROBLOCK *x, BLOCK_SIZE bsize,
   if (!memcmp(tx_type_map, x->e_mbd.tx_type_map,
               (size_t)n * sizeof(tx_type_map[0]))) {
     av1_cfl_luma_live_store(x, bsize);
+    if (bsize == BLOCK_16X16 || bsize == BLOCK_32X32) {
+      av1_cfl_luma_snap_store(x, bsize);
+    }
   }
 }
 
@@ -1438,6 +1441,9 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
     if (can_reuse) {
       memcpy(tx_type_map, xd->tx_type_map,
              (size_t)(bw * bh) * sizeof(tx_type_map[0]));
+    }
+    if (mbmi->bsize == BLOCK_16X16 || mbmi->bsize == BLOCK_32X32) {
+      x->cfl_luma_snap[mbmi->bsize == BLOCK_32X32].k.valid = 0;
     }
     av1_encode_intra_block_plane(cpi, x, mbmi->bsize, AOM_PLANE_Y,
                                  DRY_RUN_NORMAL,

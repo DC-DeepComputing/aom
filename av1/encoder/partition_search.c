@@ -449,6 +449,35 @@ static int cfl_luma_live_reuse(MACROBLOCK *x, BLOCK_SIZE bsize) {
   return 1;
 }
 
+#if !CONFIG_REALTIME_ONLY
+// Returns 1 if the luma pass of the DRY_RUN_NORMAL encode of a square 16x16 or
+// 32x32 block can be skipped because the CfL luma re-encode of its
+// PARTITION_NONE candidate recorded identical inputs (see CflLumaSnap); then
+// restores the luma pixels it produced and redoes its CfL side effects.
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
+static int cfl_luma_snap_reuse(MACROBLOCK *x, BLOCK_SIZE bsize) {
+  assert(x != NULL);
+  assert(bsize == BLOCK_16X16 || bsize == BLOCK_32X32);
+  CflLumaSnap *const s = &x->cfl_luma_snap[bsize == BLOCK_32X32];
+  if (!av1_cfl_luma_live_match_k(x, &s->k, bsize)) return 0;
+  s->k.valid = 0;
+  MACROBLOCKD *const xd = &x->e_mbd;
+  assert(!is_cur_buf_hbd(xd));
+  const int w = block_size_wide[bsize];
+  assert(w > 0 && w <= CFL_BUF_LINE);
+  const int stride = xd->plane[AOM_PLANE_Y].dst.stride;
+  uint8_t *const dst = xd->plane[AOM_PLANE_Y].dst.buf;
+  assert(dst != NULL);
+  for (int r = 0; r < w; ++r) {
+    memcpy(dst + r * stride, s->pix + r * w, (size_t)w * sizeof(s->pix[0]));
+  }
+  if (xd->cfl.store_y) cfl_store_block(xd, bsize, xd->mi[0]->tx_size);
+  return 1;
+}
+#endif  // !CONFIG_REALTIME_ONLY
+
 static void encode_superblock(const AV1_COMP *const cpi, TileDataEnc *tile_data,
                               ThreadData *td, TokenExtra **t, RUN_TYPE dry_run,
                               BLOCK_SIZE bsize, int *rate) {
@@ -482,6 +511,13 @@ static void encode_superblock(const AV1_COMP *const cpi, TileDataEnc *tile_data,
     if (cfl_luma_live && dry_run == DRY_RUN_NORMAL &&
         cfl_luma_live_reuse(x, bsize)) {
       start_plane = 1;
+#if !CONFIG_REALTIME_ONLY
+    } else if (dry_run == DRY_RUN_NORMAL &&
+               (bsize == BLOCK_16X16 || bsize == BLOCK_32X32) &&
+               x->cfl_luma_snap[bsize == BLOCK_32X32].k.valid &&
+               cfl_luma_snap_reuse(x, bsize)) {
+      start_plane = 1;
+#endif
     }
     for (int plane = start_plane; plane < max_planes; ++plane) {
       av1_encode_intra_block_plane(cpi, x, bsize, plane, dry_run,
@@ -2599,6 +2635,10 @@ void av1_rd_use_partition(AV1_COMP *cpi, ThreadData *td, TileDataEnc *tile_data,
   BLOCK_SIZE bs_type = mib[0]->bsize;
   int use_partition_none = 0;
   x->try_merge_partition = 0;
+  for (int i = 0; i < 2; ++i) {
+    x->cfl_luma_snap[i].k.valid = 0;
+    x->cfl_luma_snap[i].open = 0;
+  }
 
   if (pc_tree->none == NULL) {
     pc_tree->none = av1_alloc_pmc(cpi, bsize, &td->shared_coeff_buf);
@@ -6248,6 +6288,10 @@ static RD_STATS rd_search_for_fixed_partition(
   const AV1_COMMON *const cm = &cpi->common;
   const int num_planes = av1_num_planes(cm);
   MACROBLOCK *const x = &td->mb;
+  for (int i = 0; i < 2; ++i) {
+    x->cfl_luma_snap[i].k.valid = 0;
+    x->cfl_luma_snap[i].open = 0;
+  }
   MACROBLOCKD *const xd = &x->e_mbd;
   TileInfo *const tile_info = &tile_data->tile_info;
   RD_STATS best_rdc;
@@ -7304,8 +7348,21 @@ static void encode_live_split(const PartSearchFixedCtx *sctx, int mi_row,
     d->valid = 0;
     live = d;
   }
+  const int has_snap = (bsize == BLOCK_16X16 || bsize == BLOCK_32X32);
+  if (has_snap) {
+    CflLumaSnap *const s = &x->cfl_luma_snap[bsize == BLOCK_32X32];
+    if (s->deferred_epoch == x->live_epoch &&
+        pc_tree->partitioning == PARTITION_NONE) {
+      s->k.valid = 1;
+    }
+  }
   encode_sb_ex(sctx->cpi, sctx->td, sctx->tile_data, sctx->tp, mi_row, mi_col,
                DRY_RUN_NORMAL, bsize, pc_tree, NULL, sctx->fast_intra_sb);
+  if (has_snap) {
+    CflLumaSnap *const s = &x->cfl_luma_snap[bsize == BLOCK_32X32];
+    s->k.valid = 0;
+    s->deferred_epoch = 0;
+  }
 }
 
 static bool rd_pick_partition_rec(
@@ -7340,6 +7397,18 @@ static bool rd_pick_partition_rec(
     return part_search_state.found_best_partition;
   }
   if (UNLIKELY(is_sb_root)) x->must_find_valid_partition = 0;
+
+  // The CfL luma re-encode of the PARTITION_NONE candidate may be reused by the
+  // dry run at the end of this search (see cfl_luma_snap_reuse()).
+  const int has_luma_snap =
+      !is_sb_root && (bsize == BLOCK_16X16 || bsize == BLOCK_32X32);
+  if (has_luma_snap) {
+    CflLumaSnap *const luma_snap = &x->cfl_luma_snap[bsize == BLOCK_32X32];
+    luma_snap->k.valid = 0;
+    luma_snap->deferred_epoch = 0;
+    luma_snap->open = 1;
+  }
+  int luma_snap_defer = pc_tree->index == 3;
 
   // A dry-run (or deferred, for the 4th child) SPLIT block whose children are
   // at least one mode info allocation unit and 8x8 can reuse their live state.
@@ -7725,6 +7794,7 @@ BEGIN_PARTITION_SEARCH:
     } else if (should_do_dry_run_encode_for_current_block(
                    sb_size, x->sb_enc.max_partition_size, pc_tree->index,
                    bsize)) {
+      luma_snap_defer = 0;
       const uint64_t txk_rewrites = x->txk_rewrites;
       if (live != NULL && live->valid &&
           pc_tree->partitioning == PARTITION_SPLIT &&
@@ -7743,6 +7813,18 @@ BEGIN_PARTITION_SEARCH:
 #if CONFIG_COLLECT_COMPONENT_TIMING
   end_timing(cpi, encode_sb_time);
 #endif
+  if (has_luma_snap) {
+    CflLumaSnap *const luma_snap = &x->cfl_luma_snap[bsize == BLOCK_32X32];
+    // A NONE-best 4th child that did not dry-run may still reuse it when its
+    // parent's live-split encode reaches it (see encode_live_split()).
+    if (luma_snap->k.valid && luma_snap_defer &&
+        part_search_state.found_best_partition && pc_tree != NULL &&
+        pc_tree->partitioning == PARTITION_NONE) {
+      luma_snap->deferred_epoch = x->live_epoch;
+    }
+    luma_snap->k.valid = 0;
+    luma_snap->open = 0;
+  }
 
   if (pc_tree_dealloc == 0) {
     if (LIKELY(sctx->arena != NULL)) {
@@ -7768,6 +7850,11 @@ BEGIN_PARTITION_SEARCH:
 // allocated) together with sctx->arena.
 static void release_sb_arena_tree(const PartSearchFixedCtx *sctx) {
   ThreadData *const td = sctx->td;
+  for (int i = 0; i < 2; ++i) {
+    td->mb.cfl_luma_snap[i].k.valid = 0;
+    td->mb.cfl_luma_snap[i].deferred_epoch = 0;
+    td->mb.cfl_luma_snap[i].open = 0;
+  }
   if (td->pc_root != NULL) {
     free_pc_subtree_arena(sctx->arena, sctx->pmc_pool, td->pc_root, 0);
     td->pc_root = NULL;
@@ -7881,6 +7968,11 @@ bool av1_rd_pick_partition(AV1_COMP *const cpi, ThreadData *td,
   const MACROBLOCKD *const xd = &td->mb.e_mbd;
   const int is_sb_root = (bsize == sb_size);
   td->mb.cfl_luma_live.valid = 0;
+  for (int i = 0; i < 2; ++i) {
+    td->mb.cfl_luma_snap[i].k.valid = 0;
+    td->mb.cfl_luma_snap[i].deferred_epoch = 0;
+    td->mb.cfl_luma_snap[i].open = 0;
+  }
 
   PcTreeArena *arena = NULL;
   if (LIKELY(is_sb_root && pc_tree == td->pc_root)) {

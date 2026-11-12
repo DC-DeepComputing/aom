@@ -920,6 +920,18 @@ typedef struct CflLumaLive {
   uint8_t tx_type_map[CFL_LUMA_LIVE_MAX_MI * CFL_LUMA_LIVE_MAX_MI];
 } CflLumaLive;
 
+/*!\brief CflLumaLive of a square 16x16 or 32x32 block plus a copy of the luma
+ * pixels the CfL luma re-encode produced, so that the DRY_RUN_NORMAL encode of
+ * the block at the end of its partition search can restore them even after the
+ * SPLIT search has overwritten the block (see rd_pick_partition_rec()).
+ */
+typedef struct CflLumaSnap {
+  CflLumaLive k;
+  uint64_t deferred_epoch;
+  uint8_t open;
+  uint8_t pix[CFL_BUF_SQUARE];
+} CflLumaSnap;
+
 /*!\endcond */
 
 //! Maximum number of estimated RD Cost records for compound average.
@@ -1529,6 +1541,10 @@ typedef struct macroblock {
   uint64_t txk_rewrites;
   /*!\brief x->rdmult of the last subtree dry run. */
   int last_dry_rdmult;
+
+  /*!\brief CfL luma re-encode snapshots of the 16x16 and 32x32 PARTITION_NONE
+   * candidates of the partition nodes being searched. */
+  CflLumaSnap cfl_luma_snap[2];
 } MACROBLOCK;
 #undef SINGLE_REF_MODES
 
