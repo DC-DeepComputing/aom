@@ -16,6 +16,209 @@
       "message": "Will review this today too",
       "revId": "07ee7e91336ef373f698b829f540ce8c269b321b",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "f256f915_41c792ca",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 7525
+      },
+      "writtenOn": "2026-11-12T21:32:24Z",
+      "side": 1,
+      "message": "Left some comments. Some a nit and some are more like questions on the HME part of code. \n\nI understand this is still in development, so please feel free to just resolve the comments with \"will do\" and submit the CL. Then maybe raise fixes in follow-up CLs.",
+      "revId": "07ee7e91336ef373f698b829f540ce8c269b321b",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "9f771203_b456c38c",
+        "filename": "aom_dsp/pyramid.h",
+        "patchSetId": 3
+      },
+      "lineNbr": 119,
+      "author": {
+        "id": 7525
+      },
+      "writtenOn": "2026-11-12T21:32:24Z",
+      "side": 1,
+      "message": "Nit: `aom_fill_border()` has no callers outside `aom_dsp/pyramid.c` and is unguarded by `CONFIG_PYRAMID_ME`. Could `fill_border` remain `static inline` inside `aom_dsp/pyramid.c` to avoid exporting an unused symbol in default builds and preserve inlining in `fill_pyramid()`?",
+      "range": {
+        "startLine": 117,
+        "startChar": 0,
+        "endLine": 119,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "07ee7e91336ef373f698b829f540ce8c269b321b",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "e7f18eca_24fb90af",
+        "filename": "av1/common/av1_rtcd_defs.pl",
+        "patchSetId": 3
+      },
+      "lineNbr": 333,
+      "author": {
+        "id": 7525
+      },
+      "writtenOn": "2026-11-12T21:32:24Z",
+      "side": 1,
+      "message": "Nit: `src_stride_org` is actually the unshifted stride of `ref` (`ref_lyr-\u003estride` at `pyramid_me.c:322`, used in `ref +\u003d src_stride_org;` at `pyramid_me.c:666` while `ref_stride` is `ref_lyr-\u003estride \u003c\u003c use_alt_rows_for_sad`). Renaming this to `ref_stride_step` (or `search_ref_stride`) before SIMD specializations are added would avoid confusion once the `pyramid_me.c:61` TODO (pointing level 0 to the source frame, where `cur_lyr-\u003estride` and `ref_lyr-\u003estride` may differ) is implemented.",
+      "isAi": true,
+      "revId": "07ee7e91336ef373f698b829f540ce8c269b321b",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "904e445f_9ccb1841",
+        "filename": "av1/encoder/pyramid_me.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 351,
+      "author": {
+        "id": 7525
+      },
+      "writtenOn": "2026-11-12T21:32:24Z",
+      "side": 1,
+      "message": "Nit: `AOMMAX(40, (double)qp)` is redundant inside `if (qp \u003e\u003d 46)`.",
+      "range": {
+        "startLine": 350,
+        "startChar": 0,
+        "endLine": 351,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "07ee7e91336ef373f698b829f540ce8c269b321b",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "5ef11d05_3d3fd74b",
+        "filename": "av1/encoder/pyramid_me.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 998,
+      "author": {
+        "id": 7525
+      },
+      "writtenOn": "2026-11-12T21:32:24Z",
+      "side": 1,
+      "message": "`zero_sad_thresh` (`pme_sf.zero_mv_sad_thresh`) is used both as an absolute 64x64 SAD bound on line 989 (`best_sad \u003c zero_sad_thresh`) and as a percentage multiplier on line 996 (`(this_sb_stats-\u003ezero_mv_sad - best_sad) * 100 \u003e zero_sad_thresh * best_sad`, which also overflows 32-bit `int` for realistic 64x64 SAD thresholds). Is this expected? \n\nEven if expect, please consider adding a separate percentage field (similar to `pre_sad_thresh` / `pre_sad_pct`) and casting to `int64_t`.",
+      "range": {
+        "startLine": 989,
+        "startChar": 0,
+        "endLine": 998,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "07ee7e91336ef373f698b829f540ce8c269b321b",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "42d0e482_11f7a534",
+        "filename": "av1/encoder/pyramid_me.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 1125,
+      "author": {
+        "id": 7525
+      },
+      "writtenOn": "2026-11-12T21:32:24Z",
+      "side": 1,
+      "message": "A couple of issues with backward-reference mirroring at `layer_depth \u003c\u003d 1`:\n\n1. At `layer_depth \u003d\u003d 1`, it looks like backward references are skipped by `skip_ref_for_layer_depth()` in all subsequent stages (`pyramid_me_level2`/`level1`/`level0`, `prepare_best_pme_stats`, `post_pyramid_me`), so mirroring `pre_pme_stats` at `layer_depth \u003d\u003d 1` may be unused work. (I could be wrong here).  that can abort encoding via `aom_internal_error` if no symmetric `-rel_dist` forward reference is present in `ref_disp_order_idx`.\n2. Negating `mv` on lines 1122-1123 without clamping can put `(x_search_center, y_search_center)` outside the `-64` border in `post_pyramid_me()` line 1473 (which indexes `ref_y-\u003ebuf` before `clamp_search_area()` at line 1485) when `last_pyr_level \u003d\u003d PYR_LEVEL2`.\n3. Consider avoiding `aom_internal_error` here - it looks like we should use an assert instead maybe?",
+      "range": {
+        "startLine": 1102,
+        "startChar": 0,
+        "endLine": 1125,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "07ee7e91336ef373f698b829f540ce8c269b321b",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "6882fdb1_8fcf406b",
+        "filename": "av1/encoder/pyramid_me.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 1141,
+      "author": {
+        "id": 7525
+      },
+      "writtenOn": "2026-11-12T21:32:24Z",
+      "side": 1,
+      "message": "Two issues when `pre_sad_thresh \u003e 0`:\n\n1. If `(*pme_sb_stats)[rf_idx].prune_ref` was already set in `calc_zero_mv_sad()`, Loop 1 skipped `rf_idx` and left `best_zone_cost \u003d\u003d INT_MAX`, so `pre_pme_sad_pct * best_zone_cost` overflows signed `int` (UB). Add `if ((*pme_sb_stats)[rf_idx].prune_ref) continue;`.\n2. Line 1137/1138 multiplies with double `100.0`) rather than int as in lines 996 and 1418 (`(int64_t)(best_zone_cost - best_cost) * 100 \u003e (int64_t)pre_pme_sad_pct * best_cost`; Is this intended?",
+      "range": {
+        "startLine": 1128,
+        "startChar": 0,
+        "endLine": 1141,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "07ee7e91336ef373f698b829f540ce8c269b321b",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "a8f2db96_42b2db0f",
+        "filename": "av1/encoder/pyramid_me.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 1802,
+      "author": {
+        "id": 7525
+      },
+      "writtenOn": "2026-11-12T21:32:24Z",
+      "side": 1,
+      "message": "When an internal frame is an `S_FRAME` (`--sframe-mode`) or a forward-keyframe `OVERLAY_UPDATE` (`refbuf_state \u003d\u003d REFBUF_RESET`), `refresh_mask` is `SELECT_ALL_BUF_SLOTS` (`0xFF`), which refreshes all 8 `cm-\u003eref_frame_map` slots during encoding. `av1_get_refresh_ref_frame_map(0xFF)` returns `0`, so only slot `0` is updated in `ref_frame_map_pairs` and `ref_picture_map`, leaving slots `1..7` pointing to wiped pre-reset references. Consider handling multi-bit `refresh_mask` (`SELECT_ALL_BUF_SLOTS`) across all refreshed slots.",
+      "range": {
+        "startLine": 1789,
+        "startChar": 0,
+        "endLine": 1802,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "07ee7e91336ef373f698b829f540ce8c269b321b",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "71b06899_7e8b188f",
+        "filename": "av1/encoder/pyramid_me.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 1868,
+      "author": {
+        "id": 7525
+      },
+      "writtenOn": "2026-11-12T21:32:24Z",
+      "side": 1,
+      "message": "Since `pme_data-\u003eframe_stats_ptr \u003d \u0026pme_data-\u003epme_frame[REF_FRAMES + 1]`, index `-1` is `cm-\u003eref_frame_map[0]` (an active reference buffer), while the unused entry `pme_frame[0]` is `-REF_FRAMES - 1` (`-9`).\n\nSetting `ALTREF_FRAME`, `LAST3_FRAME`, `BWDREF_FRAME`, and `ALTREF2_FRAME` to `-1` points all four slots at `cm-\u003eref_frame_map[0]`. Because `ALTREF_FRAME` is second in `ref_frame_priority_order` (ahead of `GOLDEN_FRAME` and `LAST2_FRAME`), `init_pyramids_for_pme()` builds `cm-\u003eref_frame_map[0]`\u0027s pyramid and `init_frame_for_pme()` keeps `ALTREF_FRAME` enabled and searches it against `cm-\u003eref_frame_map[0]` (while also consuming a slot in `enforce_max_ref_frames()`).\n\nThese disabled slots should use `-REF_FRAMES - 1` (and `init_frame_for_pme()` should exclude `buf_id \u003d\u003d NULL` entries from `ref_frame_flags` / `enforce_max_ref_frames()`).",
+      "range": {
+        "startLine": 1865,
+        "startChar": 0,
+        "endLine": 1868,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "07ee7e91336ef373f698b829f540ce8c269b321b",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
