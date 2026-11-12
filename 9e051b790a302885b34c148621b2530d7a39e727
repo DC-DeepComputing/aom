@@ -23,6 +23,30 @@
       "isAi": true,
       "revId": "9e051b790a302885b34c148621b2530d7a39e727",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "748c33e5_f1652f6a",
+        "filename": "av1/encoder/encoder.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 984,
+      "author": {
+        "id": 5216012
+      },
+      "writtenOn": "2026-11-12T22:16:52Z",
+      "side": 1,
+      "message": "Thanks, I reproduced all of these with ASan on PS1:\n\n- RT speed 5 and 6: NULL OBMC and prediction buffers in the OBMC\n  prediction.\n- Good quality: NULL sms_root in init_simple_motion_search_mvs().\n- Good quality with lag_in_frames \u003e 0: NULL unscaled_last_source in\n  the LAP first pass, because the lookahead was built with\n  max_pre_frames 0.\n- kf_max_dist N -\u003e 0 together with a frame size increase: use after\n  free of the sms tree.\n\nThere is one more. Once those are fixed, the temporal filter motion\nsearch reads past the lookahead source frames, since they were\nallocated with the 64 px all intra border. 219901 doesn\u0027t cover this,\nit only grows the reference borders.\n\nI see two ways to go and would like your opinion before I upload PS2.\n\n1. Support 0 -\u003e N. Gate the inter only allocations and the border\n   size on oxcf.mode !\u003d ALLINTRA instead of key_freq_max, like\n   9f41643359 does for tmp_conv_dst and upsample_pred. ALLINTRA forces\n   kf_max_dist and lag_in_frames to 0, so it can never switch. The diff\n   is small and I have it working with tests. The cost is memory: good\n   quality and realtime encoders that start with kf_max_dist 0 would\n   allocate these buffers, one more lookahead frame and the larger\n   border on every frame buffer, even if they never switch.\n\n2. Reject raising kf_max_dist from 0 in encoder_set_config(), the same\n   way monochrome 1 -\u003e 0 and a larger lag_in_frames are rejected. No\n   memory change for anyone. This CL would keep only the N -\u003e 0 fixes:\n   set mb.mv_costs from mv_costs_alloc every time, and clear sms_root\n   when the tree is freed. Alejandro\u0027s 218983 already does the\n   rejection, so that part could also stay in his CL.\n\nI lean towards 2. On main the switch already crashes at RT speed 10\n(the PS1 tests), and with PS1 it still crashes at RT speeds 5 and 6\nand in good quality mode. So I doubt anyone depends on it, and with\noption 1 every kf_max_dist 0 encoder pays for a switch it never uses.\nWhich do you prefer?",
+      "parentUuid": "e3878593_e6e3ae85",
+      "range": {
+        "startLine": 977,
+        "startChar": 0,
+        "endLine": 984,
+        "endChar": 9999
+      },
+      "revId": "9e051b790a302885b34c148621b2530d7a39e727",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
