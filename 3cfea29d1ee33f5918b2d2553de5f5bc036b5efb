@@ -1,0 +1,70 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "f82601fb_4a0209ab",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 15
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-12T19:59:38Z",
+      "side": 1,
+      "message": "Nit: \"and reuse the precomputed zero-plane base_cost_table0 pointer in get_coeff_cost_eob\" appears left over from an earlier split (neither `base_cost_table0` nor `get_coeff_cost_eob` is touched in this CL), while the `encodemb.c` and `encodetxb.c` fast paths (`av1_encode_intra_block_plane` single-block path and inline `eob \u003d\u003d 1` entropy context path) are not mentioned.",
+      "isAi": true,
+      "revId": "3cfea29d1ee33f5918b2d2553de5f5bc036b5efb",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "547950e3_fa6a04c7",
+        "filename": "av1/common/reconintra.h",
+        "patchSetId": 15
+      },
+      "lineNbr": 23,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-12T19:59:38Z",
+      "side": 1,
+      "message": "Consider keeping `av1/common/reconintra.h` free of `\u003cemmintrin.h\u003e` and `#if defined(__SSE2__)` (lines 221-270 in `av1_fill_block_lbd`): every other `\u003cemmintrin.h\u003e` include in libaom lives under `*/x86/*`, and gating on compiler-predefined `__SSE2__` / `_M_X64` rather than `HAVE_SSE2` / RTCD causes `-DAOM_TARGET_CPU\u003dgeneric` / `-DENABLE_SSE2\u003d0` builds on x86-64 to still emit SSE2 intrinsics in `reconintra.c`, and makes both `av1_predict_dc_block_lbd_c` and `av1_predict_dc_block_lbd_sse2` execute the same `#if defined(__SSE2__)` branch in `LowbdPredictDcBlockTest.Sse2MatchesC` (leaving the `#else` `memset` loop untested on x86 CI). Moving the `_mm_storeu_si128` fill helper into `av1/common/x86/reconintra_sse2.c` and keeping `av1_fill_block_lbd` pure C (`memset(dst, val, 16/32/64)` per row, which compilers already lower to unaligned vector stores) avoids both issues.",
+      "range": {
+        "startLine": 20,
+        "startChar": 0,
+        "endLine": 23,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "3cfea29d1ee33f5918b2d2553de5f5bc036b5efb",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "8549792f_85fc989e",
+        "filename": "av1/encoder/encodetxb.c",
+        "patchSetId": 15
+      },
+      "lineNbr": 796,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-12T19:59:38Z",
+      "side": 1,
+      "message": "Nit: Unlike `update_and_record_txb_context_multi` (`if (tcoeff[0] !\u003d 0)` at line 710), this inline `eob \u003d\u003d 1` path unconditionally updates `dc_sign_cdf` and computes `((2 - dc_sign) \u003c\u003c COEFF_CONTEXT_BITS)` at lines 830-839, relying on `v !\u003d 0`. Consider adding `assert(v !\u003d 0);` here to make that invariant explicit.",
+      "range": {
+        "startLine": 793,
+        "startChar": 0,
+        "endLine": 796,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "3cfea29d1ee33f5918b2d2553de5f5bc036b5efb",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
