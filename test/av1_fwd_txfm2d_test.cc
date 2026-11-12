@@ -26,6 +26,15 @@
 #include "av1/common/av1_txfm.h"
 #include "av1/common/scan.h"
 #include "av1/encoder/hybrid_fwd_txfm.h"
+#if CONFIG_AV1_ENCODER && HAVE_AVX2 && !CONFIG_HIGHWAY && !CONFIG_SHARED
+#if !CONFIG_REALTIME_ONLY
+extern "C" {
+#include "av1/common/cfl.h"
+}
+#include "av1/encoder/intra_mode_search.h"
+#include "config/aom_dsp_rtcd.h"
+#endif  // !CONFIG_REALTIME_ONLY
+#endif  // CONFIG_AV1_ENCODER && HAVE_AVX2 && !CONFIG_HIGHWAY && !CONFIG_SHARED
 
 using libaom_test::ACMRandom;
 using libaom_test::bd;
@@ -1139,6 +1148,125 @@ TEST(AVX2, Av1DistBlockPxLbdReconMatchC) {
     }
   }
 }
+
+#if !CONFIG_REALTIME_ONLY
+TEST(AVX2, Av1CflPickPlaneParameterLbdMatchRef) {
+  static constexpr TX_SIZE kCflTxSizes[] = {
+    TX_4X4,  TX_4X8,  TX_8X4,  TX_4X16,  TX_16X4,  TX_8X8,   TX_8X16,
+    TX_16X8, TX_8X32, TX_32X8, TX_16X16, TX_16X32, TX_32X16, TX_32X32,
+  };
+  ACMRandom rnd(ACMRandom::DeterministicSeed());
+  const int src_stride = 48;
+  const int dst_stride = 64;
+  DECLARE_ALIGNED(32, uint8_t, src[32 * 48]);
+  DECLARE_ALIGNED(32, uint8_t, dst[64 * 64]);
+  DECLARE_ALIGNED(32, int16_t, src_diff[32 * 32]);
+  DECLARE_ALIGNED(32, tran_low_t, coeff[32 * 32]);
+
+  for (TX_SIZE tx_size : kCflTxSizes) {
+    const int w = tx_size_wide[tx_size];
+    const int h = tx_size_high[tx_size];
+    const int n_coeffs = tx_size_2d[tx_size];
+    const cfl_predict_lbd_fn predict_lbd = av1_get_cfl_predict_lbd_fn(tx_size);
+    ASSERT_NE(predict_lbd, nullptr);
+    const cfl_subtract_average_fn sub_avg =
+        cfl_get_subtract_average_fn(tx_size);
+
+    for (int mode = 0; mode < 3; ++mode) {
+      CFL_CTX cfl_got = {};
+      CFL_CTX cfl_ref = {};
+      const int bw = (mode == 1 && w > 4) ? (w - 4) : w;
+      const int bh = (mode == 1 && h > 4) ? (h - 4) : h;
+      cfl_got.buf_width = bw;
+      cfl_got.buf_height = bh;
+      cfl_ref.buf_width = w;
+      cfl_ref.buf_height = h;
+
+      const uint16_t base_q3 = static_cast<uint16_t>(rnd.Rand8() << 3);
+      for (int y = 0; y < bh; ++y) {
+        for (int x = 0; x < bw; ++x) {
+          const uint16_t val_q3 =
+              (mode == 2) ? static_cast<uint16_t>(
+                                (base_q3 >= 3 && base_q3 <= 2037)
+                                    ? base_q3 + (static_cast<int>(rnd(7)) - 3)
+                                    : 1000)
+                          : static_cast<uint16_t>(rnd.Rand8() << 3);
+          cfl_got.recon_buf_q3[y * CFL_BUF_LINE + x] = val_q3;
+        }
+      }
+      for (int y = 0; y < h; ++y) {
+        const int sy = (y < bh) ? y : (bh - 1);
+        for (int x = 0; x < w; ++x) {
+          const int sx = (x < bw) ? x : (bw - 1);
+          cfl_ref.recon_buf_q3[y * CFL_BUF_LINE + x] =
+              cfl_got.recon_buf_q3[sy * CFL_BUF_LINE + sx];
+        }
+      }
+
+      const int got_flat = av1_cfl_prepare_ac_lbd_avx2(&cfl_got, tx_size);
+      sub_avg(cfl_ref.recon_buf_q3, cfl_ref.ac_buf_q3);
+      for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+          ASSERT_EQ(cfl_got.ac_buf_q3[y * CFL_BUF_LINE + x],
+                    cfl_ref.ac_buf_q3[y * CFL_BUF_LINE + x])
+              << w << "x" << h << " mode=" << mode << " y=" << y << " x=" << x;
+        }
+      }
+      if (mode == 2) {
+        EXPECT_EQ(got_flat, 1) << w << "x" << h;
+      }
+
+      for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+          src[y * src_stride + x] = rnd.Rand8();
+        }
+      }
+      const uint8_t dc_val = rnd.Rand8();
+      const int got_idx = av1_cfl_pick_plane_parameter_lbd_avx2(
+          cfl_got.ac_buf_q3, src, src_stride, dc_val, tx_size);
+
+      TxfmParam txfm_param = {};
+      txfm_param.tx_type = DCT_DCT;
+      txfm_param.tx_size = tx_size;
+      txfm_param.lossless = 0;
+      txfm_param.bd = 8;
+      txfm_param.is_hbd = 0;
+      txfm_param.tx_set_type = EXT_TX_SET_ALL16;
+
+      for (int y = 0; y < h; ++y) {
+        memset(dst + y * dst_stride, dc_val, w);
+      }
+      aom_subtract_block(h, w, src_diff, w, src, src_stride, dst, dst_stride);
+      av1_lowbd_fwd_txfm(src_diff, coeff, w, &txfm_param);
+      int64_t best_cfl_cost = aom_satd(coeff, n_coeffs);
+      int ref_idx = CFL_INDEX_ZERO;
+
+      for (int si = 0; si < 2; ++si) {
+        const int dir = si ? -1 : 1;
+        for (int i = 1; i <= CFL_INDEX_ZERO; ++i) {
+          const int alpha_q3 = dir * i;
+          dst[0] = dc_val;
+          predict_lbd(cfl_ref.ac_buf_q3, dst, dst_stride, alpha_q3);
+          aom_subtract_block(h, w, src_diff, w, src, src_stride, dst,
+                             dst_stride);
+          av1_lowbd_fwd_txfm(src_diff, coeff, w, &txfm_param);
+          const int64_t cfl_cost = aom_satd(coeff, n_coeffs);
+          if (cfl_cost < best_cfl_cost) {
+            best_cfl_cost = cfl_cost;
+            ref_idx = CFL_INDEX_ZERO + alpha_q3;
+          } else {
+            break;
+          }
+        }
+      }
+      ASSERT_EQ(got_idx, ref_idx) << w << "x" << h << " mode=" << mode;
+      if (got_flat) {
+        ASSERT_EQ(got_idx, CFL_INDEX_ZERO) << w << "x" << h << " flat mode";
+      }
+    }
+  }
+}
+#endif  // !CONFIG_REALTIME_ONLY
 #endif  // CONFIG_AV1_ENCODER && HAVE_AVX2 && !CONFIG_HIGHWAY && !CONFIG_SHARED
 
 }  // namespace

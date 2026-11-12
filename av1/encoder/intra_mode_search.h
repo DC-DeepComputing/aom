@@ -360,6 +360,15 @@ static inline void set_y_mode_and_delta_angle(const int mode_idx,
       luma_angle_delta_order[reorder_delta_angle_eval != 0][mode_idx];
 }
 
+#if !CONFIG_REALTIME_ONLY && HAVE_AVX2 && !CONFIG_HIGHWAY
+/*!\cond */
+int av1_cfl_prepare_ac_lbd_avx2(CFL_CTX *cfl, TX_SIZE tx_size);
+int av1_cfl_pick_plane_parameter_lbd_avx2(const int16_t *ac_buf_q3,
+                                          const uint8_t *src, int src_stride,
+                                          uint8_t dc_val, TX_SIZE tx_size);
+/*!\endcond */
+#endif  // !CONFIG_REALTIME_ONLY && HAVE_AVX2 && !CONFIG_HIGHWAY
+
 #if defined(__GNUC__) && __GNUC__ >= 4
 #pragma GCC visibility pop
 #endif

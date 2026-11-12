@@ -156,6 +156,14 @@ static inline int av1_use_intra_edge_upsample(int bs0, int bs1, int delta,
   if (d == 0 || d >= 40) return 0;
   return type ? (blk_wh <= 8) : (blk_wh <= 16);
 }
+
+#if CONFIG_AV1_ENCODER && !CONFIG_REALTIME_ONLY && AOM_ARCH_X86_64 && \
+    HAVE_SSE2 && HAVE_SSSE3 && (defined(__SSE2__) || defined(_M_X64))
+/*!\cond */
+uint8_t av1_compute_dc_val_cfl_lbd(const MACROBLOCKD *xd, int plane,
+                                   TX_SIZE tx_size);
+/*!\endcond */
+#endif
 #if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
 #pragma GCC visibility pop
 #endif

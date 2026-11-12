@@ -4116,6 +4116,39 @@ void av1_init_intra_predictors(void) {
   aom_once(init_intra_predictors_internal);
 }
 
+#if CONFIG_AV1_ENCODER && !CONFIG_REALTIME_ONLY && AOM_ARCH_X86_64 && \
+    HAVE_SSE2 && HAVE_SSSE3 && (defined(__SSE2__) || defined(_M_X64))
+uint8_t av1_compute_dc_val_cfl_lbd(const MACROBLOCKD *xd, int plane,
+                                   TX_SIZE tx_size) {
+  assert(xd != NULL);
+  assert(plane == AOM_PLANE_U || plane == AOM_PLANE_V);
+  assert((unsigned)tx_size < TX_SIZES_ALL);
+  const struct macroblockd_plane *const pd = &xd->plane[plane];
+  const int dst_stride = pd->dst.stride;
+  const uint8_t *const dst = pd->dst.buf;
+  assert(dst != NULL);
+  const int txwpx = tx_size_wide[tx_size];
+  const int txhpx = tx_size_high[tx_size];
+  const int have_top = xd->chroma_up_available != 0;
+  const int have_left = xd->chroma_left_available != 0;
+  int n_top_px;
+  int n_left_px;
+  if (LIKELY((xd->mb_to_right_edge | xd->mb_to_bottom_edge) >= 0)) {
+    n_top_px = have_top ? txwpx : 0;
+    n_left_px = have_left ? txhpx : 0;
+  } else {
+    const int ss_x = pd->subsampling_x;
+    const int ss_y = pd->subsampling_y;
+    const int right_px = (xd->mb_to_right_edge >> (3 + ss_x)) + pd->width;
+    const int bottom_px = (xd->mb_to_bottom_edge >> (3 + ss_y)) + pd->height;
+    n_top_px = AOMMIN(AOMMAX(right_px, 0), txwpx) & -have_top;
+    n_left_px = AOMMIN(AOMMAX(bottom_px, 0), txhpx) & -have_left;
+  }
+  return compute_dc_val_cfl_lbd(dst, dst_stride, tx_size, txwpx, txhpx,
+                                n_top_px, n_left_px);
+}
+#endif
+
 #undef EDGE_FILT_LUT1
 #undef EDGE_FILT_LUT0
 #undef EDGE_FILT_CFG

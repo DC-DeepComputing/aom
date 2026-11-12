@@ -968,9 +968,80 @@ static int64_t cfl_compute_rd_fast(const AV1_COMP *const cpi, MACROBLOCK *x,
 
 static const int cfl_dir_ls[2] = { 1, -1 };
 
-#if (!CONFIG_REALTIME_ONLY || CONFIG_AV1_DECODER) && HAVE_SSSE3 && \
-    (defined(__SSE2__) || defined(_M_X64) ||                       \
+#if !CONFIG_REALTIME_ONLY && HAVE_SSSE3 &&   \
+    (defined(__SSE2__) || defined(_M_X64) || \
      (defined(_M_IX86_FP) && _M_IX86_FP >= 2))
+#if HAVE_AVX2 && !CONFIG_HIGHWAY
+#if CONFIG_RUNTIME_CPU_DETECT &&                                         \
+    (!defined(cfl_get_subtract_average_fn) ||                            \
+     !defined(cfl_get_predict_lbd_fn) || !defined(aom_subtract_block) || \
+     !defined(av1_lowbd_fwd_txfm) || !defined(aom_satd))
+#define CFL_LBD_NEED_SSSE3_FALLBACK 1
+static AOM_FORCE_INLINE int cfl_uses_avx2_lbd(void) {
+  return
+#if !defined(cfl_get_subtract_average_fn)
+      cfl_get_subtract_average_fn == cfl_get_subtract_average_fn_avx2 &&
+#endif
+#if !defined(cfl_get_predict_lbd_fn)
+      cfl_get_predict_lbd_fn == cfl_get_predict_lbd_fn_avx2 &&
+#endif
+#if !defined(aom_subtract_block)
+      aom_subtract_block == aom_subtract_block_avx2 &&
+#endif
+#if !defined(av1_lowbd_fwd_txfm)
+      av1_lowbd_fwd_txfm == av1_lowbd_fwd_txfm_avx2 &&
+#endif
+#if !defined(aom_satd)
+      aom_satd == aom_satd_avx2 &&
+#endif
+      1;
+}
+#else
+#define CFL_LBD_NEED_SSSE3_FALLBACK 0
+#endif
+
+static AOM_FORCE_INLINE int cfl_pick_plane_lbd_avx2(const AV1_COMP *cpi,
+                                                    MACROBLOCK *x, int plane,
+                                                    TX_SIZE tx_size) {
+  assert(cpi != NULL && x != NULL);
+  assert(plane == AOM_PLANE_U || plane == AOM_PLANE_V);
+  assert((unsigned)tx_size < TX_SIZES_ALL);
+  MACROBLOCKD *const xd = &x->e_mbd;
+  CFL_CTX *const cfl = &xd->cfl;
+  const CFL_PRED_TYPE pred_plane = get_cfl_pred_type(plane);
+  uint8_t dc_val;
+  if (cfl->dc_pred_is_cached[pred_plane]) {
+    dc_val = ((const uint8_t *)cfl->dc_pred_cache[pred_plane])[0];
+  } else {
+#if AOM_ARCH_X86_64 && HAVE_SSE2 && HAVE_SSSE3 && \
+    (defined(__SSE2__) || defined(_M_X64))
+    (void)cpi;
+    dc_val = av1_compute_dc_val_cfl_lbd(xd, plane, tx_size);
+    if (cfl->use_dc_pred_cache) {
+      ((uint8_t *)cfl->dc_pred_cache[pred_plane])[0] = dc_val;
+      cfl->dc_pred_is_cached[pred_plane] = true;
+    }
+#else
+    MB_MODE_INFO *const mbmi = xd->mi[0];
+    const int8_t orig_cfl_alpha_signs = mbmi->cfl_alpha_signs;
+    const uint8_t orig_cfl_alpha_idx = mbmi->cfl_alpha_idx;
+    mbmi->cfl_alpha_signs = (plane == AOM_PLANE_U) ? 0 : 2;
+    mbmi->cfl_alpha_idx = 0;
+    av1_predict_intra_block_facade(&cpi->common, xd, plane, 0, 0, tx_size);
+    mbmi->cfl_alpha_signs = orig_cfl_alpha_signs;
+    mbmi->cfl_alpha_idx = orig_cfl_alpha_idx;
+    dc_val = xd->plane[plane].dst.buf[0];
+#endif
+  }
+  const struct macroblock_plane *const p = &x->plane[plane];
+  return av1_cfl_pick_plane_parameter_lbd_avx2(cfl->ac_buf_q3, p->src.buf,
+                                               p->src.stride, dc_val, tx_size);
+}
+#else
+#define CFL_LBD_NEED_SSSE3_FALLBACK 1
+#endif  // HAVE_AVX2 && !CONFIG_HIGHWAY
+
+#if CFL_LBD_NEED_SSSE3_FALLBACK
 #if defined(__GNUC__) && !defined(__clang__)
 __attribute__((noinline, noclone))
 #elif defined(__clang__)
@@ -1030,6 +1101,7 @@ static int cfl_pick_plane_parameter_lbd(const AV1_COMP *const cpi,
   }
   return est_best_cfl_idx;
 }
+#endif  // CFL_LBD_NEED_SSSE3_FALLBACK
 #endif
 
 // If cfl_search_range is CFL_MAGS_SIZE, return zero. Otherwise return the index
@@ -1238,8 +1310,8 @@ static int cfl_rd_pick_alpha(MACROBLOCK *const x, const AV1_COMP *const cpi,
   // returning to avoid the unintentional usage of cached dc pred data.
   xd->cfl.use_dc_pred_cache = true;
   // Evaluate alpha parameter of each chroma plane.
-#if (!CONFIG_REALTIME_ONLY || CONFIG_AV1_DECODER) && HAVE_SSSE3 && \
-    (defined(__SSE2__) || defined(_M_X64) ||                       \
+#if !CONFIG_REALTIME_ONLY && HAVE_SSSE3 &&   \
+    (defined(__SSE2__) || defined(_M_X64) || \
      (defined(_M_IX86_FP) && _M_IX86_FP >= 2))
   cfl_predict_lbd_fn predict_lbd = NULL;
   if (LIKELY(cfl_search_range < CFL_MAGS_SIZE && !is_cur_buf_hbd(xd) &&
@@ -1253,17 +1325,43 @@ static int cfl_rd_pick_alpha(MACROBLOCK *const x, const AV1_COMP *const cpi,
     predict_lbd = av1_get_cfl_predict_lbd_fn(tx_size);
   }
   if (LIKELY(predict_lbd != NULL)) {
-    TxfmParam txfm_param;
-    txfm_param.tx_type = DCT_DCT;
-    txfm_param.tx_size = tx_size;
-    txfm_param.lossless = 0;
-    txfm_param.bd = 8;
-    txfm_param.is_hbd = 0;
-    txfm_param.tx_set_type = EXT_TX_SET_ALL16;
-    est_best_cfl_idx_u =
-        cfl_pick_plane_parameter_lbd(cpi, x, 1, predict_lbd, &txfm_param);
-    est_best_cfl_idx_v =
-        cfl_pick_plane_parameter_lbd(cpi, x, 2, predict_lbd, &txfm_param);
+#if HAVE_AVX2 && !CONFIG_HIGHWAY
+#if CFL_LBD_NEED_SSSE3_FALLBACK
+    if (LIKELY(cfl_uses_avx2_lbd())) {
+#else
+    {
+#endif
+      int is_ac_flat = 0;
+      if (!xd->cfl.are_parameters_computed) {
+        is_ac_flat = av1_cfl_prepare_ac_lbd_avx2(&xd->cfl, tx_size);
+      }
+      if (UNLIKELY(is_ac_flat)) {
+        est_best_cfl_idx_u = CFL_INDEX_ZERO;
+        est_best_cfl_idx_v = CFL_INDEX_ZERO;
+      } else {
+        est_best_cfl_idx_u = cfl_pick_plane_lbd_avx2(cpi, x, 1, tx_size);
+        est_best_cfl_idx_v = cfl_pick_plane_lbd_avx2(cpi, x, 2, tx_size);
+      }
+    }
+#if CFL_LBD_NEED_SSSE3_FALLBACK
+    else
+#endif
+#endif  // HAVE_AVX2 && !CONFIG_HIGHWAY
+#if CFL_LBD_NEED_SSSE3_FALLBACK
+    {
+      TxfmParam txfm_param;
+      txfm_param.tx_type = DCT_DCT;
+      txfm_param.tx_size = tx_size;
+      txfm_param.lossless = 0;
+      txfm_param.bd = 8;
+      txfm_param.is_hbd = 0;
+      txfm_param.tx_set_type = EXT_TX_SET_ALL16;
+      est_best_cfl_idx_u =
+          cfl_pick_plane_parameter_lbd(cpi, x, 1, predict_lbd, &txfm_param);
+      est_best_cfl_idx_v =
+          cfl_pick_plane_parameter_lbd(cpi, x, 2, predict_lbd, &txfm_param);
+    }
+#endif
   } else
 #endif
   {
@@ -1272,6 +1370,7 @@ static int cfl_rd_pick_alpha(MACROBLOCK *const x, const AV1_COMP *const cpi,
     est_best_cfl_idx_v = cfl_pick_plane_parameter(
         cpi, x, 2, tx_size, plane_bsize, cfl_search_range);
   }
+#undef CFL_LBD_NEED_SSSE3_FALLBACK
 
   if (LIKELY(cfl_search_range == 1)) {
     // For cfl_search_range=1, further refinement of alpha is not enabled. Hence
