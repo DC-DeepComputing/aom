@@ -977,6 +977,15 @@ static inline tran_low_t *sby_cfl_qcoeff_buf(SbyCflState *s) {
   return (tran_low_t *)(((uintptr_t)s->qcoeff_raw + 31) & ~(uintptr_t)31);
 }
 
+enum {
+  SBUV_PLANE_NONE = 0,   // Neither dst/src_diff nor coeff is live.
+  SBUV_PLANE_DIFF = 1,   // pd->dst and p->src_diff are live (DC-skip).
+  SBUV_PLANE_COEFF = 2,  // pd->dst, p->src_diff, and p->coeff are live.
+  SBUV_TOUCHED_U = 1 << 4,
+  SBUV_TOUCHED_V = 1 << 5,
+  SBUV_TOUCHED_UV = SBUV_TOUCHED_U | SBUV_TOUCHED_V,
+};
+
 /*!\brief Zero-copy in-place chroma state left by the winning candidate of
  * av1_rd_pick_intra_sbuv_mode() for reuse by encode_block_intra().
  */
@@ -985,9 +994,11 @@ typedef struct SbuvLiveState {
   int16_t mi_col;
   // 0: invalid, 1: armed for U/V reuse, 2: validated for current block.
   uint8_t valid;
-  // Bit 0..1: has_coeff[U/V - 1], 2..4: cfl_alpha_signs, 5..7: segment_id.
+  // Bits 2..4: cfl_alpha_signs, 5..7: segment_id.
   uint8_t has_coeff_mask;
   uint8_t bsize;
+  // Bits 0..1: U state (0..2), 2..3: V state (0..2), 4..5: touched mask.
+  uint8_t plane_state;
   uint8_t tx_size;
   uint8_t uv_mode;
   int8_t angle_delta;

@@ -23,6 +23,9 @@
 
 void av1_txb_init_levels_avx2(const tran_low_t *const coeff, const int width,
                               const int height, uint8_t *const levels) {
+  assert(coeff != NULL && levels != NULL);
+  assert(height == 4 || height == 8 || height == 16 || height == 32);
+  assert(width >= 4 && width <= 32);
   const __m256i y_zeros = _mm256_setzero_si256();
   const __m128i zero = _mm256_castsi256_si128(y_zeros);
 
@@ -33,9 +36,10 @@ void av1_txb_init_levels_avx2(const tran_low_t *const coeff, const int width,
   // (height + TX_PAD_HOR) and zero the TX_PAD_BOTTOM (4) trailing rows directly
   // after the loop.
   if (height == 4) {
+    assert((width & 3) == 0);
     // Padded stride = 4 + 4 = 8; 4 rows of 4 coeffs + 4 zero-pad bytes per
     // iter.
-    uint8_t *const ls_end = levels + width * 8;
+    uint8_t *const ls_end = levels + (width << 3);
     do {
       const __m256i c0 = yy_loadu_256(cf);
       const __m256i c1 = yy_loadu_256(cf + 8);
@@ -50,6 +54,7 @@ void av1_txb_init_levels_avx2(const tran_low_t *const coeff, const int width,
     // Zero 4 bottom padding rows (4 * 8 = 32 bytes).
     yy_storeu_256(ls, y_zeros);
   } else if (height == 8) {
+    assert((width & 3) == 0);
     // Padded stride = 8 + 4 = 12; 4 rows per iteration (4 * 12 = 48 bytes).
     uint8_t *const ls_end = levels + width * 12;
     do {
@@ -69,11 +74,11 @@ void av1_txb_init_levels_avx2(const tran_low_t *const coeff, const int width,
 
       xx_storel_64(ls, res0);
       *(int32_t *)(ls + 8) = 0;
-      xx_storel_64(ls + 12, _mm_srli_si128(res0, 8));
+      xx_storel_64(ls + 12, _mm_unpackhi_epi64(res0, res0));
       *(int32_t *)(ls + 20) = 0;
       xx_storel_64(ls + 24, res1);
       *(int32_t *)(ls + 32) = 0;
-      xx_storel_64(ls + 36, _mm_srli_si128(res1, 8));
+      xx_storel_64(ls + 36, _mm_unpackhi_epi64(res1, res1));
       *(int32_t *)(ls + 44) = 0;
       cf += 32;
       ls += 48;
@@ -82,6 +87,7 @@ void av1_txb_init_levels_avx2(const tran_low_t *const coeff, const int width,
     yy_storeu_256(ls, y_zeros);
     xx_storeu_128(ls + 32, zero);
   } else if (height == 16) {
+    assert((width & 1) == 0);
     // Padded stride = 16 + 4 = 20; 2 rows per iteration (2 * 20 = 40 bytes).
     uint8_t *const ls_end = levels + width * 20;
     do {

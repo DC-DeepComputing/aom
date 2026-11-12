@@ -548,6 +548,7 @@ static AOM_FORCE_INLINE tran_low_t pack_txb_coeff_token(tran_low_t level,
 #endif
 
 #define TXB_EOB_MASK 0x07FFu
+#define TXB_PACKED_NEED_SUM (1u << 22)
 
 // Number of tran_low_t entries a transform block takes in the superblock's
 // tcoeff[] stream: one header entry (see txb_header()), then the packed
@@ -1992,7 +1993,7 @@ static int update_and_record_txb_context_multi(
   const PLANE_TYPE plane_type = (PLANE_TYPE)(packed_tx & 0xFu);
   const TX_SIZE tx_size = (TX_SIZE)((packed_tx >> 4) & 0xFFu);
   const TX_SIZE txsize_ctx = (TX_SIZE)((packed_tx >> 12) & 0xFFu);
-  const TX_CLASS tx_class = (TX_CLASS)(packed_tx >> 20);
+  const TX_CLASS tx_class = (TX_CLASS)((packed_tx >> 20) & 3u);
   const int bhl = get_txb_bhl(tx_size);
   const int width = get_txb_wide(tx_size);
   const int height = get_txb_high(tx_size);
@@ -2119,6 +2120,7 @@ static int update_and_record_txb_context_multi(
 #if ENCODETXB_FAST_PACK
 typedef struct {
   const uint8_t *levels;
+  const int16_t *scan;
   aom_cdf_prob (*br_cdfs)[CDF_SIZE(BR_CDF_SIZE)];
   uint16_t *hi_out;
   intptr_t stride;
@@ -2127,8 +2129,20 @@ typedef struct {
   uint32_t gol_or;
 } BrPackState;
 
+TXB_COLD_FN static uint32_t sum_abs_qcoeff_cold(const tran_low_t *qcoeff,
+                                                const int16_t *scan, int eob) {
+  assert(qcoeff != NULL && scan != NULL);
+  assert(eob >= 2 && eob <= 1024);
+  uint32_t sum = 0;
+  for (int i = 0; i < eob; ++i) sum += (uint32_t)abs(qcoeff[scan[i]]);
+  return sum;
+}
+
 TXB_NOINLINE_FN static uint16_t update_pack_ac_br_cold(
-    BrPackState *TXB_RESTRICT st, int pos, uint32_t base_tok, uint32_t level) {
+    BrPackState *TXB_RESTRICT st, int c, uint32_t base_tok, uint32_t level) {
+  assert(st != NULL && st->scan != NULL);
+  assert(c >= 1 && c < 1024);
+  const int pos = st->scan[c];
   const int br_ctx = get_br_ctx_simple_stride(st->levels, pos, st->bhl,
                                               st->stride, st->tx_class);
   update_br_cdf_loop(st->br_cdfs[br_ctx], (int)level - 1 - NUM_BASE_LEVELS);
@@ -2232,6 +2246,7 @@ static uint32_t update_and_record_txb_context_2d_eob5_10(
   uint16_t *TXB_RESTRICT out = (uint16_t *)tcoeff;
   BrPackState br_st;
   br_st.levels = lv16;
+  br_st.scan = scan;
   br_st.br_cdfs =
       ec_ctx->coeff_br_cdf[AOMMIN(txsize_ctx, TX_32X32)][plane_type];
   br_st.hi_out = out + eob;
@@ -2332,7 +2347,7 @@ TXB_COLD_FN static uint32_t finish_txb_tail(
     const tran_low_t *qcoeff, tran_low_t *tcoeff, const int16_t *scan,
     uint16_t *hi_out, const uint64_t *sign_chunks, uint64_t sign_acc, int eob,
     int n_chunks, uint32_t n_ac, uint32_t gol_or, int cap_u16,
-    uint32_t packed_rec, uint32_t abs_sum) {
+    uint32_t packed_rec) {
   const uint32_t total_ac = ((uint32_t)n_chunks << 6) + n_ac;
   if (LIKELY(gol_or == 0)) {
     const int sign_u16 = (int)((total_ac + 15u) >> 4);
@@ -2363,11 +2378,11 @@ TXB_COLD_FN static uint32_t finish_txb_tail(
           *hi_out++ = (uint16_t)carry;
         }
       }
-      return abs_sum | TXB_RET_FAST;
+      return TXB_RET_FAST;
     }
   }
   return finish_golomb_or_slow_cold(qcoeff, tcoeff, scan, hi_out, eob, total_ac,
-                                    gol_or, cap_u16, packed_rec, abs_sum);
+                                    gol_or, cap_u16, packed_rec, 0u);
 }
 #endif  // ENCODETXB_FAST_PACK
 
@@ -2428,7 +2443,7 @@ static uint32_t update_and_record_txb_context_multi(
   const PLANE_TYPE plane_type = (PLANE_TYPE)(packed_tx & 0xFu);
   const TX_SIZE tx_size = (TX_SIZE)((packed_tx >> 4) & 0xFFu);
   const TX_SIZE txsize_ctx = (TX_SIZE)((packed_tx >> 12) & 0xFFu);
-  const TX_CLASS tx_class = (TX_CLASS)(packed_tx >> 20);
+  const TX_CLASS tx_class = (TX_CLASS)((packed_tx >> 20) & 3u);
   const int bhl = get_txb_bhl(tx_size);
   const int width = get_txb_wide(tx_size);
   const int height = 1 << bhl;
@@ -2493,11 +2508,11 @@ static uint32_t update_and_record_txb_context_multi(
   const uint64_t *const k_mask = kCdf4Mask;
   const __m128i top_vec = _mm_set1_epi16((int16_t)CDF_PROB_TOP);
 #endif
-  uint32_t abs_sum;
 #if ENCODETXB_FAST_PACK
   uint16_t *TXB_RESTRICT out = (uint16_t *)tcoeff;
   BrPackState br_st;
   br_st.levels = levels;
+  br_st.scan = scan;
   br_st.br_cdfs =
       ec_ctx->coeff_br_cdf[AOMMIN(txsize_ctx, TX_32X32)][plane_type];
   br_st.hi_out = out + eob;
@@ -2510,6 +2525,7 @@ static uint32_t update_and_record_txb_context_multi(
   uint64_t sign_acc;
   uint32_t n_ac = 1u;
 #else
+  uint32_t abs_sum = 0;
   aom_cdf_prob(*TXB_RESTRICT const br_cdfs)[CDF_SIZE(BR_CDF_SIZE)] =
       ec_ctx->coeff_br_cdf[AOMMIN(txsize_ctx, TX_32X32)][plane_type];
 #endif
@@ -2520,7 +2536,6 @@ static uint32_t update_and_record_txb_context_multi(
     const tran_low_t v = qcoeff[pos];
     const uint32_t level = (uint32_t)abs(v);
     const uint32_t symb = AOMMIN(level, 3u) - 1u;
-    abs_sum = level;
     assert(coeff_ctx < 4);
 #if HAVE_SSE2 && defined(__SSE2__)
     update_cdf_3_mask(
@@ -2543,6 +2558,7 @@ static uint32_t update_and_record_txb_context_multi(
       *out++ = (uint16_t)base_tok;
     }
 #else
+    abs_sum = level;
     uint32_t tok = level | ((uint32_t)(v < 0) << 20) | (coeff_ctx << 21);
     if (UNLIKELY(level > NUM_BASE_LEVELS)) {
       const int br_ctx = get_br_ctx_eob(pos, bhl, tx_class);
@@ -2562,7 +2578,6 @@ static uint32_t update_and_record_txb_context_multi(
       const tran_low_t v = qcoeff[pos];
       const uint32_t level = (uint32_t)abs(v);
       const uint32_t symb = AOMMIN(level, 3u);
-      abs_sum += level;
 #if HAVE_SSE2 && defined(__SSE2__)
       update_cdf_4_mask(base_cdfs[coeff_ctx], symb, k_mask, top_vec);
 #else
@@ -2573,7 +2588,7 @@ static uint32_t update_and_record_txb_context_multi(
       n_ac += nz;
       const uint32_t base_tok = symb | (coeff_ctx << 2);
       if (UNLIKELY(level > NUM_BASE_LEVELS)) {
-        *out++ = update_pack_ac_br_cold(&br_st, pos, base_tok, level);
+        *out++ = update_pack_ac_br_cold(&br_st, (int)c, base_tok, level);
       } else {
         *out++ = (uint16_t)base_tok;
       }
@@ -2612,7 +2627,6 @@ static uint32_t update_and_record_txb_context_multi(
     const tran_low_t v = qcoeff[0];
     const uint32_t level = (uint32_t)abs(v);
     const uint32_t symb = AOMMIN(level, 3u);
-    abs_sum += level;
 #if HAVE_SSE2 && defined(__SSE2__)
     update_cdf_4_mask(base_cdfs[coeff_ctx], symb, k_mask, top_vec);
 #else
@@ -2630,6 +2644,7 @@ static uint32_t update_and_record_txb_context_multi(
       *out++ = (uint16_t)base_tok;
     }
 #else
+    abs_sum += level;
     uint32_t tok = level | ((uint32_t)(v < 0) << 20) | (coeff_ctx << 21);
     if (UNLIKELY(level > NUM_BASE_LEVELS)) {
       const int br_ctx = get_br_ctx_stride(levels, 0, bhl, stride, tx_class);
@@ -2643,6 +2658,7 @@ static uint32_t update_and_record_txb_context_multi(
   const int cap_u16 = width << (bhl + 1);
   uint16_t *hi_out = br_st.hi_out;
   const uint32_t gol_or = br_st.gol_or;
+  uint32_t ret;
   if (LIKELY(gol_or == 0 && n_chunks == 0)) {
     const int sign_u16 = (int)((n_ac + 15u) >> 4);
     if (LIKELY(hi_out + 1 + sign_u16 <= (uint16_t *)tcoeff + cap_u16)) {
@@ -2653,12 +2669,19 @@ static uint32_t update_and_record_txb_context_multi(
         sign_acc >>= 16;
         *hi_out++ = (uint16_t)sign_acc;
       }
-      return abs_sum | TXB_RET_FAST;
+      ret = TXB_RET_FAST;
+      goto done_ret;
     }
   }
-  return finish_txb_tail(
-      qcoeff, tcoeff, scan, hi_out, sign_chunks, sign_acc, eob, n_chunks, n_ac,
-      gol_or, cap_u16, (uint32_t)tx_size | ((uint32_t)tx_class << 8), abs_sum);
+  ret = finish_txb_tail(qcoeff, tcoeff, scan, hi_out, sign_chunks, sign_acc,
+                        eob, n_chunks, n_ac, gol_or, cap_u16,
+                        (uint32_t)tx_size | ((uint32_t)tx_class << 8));
+done_ret:
+  if (UNLIKELY(packed_tx & TXB_PACKED_NEED_SUM)) {
+    ret = (ret & ~TXB_RET_SUM_MASK) |
+          (sum_abs_qcoeff_cold(qcoeff, scan, eob) & TXB_RET_SUM_MASK);
+  }
+  return ret;
 #else
   return abs_sum;
 #endif
@@ -2771,6 +2794,7 @@ TXB_NOINLINE_FN static void update_and_record_txb_context_output(
   av1_set_entropy_contexts(xd, pd, plane, plane_bsize, tx_size, cul_level,
                            blk_col, blk_row);
 
+  int abs_sum;
   if (eob == 1) {
     const tran_low_t level = abs(dc_val);
 #if ENCODETXB_FAST_PACK
@@ -2827,24 +2851,25 @@ TXB_NOINLINE_FN static void update_and_record_txb_context_output(
       }
     }
 #endif
-    if (UNLIKELY(cpi->mt_info.pack_bs_mt_enabled)) td->abs_sum_level += level;
+    abs_sum = level;
   } else {
     tran_low_t *const tcoeff = tc;
     const SCAN_ORDER *const scan_order = get_scan(tx_size, tx_type);
 #if CONFIG_ENTROPY_STATS
-    const uint32_t packed_tx = (uint32_t)plane_type | ((uint32_t)tx_size << 4) |
-                               ((uint32_t)txsize_ctx << 12) |
-                               ((uint32_t)tx_class << 20);
+    const uint32_t packed_tx =
+        (uint32_t)plane_type | ((uint32_t)tx_size << 4) |
+        ((uint32_t)txsize_ctx << 12) | ((uint32_t)tx_class << 20) |
+        (cpi->mt_info.pack_bs_mt_enabled ? TXB_PACKED_NEED_SUM : 0u);
     txb_rec[0] = txb_header((uint32_t)eob, ent_byte);
-    const int abs_sum = update_and_record_txb_context_multi(
-        cpi, td, ec_ctx, qcoeff, tcoeff, eob, scan_order->scan, packed_tx,
-        allow_update_cdf);
+    abs_sum = update_and_record_txb_context_multi(cpi, td, ec_ctx, qcoeff,
+                                                  tcoeff, eob, scan_order->scan,
+                                                  packed_tx, allow_update_cdf);
 #else
-    int abs_sum;
     if (allow_update_cdf) {
       const uint32_t packed_tx =
           (uint32_t)plane_type | ((uint32_t)tx_size << 4) |
-          ((uint32_t)txsize_ctx << 12) | ((uint32_t)tx_class << 20);
+          ((uint32_t)txsize_ctx << 12) | ((uint32_t)tx_class << 20) |
+          (cpi->mt_info.pack_bs_mt_enabled ? TXB_PACKED_NEED_SUM : 0u);
       uint32_t ret;
       if (tx_class == TX_CLASS_2D && eob <= 10) {
 #if HAVE_SSE2 && defined(__SSE2__) && ENCODETXB_FAST_PACK
@@ -2884,8 +2909,8 @@ TXB_NOINLINE_FN static void update_and_record_txb_context_output(
       abs_sum = (int)ret;
     }
 #endif
-    if (UNLIKELY(cpi->mt_info.pack_bs_mt_enabled)) td->abs_sum_level += abs_sum;
   }
+  if (UNLIKELY(cpi->mt_info.pack_bs_mt_enabled)) td->abs_sum_level += abs_sum;
 }
 
 #if !CONFIG_ENTROPY_STATS
@@ -3080,9 +3105,10 @@ TXB_NOINLINE_FN static void update_intra_mb_txb_context_output(
         ec_ctx->txb_skip_cdf[txsize_ctx];
     aom_cdf_prob *const eob_cdf0 =
         get_eob_flag_cdf(ec_ctx, eob_s, plane_type, 0);
-    const uint32_t packed_base = (uint32_t)plane_type |
-                                 ((uint32_t)tx_size << 4) |
-                                 ((uint32_t)txsize_ctx << 12);
+    const uint32_t packed_base =
+        (uint32_t)plane_type | ((uint32_t)tx_size << 4) |
+        ((uint32_t)txsize_ctx << 12) |
+        (cpi->mt_info.pack_bs_mt_enabled ? TXB_PACKED_NEED_SUM : 0u);
 
     const int max_blocks_wide =
         is_single_txb ? step_w

@@ -6179,11 +6179,17 @@ static void txfm_rd_in_plane_pack(MACROBLOCK *x, const AV1_COMP *cpi,
           p->src.buf, p->src.stride, pd->dst.buf, pd->dst.stride, p->src_diff,
           (uint32_t)txw | ((uint32_t)txw << 16) | ((uint32_t)txh << 24));
 #if !CONFIG_REALTIME_ONLY
-      if (txfm_params->enable_nn_prune_intra_tx_depths) {
+      if (UNLIKELY(txfm_params->enable_nn_prune_intra_tx_depths)) {
         ml_predict_intra_tx_depth_prune(x, 0, 0, plane_bsize, plane_tx_size);
         if (txfm_params->nn_prune_depths_for_intra_tx == TX_PRUNE_LARGEST) {
           av1_invalid_rd_stats(rd_stats);
           x->sby_cfl.valid = 0;
+          if (plane != 0) {
+            const int s_shift = (plane - 1) * 2;
+            x->sbuv_live.plane_state =
+                (uint8_t)((x->sbuv_live.plane_state & ~(3u << s_shift)) |
+                          (1u << (plane + 3)));
+          }
           return;
         }
       }
@@ -6192,7 +6198,13 @@ static void txfm_rd_in_plane_pack(MACROBLOCK *x, const AV1_COMP *cpi,
                    try_intra_dc_skip_lbd(x, plane, 0, 0, 0, plane_bsize,
                                          tx_bsize, plane_tx_size, sum_sse,
                                          rd_stats))) {
-        // DC-skip filled rd_stats directly.
+        // DC-skip filled rd_stats directly; dst + src_diff are live (state 1).
+        if (plane != 0) {
+          const int s_shift = (plane - 1) * 2;
+          x->sbuv_live.plane_state =
+              (uint8_t)((x->sbuv_live.plane_state & ~(3u << s_shift)) |
+                        (SBUV_PLANE_DIFF << s_shift) | (1u << (plane + 3)));
+        }
       } else {
         TXB_CTX txb_ctx;
         get_txb_ctx_fast(plane_bsize, plane_tx_size, plane,
@@ -6204,11 +6216,23 @@ static void txfm_rd_in_plane_pack(MACROBLOCK *x, const AV1_COMP *cpi,
                                   ((uint64_t)(uint32_t)sum_sse << 32);
         search_tx_type_intra_lbd(cpi, x, sse_pack, &txb_ctx,
                                  ref_best_rd - current_rd, rd_stats);
+        if (plane != 0) {
+          const int s_shift = (plane - 1) * 2;
+          x->sbuv_live.plane_state =
+              (uint8_t)((x->sbuv_live.plane_state & ~(3u << s_shift)) |
+                        (SBUV_PLANE_COEFF << s_shift) | (1u << (plane + 3)));
+        }
       }
     } else
 #endif
     {
       if (!is_inter) {
+        if (plane != 0) {
+          const int s_shift = (plane - 1) * 2;
+          x->sbuv_live.plane_state =
+              (uint8_t)((x->sbuv_live.plane_state & ~(3u << s_shift)) |
+                        (1u << (plane + 3)));
+        }
         av1_predict_intra_block_facade(&cpi->common, xd, plane, 0, 0,
                                        plane_tx_size);
         av1_subtract_txb(x, plane, plane_bsize, 0, 0, plane_tx_size, DCT_DCT,
@@ -6258,6 +6282,12 @@ static void txfm_rd_in_plane_pack(MACROBLOCK *x, const AV1_COMP *cpi,
     return;
   }
 
+  if (plane != 0 && !is_inter_block(mbmi)) {
+    const int s_shift = (plane - 1) * 2;
+    x->sbuv_live.plane_state =
+        (uint8_t)((x->sbuv_live.plane_state & ~(3u << s_shift)) |
+                  (1u << (plane + 3)));
+  }
   txfm_rd_in_plane_multi(x, cpi, rd_stats, ref_best_rd, current_rd,
                          (pack_hi & ~0xFF000000000000ULL) |
                              ((uint64_t)(uint8_t)plane_tx_size << 48));

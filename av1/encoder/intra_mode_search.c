@@ -1380,6 +1380,7 @@ static int cfl_rd_pick_alpha(MACROBLOCK *const x, const AV1_COMP *const cpi,
         cpi, x, 2, tx_size, plane_bsize, cfl_search_range);
   }
 #undef CFL_LBD_NEED_SSSE3_FALLBACK
+  if (!untouched) x->sbuv_live.plane_state = SBUV_TOUCHED_UV;
 
   if (LIKELY(cfl_search_range == 1)) {
     // For cfl_search_range=1, further refinement of alpha is not enabled. Hence
@@ -1445,6 +1446,7 @@ static int cfl_rd_pick_alpha(MACROBLOCK *const x, const AV1_COMP *const cpi,
     return 0;
   }
 
+  x->sbuv_live.plane_state = SBUV_TOUCHED_UV;
   return cfl_rd_pick_alpha_multi(x, cpi, tx_size, ref_best_rd, cfl_search_range,
                                  est_best_cfl_idx_u, est_best_cfl_idx_v,
                                  best_rd_stats, best_cfl_alpha_idx,
@@ -1565,6 +1567,13 @@ static uint8_t sby_cfl_can_track(const AV1_COMP *cpi, const MACROBLOCK *x,
 #endif
 }
 
+static inline uint8_t sbuv_clear_touched(uint8_t win_state,
+                                         uint8_t live_state) {
+  const uint8_t touched = (uint8_t)(live_state >> 4);
+  return (uint8_t)(win_state &
+                   ~(((touched & 1u) * 3u) | ((touched & 2u) * 6u)));
+}
+
 int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
                                     int *rate, int *rate_tokenonly,
                                     int64_t *distortion, uint8_t *skippable,
@@ -1577,6 +1586,7 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
   const uint8_t sby_valid = x->sby_cfl.valid;
   x->sby_cfl.valid = 0;
   x->sbuv_live.valid = 0;
+  x->sbuv_live.plane_state = SBUV_PLANE_NONE;
   xd->cfl.store_y = 0;
 
   init_sbuv_mode(mbmi);
@@ -1686,8 +1696,7 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
   uint8_t best_cfl_alpha_idx = mbmi->cfl_alpha_idx;
   int8_t best_cfl_alpha_signs = mbmi->cfl_alpha_signs;
   int dir_mode_skip_mask_ready = 0;
-  int win_inplace = 0;
-  uint8_t win_has_coeff = 0;
+  uint8_t win_plane_state = 0;
 
   // Search through all non-palette modes, stopping once no allowed modes
   // remain.
@@ -1706,7 +1715,7 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
     RD_STATS tokenonly_rd_stats;
     const int is_directional_mode =
         (uv_mode >= UV_V_PRED && uv_mode <= UV_D67_PRED);
-    int cand_inplace = 0;
+    uint8_t cand_plane_state = 0;
 
     mbmi->uv_mode = uv_mode;
     mbmi->angle_delta[PLANE_TYPE_UV] = 0;
@@ -1716,14 +1725,20 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
         sby_cfl_materialize(x, mbmi->bsize, mbmi->tx_size, can_reuse);
       }
       const TX_SIZE uv_tx_size = av1_get_tx_size(AOM_PLANE_U, xd);
+      x->sbuv_live.plane_state = SBUV_PLANE_NONE;
       const int cfl_res = cfl_rd_pick_alpha(
           x, cpi, uv_tx_size, best_rd, sf->intra_sf.cfl_search_range,
           &tokenonly_rd_stats, &mbmi->cfl_alpha_idx, &mbmi->cfl_alpha_signs);
       if (cfl_res <= 0) {
-        if (cfl_res == 0) win_inplace = 0;
+        if (cfl_res == 0) {
+          win_plane_state =
+              sbuv_clear_touched(win_plane_state, x->sbuv_live.plane_state);
+        }
         continue;
       }
-      cand_inplace = (cfl_res == 1);
+      cand_plane_state = (cfl_res == 1)
+                             ? (uint8_t)(x->sbuv_live.plane_state & 0xFu)
+                             : SBUV_PLANE_NONE;
     } else if (is_directional_mode && use_angle_delta) {
       if (sf->intra_sf.chroma_intra_pruning_with_hog &&
           !dir_mode_skip_mask_ready) {
@@ -1746,13 +1761,17 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
 
       // Search through angle delta
       int dummy_rate;
+      x->sbuv_live.plane_state = SBUV_PLANE_NONE;
       const int ang_res = rd_pick_intra_angle_sbuv(
           cpi, x, bsize, mode_rate, best_rd, &dummy_rate, &tokenonly_rd_stats);
       if (!ang_res) {
-        win_inplace = 0;
+        win_plane_state =
+            sbuv_clear_touched(win_plane_state, x->sbuv_live.plane_state);
         continue;
       }
-      cand_inplace = (ang_res == 2);
+      cand_plane_state = (ang_res == 2)
+                             ? (uint8_t)(x->sbuv_live.plane_state & 0xFu)
+                             : SBUV_PLANE_NONE;
     } else {
       if (uv_mode == UV_SMOOTH_PRED &&
           should_prune_chroma_smooth_pred_based_on_source_variance(cpi, x,
@@ -1760,11 +1779,13 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
         continue;
 
       // Predict directly if we don't need to search for angle delta.
+      x->sbuv_live.plane_state = SBUV_PLANE_NONE;
       if (!av1_txfm_uvrd(cpi, x, &tokenonly_rd_stats, bsize, best_rd)) {
-        win_inplace = 0;
+        win_plane_state =
+            sbuv_clear_touched(win_plane_state, x->sbuv_live.plane_state);
         continue;
       }
-      cand_inplace = 1;
+      cand_plane_state = (uint8_t)(x->sbuv_live.plane_state & 0xFu);
     }
 
     int extra_cost = 0;
@@ -1805,11 +1826,10 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
       *rate_tokenonly = tokenonly_rd_stats.rate;
       *distortion = tokenonly_rd_stats.dist;
       *skippable = tokenonly_rd_stats.skip_txfm;
-      win_inplace = cand_inplace;
-      win_has_coeff = (uint8_t)((x->plane[1].eobs[0] > 0) |
-                                ((x->plane[2].eobs[0] > 0) << 1));
+      win_plane_state = cand_plane_state;
     } else {
-      win_inplace = 0;
+      win_plane_state =
+          sbuv_clear_touched(win_plane_state, x->sbuv_live.plane_state);
     }
   }
 
@@ -1822,11 +1842,12 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
   if (UNLIKELY(cpi->oxcf.tool_cfg.enable_palette &&
                av1_allow_palette(cm->features.allow_screen_content_tools,
                                  mbmi_bsize))) {
+    x->sbuv_live.plane_state = SBUV_PLANE_NONE;
     pick_palette_intra_sbuv_cold(cpi, x, uv_mode_cost[UV_DC_PRED], &best_rd,
                                  rate, rate_tokenonly, distortion, skippable);
-    win_inplace = 0;
+    win_plane_state = SBUV_PLANE_NONE;
   }
-  if (win_inplace && bsize == mbmi_bsize &&
+  if (win_plane_state && bsize == mbmi_bsize &&
       ((best_uv_mode != UV_CFL_PRED) || x->cfl_luma_live.valid ||
        ((bsize == BLOCK_8X8 || bsize == BLOCK_16X16 || bsize == BLOCK_32X32) &&
         x->cfl_luma_snap[av1_cfl_luma_snap_idx(bsize)].k.valid))) {
@@ -1834,10 +1855,10 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
     s->mi_row = (int16_t)xd->mi_row;
     s->mi_col = (int16_t)xd->mi_col;
     s->valid = 1;
+    s->plane_state = win_plane_state;
     assert((unsigned)mbmi->segment_id < MAX_SEGMENTS);
-    s->has_coeff_mask =
-        (uint8_t)(win_has_coeff | ((best_cfl_alpha_signs & 7) << 2) |
-                  ((mbmi->segment_id & 7) << 5));
+    s->has_coeff_mask = (uint8_t)(((best_cfl_alpha_signs & 7) << 2) |
+                                  ((mbmi->segment_id & 7) << 5));
     s->bsize = (uint8_t)bsize;
     s->tx_size = (uint8_t)max_tx_size;
     s->uv_mode = (uint8_t)best_uv_mode;

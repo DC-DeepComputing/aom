@@ -849,7 +849,7 @@ int av1_sbuv_live_prepare(struct intra_b_args *args, int sub_blk,
   assert((unsigned)plane_bsize < BLOCK_SIZES_ALL);
   assert((unsigned)tx_size < TX_SIZES_ALL);
   if (sub_blk != 0 || plane_bsize != txsize_to_bsize[tx_size] ||
-      s->tx_size != (uint8_t)tx_size) {
+      s->tx_size != (uint8_t)tx_size || s->valid == 0) {
     s->valid = 0;
     return 0;
   }
@@ -901,6 +901,8 @@ int av1_sbuv_live_prepare(struct intra_b_args *args, int sub_blk,
     }
     s->valid = 2;
   }
+  const unsigned int pstate = (s->plane_state >> ((plane - 1) * 2)) & 3u;
+  if (!pstate) return 0;
   if (mbmi->skip_txfm) return 1;
   const TX_TYPE tx_type = (txsize_sqr_up_map[tx_size] == TX_32X32)
                               ? DCT_DCT
@@ -909,7 +911,7 @@ int av1_sbuv_live_prepare(struct intra_b_args *args, int sub_blk,
   args->txfm_param.tx_type = tx_type;
   args->quant_param.qmatrix = (tx_type < IDTX) ? args->seg_qmatrix : NULL;
   args->quant_param.iqmatrix = (tx_type < IDTX) ? args->seg_iqmatrix : NULL;
-  if (!((s->has_coeff_mask >> (plane - 1)) & 1u)) {
+  if (pstate == SBUV_PLANE_DIFF) {
     struct macroblock_plane *const p = &x->plane[plane];
     av1_fwd_txfm(p->src_diff, p->coeff, block_size_wide[plane_bsize],
                  &args->txfm_param);
