@@ -508,11 +508,16 @@ static void encode_superblock(const AV1_COMP *const cpi, TileDataEnc *tile_data,
     const TRELLIS_OPT_TYPE enable_trellis =
         cpi->optimize_seg_arr[mbmi->segment_id];
     int start_plane = 0;
-    if (cfl_luma_live && dry_run == DRY_RUN_NORMAL &&
-        cfl_luma_live_reuse(x, bsize)) {
+    if (UNLIKELY(x->out_reuse)) {
+      // OUTPUT_ENABLED encode of a live block: its last dry run left the same
+      // pixels, eobs, contexts and coefficients (see mark_output_reuse()).
+      assert(dry_run == OUTPUT_ENABLED);
+      start_plane = max_planes;
+    } else if (cfl_luma_live && dry_run == DRY_RUN_NORMAL &&
+               cfl_luma_live_reuse(x, bsize)) {
       start_plane = 1;
 #if !CONFIG_REALTIME_ONLY
-    } else if (dry_run == DRY_RUN_NORMAL &&
+    } else if (dry_run != DRY_RUN_COSTCOEFFS &&
                (bsize == BLOCK_16X16 || bsize == BLOCK_32X32) &&
                x->cfl_luma_snap[bsize == BLOCK_32X32].k.valid &&
                cfl_luma_snap_reuse(x, bsize)) {
@@ -2350,6 +2355,19 @@ static void encode_b(const AV1_COMP *const cpi, TileDataEnc *tile_data,
   x->rdmult = origin_mult;
 }
 
+// Returns 1 if pc_tree was marked by mark_output_reuse().
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
+static int is_output_reuse_node(const MACROBLOCK *x, const PC_TREE *pc_tree) {
+  assert(x != NULL && pc_tree != NULL);
+  assert(x->out_reuse_cnt <= OUT_REUSE_MAX_NODES);
+  for (int i = 0; i < x->out_reuse_cnt; ++i) {
+    if (x->out_reuse_node[i] == pc_tree) return 1;
+  }
+  return 0;
+}
+
 static void encode_sb_ex(const AV1_COMP *const cpi, ThreadData *td,
                          TileDataEnc *tile_data, TokenExtra **tp, int mi_row,
                          int mi_col, RUN_TYPE dry_run, BLOCK_SIZE bsize,
@@ -2366,6 +2384,16 @@ static void encode_sb_ex(const AV1_COMP *const cpi, ThreadData *td,
   MACROBLOCK *const x = &td->mb;
   MACROBLOCKD *const xd = &x->e_mbd;
   const int hbs = mi_size_wide[bsize] >> 1;
+
+  if (UNLIKELY(!dry_run && x->out_reuse_cnt != 0) && !x->out_reuse &&
+      is_output_reuse_node(x, pc_tree)) {
+    // The whole subtree reuses its dry runs (see mark_output_reuse()).
+    x->out_reuse = 1;
+    encode_sb_ex(cpi, td, tile_data, tp, mi_row, mi_col, dry_run, bsize,
+                 pc_tree, rate, fast_intra_sb);
+    x->out_reuse = 0;
+    return;
+  }
 
   if (UNLIKELY(!dry_run) && bsize >= BLOCK_8X8) {
     if ((mi_row + hbs) < mi_params->mi_rows &&
@@ -2635,6 +2663,8 @@ void av1_rd_use_partition(AV1_COMP *cpi, ThreadData *td, TileDataEnc *tile_data,
   BLOCK_SIZE bs_type = mib[0]->bsize;
   int use_partition_none = 0;
   x->try_merge_partition = 0;
+  x->out_reuse = 0;
+  x->out_reuse_cnt = 0;
   for (int i = 0; i < 2; ++i) {
     x->cfl_luma_snap[i].k.valid = 0;
     x->cfl_luma_snap[i].open = 0;
@@ -4029,6 +4059,7 @@ typedef struct PartSearchFixedCtx {
   uint8_t ss_y;
   uint8_t live_ok;
   uint8_t dry_rdmult_free;
+  uint8_t out_ok;
 } PartSearchFixedCtx;
 /*!\endcond */
 
@@ -6288,6 +6319,8 @@ static RD_STATS rd_search_for_fixed_partition(
   const AV1_COMMON *const cm = &cpi->common;
   const int num_planes = av1_num_planes(cm);
   MACROBLOCK *const x = &td->mb;
+  x->out_reuse = 0;
+  x->out_reuse_cnt = 0;
   for (int i = 0; i < 2; ++i) {
     x->cfl_luma_snap[i].k.valid = 0;
     x->cfl_luma_snap[i].open = 0;
@@ -6348,6 +6381,7 @@ static RD_STATS rd_search_for_fixed_partition(
   sctx.ss_y = (uint8_t)xd->plane[1].subsampling_y;
   sctx.live_ok = 0;
   sctx.dry_rdmult_free = 0;
+  sctx.out_ok = 0;
 
   switch (partition) {
     case PARTITION_NONE:
@@ -7365,6 +7399,65 @@ static void encode_live_split(const PartSearchFixedCtx *sctx, int mi_row,
   }
 }
 
+// Marks the subtrees whose OUTPUT_ENABLED encode can reuse their last dry run:
+// children 0..2 of the SPLIT root, which are live as in encode_live_split(),
+// and likewise down the chain of live 4th children. Their pixels, mode info
+// and contexts are what re-encoding would produce, and each block's own
+// PICK_MODE_CONTEXT still holds the coefficients its last encode quantized
+// without aliasing before OUTPUT_ENABLED because
+// prune_pc_node_keep_best_none() retains winning-tree PMCs rather than
+// returning them to pmc_pool.
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
+static void mark_output_reuse(const PartSearchFixedCtx *sctx, int mi_row,
+                              int mi_col, BLOCK_SIZE bsize,
+                              const PC_TREE *pc_tree) {
+  assert(sctx != NULL && sctx->td != NULL && sctx->live_defer != NULL &&
+         pc_tree != NULL);
+  MACROBLOCK *const x = &sctx->td->mb;
+  int n = 0;
+  for (;;) {
+    assert((unsigned)bsize < BLOCK_SIZES_ALL);
+    assert(n + 3 <= OUT_REUSE_MAX_NODES);
+    for (int i = 0; i < 3; ++i) {
+      assert(pc_tree->split[i] != NULL);
+      x->out_reuse_node[n++] = pc_tree->split[i];
+    }
+    const int hbs = mi_size_wide[bsize] >> 1;
+    mi_row += hbs;
+    mi_col += hbs;
+    bsize = get_partition_subsize(bsize, PARTITION_SPLIT);
+    assert((unsigned)bsize < BLOCK_SIZES_ALL);
+    assert(pc_tree->split[3] != NULL);
+    pc_tree = pc_tree->split[3];
+    if (bsize < BLOCK_16X16 || bsize >= BLOCK_SIZES_ALL ||
+        pc_tree->partitioning != PARTITION_SPLIT ||
+        n + 3 > OUT_REUSE_MAX_NODES) {
+      break;
+    }
+    const int level = mi_size_wide_log2[bsize] - 2;
+    assert(level >= 0 && level < LIVE_SPLIT_LEVELS);
+    LiveSplit *const d = &sctx->live_defer[level];
+    if (!d->valid || d->mi_row != mi_row || d->mi_col != mi_col ||
+        d->epoch != x->live_epoch ||
+        (!sctx->dry_rdmult_free && d->rdmult != x->rdmult)) {
+      break;
+    }
+    d->valid = 0;
+  }
+  x->out_reuse_cnt = (uint8_t)n;
+  // A NONE-best 4th child at the end of the chain was never dry-run, but its
+  // CfL luma re-encode snapshot (and its coefficients) may still be reused.
+  if (bsize == BLOCK_16X16 || bsize == BLOCK_32X32) {
+    CflLumaSnap *const s = &x->cfl_luma_snap[bsize == BLOCK_32X32];
+    if (s->deferred_epoch == x->live_epoch &&
+        pc_tree->partitioning == PARTITION_NONE) {
+      s->k.valid = 1;
+    }
+  }
+}
+
 static bool rd_pick_partition_rec(
     const PartSearchFixedCtx *sctx, int mi_row, int mi_col, BLOCK_SIZE bsize,
     RD_STATS *rd_cost, RD_STATS best_rdc, PC_TREE *pc_tree,
@@ -7422,6 +7515,13 @@ static bool rd_pick_partition_rec(
     assert(level >= 0 && level < LIVE_SPLIT_LEVELS);
     assert(sctx->live_defer != NULL);
     live = pc_tree->index == 3 ? &sctx->live_defer[level] : &live_local;
+    live->valid = 0;
+  } else if (UNLIKELY(is_sb_root) && sctx->out_ok &&
+             blk_params.subsize <= x->sb_enc.max_partition_size &&
+             mi_size_wide[blk_params.subsize] >=
+                 mi_size_wide[cm->mi_params.mi_alloc_bsize]) {
+    // Children 0..2 of the root dry-run themselves (see mark_output_reuse()).
+    live = &live_local;
     live->valid = 0;
   }
 
@@ -7780,8 +7880,17 @@ BEGIN_PARTITION_SEARCH:
       ++cpi->sb_counter;
 #endif  // COLLECT_MOTION_SEARCH_FEATURE_SB
       set_cb_offsets(x->cb_offset, 0, 0);
+      if (live != NULL && live->valid && emit_output &&
+          pc_tree->partitioning == PARTITION_SPLIT &&
+          live->epoch == x->live_epoch &&
+          (sctx->dry_rdmult_free || live->rdmult == x->rdmult)) {
+        mark_output_reuse(sctx, mi_row, mi_col, bsize, pc_tree);
+      }
       encode_sb_ex(cpi, td, tile_data, tp, mi_row, mi_col, run_type, bsize,
                    pc_tree, NULL, sctx->fast_intra_sb);
+      x->out_reuse_cnt = 0;
+      x->cfl_luma_snap[0].k.valid = 0;
+      x->cfl_luma_snap[1].k.valid = 0;
       assert(pc_tree == td->pc_root);
       if (LIKELY(sctx->arena != NULL)) {
         free_pc_subtree_arena(sctx->arena, sctx->pmc_pool, pc_tree, 0);
@@ -7850,6 +7959,8 @@ BEGIN_PARTITION_SEARCH:
 // allocated) together with sctx->arena.
 static void release_sb_arena_tree(const PartSearchFixedCtx *sctx) {
   ThreadData *const td = sctx->td;
+  td->mb.out_reuse = 0;
+  td->mb.out_reuse_cnt = 0;
   for (int i = 0; i < 2; ++i) {
     td->mb.cfl_luma_snap[i].k.valid = 0;
     td->mb.cfl_luma_snap[i].deferred_epoch = 0;
@@ -8029,6 +8140,14 @@ bool av1_rd_pick_partition(AV1_COMP *const cpi, ThreadData *td,
                 !is_trellis_used(cpi->sf.rd_sf.optimize_coefficients,
                                  DRY_RUN_NORMAL) ||
                 tuning != 0);
+  // The OUTPUT_ENABLED encode of a live subtree recomputes exactly what its
+  // dry runs left if both passes use trellis (and so rdmult) alike.
+  sctx.out_ok =
+      (uint8_t)(sctx.live_ok &&
+                cpi->sf.rd_sf.optimize_coefficients != FINAL_PASS_TRELLIS_OPT &&
+                cpi->optimize_seg_arr[0] != FINAL_PASS_TRELLIS_OPT);
+  td->mb.out_reuse = 0;
+  td->mb.out_reuse_cnt = 0;
   // Invalidate prior-SB epochs and keep live_epoch non-zero (0 is the
   // invalid sentinel for last_dry_epoch and deferred_epoch).
   td->mb.last_dry_epoch = 0;

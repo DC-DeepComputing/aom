@@ -823,6 +823,7 @@ typedef struct {
 /*!\cond */
 // 4: NEAREST, NEW, NEAR, GLOBAL
 #define SINGLE_REF_MODES ((REF_FRAMES - 1) * 4)
+struct PC_TREE;
 /*!\endcond */
 struct inter_modes_info;
 
@@ -884,6 +885,9 @@ typedef struct SetOffsetsLoc {
 
 //! Max mi units per side of a block that may use CfL (32x32).
 #define CFL_LUMA_LIVE_MAX_MI (CFL_BUF_LINE >> MI_SIZE_LOG2)
+
+//! Max PC_TREE nodes whose OUTPUT_ENABLED encode reuses their dry runs.
+#define OUT_REUSE_MAX_NODES 12
 
 /*!\brief Snapshot of the luma reconstruction (pixels in dst and
  * cfl.recon_buf_q3, plus eobs and txb_entropy_ctx in PICK_MODE_CONTEXT)
@@ -1545,6 +1549,14 @@ typedef struct macroblock {
   /*!\brief CfL luma re-encode snapshots of the 16x16 and 32x32 PARTITION_NONE
    * candidates of the partition nodes being searched. */
   CflLumaSnap cfl_luma_snap[2];
+
+  /*!\brief Set while the OUTPUT_ENABLED encode of a live subtree reuses the
+   * coefficients its dry runs left in the PICK_MODE_CONTEXT buffers. */
+  uint8_t out_reuse;
+  /*!\brief Number of entries in out_reuse_node. */
+  uint8_t out_reuse_cnt;
+  /*!\brief PC_TREE nodes whose OUTPUT_ENABLED encode reuses their dry runs. */
+  const struct PC_TREE *out_reuse_node[OUT_REUSE_MAX_NODES];
 } MACROBLOCK;
 #undef SINGLE_REF_MODES
 

@@ -91,8 +91,6 @@ void av1_setup_shared_coeff_buffer(const SequenceHeader *const seq_params,
           (tran_low_t *)((uint8_t *)shared_bufs->coeff_buf[0] +
                          sizeof(PmcPoolHeader));
     }
-    AOM_CHECK_MEM_ERROR(error, shared_bufs->qcoeff_buf[i],
-                        aom_memalign(32, max_num_pix * sizeof(tran_low_t)));
     AOM_CHECK_MEM_ERROR(error, shared_bufs->dqcoeff_buf[i],
                         aom_memalign(32, max_num_pix * sizeof(tran_low_t)));
   }
@@ -114,16 +112,12 @@ void av1_free_shared_coeff_buffer(PC_TREE_SHARED_BUFFERS *shared_bufs) {
     aom_free(pool);
     shared_bufs->coeff_buf[0] = NULL;
   }
-  aom_free(shared_bufs->qcoeff_buf[0]);
   aom_free(shared_bufs->dqcoeff_buf[0]);
-  shared_bufs->qcoeff_buf[0] = NULL;
   shared_bufs->dqcoeff_buf[0] = NULL;
   for (int i = 1; i < 3; i++) {
     aom_free(shared_bufs->coeff_buf[i]);
-    aom_free(shared_bufs->qcoeff_buf[i]);
     aom_free(shared_bufs->dqcoeff_buf[i]);
     shared_bufs->coeff_buf[i] = NULL;
-    shared_bufs->qcoeff_buf[i] = NULL;
     shared_bufs->dqcoeff_buf[i] = NULL;
   }
 }
@@ -142,6 +136,7 @@ __attribute__((noinline))
 static PICK_MODE_CONTEXT *av1_alloc_pmc_slow(
     int num_pix, int num_blk, bool use_palette,
     PC_TREE_SHARED_BUFFERS *shared_bufs) {
+  assert(num_pix > 0 && num_blk > 0 && shared_bufs != NULL);
   // Size plane arrays by shared_bufs capacity rather than per-frame
   // av1_num_planes(cm), because monochrome can dynamically toggle 0 -> 1 -> 0
   // across frames while reusing pooled PICK_MODE_CONTEXT nodes.
@@ -153,9 +148,15 @@ static PICK_MODE_CONTEXT *av1_alloc_pmc_slow(
   const size_t pal_sz =
       use_palette ? ((num_pix * sizeof(uint8_t) + 31) & ~(size_t)31) : 0;
   const size_t tx_type_sz = num_blk * sizeof(uint8_t);
+  // Each context keeps its own quantized coefficients (no plane block is
+  // larger than the luma block), so the OUTPUT_ENABLED encode can reuse the
+  // ones its last dry run left (see mark_output_reuse()).
+  const size_t qcoeff_sz =
+      ((size_t)num_pix * sizeof(tran_low_t) + 31) & ~(size_t)31;
 
-  const size_t total_sz = ctx_sz + (size_t)num_planes * (eob_sz + txb_ctx_sz) +
-                          2 * pal_sz + tx_type_sz;
+  const size_t total_sz =
+      ctx_sz + (size_t)num_planes * (eob_sz + txb_ctx_sz + qcoeff_sz) +
+      2 * pal_sz + tx_type_sz;
   uint8_t *raw = (uint8_t *)aom_memalign(32, total_sz);
   if (!raw) {
     return NULL;
@@ -168,7 +169,9 @@ static PICK_MODE_CONTEXT *av1_alloc_pmc_slow(
   uint8_t *ptr = raw + ctx_sz;
   for (int i = 0; i < num_planes; ++i) {
     ctx->coeff[i] = shared_bufs->coeff_buf[i];
-    ctx->qcoeff[i] = shared_bufs->qcoeff_buf[i];
+    ctx->qcoeff[i] = (tran_low_t *)ptr;
+    assert(((uintptr_t)ctx->qcoeff[i] & 31) == 0);
+    ptr += qcoeff_sz;
     ctx->dqcoeff[i] = shared_bufs->dqcoeff_buf[i];
     ctx->eobs[i] = (uint16_t *)ptr;
     ptr += eob_sz;

@@ -29,7 +29,6 @@ struct ThreadData;
 
 typedef struct {
   tran_low_t *coeff_buf[MAX_MB_PLANE];
-  tran_low_t *qcoeff_buf[MAX_MB_PLANE];
   tran_low_t *dqcoeff_buf[MAX_MB_PLANE];
 } PC_TREE_SHARED_BUFFERS;
 

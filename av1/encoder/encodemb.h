@@ -423,17 +423,30 @@ static inline int av1_cfl_luma_live_match_k(const MACROBLOCK *x,
       k->qmatrix != pd->seg_qmatrix[mbmi->segment_id][mbmi->tx_size] ||
       k->iqmatrix != pd->seg_iqmatrix[mbmi->segment_id][mbmi->tx_size] ||
       k->above_ctx != pd->above_entropy_context ||
-      k->left_ctx != pd->left_entropy_context || xd->tx_type_map_stride != bw) {
+      k->left_ctx != pd->left_entropy_context) {
     return 0;
   }
   assert(bw > 0 && bw <= CFL_LUMA_LIVE_MAX_MI);
   assert(bh > 0 && bh <= CFL_LUMA_LIVE_MAX_MI);
-  return !memcmp(k->above, pd->above_entropy_context,
-                 (size_t)bw * sizeof(k->above[0])) &&
-         !memcmp(k->left, pd->left_entropy_context,
-                 (size_t)bh * sizeof(k->left[0])) &&
-         !memcmp(k->tx_type_map, xd->tx_type_map,
-                 (size_t)(bw * bh) * sizeof(k->tx_type_map[0]));
+  if (memcmp(k->above, pd->above_entropy_context,
+             (size_t)bw * sizeof(k->above[0])) ||
+      memcmp(k->left, pd->left_entropy_context,
+             (size_t)bh * sizeof(k->left[0]))) {
+    return 0;
+  }
+  if (LIKELY(xd->tx_type_map_stride == bw)) {
+    return !memcmp(k->tx_type_map, xd->tx_type_map,
+                   (size_t)(bw * bh) * sizeof(k->tx_type_map[0]));
+  }
+  // OUTPUT_ENABLED encodes read the frame-level map.
+  for (int r = 0; r < bh; ++r) {
+    if (memcmp(k->tx_type_map + r * bw,
+               xd->tx_type_map + r * xd->tx_type_map_stride,
+               (size_t)bw * sizeof(k->tx_type_map[0]))) {
+      return 0;
+    }
+  }
+  return 1;
 }
 
 // Returns 1 if the luma state recorded by av1_cfl_luma_live_store() is still
