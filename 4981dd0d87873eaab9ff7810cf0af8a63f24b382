@@ -1,0 +1,28 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "b7c8de8e_0c943cf3",
+        "filename": "av1/encoder/encoder.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 1085,
+      "author": {
+        "id": 5960
+      },
+      "writtenOn": "2026-11-12T21:06:16Z",
+      "side": 1,
+      "message": "`last_width`/`last_height` here is `cm-\u003ewidth`/`cm-\u003eheight` of the previous coded frame, which reflects internal scaling (`AOME_SET_SCALEMODE` / `RESIZE_DYNAMIC` / `RESIZE_FIXED`) rather than the dimensions `cpi-\u003eactive_map.map` was populated for in `av1_set_active_map()`:\n- If a map is set at 384x256, a frame is internally scaled to 192x128, and `aom_codec_enc_config_set()` then resizes `g_w`/`g_h` to 192x128, `cm-\u003ewidth \u003d\u003d last_width` (192) leaves `active_map.enabled \u003d 1` and sets `active_map.update \u003d 1`, copying the stride-96 map into the stride-48 `seg_map` (and similarly if a control sets `active_map.update \u003d 1` right before an internally scaled frame).\n- Conversely, updating bitrate or `AOME_SET_CPUUSED` after an internally scaled frame sees `cm-\u003ewidth !\u003d last_width` and disables a valid map even though `g_w`/`g_h` did not change.\n\nCan we record `mi_rows`/`mi_cols` on `ActiveMap` in `av1_set_active_map()` (clearing `enabled` in `realloc_segmentation_maps()`) and check `cm-\u003emi_params` against them in both `av1_change_config()` and `av1_apply_active_map()`, similar to `av1_apply_roi_map()`?",
+      "range": {
+        "startLine": 1083,
+        "startChar": 0,
+        "endLine": 1085,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "4981dd0d87873eaab9ff7810cf0af8a63f24b382",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
