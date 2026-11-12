@@ -55,6 +55,18 @@ void av1_lowbd_fwd_txfm_nl_avx2(const int16_t *src_diff, tran_low_t *coeff,
                                 int diff_stride, TX_SIZE tx_size,
                                 TX_TYPE tx_type);
 
+uint32_t av1_lowbd_fwd_txfm2d_8x8_cached_avx2(const int16_t *input,
+                                              int32_t *output, int stride,
+                                              TX_TYPE tx_type,
+                                              int16_t *col_cache,
+                                              uint32_t col_valid);
+
+uint32_t av1_lowbd_fwd_txfm2d_16x16_cached_avx2(const int16_t *input,
+                                                int32_t *output, int stride,
+                                                TX_TYPE tx_type,
+                                                int16_t *col_cache,
+                                                uint32_t col_valid);
+
 uint64_t av1_sub_sum_sse_lbd_avx2(const uint8_t *src, int src_stride,
                                   const uint8_t *dst, int dst_stride,
                                   int16_t *diff, uint32_t dims_pack);

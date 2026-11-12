@@ -6405,5 +6405,92 @@ int av1_cfl_pick_plane_parameter_lbd_avx2(const int16_t *ac_buf_q3,
 
 #endif  // !CONFIG_REALTIME_ONLY
 
+uint32_t av1_lowbd_fwd_txfm2d_8x8_cached_avx2(const int16_t *input,
+                                              int32_t *output, int stride,
+                                              TX_TYPE tx_type,
+                                              int16_t *col_cache,
+                                              uint32_t col_valid) {
+  assert(input != NULL && output != NULL && col_cache != NULL);
+  assert(((uintptr_t)output & 31u) == 0);
+  assert(((uintptr_t)col_cache & 31u) == 0);
+  assert((const void *)col_cache != (const void *)input &&
+         (const void *)col_cache != (const void *)output);
+  assert((unsigned)tx_type < TX_TYPES);
+  const int vtx = vtx_tab[tx_type];
+  if (LIKELY(vtx == DCT_1D || vtx == ADST_1D)) {
+    const uint32_t bit = (vtx == DCT_1D) ? 1u : 2u;
+    __m256i *const slot = (__m256i *)col_cache + ((vtx == DCT_1D) ? 0 : 4);
+    __m256i p0, p1, p2, p3;
+    if (!(col_valid & bit)) {
+      __m256i col_vecs[4], b[4];
+      load_8x8_dual_sll_avx2(input, stride, av1_fwd_txfm_shift_ls[TX_8X8][0],
+                             col_vecs);
+      fwd_txfm8x8_col_dual_avx2(vtx, col_vecs, b);
+      round_shift_transpose_8x8_dual_avx2(b, 1, col_vecs);
+      p0 = col_vecs[0];
+      p1 = col_vecs[1];
+      p2 = col_vecs[2];
+      p3 = col_vecs[3];
+      _mm256_store_si256(slot + 0, p0);
+      _mm256_store_si256(slot + 1, p1);
+      _mm256_store_si256(slot + 2, p2);
+      _mm256_store_si256(slot + 3, p3);
+      col_valid |= bit;
+    } else {
+      p0 = _mm256_load_si256(slot + 0);
+      p1 = _mm256_load_si256(slot + 1);
+      p2 = _mm256_load_si256(slot + 2);
+      p3 = _mm256_load_si256(slot + 3);
+    }
+    const __m256i row_in[4] = { p0, p1, p2, p3 };
+    fwd_txfm8x8_row_dual_store_avx2(htx_tab[tx_type], row_in, output);
+    return col_valid;
+  }
+  lowbd_fwd_txfm2d_8x8_non_dct_avx2(input, output, stride, tx_type, 8);
+  return col_valid;
+}
+
+uint32_t av1_lowbd_fwd_txfm2d_16x16_cached_avx2(const int16_t *input,
+                                                int32_t *output, int stride,
+                                                TX_TYPE tx_type,
+                                                int16_t *col_cache,
+                                                uint32_t col_valid) {
+  assert(input != NULL && output != NULL && col_cache != NULL);
+  assert(((uintptr_t)output & 31u) == 0);
+  assert(((uintptr_t)col_cache & 31u) == 0);
+  assert((const void *)col_cache != (const void *)input &&
+         (const void *)col_cache != (const void *)output);
+  assert((unsigned)tx_type < TX_TYPES);
+  const int vtx = vtx_tab[tx_type];
+  if (LIKELY(vtx == DCT_1D || vtx == ADST_1D)) {
+    const uint32_t bit = (vtx == DCT_1D) ? 1u : 2u;
+    __m256i *const slot = (__m256i *)col_cache + ((vtx == DCT_1D) ? 0 : 16);
+    __m256i buf0[16];
+    if (!(col_valid & bit)) {
+      if (vtx == DCT_1D) {
+        fdct16x16_col_cb13_avx2(input, buf0, stride);
+      } else {
+        fadst16x16_col_cb13_avx2(input, buf0, stride);
+      }
+      transpose_round_shift_16bit_16x16_avx2(buf0, slot, 2);
+      col_valid |= bit;
+    }
+    const int htx = htx_tab[tx_type];
+    if (LIKELY(htx == DCT_1D)) {
+      fdct16x16_row_cb12_avx2(slot, output);
+    } else if (LIKELY(htx == ADST_1D)) {
+      fadst16x16_row_cb12_avx2(slot, output);
+    } else if (htx == FLIPADST_1D) {
+      flip_buf_avx2(slot, buf0, 16);
+      fadst16x16_row_cb12_avx2(buf0, output);
+    } else {
+      fidentity16x16_row_cb12_avx2(slot, output);
+    }
+    return col_valid;
+  }
+  lowbd_fwd_txfm2d_16x16_non_dct_avx2(input, output, stride, tx_type, 8);
+  return col_valid;
+}
+
 #undef AOM_FDCT_NO_UNROLL
 #undef AOM_FDCT_NOINLINE

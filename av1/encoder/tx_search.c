@@ -3645,6 +3645,12 @@ static void search_tx_type_multi_lbd(const AV1_COMP *cpi, MACROBLOCK *x,
   int64_t best_dist = INT64_MAX;
   int64_t best_sse = INT64_MAX;
   uint32_t best_meta = 0;  // b0..7: tx_type, b8..15: txb_ctx, b16..31: eob
+#if TX_SEARCH_FWD_AVX2
+  int16_t col_raw[2 * 256 + 16];
+  int16_t *const col_cache =
+      (int16_t *)(((uintptr_t)col_raw + 31u) & ~(uintptr_t)31u);
+  uint32_t col_valid = 0;
+#endif
 
   do {
     const TX_TYPE tx_type = (TX_TYPE)(txk_order & 0xF);
@@ -3658,13 +3664,29 @@ static void search_tx_type_multi_lbd(const AV1_COMP *cpi, MACROBLOCK *x,
 #if TX_SEARCH_FWD_AVX2
 #if CONFIG_RUNTIME_CPU_DETECT && !defined(av1_lowbd_fwd_txfm)
     if (LIKELY(avx2_fwd_fn != NULL)) {
-      avx2_fwd_fn(src_diff, coeff_ptr, diff_stride, tx_type, 8);
+      if (cur_txs == TX_8X8) {
+        col_valid = av1_lowbd_fwd_txfm2d_8x8_cached_avx2(
+            src_diff, coeff_ptr, diff_stride, tx_type, col_cache, col_valid);
+      } else if (cur_txs == TX_16X16) {
+        col_valid = av1_lowbd_fwd_txfm2d_16x16_cached_avx2(
+            src_diff, coeff_ptr, diff_stride, tx_type, col_cache, col_valid);
+      } else {
+        avx2_fwd_fn(src_diff, coeff_ptr, diff_stride, tx_type, 8);
+      }
     } else {
       fwd_txfm_lbd_nl_fallback(src_diff, coeff_ptr, diff_stride, cur_txs,
                                tx_type);
     }
 #else
-    avx2_fwd_fn(src_diff, coeff_ptr, diff_stride, tx_type, 8);
+    if (cur_txs == TX_8X8) {
+      col_valid = av1_lowbd_fwd_txfm2d_8x8_cached_avx2(
+          src_diff, coeff_ptr, diff_stride, tx_type, col_cache, col_valid);
+    } else if (cur_txs == TX_16X16) {
+      col_valid = av1_lowbd_fwd_txfm2d_16x16_cached_avx2(
+          src_diff, coeff_ptr, diff_stride, tx_type, col_cache, col_valid);
+    } else {
+      avx2_fwd_fn(src_diff, coeff_ptr, diff_stride, tx_type, 8);
+    }
 #endif
 #else
     fwd_txfm_lbd_nl_fallback(src_diff, coeff_ptr, diff_stride, cur_txs,

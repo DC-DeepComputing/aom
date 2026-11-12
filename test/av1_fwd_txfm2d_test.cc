@@ -1267,6 +1267,54 @@ TEST(AVX2, Av1CflPickPlaneParameterLbdMatchRef) {
   }
 }
 #endif  // !CONFIG_REALTIME_ONLY
+
+TEST(AVX2, Av1LowbdFwdTxfm2dCachedMatchNonCached) {
+  static constexpr TX_SIZE kCachedTxSizes[] = { TX_8X8, TX_16X16 };
+  static constexpr int kStrides[] = { 20, 32, 64 };
+  ACMRandom rnd(ACMRandom::DeterministicSeed());
+  DECLARE_ALIGNED(32, int16_t, input[16 * 64]);
+  DECLARE_ALIGNED(32, int32_t, got[256]);
+  DECLARE_ALIGNED(32, int32_t, ref[256]);
+  DECLARE_ALIGNED(32, int16_t, col_cache[2 * 256]);
+
+  for (TX_SIZE tx_size : kCachedTxSizes) {
+    const int n = tx_size_wide[tx_size];
+    const int n_coeffs = n * n;
+    const FwdTxfm2dFunc ref_fn = av1_lowbd_fwd_txfm2d_func_avx2(tx_size);
+    ASSERT_NE(ref_fn, nullptr);
+    for (int stride : kStrides) {
+      for (int y = 0; y < n; ++y) {
+        for (int x = 0; x < stride; ++x) {
+          input[y * stride + x] =
+              static_cast<int16_t>(static_cast<int>(rnd(511)) - 255);
+        }
+      }
+      for (int dir = 0; dir < 2; ++dir) {
+        uint32_t col_valid = 0;
+        memset(col_cache, 0, sizeof(col_cache));
+        for (int step = 0; step < TX_TYPES; ++step) {
+          const TX_TYPE tx_type =
+              static_cast<TX_TYPE>(dir == 0 ? step : (TX_TYPES - 1 - step));
+          memset(got, 0, sizeof(got));
+          memset(ref, 0, sizeof(ref));
+          if (tx_size == TX_8X8) {
+            col_valid = av1_lowbd_fwd_txfm2d_8x8_cached_avx2(
+                input, got, stride, tx_type, col_cache, col_valid);
+          } else {
+            col_valid = av1_lowbd_fwd_txfm2d_16x16_cached_avx2(
+                input, got, stride, tx_type, col_cache, col_valid);
+          }
+          ref_fn(input, ref, stride, tx_type, 8);
+          for (int i = 0; i < n_coeffs; ++i) {
+            ASSERT_EQ(got[i], ref[i])
+                << n << "x" << n << " stride=" << stride << " dir=" << dir
+                << " tx_type=" << static_cast<int>(tx_type) << " i=" << i;
+          }
+        }
+      }
+    }
+  }
+}
 #endif  // CONFIG_AV1_ENCODER && HAVE_AVX2 && !CONFIG_HIGHWAY && !CONFIG_SHARED
 
 }  // namespace
