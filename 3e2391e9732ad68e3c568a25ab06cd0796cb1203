@@ -1,0 +1,70 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "f91f8e88_be389fc4",
+        "filename": "aom_dsp/variance_hwy.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 434,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-11-12T18:34:40Z",
+      "side": 1,
+      "message": "nit: Drop the internal \"Group B (CL 5): \" prefix from this comment.",
+      "isAi": true,
+      "revId": "3e2391e9732ad68e3c568a25ab06cd0796cb1203",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "fa781397_12196788",
+        "filename": "aom_dsp/variance_hwy.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 719,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-11-12T18:34:40Z",
+      "side": 1,
+      "message": "optional: The `y_offset \u003d\u003d 4` and `y_offset !\u003d 0 \u0026\u0026 y_offset !\u003d 4` vertical loops are duplicated across all three `x_offset` branches (lines 548-586, 603-649, 672-718), only differing in how a single horizontal row is produced (`SubPelLoad`, `AverageRound`, or `FilterPairPack`), and `HasSec` alternates between `if (HasSec)` and `HWY_IF_CONSTEXPR(HasSec)`. Extracting a small helper/lambda for the horizontal row step (and using `HWY_IF_CONSTEXPR(HasSec)` consistently) would remove ~90 lines of duplicated loop code.",
+      "range": {
+        "startLine": 534,
+        "startChar": 0,
+        "endLine": 719,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "3e2391e9732ad68e3c568a25ab06cd0796cb1203",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "faa99f05_d9d5112e",
+        "filename": "aom_dsp/variance_hwy.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 836,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-11-12T18:34:40Z",
+      "side": 1,
+      "message": "optional: `SubPixelVariance64Or128` and `SubPixelAvgVariance64Or128` (and optionally `SubPixel{Avg}Variance32xH`) could be unified into a single template `SubPixelVarianceWxH\u003cBlockWidth, BlockHeight, ChunkHeight, WLog2, HLog2, HasSec\u003e` by passing `HasSec ? sec_ptr : nullptr` and `HasSec ? BlockWidth : 0` to `SubPixelVarianceWxHImp\u003c64, HasSec\u003e`.",
+      "range": {
+        "startLine": 760,
+        "startChar": 0,
+        "endLine": 836,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "3e2391e9732ad68e3c568a25ab06cd0796cb1203",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
