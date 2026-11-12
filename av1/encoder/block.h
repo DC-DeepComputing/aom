@@ -924,10 +924,11 @@ typedef struct CflLumaLive {
   uint8_t tx_type_map[CFL_LUMA_LIVE_MAX_MI * CFL_LUMA_LIVE_MAX_MI];
 } CflLumaLive;
 
-/*!\brief CflLumaLive of a square 16x16 or 32x32 block plus a copy of the luma
- * pixels the CfL luma re-encode produced, so that the DRY_RUN_NORMAL encode of
- * the block at the end of its partition search can restore them even after the
- * SPLIT search has overwritten the block (see rd_pick_partition_rec()).
+/*!\brief CflLumaLive of a square 8x8, 16x16 or 32x32 block plus a copy of the
+ * luma pixels the CfL luma re-encode produced, so that the DRY_RUN_NORMAL
+ * encode of the block at the end of its partition search can restore them even
+ * after the SPLIT search has overwritten the block (see
+ * rd_pick_partition_rec()).
  */
 typedef struct CflLumaSnap {
   CflLumaLive k;
@@ -935,6 +936,23 @@ typedef struct CflLumaSnap {
   uint8_t open;
   uint8_t pix[CFL_BUF_SQUARE];
 } CflLumaSnap;
+
+/*!\brief Pixel and mode-info snapshot of quadrants 0..2 of a 16x16
+ * PARTITION_SPLIT candidate across rectangular_partition_search().
+ */
+typedef struct LiveSplitRectSnap {
+  uint8_t pix[3][MAX_MB_PLANE][8 * 8];
+  MB_MODE_INFO *mi_grid[3][2 * 2];
+  MB_MODE_INFO mi_alloc[3];
+} LiveSplitRectSnap;
+
+/*!\brief Pixel snapshot of a PARTITION_HORZ candidate (8x8 or 16x16) across the
+ * subsequent PARTITION_VERT evaluation.
+ */
+typedef struct LiveRectHorzSnap {
+  uint8_t sub0_pix[MAX_MB_PLANE][8 * 16];
+  uint8_t sub1_y_pix[8 * 16];
+} LiveRectHorzSnap;
 
 /*!\brief Luma state captured during the WINNER_MODE_EVAL pass of
  * av1_rd_pick_intra_sby_mode() for reuse as CfL Pass-1 reconstruction in
@@ -1569,17 +1587,29 @@ typedef struct macroblock {
   /*!\brief x->rdmult of the last subtree dry run. */
   int last_dry_rdmult;
 
-  /*!\brief CfL luma re-encode snapshots of the 16x16 and 32x32 PARTITION_NONE
-   * candidates of the partition nodes being searched. */
-  CflLumaSnap cfl_luma_snap[2];
+  /*!\brief CfL luma re-encode snapshots of the 8x8, 16x16 and 32x32
+   * PARTITION_NONE candidates of the partition nodes being searched. */
+  CflLumaSnap cfl_luma_snap[3];
+  /*!\brief Pixel/mode-info snapshot for 16x16 LiveSplit blocks. */
+  LiveSplitRectSnap live_split_rect_snap;
+  /*!\brief Pixel snapshots for 8x8 and 16x16 LiveRect HORZ blocks. */
+  LiveRectHorzSnap live_rect_horz_snap[2];
 
   /*!\brief Set while the OUTPUT_ENABLED encode of a live subtree reuses the
    * coefficients its dry runs left in the PICK_MODE_CONTEXT buffers. */
   uint8_t out_reuse;
+  /*!\brief Set when the current block in OUTPUT_ENABLED may reuse
+   * cfl_luma_live. */
+  uint8_t out_reuse_cfl;
   /*!\brief Number of entries in out_reuse_node. */
   uint8_t out_reuse_cnt;
   /*!\brief PC_TREE nodes whose OUTPUT_ENABLED encode reuses their dry runs. */
   const struct PC_TREE *out_reuse_node[OUT_REUSE_MAX_NODES];
+  /*!\brief PC_TREE HORZ/VERT node whose sub_tree[0] reuses its dry run in
+   * OUTPUT_ENABLED. */
+  const struct PC_TREE *out_reuse_rect;
+  /*!\brief Deferred CflLumaLive for sub_tree[1] of out_reuse_rect. */
+  CflLumaLive out_reuse_sub1_cfl;
   /*!\brief State captured from WINNER_MODE_EVAL for CfL Pass-1 reuse. */
   SbyCflState sby_cfl;
 } MACROBLOCK;

@@ -1480,7 +1480,7 @@ static void cfl_luma_live_and_snap_store(MACROBLOCK *x, BLOCK_SIZE bsize) {
   assert(x != NULL);
   assert((unsigned)bsize < BLOCK_SIZES_ALL);
   av1_cfl_luma_live_store(x, bsize);
-  if (bsize == BLOCK_16X16 || bsize == BLOCK_32X32) {
+  if (bsize == BLOCK_8X8 || bsize == BLOCK_16X16 || bsize == BLOCK_32X32) {
     av1_cfl_luma_snap_store(x, bsize);
   }
 }
@@ -1592,8 +1592,8 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
   const int can_reuse =
       need_cfl_y && frame_is_intra_only(cm) && !av1_allow_intrabc(cm) &&
       !cpi->sf.rt_sf.use_nonrd_pick_mode &&
-      !(xd->bd > 8 && cpi->oxcf.algo_cfg.sharpness == 3) && bw >= 2 &&
-      bh >= 2 && bw <= CFL_LUMA_LIVE_MAX_MI && bh <= CFL_LUMA_LIVE_MAX_MI &&
+      !(xd->bd > 8 && cpi->oxcf.algo_cfg.sharpness == 3) &&
+      bw <= CFL_LUMA_LIVE_MAX_MI && bh <= CFL_LUMA_LIVE_MAX_MI &&
       xd->tx_type_map_stride == bw &&
       mbmi->palette_mode_info.palette_size[0] == 0;
   // Defer CfL Pass-1 luma reconstruction until UV_CFL_PRED survives rate
@@ -1603,8 +1603,9 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
   const int defer_cfl_y = need_cfl_y && sby_valid && !x->sby_cfl.rewrote_txk;
   if (need_cfl_y) {
     x->cfl_luma_live.valid = 0;
-    if (mbmi->bsize == BLOCK_16X16 || mbmi->bsize == BLOCK_32X32) {
-      x->cfl_luma_snap[mbmi->bsize == BLOCK_32X32].k.valid = 0;
+    if (mbmi->bsize == BLOCK_8X8 || mbmi->bsize == BLOCK_16X16 ||
+        mbmi->bsize == BLOCK_32X32) {
+      x->cfl_luma_snap[av1_cfl_luma_snap_idx(mbmi->bsize)].k.valid = 0;
     }
     if (!defer_cfl_y) {
       if (sby_valid) {

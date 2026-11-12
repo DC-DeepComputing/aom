@@ -373,13 +373,19 @@ static inline void av1_cfl_luma_live_store(MACROBLOCK *x, BLOCK_SIZE bsize) {
   k->valid = 1;
 }
 
-// Copies the CflLumaLive just recorded for a square 16x16 or 32x32 block that
-// lies inside the frame, together with its luma pixels, to its snapshot slot.
+// Returns the CflLumaSnap slot index for a square 8x8, 16x16, or 32x32 block.
+static inline int av1_cfl_luma_snap_idx(BLOCK_SIZE bsize) {
+  assert(bsize == BLOCK_8X8 || bsize == BLOCK_16X16 || bsize == BLOCK_32X32);
+  return mi_size_wide[bsize] >> 2;
+}
+
+// Copies the CflLumaLive just recorded for a square 8x8, 16x16 or 32x32 block
+// that lies inside the frame, together with its luma pixels, to its snapshot
+// slot.
 static inline void av1_cfl_luma_snap_store(MACROBLOCK *x, BLOCK_SIZE bsize) {
   assert(x != NULL);
-  assert(bsize == BLOCK_16X16 || bsize == BLOCK_32X32);
   const MACROBLOCKD *const xd = &x->e_mbd;
-  CflLumaSnap *const s = &x->cfl_luma_snap[bsize == BLOCK_32X32];
+  CflLumaSnap *const s = &x->cfl_luma_snap[av1_cfl_luma_snap_idx(bsize)];
   if (!s->open || xd->mb_to_right_edge < 0 || xd->mb_to_bottom_edge < 0 ||
       is_cur_buf_hbd(xd)) {
     return;
