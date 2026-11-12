@@ -1516,6 +1516,19 @@ typedef struct macroblock {
 
   /*!\brief Luma state left by the CfL luma re-encode of the current block. */
   CflLumaLive cfl_luma_live;
+
+  /*!\brief Bumped whenever the RD search or an encode may write block state
+   * (pixels, mode info, contexts); see rd_pick_partition_rec(). */
+  uint64_t live_epoch;
+  /*!\brief live_epoch right after the last subtree dry run if that dry run
+   * rewrote no luma tx type, else 0. */
+  uint64_t last_dry_epoch;
+  /*!\brief Number of luma eob == 0 tx types rewritten in place to DCT_DCT
+   * during an encode; re-encoding from DCT_DCT can produce eob > 0, so a dry
+   * run that rewrites any tx type cannot be reused as already idempotent. */
+  uint64_t txk_rewrites;
+  /*!\brief x->rdmult of the last subtree dry run. */
+  int last_dry_rdmult;
 } MACROBLOCK;
 #undef SINGLE_REF_MODES
 

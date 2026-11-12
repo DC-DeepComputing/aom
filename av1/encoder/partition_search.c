@@ -461,6 +461,7 @@ static void encode_superblock(const AV1_COMP *const cpi, TileDataEnc *tile_data,
   const int is_inter = is_inter_block(mbmi);
   const int cfl_luma_live = x->cfl_luma_live.valid;
   x->cfl_luma_live.valid = 0;
+  ++x->live_epoch;
 
   // Initialize tx_mode and tx_size_search_method
   TxfmSearchParams *txfm_params = &x->txfm_search_params;
@@ -939,6 +940,7 @@ static void set_offsets_sub_intra(const AV1_COMP *const cpi,
   const int mi_alloc_idx =
       mi_alloc_row * mi_params->mi_alloc_stride + mi_alloc_col;
   MB_MODE_INFO *const mbmi = &mi_params->mi_alloc[mi_alloc_idx];
+  ++x->live_epoch;
   if (set_seg_id && UNLIKELY(mbmi->segment_id != 0)) mbmi->segment_id = 0;
   MB_MODE_INFO **const mi_ptr = mi_params->mi_grid_base + mi_grid_idx;
   *mi_ptr = mbmi;
@@ -1316,6 +1318,7 @@ void av1_set_offsets_without_segment_id(const AV1_COMP *const cpi,
                                         const TileInfo *const tile,
                                         MACROBLOCK *const x, int mi_row,
                                         int mi_col, BLOCK_SIZE bsize) {
+  ++x->live_epoch;
   set_offsets_core(cpi, tile, x, mi_row, mi_col, bsize);
 }
 
@@ -1462,6 +1465,7 @@ static void pick_sb_modes_ex(AV1_COMP *const cpi, TileDataEnc *tile_data,
                              const RD_STATS *best_rd_in, int fast_intra_sb) {
   RD_STATS best_rd = *best_rd_in;
   x->cfl_luma_live.valid = 0;
+  ++x->live_epoch;
   if (cpi->sf.part_sf.use_best_rd_for_pruning && best_rd.rdcost < 0) {
     ctx->rd_stats.rdcost = INT64_MAX;
     ctx->rd_stats.skip_txfm = 0;
@@ -3952,6 +3956,21 @@ typedef struct PcTreeArena {
   PC_TREE nodes[PC_ARENA_CAP];
 } PcTreeArena;
 
+/*!\brief Contexts left by the dry runs of children 0..2 of a SPLIT block whose
+ * pixels, mode info and contexts are still live (see rd_pick_partition_rec()).
+ */
+typedef struct LiveSplit {
+  RD_SEARCH_MACROBLOCK_CONTEXT ctx;
+  uint64_t epoch;
+  int rdmult;
+  int mi_row;
+  int mi_col;
+  int valid;
+} LiveSplit;
+
+// LiveSplit slots of not yet encoded 4th children, by square size 16..128.
+#define LIVE_SPLIT_LEVELS 4
+
 typedef struct PartSearchFixedCtx {
   AV1_COMP *cpi;
   ThreadData *td;
@@ -3959,6 +3978,7 @@ typedef struct PartSearchFixedCtx {
   TokenExtra **tp;
   PmcPoolHeader *pmc_pool;
   PcTreeArena *arena;
+  LiveSplit *live_defer;
   int num_planes;
   BLOCK_SIZE sb_size;
   SB_MULTI_PASS_MODE multi_pass_mode;
@@ -3967,6 +3987,8 @@ typedef struct PartSearchFixedCtx {
   uint8_t fast_4x4_base;
   uint8_t ss_x;
   uint8_t ss_y;
+  uint8_t live_ok;
+  uint8_t dry_rdmult_free;
 } PartSearchFixedCtx;
 /*!\endcond */
 
@@ -4438,8 +4460,11 @@ static bool rd_pick_partition_sq_leaf(const PartSearchFixedCtx *sctx,
     pc_tree->partitioning = PARTITION_NONE;
     *rd_cost = this_rdc;
     if (blk_idx != 3 || UNLIKELY(bsize == x->sb_enc.max_partition_size)) {
+      const uint64_t txk_rewrites = x->txk_rewrites;
       encode_b(cpi, tile_data, td, sctx->tp, mi_row, mi_col, DRY_RUN_NORMAL,
                bsize, PARTITION_NONE, pc_tree->none, NULL, 1);
+      x->last_dry_epoch = x->txk_rewrites == txk_rewrites ? x->live_epoch : 0;
+      x->last_dry_rdmult = x->rdmult;
       if (bsize == BLOCK_8X8) {
         update_part_ctx_fast(xd, mi_row, mi_col, BLOCK_8X8, BLOCK_8X8);
       }
@@ -5833,7 +5858,8 @@ static void split_partition_search(const PartSearchFixedCtx *sctx,
                                    SIMPLE_MOTION_DATA_TREE *sms_tree,
                                    RD_SEARCH_MACROBLOCK_CONTEXT *x_ctx,
                                    PartitionSearchState *part_search_state,
-                                   RD_STATS *best_rdc, int64_t *part_split_rd) {
+                                   RD_STATS *best_rdc, int64_t *part_split_rd,
+                                   LiveSplit *live) {
   // Check if partition split is allowed.
   if (part_search_state->terminate_partition_search ||
       !part_search_state->do_square_split)
@@ -5955,6 +5981,13 @@ static void split_partition_search(const PartSearchFixedCtx *sctx,
     sum_rdc.rate += part_search_state->this_rdc.rate;
     sum_rdc.dist += part_search_state->this_rdc.dist;
     av1_rd_cost_update(x->rdmult, &sum_rdc);
+    // Children 0..2 stay live if their own dry run was the last thing to
+    // touch their state, rewrote no tx type and used the same rdmult.
+    if (live != NULL && idx < 3 &&
+        (x->last_dry_epoch != x->live_epoch ||
+         (!sctx->dry_rdmult_free && x->last_dry_rdmult != x->rdmult))) {
+      live = NULL;
+    }
 
     // Set split ctx as ready for use.
     if (idx <= 1 && (bsize <= BLOCK_8X8 ||
@@ -5987,6 +6020,18 @@ static void split_partition_search(const PartSearchFixedCtx *sctx,
       *best_rdc = sum_rdc;
       part_search_state->found_best_partition = true;
       pc_tree->partitioning = PARTITION_SPLIT;
+      if (live != NULL) {
+        // av1_save_context() reads the txfm contexts at the current pointers.
+        x->e_mbd.above_txfm_context = x_ctx->p_ta;
+        x->e_mbd.left_txfm_context = x_ctx->p_tl;
+        av1_save_context(x, &live->ctx, mi_row, mi_col, bsize,
+                         sctx->num_planes);
+        live->epoch = x->live_epoch;
+        live->rdmult = x->rdmult;
+        live->mi_row = mi_row;
+        live->mi_col = mi_col;
+        live->valid = 1;
+      }
     }
   } else if (cpi->sf.part_sf.less_rectangular_check_level > 0) {
     // Skip rectangular partition test when partition type none gives better
@@ -6248,6 +6293,7 @@ static RD_STATS rd_search_for_fixed_partition(
   sctx.tp = tp;
   sctx.pmc_pool = av1_pmc_pool(&td->shared_coeff_buf);
   sctx.arena = NULL;
+  sctx.live_defer = NULL;
   sctx.num_planes = num_planes;
   sctx.sb_size = cm->seq_params->sb_size;
   sctx.multi_pass_mode = SB_SINGLE_PASS;
@@ -6256,6 +6302,8 @@ static RD_STATS rd_search_for_fixed_partition(
   sctx.fast_4x4_base = 0;
   sctx.ss_x = (uint8_t)xd->plane[1].subsampling_x;
   sctx.ss_y = (uint8_t)xd->plane[1].subsampling_y;
+  sctx.live_ok = 0;
+  sctx.dry_rdmult_free = 0;
 
   switch (partition) {
     case PARTITION_NONE:
@@ -7216,11 +7264,57 @@ static inline void set_sms_tree_partitioning(SIMPLE_MOTION_DATA_TREE *sms_tree,
   sms_tree->partitioning = partition;
 }
 
+// DRY_RUN_NORMAL encode of a SPLIT block whose children 0..2 are live: their
+// earlier dry runs left exactly the pixels, mode info and contexts that
+// re-encoding them would produce, so only their contexts are restored and the
+// 4th child is encoded (itself live-split if it recorded a slot).
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
+static void encode_live_split(const PartSearchFixedCtx *sctx, int mi_row,
+                              int mi_col, BLOCK_SIZE bsize, PC_TREE *pc_tree,
+                              const LiveSplit *live) {
+  assert(sctx != NULL && sctx->cpi != NULL && sctx->td != NULL &&
+         sctx->tile_data != NULL && sctx->tp != NULL &&
+         sctx->live_defer != NULL && pc_tree != NULL && live != NULL);
+  assert((unsigned)sctx->cpi->oxcf.tune_cfg.tuning < 32u);
+  MACROBLOCK *const x = &sctx->td->mb;
+  for (;;) {
+    assert((unsigned)bsize < BLOCK_SIZES_ALL);
+    av1_restore_context(x, &live->ctx, mi_row, mi_col, bsize, sctx->num_planes);
+    const int hbs = mi_size_wide[bsize] >> 1;
+    mi_row += hbs;
+    mi_col += hbs;
+    bsize = get_partition_subsize(bsize, PARTITION_SPLIT);
+    assert((unsigned)bsize < BLOCK_SIZES_ALL);
+    assert(pc_tree->split[3] != NULL);
+    pc_tree = pc_tree->split[3];
+    if (bsize < BLOCK_16X16 || bsize >= BLOCK_SIZES_ALL ||
+        pc_tree->partitioning != PARTITION_SPLIT) {
+      break;
+    }
+    const int level = mi_size_wide_log2[bsize] - 2;
+    assert(level >= 0 && level < LIVE_SPLIT_LEVELS);
+    LiveSplit *const d = &sctx->live_defer[level];
+    if (!d->valid || d->mi_row != mi_row || d->mi_col != mi_col ||
+        d->epoch != x->live_epoch ||
+        (!sctx->dry_rdmult_free && d->rdmult != x->rdmult)) {
+      break;
+    }
+    d->valid = 0;
+    live = d;
+  }
+  encode_sb_ex(sctx->cpi, sctx->td, sctx->tile_data, sctx->tp, mi_row, mi_col,
+               DRY_RUN_NORMAL, bsize, pc_tree, NULL, sctx->fast_intra_sb);
+}
+
 static bool rd_pick_partition_rec(
     const PartSearchFixedCtx *sctx, int mi_row, int mi_col, BLOCK_SIZE bsize,
     RD_STATS *rd_cost, RD_STATS best_rdc, PC_TREE *pc_tree,
     SIMPLE_MOTION_DATA_TREE *sms_tree, int64_t *none_rd,
     RD_RECT_PART_WIN_INFO *rect_part_win_info, int is_sb_root) {
+  assert(sctx != NULL && sctx->cpi != NULL && sctx->td != NULL &&
+         sctx->tile_data != NULL && sctx->tp != NULL && pc_tree != NULL);
   AV1_COMP *const cpi = sctx->cpi;
   ThreadData *const td = sctx->td;
   TileDataEnc *const tile_data = sctx->tile_data;
@@ -7246,6 +7340,21 @@ static bool rd_pick_partition_rec(
     return part_search_state.found_best_partition;
   }
   if (UNLIKELY(is_sb_root)) x->must_find_valid_partition = 0;
+
+  // A dry-run (or deferred, for the 4th child) SPLIT block whose children are
+  // at least one mode info allocation unit and 8x8 can reuse their live state.
+  LiveSplit live_local;
+  LiveSplit *live = NULL;
+  if (sctx->live_ok && !is_sb_root && bsize >= BLOCK_16X16 &&
+      bsize <= x->sb_enc.max_partition_size &&
+      mi_size_wide[blk_params.subsize] >=
+          mi_size_wide[cm->mi_params.mi_alloc_bsize]) {
+    const int level = mi_size_wide_log2[bsize] - 2;
+    assert(level >= 0 && level < LIVE_SPLIT_LEVELS);
+    assert(sctx->live_defer != NULL);
+    live = pc_tree->index == 3 ? &sctx->live_defer[level] : &live_local;
+    live->valid = 0;
+  }
 
   // Override skipping rectangular partition operations for edge blocks.
   if (none_rd) *none_rd = 0;
@@ -7353,6 +7462,7 @@ static bool rd_pick_partition_rec(
 
   // Partition search
 BEGIN_PARTITION_SEARCH:
+  if (live != NULL) live->valid = 0;
   // If a valid partition is required, usually when the first round cannot find
   // a valid one under the cost limit after pruning, reset the limitations on
   // partition types and intra cnn output.
@@ -7430,7 +7540,7 @@ BEGIN_PARTITION_SEARCH:
   // PARTITION_SPLIT search stage.
   int64_t part_split_rd = INT64_MAX;
   split_partition_search(sctx, x, pc_tree, sms_tree, &x_ctx, &part_search_state,
-                         &best_rdc, &part_split_rd);
+                         &best_rdc, &part_split_rd, live);
 #if CONFIG_COLLECT_COMPONENT_TIMING
   end_timing(cpi, split_partition_search_time);
 #endif
@@ -7615,8 +7725,19 @@ BEGIN_PARTITION_SEARCH:
     } else if (should_do_dry_run_encode_for_current_block(
                    sb_size, x->sb_enc.max_partition_size, pc_tree->index,
                    bsize)) {
-      encode_sb_ex(cpi, td, tile_data, tp, mi_row, mi_col, DRY_RUN_NORMAL,
-                   bsize, pc_tree, NULL, sctx->fast_intra_sb);
+      const uint64_t txk_rewrites = x->txk_rewrites;
+      if (live != NULL && live->valid &&
+          pc_tree->partitioning == PARTITION_SPLIT &&
+          live->epoch == x->live_epoch &&
+          (sctx->dry_rdmult_free || live->rdmult == x->rdmult)) {
+        live->valid = 0;
+        encode_live_split(sctx, mi_row, mi_col, bsize, pc_tree, live);
+      } else {
+        encode_sb_ex(cpi, td, tile_data, tp, mi_row, mi_col, DRY_RUN_NORMAL,
+                     bsize, pc_tree, NULL, sctx->fast_intra_sb);
+      }
+      x->last_dry_epoch = x->txk_rewrites == txk_rewrites ? x->live_epoch : 0;
+      x->last_dry_rdmult = x->rdmult;
     }
   }
 #if CONFIG_COLLECT_COMPONENT_TIMING
@@ -7800,6 +7921,26 @@ bool av1_rd_pick_partition(AV1_COMP *const cpi, ThreadData *td,
                 !cpi->sf.inter_sf.prune_ref_frame_for_rect_partitions);
   sctx.ss_x = (uint8_t)xd->plane[1].subsampling_x;
   sctx.ss_y = (uint8_t)xd->plane[1].subsampling_y;
+  LiveSplit live_defer[LIVE_SPLIT_LEVELS];
+  for (int i = 0; i < LIVE_SPLIT_LEVELS; ++i) live_defer[i].valid = 0;
+  sctx.live_defer = live_defer;
+  // Exclude HBD sharpness == 3: get_txb_rdmult_hbd() inspects full-block
+  // pd->dst.buf variance, which differs before vs after the first dry run.
+  sctx.live_ok = (uint8_t)(fast_intra && !av1_allow_intrabc(cm) &&
+                           !cpi->sf.rt_sf.use_nonrd_pick_mode &&
+                           !(xd->bd > 8 && cpi->oxcf.algo_cfg.sharpness == 3) &&
+                           multi_pass_mode == SB_SINGLE_PASS);
+  // The rdmult of a dry run does not depend on the caller if encode_b() sets
+  // it per block or no trellis runs in dry runs.
+  sctx.dry_rdmult_free =
+      (uint8_t)(cpi->oxcf.mode != ALLINTRA ||
+                !is_trellis_used(cpi->sf.rd_sf.optimize_coefficients,
+                                 DRY_RUN_NORMAL) ||
+                tuning != 0);
+  // Invalidate prior-SB epochs and keep live_epoch non-zero (0 is the
+  // invalid sentinel for last_dry_epoch and deferred_epoch).
+  td->mb.last_dry_epoch = 0;
+  if (++td->mb.live_epoch == 0) ++td->mb.live_epoch;
 
   if (LIKELY(arena != NULL)) {
     return rd_pick_partition_sb_arena(&sctx, mi_row, mi_col, bsize, rd_cost,

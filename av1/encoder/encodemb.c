@@ -720,6 +720,8 @@ static void encode_block_intra(struct intra_b_args *const args, int block,
   }
 
   if (*eob == 0 && plane == 0) {
+    x->txk_rewrites +=
+        xd->tx_type_map[blk_row * xd->tx_type_map_stride + blk_col] != DCT_DCT;
     update_txk_array(xd, blk_row, blk_col, tx_size, DCT_DCT);
   }
 
