@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "899b48ed_ef3e3c67",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 4810955
+      },
+      "writtenOn": "2026-11-12T16:52:00Z",
+      "side": 1,
+      "message": "Hi Wan-Teh, Yunqing, \n\ncould you please take a look? This lets the decoder use the existing dual/quad luma loop filters, but only when every line in the batch has the same transform size, filter length and limits, so the output is identical to lpf_opt_level \u003d 0. Encoder behavior is unchanged.\n\nTesting summary (on a52c0da614):\n\nBit-exactness\n- Conformance: Argon v2.1.1 (profiles 0/1/2, incl. 12-bit) plus the libaom and\n  Chromium 8/10-bit test vectors. Single-thread, 16-thread row-mt and\n  16-thread tile-mt. Same pass count as main (3607/3609, the 2 failures are\n  identical on main), and every output MD5 matches main.\n- test_libaom (full): 30405 passed, 0 failed.\n- Encoder: 15 good/realtime encodes byte-identical to main.\n\nSanitizers\n- ASan/UBSan: 4518 unit tests plus 833 Argon streams, clean.\n\nBuild configurations\n- clang Debug, generic (no SIMD), encoder-only, realtime-only, GCC\n  decoder-only, arm64: all build and pass. 32-bit x86 not tested locally.\n\nPerformance (AMD Zen 5, wall time)\n- Decode, CTC random-access A2-A5/B1: 2102.9 -\u003e 2061.8 s (-1.95%),\n  from -0.91% at QP 23 to -3.60% at QP 63.\n- Encoder speed is neutral: +0.10% to +0.28% (good), -0.35% to +0.30% (RT)\n  with function-aligned builds to rule out code-layout noise.",
+      "revId": "a06a0fe5c6cda4f8bde2e6d93bfbb41125cf7601",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
