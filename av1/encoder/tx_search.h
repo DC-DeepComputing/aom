@@ -196,6 +196,13 @@ int av1_txfm_search(const AV1_COMP *cpi, MACROBLOCK *x, BLOCK_SIZE bsize,
                     RD_STATS *rd_stats, RD_STATS *rd_stats_y,
                     RD_STATS *rd_stats_uv, int mode_rate, int64_t ref_best_rd);
 
+/*!\cond */
+// Completes luma reconstruction (the skipped last-txb IDCT add and any
+// eob == 0 tx_type rewrite to DCT_DCT) from WINNER_MODE_EVAL before CfL
+// subsampling.
+void av1_sby_cfl_finish_recon(MACROBLOCK *x);
+/*!\endcond */
+
 #if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
 #pragma GCC visibility pop
 #endif

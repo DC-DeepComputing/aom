@@ -1374,6 +1374,18 @@ static void pick_palette_intra_sbuv_cold(const AV1_COMP *const cpi,
   *mbmi = best_mbmi;
 }
 
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
+static void cfl_luma_live_and_snap_store(MACROBLOCK *x, BLOCK_SIZE bsize) {
+  assert(x != NULL);
+  assert((unsigned)bsize < BLOCK_SIZES_ALL);
+  av1_cfl_luma_live_store(x, bsize);
+  if (bsize == BLOCK_16X16 || bsize == BLOCK_32X32) {
+    av1_cfl_luma_snap_store(x, bsize);
+  }
+}
+
 // Records the luma state of the CfL luma re-encode for reuse by the
 // DRY_RUN_NORMAL encode of the same block, unless the re-encode rewrote tx
 // types (eob == 0) relative to tx_type_map, the map it started from.
@@ -1382,15 +1394,65 @@ __attribute__((noinline))
 #endif
 static void cfl_luma_live_arm(MACROBLOCK *x, BLOCK_SIZE bsize,
                               const uint8_t *tx_type_map) {
+  assert(x != NULL && tx_type_map != NULL);
   assert((unsigned)bsize < BLOCK_SIZES_ALL);
   const int n = mi_size_wide[bsize] * mi_size_high[bsize];
   if (!memcmp(tx_type_map, x->e_mbd.tx_type_map,
               (size_t)n * sizeof(tx_type_map[0]))) {
-    av1_cfl_luma_live_store(x, bsize);
-    if (bsize == BLOCK_16X16 || bsize == BLOCK_32X32) {
-      av1_cfl_luma_snap_store(x, bsize);
-    }
+    cfl_luma_live_and_snap_store(x, bsize);
   }
+}
+
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
+static void sby_cfl_materialize(MACROBLOCK *x, BLOCK_SIZE bsize,
+                                TX_SIZE tx_size, int can_reuse) {
+  assert(x != NULL);
+  assert((unsigned)bsize < BLOCK_SIZES_ALL);
+  assert((unsigned)tx_size < TX_SIZES_ALL);
+  av1_sby_cfl_finish_recon(x);
+#if !CONFIG_REALTIME_ONLY
+  MACROBLOCKD *const xd = &x->e_mbd;
+  xd->cfl.store_y = 1;
+  cfl_store_block(xd, bsize, tx_size);
+  xd->cfl.store_y = 0;
+#else
+  (void)tx_size;
+#endif
+  if (can_reuse) {
+    cfl_luma_live_and_snap_store(x, bsize);
+  }
+}
+
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
+static uint8_t sby_cfl_can_track(const AV1_COMP *cpi, const MACROBLOCK *x,
+                                 const MB_MODE_INFO *mbmi) {
+  assert(cpi != NULL && x != NULL && mbmi != NULL);
+#if !CONFIG_REALTIME_ONLY
+  const AV1_COMMON *const cm = &cpi->common;
+  const MACROBLOCKD *const xd = &x->e_mbd;
+  const TxfmSearchParams *const tp = &x->txfm_search_params;
+  return !cpi->sf.rt_sf.use_nonrd_pick_mode && !is_stat_generation_stage(cpi) &&
+         xd->is_chroma_ref && store_cfl_required_rdo(cm, x) &&
+         cpi->sf.winner_mode_sf.enable_winner_mode_for_coeff_opt == 1 &&
+         tp->coeff_opt_thresholds[0] == UINT_MAX &&
+         tp->coeff_opt_thresholds[1] == UINT_MAX && tp->predict_dc_level == 0 &&
+         (!cm->quant_params.using_qmatrix || tp->use_qm_dist_metric) &&
+         !cpi->do_border_pad && !is_cur_buf_hbd(xd) && xd->bd == 8 &&
+         !xd->lossless[mbmi->segment_id] && !x->seg_skip_block &&
+         x->plane[0].dequant_QTX[1] >= 8 &&
+         (x->pix_to_bottom_edge | x->pix_to_right_edge) >= 0 &&
+         (xd->mb_to_bottom_edge | xd->mb_to_right_edge) >= 0 &&
+         mbmi->palette_mode_info.palette_size[0] == 0;
+#else
+  (void)cpi;
+  (void)x;
+  (void)mbmi;
+  return 0;
+#endif
 }
 
 int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
@@ -1401,6 +1463,10 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
   MACROBLOCKD *xd = &x->e_mbd;
   MB_MODE_INFO *mbmi = xd->mi[0];
   assert(!is_inter_block(mbmi));
+
+  const uint8_t sby_valid = x->sby_cfl.valid;
+  x->sby_cfl.valid = 0;
+  xd->cfl.store_y = 0;
 
   init_sbuv_mode(mbmi);
 
@@ -1415,41 +1481,49 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
 
   // Only store reconstructed luma when there's chroma RDO. When there's no
   // chroma RDO, the reconstructed luma will be stored in encode_superblock().
-  xd->cfl.store_y = store_cfl_required_rdo(cm, x);
-  if (xd->cfl.store_y) {
-    // Restore reconstructed luma values.
-    // TODO(chiyotsai@google.com): right now we are re-computing the txfm in
-    // this function everytime we search through uv modes. There is some
-    // potential speed up here if we cache the result to avoid redundant
-    // computation.
-    // In intra-only RD search nothing touches the luma state between here and
-    // a DRY_RUN_NORMAL encode of this block, so it can be reused there unless
-    // this pass rewrites tx types (eob == 0) or the block uses palette.
-    // Also exclude HBD sharpness == 3 because get_txb_rdmult_hbd() inspects
-    // full-block pd->dst.buf variance, which differs before final encoding.
-    assert((unsigned)mbmi->bsize < BLOCK_SIZES_ALL);
-    const int bw = mi_size_wide[mbmi->bsize];
-    const int bh = mi_size_high[mbmi->bsize];
-    const int can_reuse = frame_is_intra_only(cm) && !av1_allow_intrabc(cm) &&
-                          !cpi->sf.rt_sf.use_nonrd_pick_mode &&
-                          !(xd->bd > 8 && cpi->oxcf.algo_cfg.sharpness == 3) &&
-                          bw >= 2 && bh >= 2 && bw <= CFL_LUMA_LIVE_MAX_MI &&
-                          bh <= CFL_LUMA_LIVE_MAX_MI &&
-                          xd->tx_type_map_stride == bw &&
-                          mbmi->palette_mode_info.palette_size[0] == 0;
-    uint8_t tx_type_map[CFL_LUMA_LIVE_MAX_MI * CFL_LUMA_LIVE_MAX_MI];
-    if (can_reuse) {
-      memcpy(tx_type_map, xd->tx_type_map,
-             (size_t)(bw * bh) * sizeof(tx_type_map[0]));
-    }
+  const CFL_ALLOWED_TYPE need_cfl_y = store_cfl_required_rdo(cm, x);
+  assert((unsigned)mbmi->bsize < BLOCK_SIZES_ALL);
+  const int bw = mi_size_wide[mbmi->bsize];
+  const int bh = mi_size_high[mbmi->bsize];
+  // In intra-only RD search nothing touches the luma state between here and a
+  // DRY_RUN_NORMAL encode of this block, so it can be reused there unless this
+  // pass rewrites tx types (eob == 0) or the block uses palette. Also exclude
+  // HBD sharpness == 3 because get_txb_rdmult_hbd() inspects full-block
+  // pd->dst.buf variance, which differs before final encoding.
+  const int can_reuse =
+      need_cfl_y && frame_is_intra_only(cm) && !av1_allow_intrabc(cm) &&
+      !cpi->sf.rt_sf.use_nonrd_pick_mode &&
+      !(xd->bd > 8 && cpi->oxcf.algo_cfg.sharpness == 3) && bw >= 2 &&
+      bh >= 2 && bw <= CFL_LUMA_LIVE_MAX_MI && bh <= CFL_LUMA_LIVE_MAX_MI &&
+      xd->tx_type_map_stride == bw &&
+      mbmi->palette_mode_info.palette_size[0] == 0;
+  // Defer CfL Pass-1 luma reconstruction until UV_CFL_PRED survives rate
+  // pruning, unless WINNER_MODE_EVAL rewrote tx_type_map (rewrote_txk): then
+  // materialize immediately with can_reuse = 0 so the rewrite is finalized
+  // without arming stale live reuse.
+  const int defer_cfl_y = need_cfl_y && sby_valid && !x->sby_cfl.rewrote_txk;
+  if (need_cfl_y) {
+    x->cfl_luma_live.valid = 0;
     if (mbmi->bsize == BLOCK_16X16 || mbmi->bsize == BLOCK_32X32) {
       x->cfl_luma_snap[mbmi->bsize == BLOCK_32X32].k.valid = 0;
     }
-    av1_encode_intra_block_plane(cpi, x, mbmi->bsize, AOM_PLANE_Y,
-                                 DRY_RUN_NORMAL,
-                                 cpi->optimize_seg_arr[mbmi->segment_id]);
-    xd->cfl.store_y = 0;
-    if (can_reuse) cfl_luma_live_arm(x, mbmi->bsize, tx_type_map);
+    if (!defer_cfl_y) {
+      if (sby_valid) {
+        sby_cfl_materialize(x, mbmi->bsize, mbmi->tx_size, 0);
+      } else {
+        uint8_t tx_type_map[CFL_LUMA_LIVE_MAX_MI * CFL_LUMA_LIVE_MAX_MI];
+        if (can_reuse) {
+          memcpy(tx_type_map, xd->tx_type_map,
+                 (size_t)(bw * bh) * sizeof(tx_type_map[0]));
+        }
+        xd->cfl.store_y = 1;
+        av1_encode_intra_block_plane(cpi, x, mbmi->bsize, AOM_PLANE_Y,
+                                     DRY_RUN_NORMAL,
+                                     cpi->optimize_seg_arr[mbmi->segment_id]);
+        xd->cfl.store_y = 0;
+        if (can_reuse) cfl_luma_live_arm(x, mbmi->bsize, tx_type_map);
+      }
+    }
   }
 
   const ModeCosts *const mode_costs = &x->mode_costs;
@@ -1522,6 +1596,9 @@ int64_t av1_rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
     mbmi->angle_delta[PLANE_TYPE_UV] = 0;
     if (uv_mode == UV_CFL_PRED) {
       assert(!is_directional_mode);
+      if (defer_cfl_y) {
+        sby_cfl_materialize(x, mbmi->bsize, mbmi->tx_size, can_reuse);
+      }
       const TX_SIZE uv_tx_size = av1_get_tx_size(AOM_PLANE_U, xd);
       if (!cfl_rd_pick_alpha(x, cpi, uv_tx_size, best_rd,
                              sf->intra_sf.cfl_search_range, &tokenonly_rd_stats,
@@ -1677,6 +1754,7 @@ int av1_search_palette_mode(IntraModeSearchState *intra_search_state,
     if (intra_search_state->rate_uv_intra == INT_MAX) {
       // We have not found any good uv mode yet, so we need to search for it.
       TX_SIZE uv_tx = av1_get_tx_size(AOM_PLANE_U, xd);
+      x->sby_cfl.valid = 0;
       av1_rd_pick_intra_sbuv_mode(cpi, x, &intra_search_state->rate_uv_intra,
                                   &intra_search_state->rate_uv_tokenonly,
                                   &intra_search_state->dist_uvs,
@@ -1997,6 +2075,7 @@ int av1_search_intra_uv_modes_in_interframe(
   assert(intra_search_state->rate_uv_intra == INT_MAX);
   // If no good uv-predictor had been found, search for it.
   const TX_SIZE uv_tx = av1_get_tx_size(AOM_PLANE_U, xd);
+  x->sby_cfl.valid = 0;
   av1_rd_pick_intra_sbuv_mode(cpi, x, &intra_search_state->rate_uv_intra,
                               &intra_search_state->rate_uv_tokenonly,
                               &intra_search_state->dist_uvs,
@@ -2135,8 +2214,14 @@ static int64_t finish_intra_sby_slow_path(
     if (is_winner_mode_processing_enabled(cpi, x, mbmi, 0)) {
       set_mode_eval_params(cpi, x, WINNER_MODE_EVAL);
       *mbmi = best_mbmi;
-      intra_block_yrd(cpi, x, bsize, bmode_costs, &best_rd, rate,
-                      rate_tokenonly, distortion, skippable, &best_mbmi, ctx);
+      x->sby_cfl.track = sby_cfl_can_track(cpi, x, mbmi);
+      x->sby_cfl.rewrote_txk = 0;
+      if (!intra_block_yrd(cpi, x, bsize, bmode_costs, &best_rd, rate,
+                           rate_tokenonly, distortion, skippable, &best_mbmi,
+                           ctx)) {
+        x->sby_cfl.valid = 0;
+      }
+      x->sby_cfl.track = 0;
     }
   }
   *mbmi = best_mbmi;
@@ -2215,6 +2300,8 @@ int64_t av1_rd_pick_intra_sby_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
   MACROBLOCKD *const xd = &x->e_mbd;
   MB_MODE_INFO *const mbmi = xd->mi[0];
   assert(!is_inter_block(mbmi));
+  x->sby_cfl.valid = 0;
+  x->sby_cfl.track = 0;
   const BLOCK_SIZE mbmi_bsize = mbmi->bsize;
   const IntraModeCfg *const intra_mode_cfg = &cpi->oxcf.intra_mode_cfg;
   const INTRA_MODE_SPEED_FEATURES *const intra_sf = &cpi->sf.intra_sf;
@@ -2527,10 +2614,14 @@ int64_t av1_rd_pick_intra_sby_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
   mbmi->tx_size = best_tx_size;
   if (is_winner_mode_processing_enabled(cpi, x, mbmi, 0)) {
     set_mode_eval_params(cpi, x, WINNER_MODE_EVAL);
+    x->sby_cfl.track = sby_cfl_can_track(cpi, x, mbmi);
+    x->sby_cfl.rewrote_txk = 0;
     if (!intra_block_yrd(cpi, x, bsize, bmode_costs, &best_rd, rate,
                          rate_tokenonly, distortion, skippable, NULL, ctx)) {
       mbmi->tx_size = best_tx_size;
+      x->sby_cfl.valid = 0;
     }
+    x->sby_cfl.track = 0;
   }
   av1_copy_tx_type_map(xd->tx_type_map, ctx->tx_type_map, ctx->num_4x4_blk);
   return best_rd;

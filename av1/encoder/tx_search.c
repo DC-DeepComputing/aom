@@ -2997,6 +2997,9 @@ static void search_tx_type_general(const AV1_COMP *cpi, MACROBLOCK *x,
   tran_low_t *best_dqcoeff = x->dqcoeff_buf;
 
   const int seg_id = mbmi->segment_id;
+  if (UNLIKELY(plane == 0 && !is_inter_block(mbmi) && x->sby_cfl.track)) {
+    x->sby_cfl.valid = 0;
+  }
   int skip_trellis =
       !is_trellis_used(cpi->optimize_seg_arr[seg_id], DRY_RUN_NORMAL);
 
@@ -3496,6 +3499,50 @@ static void search_tx_type_general(const AV1_COMP *cpi, MACROBLOCK *x,
 }
 
 #if !CONFIG_COLLECT_RD_STATS && !COLLECT_TX_SIZE_DATA
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#endif
+static void sby_cfl_txb_finish(MACROBLOCK *x, int block, int blk_row,
+                               int blk_col, BLOCK_SIZE plane_bsize,
+                               TX_SIZE tx_size, TX_TYPE tx_type, uint16_t eob,
+                               const tran_low_t *qcoeff_src,
+                               const tran_low_t *dqcoeff_src) {
+  assert(x != NULL);
+  assert((unsigned)plane_bsize < BLOCK_SIZES_ALL);
+  assert((unsigned)tx_size < TX_SIZES_ALL);
+  assert((unsigned)tx_type < TX_TYPES);
+  struct macroblock_plane *const p = &x->plane[0];
+  const int block_offset = BLOCK_OFFSET(block);
+  const int n_coeffs = av1_get_max_eob(tx_size);
+  assert(block_offset >= 0 && block_offset + n_coeffs <= CFL_BUF_SQUARE);
+  assert((unsigned)blk_row < CFL_LUMA_LIVE_MAX_MI &&
+         (unsigned)blk_col < CFL_LUMA_LIVE_MAX_MI);
+  assert(eob <= n_coeffs);
+  if (qcoeff_src != NULL) {
+    if (eob) {
+      memcpy(p->qcoeff + block_offset, qcoeff_src + block_offset,
+             (size_t)n_coeffs * sizeof(tran_low_t));
+    } else {
+      memset(p->qcoeff + block_offset, 0,
+             (size_t)n_coeffs * sizeof(tran_low_t));
+    }
+  }
+  const bool need_recon_intra =
+      (blk_row + tx_size_high_unit[tx_size] < mi_size_high[plane_bsize] ||
+       blk_col + tx_size_wide_unit[tx_size] < mi_size_wide[plane_bsize]);
+  if (!need_recon_intra && eob > 0 && dqcoeff_src != NULL) {
+    memcpy(p->dqcoeff + block_offset, dqcoeff_src + block_offset,
+           (size_t)n_coeffs * sizeof(tran_low_t));
+  }
+  x->sby_cfl.rewrote_txk |= (eob == 0 && tx_type != DCT_DCT);
+  x->sby_cfl.last_tx_type = (uint8_t)tx_type;
+  x->sby_cfl.last_tx_size = (uint8_t)tx_size;
+  x->sby_cfl.last_blk_row = (uint8_t)blk_row;
+  x->sby_cfl.last_blk_col = (uint8_t)blk_col;
+  x->sby_cfl.last_eob = (!need_recon_intra) ? eob : 0;
+  x->sby_cfl.last_block = (uint16_t)block_offset;
+}
+
 // Multi-candidate transform type search for 8-bit, fully visible, non-lossless
 // luma blocks with txw and txh <= 32. Produces the same results as
 // search_tx_type_general() for such blocks.
@@ -3533,6 +3580,9 @@ static void search_tx_type_multi_lbd(const AV1_COMP *cpi, MACROBLOCK *x,
                     << MI_SIZE_LOG2)];
   const int block_offset = BLOCK_OFFSET(block);
   const int n_coeffs = av1_get_max_eob(tx_size);
+  assert(!x->sby_cfl.track || block_offset + n_coeffs <= CFL_BUF_SQUARE);
+  tran_low_t *best_qcoeff =
+      UNLIKELY(x->sby_cfl.track) ? sby_cfl_qcoeff_buf(&x->sby_cfl) : p->qcoeff;
   const int log_scale = av1_get_tx_scale(tx_size);
   assert(log_scale <= MAX_TX_SCALE);
   const unsigned int coeff_opt_satd_threshold =
@@ -3706,10 +3756,13 @@ static void search_tx_type_multi_lbd(const AV1_COMP *cpi, MACROBLOCK *x,
                                   : p->txb_entropy_ctx[block];
       best_meta = (uint32_t)tx_type | ((uint32_t)cur_ctx << 8) |
                   ((uint32_t)this_eob << 16);
-      // Swap dqcoeff buffers
+      // Swap dqcoeff and qcoeff buffers
       tran_low_t *const tmp_dqcoeff = best_dqcoeff;
       best_dqcoeff = p->dqcoeff;
       p->dqcoeff = tmp_dqcoeff;
+      tran_low_t *const tmp_qcoeff = best_qcoeff;
+      best_qcoeff = p->qcoeff;
+      p->qcoeff = tmp_qcoeff;
       if (rem_candidates > 1) {
         const int adapt_lvl = cpi->sf.tx_sf.adaptive_txb_search_level;
         if (adapt_lvl && (best_rd - (best_rd >> adapt_lvl)) > ref_best_rd) {
@@ -3783,6 +3836,18 @@ static void search_tx_type_multi_lbd(const AV1_COMP *cpi, MACROBLOCK *x,
     }
   }
   if (p->dqcoeff == x->dqcoeff_buf) p->dqcoeff = best_dqcoeff;
+  if (UNLIKELY(x->sby_cfl.track)) {
+    tran_low_t *const qc_buf = sby_cfl_qcoeff_buf(&x->sby_cfl);
+    if (p->qcoeff == qc_buf) p->qcoeff = best_qcoeff;
+    if (UNLIKELY(best_rate == INT_MAX)) {
+      x->sby_cfl.valid = 0;
+    } else {
+      sby_cfl_txb_finish(
+          x, block, blk_row, blk_col, plane_bsize, final_tx_size, best_tx_type,
+          best_eob, (best_qcoeff == qc_buf) ? best_qcoeff : NULL,
+          (best_dqcoeff == x->dqcoeff_buf) ? best_dqcoeff : NULL);
+    }
+  }
 }
 
 // Inline intra-luma mask computation when plane == 0, !is_inter,
@@ -4047,6 +4112,10 @@ static AOM_FORCE_INLINE void finish_single_cand_lbd(
   best_rd_stats->sse = best_sse;
   best_rd_stats->skip_txfm = this_eob == 0;
   best_rd_stats->zero_rate = 0;
+  if (UNLIKELY(plane == 0 && !is_inter && x->sby_cfl.track)) {
+    sby_cfl_txb_finish(x, block, blk_row, blk_col, plane_bsize, tx_size,
+                       tx_type, this_eob, NULL, NULL);
+  }
 }
 
 #if TX_SEARCH_FWD_AVX2
@@ -4959,7 +5028,10 @@ static int64_t uniform_txfm_yrd(const AV1_COMP *const cpi, MACROBLOCK *x,
   txfm_rd_in_plane_pack(
       x, cpi, rd_stats, ref_best_rd, AOMMIN(no_this_rd, skip_txfm_rd),
       pack_tx_blk_args(0, 0, 0, AOM_PLANE_Y, bs, tx_size, ftxs_mode));
-  if (rd_stats->rate == INT_MAX) return INT64_MAX;
+  if (rd_stats->rate == INT_MAX) {
+    if (UNLIKELY(x->sby_cfl.track)) x->sby_cfl.valid = 0;
+    return INT64_MAX;
+  }
 
   int64_t rd;
   // rdstats->rate should include all the rate except skip/non-skip cost as the
@@ -5101,7 +5173,10 @@ static AOM_FORCE_INLINE void choose_tx_size_type_from_rd_impl(
     mbmi->tx_size = best_tx_size;
     if (!best_in_xd) {
       av1_copy_tx_type_map(xd->tx_type_map, best_txk_type_map, num_blks);
+      x->sby_cfl.valid = 0;
     }
+  } else {
+    x->sby_cfl.valid = 0;
   }
 
 #if !CONFIG_REALTIME_ONLY
@@ -5858,6 +5933,9 @@ void av1_pick_uniform_tx_size_type_yrd(const AV1_COMP *const cpi, MACROBLOCK *x,
   } else {
     choose_tx_size_type_from_rd(cpi, x, rd_stats, ref_best_rd, bs);
   }
+  if (UNLIKELY(x->sby_cfl.track && rd_stats->rate == INT_MAX)) {
+    x->sby_cfl.valid = 0;
+  }
 
   // Save the RD search results into mb_rd_record for possible reuse in future.
   if (mb_rd_record) {
@@ -6009,6 +6087,7 @@ static void txfm_rd_in_plane_multi(MACROBLOCK *x, const AV1_COMP *cpi,
 
   if (is_inter ? incomplete_exit : exit_early) {
     av1_invalid_rd_stats(rd_stats);
+    if (UNLIKELY(x->sby_cfl.track)) x->sby_cfl.valid = 0;
   }
 }
 
@@ -6024,6 +6103,12 @@ static void txfm_rd_in_plane_pack(MACROBLOCK *x, const AV1_COMP *cpi,
   const TX_SIZE tx_size = (TX_SIZE)(uint8_t)(pack_hi >> 48);
   assert(IMPLIES(plane == 0, x->e_mbd.mi[0]->tx_size == tx_size));
 
+  if (UNLIKELY(x->sby_cfl.track)) {
+    x->sby_cfl.valid = 0;
+    x->sby_cfl.rewrote_txk = 0;
+    x->sby_cfl.last_eob = 0;
+  }
+
   if (UNLIKELY(!cpi->oxcf.txfm_cfg.enable_tx64 &&
                txsize_sqr_up_map[tx_size] == TX_64X64)) {
     av1_invalid_rd_stats(rd_stats);
@@ -6033,6 +6118,10 @@ static void txfm_rd_in_plane_pack(MACROBLOCK *x, const AV1_COMP *cpi,
   if (current_rd > ref_best_rd) {
     av1_invalid_rd_stats(rd_stats);
     return;
+  }
+
+  if (UNLIKELY(x->sby_cfl.track && x->rd_model != LOW_TXFM_RD)) {
+    x->sby_cfl.valid = 1;
   }
 
   MACROBLOCKD *const xd = &x->e_mbd;
@@ -6072,6 +6161,7 @@ static void txfm_rd_in_plane_pack(MACROBLOCK *x, const AV1_COMP *cpi,
         ml_predict_intra_tx_depth_prune(x, 0, 0, plane_bsize, plane_tx_size);
         if (txfm_params->nn_prune_depths_for_intra_tx == TX_PRUNE_LARGEST) {
           av1_invalid_rd_stats(rd_stats);
+          x->sby_cfl.valid = 0;
           return;
         }
       }
@@ -6107,6 +6197,7 @@ static void txfm_rd_in_plane_pack(MACROBLOCK *x, const AV1_COMP *cpi,
           ml_predict_intra_tx_depth_prune(x, 0, 0, plane_bsize, plane_tx_size);
           if (tp->nn_prune_depths_for_intra_tx == TX_PRUNE_LARGEST) {
             av1_invalid_rd_stats(rd_stats);
+            x->sby_cfl.valid = 0;
             return;
           }
         }
@@ -6136,6 +6227,7 @@ static void txfm_rd_in_plane_pack(MACROBLOCK *x, const AV1_COMP *cpi,
       const int64_t rd = RDCOST(x->rdmult, rd_stats->rate, rd_stats->dist);
       if (current_rd + rd > ref_best_rd) {
         av1_invalid_rd_stats(rd_stats);
+        x->sby_cfl.valid = 0;
         return;
       }
       rd_stats->skip_txfm = 0;
@@ -6270,6 +6362,64 @@ int av1_txfm_search(const AV1_COMP *cpi, MACROBLOCK *x, BLOCK_SIZE bsize,
   }
 
   return 1;
+}
+
+void av1_sby_cfl_finish_recon(MACROBLOCK *x) {
+  assert(x != NULL);
+  MACROBLOCKD *const xd = &x->e_mbd;
+  const struct macroblockd_plane *const pd = &xd->plane[0];
+  if (x->sby_cfl.last_eob > 0) {
+    assert(x->sby_cfl.last_tx_size < TX_SIZES_ALL);
+    assert(x->sby_cfl.last_tx_type < TX_TYPES);
+    assert(x->sby_cfl.last_block < CFL_BUF_SQUARE);
+    const int dst_stride = pd->dst.stride;
+    const int blk_row = x->sby_cfl.last_blk_row;
+    const int blk_col = x->sby_cfl.last_blk_col;
+    uint8_t *const dst =
+        &pd->dst.buf[(blk_row * dst_stride + blk_col) << MI_SIZE_LOG2];
+#if !CONFIG_COLLECT_RD_STATS && !COLLECT_TX_SIZE_DATA
+    inv_txfm_add_lbd_nonlossless(
+        x->plane[0].dqcoeff + x->sby_cfl.last_block, dst, dst_stride,
+        (TX_TYPE)x->sby_cfl.last_tx_type, (TX_SIZE)x->sby_cfl.last_tx_size,
+        x->sby_cfl.last_eob);
+#else
+    TxfmParam param;
+    param.tx_type = (TX_TYPE)x->sby_cfl.last_tx_type;
+    param.tx_size = (TX_SIZE)x->sby_cfl.last_tx_size;
+    param.eob = x->sby_cfl.last_eob;
+    param.lossless = 0;
+    param.bd = 8;
+    param.is_hbd = 0;
+    param.tx_set_type = EXT_TX_SET_ALL16;
+    av1_inv_txfm_add(x->plane[0].dqcoeff + x->sby_cfl.last_block, dst,
+                     dst_stride, &param);
+#endif
+  }
+  if (UNLIKELY(x->sby_cfl.rewrote_txk)) {
+    const MB_MODE_INFO *const mbmi = xd->mi[0];
+    const TX_SIZE tx_size = mbmi->tx_size;
+    const BLOCK_SIZE bsize = mbmi->bsize;
+    assert((unsigned)tx_size < TX_SIZES_ALL);
+    assert((unsigned)bsize < BLOCK_SIZES_ALL);
+    const int bw = mi_size_wide[bsize];
+    const int bh = mi_size_high[bsize];
+    const int txw_unit = tx_size_wide_unit[tx_size];
+    const int txh_unit = tx_size_high_unit[tx_size];
+    const int step = txw_unit * txh_unit;
+    const uint16_t *const eobs = x->plane[0].eobs;
+    int block = 0;
+    for (int blk_row = 0; blk_row < bh; blk_row += txh_unit) {
+      for (int blk_col = 0; blk_col < bw; blk_col += txw_unit) {
+        if (eobs[block] == 0) {
+          x->txk_rewrites +=
+              xd->tx_type_map[blk_row * xd->tx_type_map_stride + blk_col] !=
+              DCT_DCT;
+          update_txk_array(xd, blk_row, blk_col, tx_size, DCT_DCT);
+        }
+        block += step;
+      }
+    }
+  }
 }
 
 #undef TX_SEARCH_FWD_AVX2

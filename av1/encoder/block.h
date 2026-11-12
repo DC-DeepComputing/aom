@@ -936,6 +936,29 @@ typedef struct CflLumaSnap {
   uint8_t pix[CFL_BUF_SQUARE];
 } CflLumaSnap;
 
+/*!\brief Luma state captured during the WINNER_MODE_EVAL pass of
+ * av1_rd_pick_intra_sby_mode() for reuse as CfL Pass-1 reconstruction in
+ * av1_rd_pick_intra_sbuv_mode().
+ */
+typedef struct SbyCflState {
+  uint8_t track;
+  uint8_t valid;
+  uint8_t rewrote_txk;
+  uint8_t last_tx_type;
+  uint8_t last_tx_size;
+  uint8_t last_blk_row;
+  uint8_t last_blk_col;
+  uint16_t last_eob;
+  uint16_t last_block;
+  // Extra 8 elements provide up to 31 bytes of headroom to align to 32 bytes.
+  tran_low_t qcoeff_raw[CFL_BUF_SQUARE + 8];
+} SbyCflState;
+
+static inline tran_low_t *sby_cfl_qcoeff_buf(SbyCflState *s) {
+  assert(s != NULL);
+  return (tran_low_t *)(((uintptr_t)s->qcoeff_raw + 31) & ~(uintptr_t)31);
+}
+
 /*!\endcond */
 
 //! Maximum number of estimated RD Cost records for compound average.
@@ -1557,6 +1580,8 @@ typedef struct macroblock {
   uint8_t out_reuse_cnt;
   /*!\brief PC_TREE nodes whose OUTPUT_ENABLED encode reuses their dry runs. */
   const struct PC_TREE *out_reuse_node[OUT_REUSE_MAX_NODES];
+  /*!\brief State captured from WINNER_MODE_EVAL for CfL Pass-1 reuse. */
+  SbyCflState sby_cfl;
 } MACROBLOCK;
 #undef SINGLE_REF_MODES
 

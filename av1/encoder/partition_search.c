@@ -2665,6 +2665,8 @@ void av1_rd_use_partition(AV1_COMP *cpi, ThreadData *td, TileDataEnc *tile_data,
   x->try_merge_partition = 0;
   x->out_reuse = 0;
   x->out_reuse_cnt = 0;
+  x->sby_cfl.valid = 0;
+  x->sby_cfl.track = 0;
   for (int i = 0; i < 2; ++i) {
     x->cfl_luma_snap[i].k.valid = 0;
     x->cfl_luma_snap[i].open = 0;
@@ -6321,6 +6323,8 @@ static RD_STATS rd_search_for_fixed_partition(
   MACROBLOCK *const x = &td->mb;
   x->out_reuse = 0;
   x->out_reuse_cnt = 0;
+  x->sby_cfl.valid = 0;
+  x->sby_cfl.track = 0;
   for (int i = 0; i < 2; ++i) {
     x->cfl_luma_snap[i].k.valid = 0;
     x->cfl_luma_snap[i].open = 0;
@@ -7961,6 +7965,8 @@ static void release_sb_arena_tree(const PartSearchFixedCtx *sctx) {
   ThreadData *const td = sctx->td;
   td->mb.out_reuse = 0;
   td->mb.out_reuse_cnt = 0;
+  td->mb.sby_cfl.valid = 0;
+  td->mb.sby_cfl.track = 0;
   for (int i = 0; i < 2; ++i) {
     td->mb.cfl_luma_snap[i].k.valid = 0;
     td->mb.cfl_luma_snap[i].deferred_epoch = 0;
@@ -8079,6 +8085,8 @@ bool av1_rd_pick_partition(AV1_COMP *const cpi, ThreadData *td,
   const MACROBLOCKD *const xd = &td->mb.e_mbd;
   const int is_sb_root = (bsize == sb_size);
   td->mb.cfl_luma_live.valid = 0;
+  td->mb.sby_cfl.valid = 0;
+  td->mb.sby_cfl.track = 0;
   for (int i = 0; i < 2; ++i) {
     td->mb.cfl_luma_snap[i].k.valid = 0;
     td->mb.cfl_luma_snap[i].deferred_epoch = 0;
