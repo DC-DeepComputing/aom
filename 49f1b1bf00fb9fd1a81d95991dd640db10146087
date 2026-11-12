@@ -1,0 +1,100 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "fc538133_5049841c",
+        "filename": "av1/encoder/encodetxb.c",
+        "patchSetId": 13
+      },
+      "lineNbr": 375,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-12T19:37:07Z",
+      "side": 1,
+      "message": "When `eob \u003d\u003d 2 \u0026\u0026 tx_class \u003d\u003d TX_CLASS_2D \u0026\u0026 (unsigned int)(qcoeff[0] + NUM_BASE_LEVELS) \u003c\u003d 2 * NUM_BASE_LEVELS` (under `!CONFIG_ENTROPY_STATS`), `update_and_record_txb_context_output` (lines 638-643) and `record_txb_context_output` (lines 844-849) skip `memcpy` and only write `tcoeff[0]` and `tcoeff[scan[1]]`. Since `coeff_buf_pool-\u003etcoeff` is allocated via `aom_memalign` without zero-initialization, calling `av1_txb_init_levels(tcoeff, width, height, levels)` here reads uninitialized heap entries across the rest of the transform block (which triggers MSan/Valgrind errors in `av1_txb_init_levels_c` and skips the `eob \u003d\u003d 2` fast path during bitstream packing). Please add the matching `eob \u003d\u003d 2 \u0026\u0026 tx_class \u003d\u003d TX_CLASS_2D \u0026\u0026 (unsigned int)(tcoeff[0] + NUM_BASE_LEVELS) \u003c\u003d 2 * NUM_BASE_LEVELS` fast path here as well. (If GCC warned `-Wmaybe-uninitialized` on `levels` at line 410 because it cannot prove `scan[0] \u003d\u003d 0`, splitting `c \u003d\u003d 0` out of the `c \u003d eob - 2` loop to use `pos \u003d 0` / `tcoeff[0]` directly—like `warehouse_efficients_txb_loop` in `txb_rdopt.c`—avoids that warning.)",
+      "range": {
+        "startLine": 369,
+        "startChar": 0,
+        "endLine": 375,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "49f1b1bf00fb9fd1a81d95991dd640db10146087",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "e42bb5f4_4bc409cc",
+        "filename": "av1/encoder/intra_mode_search.h",
+        "patchSetId": 13
+      },
+      "lineNbr": 28,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-12T19:37:07Z",
+      "side": 1,
+      "message": "Nit: Other headers in libaom (e.g., `cost.h`, `rdopt.h`, `tx_search.h`, `txb_rdopt.h`, `txb_common.h`) guard `#pragma GCC visibility push(hidden)` / `pop` with `#if defined(__ELF__) \u0026\u0026 (defined(__GNUC__) || defined(__clang__))`. Without `defined(__ELF__)`, non-ELF GNU targets such as MinGW-w64 GCC on Windows emit `-Wattributes` (`visibility attribute not supported in this configuration; ignored`). Same at line 363 and in `av1/encoder/intra_mode_search_utils.h` (lines 36 and 735).",
+      "range": {
+        "startLine": 26,
+        "startChar": 0,
+        "endLine": 28,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "49f1b1bf00fb9fd1a81d95991dd640db10146087",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "78467af9_cb3b53bc",
+        "filename": "av1/encoder/intra_mode_search.h",
+        "patchSetId": 13
+      },
+      "lineNbr": 360,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-12T19:37:07Z",
+      "side": 1,
+      "message": "Nit: Consider adding `assert(mode_idx \u003e\u003d 0 \u0026\u0026 mode_idx \u003c LUMA_MODE_COUNT);` before indexing `luma_mode_order` and `luma_angle_delta_order`.",
+      "range": {
+        "startLine": 358,
+        "startChar": 0,
+        "endLine": 360,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "49f1b1bf00fb9fd1a81d95991dd640db10146087",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "759d53f9_6ccf88e8",
+        "filename": "av1/encoder/rd.c",
+        "patchSetId": 13
+      },
+      "lineNbr": 231,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-12T19:37:07Z",
+      "side": 1,
+      "message": "Nit: Consider guarding `tmp_pred_cost` with `if (cm-\u003eseg.enabled \u0026\u0026 !is_intra_only)` (matching `spatial_pred_cost` at line 220) so inter frames with segmentation disabled skip it too, and guarding the `seg_tmp_pred_cost` accumulation in `encodeframe_utils.c:254` with `cm-\u003efeatures.primary_ref_frame !\u003d PRIMARY_REF_NONE` so intra-only frames with segmentation enabled do not read unpopulated `x-\u003emode_costs.tmp_pred_cost`.",
+      "range": {
+        "startLine": 227,
+        "startChar": 0,
+        "endLine": 231,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "49f1b1bf00fb9fd1a81d95991dd640db10146087",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
