@@ -1,0 +1,94 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "83a6325d_b88ae424",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 15
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-12T21:08:26Z",
+      "side": 1,
+      "message": "Nit: Unlike the preceding CLs in this stack (219188-219203), the commit message is missing the `Benchmarking results` summary block, and does not mention the additional CDEF changes (`cdef_directions_padded_inline` / `cdef_pri_taps_inline`, replacing secondary-tap `mullo_s16` with additions, `filter_block_4x4` `noinline`, and hidden symbol visibility in `cdef_block.h`).",
+      "isAi": true,
+      "revId": "dcc4cb9b4d50a996765804b8a2c3a78676f3317f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "96d79ae0_1130aa74",
+        "filename": "av1/common/cdef_block_simd.h",
+        "patchSetId": 15
+      },
+      "lineNbr": 272,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-12T21:08:26Z",
+      "side": 1,
+      "message": "`cdef_filter_8_{0,1,2}` and `cdef_filter_16_{0,1,2}` (lines 641-765) are split into 6 entry points specifically so `is_lowbd`, `enable_primary`, `enable_secondary`, and `clipping_required` constant-fold at compile time. Marking the shared 12-parameter `filter_block_4x4` `noinline` keeps the `block_width \u003d\u003d 8` prologues compact, but for 4:2:0 content every filtered chroma block has `block_width \u003d\u003d 4` (two calls per 8x8 luma CDEF block): without IPA constant-cloning, each call spills 6 of the 12 arguments to the stack on x86-64 and evaluates `is_lowbd`, `enable_primary`, `enable_secondary`, and `clipping_required` dynamically inside the loop. Was `noinline` measured on 4:2:0 chroma, or would per-variant `noinline` wrappers around an always-inline body (preserving constant folding while keeping `filter_block_4x4` out of the 8x8 fast path) work better?",
+      "range": {
+        "startLine": 265,
+        "startChar": 0,
+        "endLine": 272,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "dcc4cb9b4d50a996765804b8a2c3a78676f3317f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "8ee767bb_6ed3113d",
+        "filename": "av1/encoder/cnn.c",
+        "patchSetId": 15
+      },
+      "lineNbr": 1110,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-12T21:08:26Z",
+      "side": 1,
+      "message": "Nit: Two minor suggestions for `stack_input`: (1) `DECLARE_ALIGNED(32, float, stack_input[kCnnStackInputElems]);` would match `aom_malloc` alignment for the AVX2 256-bit loads in `av1_cnn_predict`; (2) `stack_input` unconditionally reserves ~18.5 KiB on the caller stack across the `av1_cnn_predict` call tree (including when `num_workers \u003c\u003d 1` runs on the host application thread, and even on the `total_elems \u003e kCnnStackInputElems` fallback). If tight host stacks (e.g. 64-128 KiB) are a concern, keeping this scratch buffer alongside `cnn_buffer` in `PartSearchInfo` would avoid both `aom_malloc` and the stack frame growth.",
+      "range": {
+        "startLine": 1105,
+        "startChar": 0,
+        "endLine": 1110,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "dcc4cb9b4d50a996765804b8a2c3a78676f3317f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "84071663_eef0d374",
+        "filename": "av1/encoder/x86/cnn_avx2.c",
+        "patchSetId": 15
+      },
+      "lineNbr": 426,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-12T21:08:26Z",
+      "side": 1,
+      "message": "Line 278 introduces `kMinWidthFor3_5x5BlocksLoad \u003d kMinWidthFor3_5x5Blocks + 2` (`15`) and uses it in the new 4-channel fast path at line 304 because `_mm256_loadu_ps(input_ptr + 7)` reads offsets `+7..+14`. However, this fallback/remainder loop (reached when `out_channels % 4 !\u003d 0`, `channel_step \u003e 1`, or `in_channels !\u003d 1`) still checks `rem_width \u003e\u003d kMinWidthFor3_5x5Blocks` (`13`) before calling `PERFORM_CONVOLVE_FOR_3_5X5_BLOCKS()`, which performs the same `_mm256_loadu_ps(input_ptr + 7)` load and can read 1-2 floats past the end of `input[k]` on the bottom row when `rem_width` is `13` or `14` and `in_stride \u003d\u003d in_width`. Please update line 421 to `rem_width \u003e\u003d kMinWidthFor3_5x5BlocksLoad` as well.",
+      "range": {
+        "startLine": 420,
+        "startChar": 0,
+        "endLine": 426,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "dcc4cb9b4d50a996765804b8a2c3a78676f3317f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
