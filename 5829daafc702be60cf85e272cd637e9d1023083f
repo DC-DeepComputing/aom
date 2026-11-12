@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "a6eab112_3d1b958c",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 5281361
+      },
+      "writtenOn": "2026-11-12T00:06:48Z",
+      "side": 1,
+      "message": "Context on this CL \u0026 the automated code review knowledge base project:\n\n- **What this is:** These Markdown rules are distilled from historical code review comments in this repository to help Google\u0027s automated Gerrit code review agent surface repo-specific invariants, API conventions, and common pitfalls during review.\n- **Opt-in only (no immediate behavior change):** Landing files under `knowledge_base/` does not turn on automated review comments by itself. Rules only take effect for directories whose `DIR_METADATA` opts in via `agentic_review` / `mixins` (and can be scoped by `path_expression` / `content_patterns` or suppressed per directory via `exclude_rules: \"\u003crepo-relative-path\u003e\"`).\n- **Rule format \u0026 frontmatter:** Each rule uses YAML frontmatter (`name`, 1-line `description`, plus informational `rubric` and `severity` tags from extraction) followed by `**Rule.**`, `**Why.**`, and `## Examples`. The review agent uses the 1-line `description` to selectively load only relevant rules into context.\n- **Ownership \u0026 sizing:** These Tier-1 starter rules come from \u003e\u003d2 historical CLs as an initial seed for owners to trim, edit, relocate, or drop as you see fit.\n\n**References:**\n- User guide (Googler-only): http://go/chai-codereview\n- Submitted Chromium base rules: https://chromium.googlesource.com/chromium/src/+/main/agents/knowledge_base/rules/\n- Example team opt-ins / rules: https://crrev.com/c/8691451 (Autofill `DIR_METADATA` mixin), https://crrev.com/c/8641149 (`components/sync`), https://crrev.com/c/8618672 (DevTools `.agents/rules`)",
+      "revId": "5829daafc702be60cf85e272cd637e9d1023083f",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
