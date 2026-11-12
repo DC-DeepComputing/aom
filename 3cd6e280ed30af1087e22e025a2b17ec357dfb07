@@ -17,6 +17,24 @@
       "isAi": true,
       "revId": "3cd6e280ed30af1087e22e025a2b17ec357dfb07",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "c068242c_f4b87995",
+        "filename": "aom_dsp/variance_hwy.h",
+        "patchSetId": 7
+      },
+      "lineNbr": 513,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-12T18:29:12Z",
+      "side": 1,
+      "message": "Done, thanks! Added all the requested assert and static_assert precondition guards and accumulator bound notes.",
+      "parentUuid": "6ced2e4f_5852efcc",
+      "revId": "3cd6e280ed30af1087e22e025a2b17ec357dfb07",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
   ]
 }
