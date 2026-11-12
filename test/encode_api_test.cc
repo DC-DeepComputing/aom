@@ -4691,6 +4691,71 @@ TEST(EncodeAPI, Avg16x16IntegerOverflow) {
 
   EXPECT_EQ(AOM_CODEC_OK, aom_codec_destroy(&enc));
 }
+
+// Reproduces b/584264300: signed integer overflow when computing
+// (9 * avg_64x64) >> 5 in av1_choose_var_based_partitioning().
+TEST(EncodeAPI, Avg64x64IntegerOverflow) {
+  aom_codec_iface_t *const iface = aom_codec_av1_cx();
+  aom_codec_enc_cfg_t cfg;
+  ASSERT_EQ(aom_codec_enc_config_default(iface, &cfg, AOM_USAGE_REALTIME),
+            AOM_CODEC_OK);
+  cfg.g_threads = 8;
+  cfg.g_profile = 2;
+  cfg.g_w = 769;
+  cfg.g_h = 863;
+  cfg.g_bit_depth = AOM_BITS_12;
+  cfg.g_input_bit_depth = 12;
+  cfg.g_timebase.num = 1;
+  cfg.g_timebase.den = 1000 * 1000;
+  cfg.g_pass = AOM_RC_ONE_PASS;
+  cfg.g_lag_in_frames = 0;
+  cfg.rc_end_usage = AOM_VBR;
+  cfg.rc_min_quantizer = 2;
+  cfg.rc_max_quantizer = 58;
+
+  aom_codec_ctx_t enc;
+  ASSERT_EQ(aom_codec_enc_init(&enc, iface, &cfg, AOM_CODEC_USE_HIGHBITDEPTH),
+            AOM_CODEC_OK);
+  ASSERT_EQ(aom_codec_control(&enc, AOME_SET_CPUUSED, 6), AOM_CODEC_OK);
+
+  aom_image_t *const image =
+      aom_img_alloc(nullptr, AOM_IMG_FMT_I42216, cfg.g_w, cfg.g_h, 1);
+  ASSERT_NE(image, nullptr);
+  const uint16_t val = 1 << (cfg.g_bit_depth - 1);
+  for (int plane = 0; plane < 3; ++plane) {
+    const unsigned int plane_h =
+        (plane == 0)
+            ? image->d_h
+            : (image->d_h + image->y_chroma_shift) >> image->y_chroma_shift;
+    const unsigned int plane_w =
+        (plane == 0)
+            ? image->d_w
+            : (image->d_w + image->x_chroma_shift) >> image->x_chroma_shift;
+    for (unsigned int y = 0; y < plane_h; ++y) {
+      uint16_t *row = reinterpret_cast<uint16_t *>(image->planes[plane] +
+                                                   y * image->stride[plane]);
+      std::fill_n(row, plane_w, val);
+    }
+  }
+
+  ASSERT_EQ(aom_codec_encode(&enc, image, 0, 1, AOM_EFLAG_FORCE_KF),
+            AOM_CODEC_OK);
+  aom_codec_iter_t iter = nullptr;
+  const aom_codec_cx_pkt_t *pkt;
+  while ((pkt = aom_codec_get_cx_data(&enc, &iter)) != nullptr) {
+    ASSERT_EQ(pkt->kind, AOM_CODEC_CX_FRAME_PKT);
+  }
+
+  // Flush the encoder.
+  ASSERT_EQ(aom_codec_encode(&enc, nullptr, 0, 0, 0), AOM_CODEC_OK);
+  iter = nullptr;
+  while ((pkt = aom_codec_get_cx_data(&enc, &iter)) != nullptr) {
+    ASSERT_EQ(pkt->kind, AOM_CODEC_CX_FRAME_PKT);
+  }
+
+  aom_img_free(image);
+  ASSERT_EQ(aom_codec_destroy(&enc), AOM_CODEC_OK);
+}
 #endif  // CONFIG_AV1_HIGHBITDEPTH
 
 }  // namespace
