@@ -1,0 +1,112 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "f38d662e_af2cac34",
+        "filename": "aom_dsp/variance_hwy.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 722,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-11-13T00:03:08Z",
+      "side": 1,
+      "message": "nit: Add entry `assert`s for `w` and `h` (matching `obmc_variance_w16n` in `aom_dsp/x86/obmc_variance_avx2.c:96-98`), and document the 15-bit `pre` / `mask` precondition above `WidenMulPairwiseAdd`:\n```cpp\n  assert(w \u003e\u003d kStep);\n  assert(IS_POWER_OF_TWO(w));\n  assert(IS_POWER_OF_TWO(h));\n```",
+      "isAi": true,
+      "revId": "2021ef38afa57d0fb9241bddcc673d504cbc19e4",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "2761fa43_d88d1712",
+        "filename": "aom_dsp/variance_hwy.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 775,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-11-13T00:03:08Z",
+      "side": 1,
+      "message": "nit: For `width \u003d\u003d 8`, you can either delegate to `aom_comp_avg_pred_avx2` (like `CompMaskPred` and `HighbdCompMaskPred` do) or reuse `LoadRowsU\u003c4\u003e(du8_32, ref, ref_stride)` instead of manually combining `ref_0..ref_3`:\n```cpp\n  if (width \u003d\u003d 8) {\n    assert(height % 4 \u003d\u003d 0);\n    constexpr hn::FixedTag\u003cuint8_t, 32\u003e du8_32;\n    do {\n      const auto pred_0123 \u003d hn::LoadU(du8_32, pred);\n      const auto ref_0123 \u003d LoadRowsU\u003c4\u003e(du8_32, ref, ref_stride);\n      hn::StoreU(hn::AverageRound(pred_0123, ref_0123), du8_32, comp_pred);\n```",
+      "range": {
+        "startLine": 757,
+        "startChar": 0,
+        "endLine": 775,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "2021ef38afa57d0fb9241bddcc673d504cbc19e4",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "63d30c5f_cdf5c153",
+        "filename": "aom_dsp/variance_hwy.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 942,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-11-13T00:03:08Z",
+      "side": 1,
+      "message": "nit: Use `const uint16_t *` for `pred` and `ref` (`CONVERT_TO_SHORTPTR` casts away `const`), and `int16_t *` for `comp_pred` to avoid repeating `reinterpret_cast\u003cint16_t *\u003e(comp_pred)` on lines 958 and 971:\n```cpp\n  const uint16_t *pred \u003d CONVERT_TO_SHORTPTR(pred8);\n  const uint16_t *ref \u003d CONVERT_TO_SHORTPTR(ref8);\n  int16_t *comp_pred \u003d\n      reinterpret_cast\u003cint16_t *\u003e(CONVERT_TO_SHORTPTR(comp_pred8));\n```",
+      "range": {
+        "startLine": 940,
+        "startChar": 0,
+        "endLine": 942,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "2021ef38afa57d0fb9241bddcc673d504cbc19e4",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "98878549_48d6415f",
+        "filename": "aom_dsp/variance_hwy.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 1152,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-11-13T00:03:08Z",
+      "side": 1,
+      "message": "nit: Since `FOR_EACH_OBMC_VAR_BLOCK_SIZE` only instantiates `W \u003e\u003d 16` (and calling `_avx2` inside a macro parameterized by `suffix` would recurse if used for `avx2`), replace `HWY_IF_CONSTEXPR((W) \u003e\u003d 16)` and the `_avx2` fallback with a `static_assert`:\n```cpp\n    static_assert((W) \u003e\u003d 16, \"FOBMC_VAR requires W \u003e\u003d 16.\");\n    int sum \u003d 0;\n    HWY_NAMESPACE::ObmcVarianceW16N(pre, pre_stride, wsrc, mask, sse, \u0026sum, W,\n                                    H);\n    return *sse - static_cast\u003cunsigned int\u003e((static_cast\u003cint64_t\u003e(sum) * sum) /\n                                            ((W) * (H)));\n```",
+      "range": {
+        "startLine": 1144,
+        "startChar": 0,
+        "endLine": 1152,
+        "endChar": 9999
+      },
+      "isAi": true,
+      "revId": "2021ef38afa57d0fb9241bddcc673d504cbc19e4",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "2b4a1465_4276da1a",
+        "filename": "test/comp_mask_pred_test.cc",
+        "patchSetId": 8
+      },
+      "lineNbr": 200,
+      "author": {
+        "id": 7060
+      },
+      "writtenOn": "2026-11-13T00:03:08Z",
+      "side": 1,
+      "message": "IMPORTANT: `kCompMaskPredParams` on line 42 is guarded by `#if HAVE_SSSE3 || HAVE_SSE2 || HAVE_AVX2 || HAVE_NEON` (missing `|| HAVE_AVX512`, unlike `kValidBlockSize` on line 210).\n\nAlso, `kCompMaskPredParams` only covers up to `BLOCK_32X32` (since `get_wedge_types_lookup(bsize) \u003d\u003d 0` for `width \u003e 32`), which leaves the `else` (`width \u003e 32`, e.g. `64x64`, `128x128`) branch in `CompMaskPred` (`aom_dsp/variance_hwy.h:886`) and `width \u003e 32` in `HighbdCompMaskPred` (`aom_dsp/variance_hwy.h:964`) untested by `CheckOutput`. Can we cover `width \u003e 32` block sizes (used by `COMPOUND_DISTWTD` / `COMPOUND_DIFFWTD`) with a random mask in `[0, AOM_BLEND_A64_MAX_ALPHA]` when `wedge_types \u003d\u003d 0`?",
+      "isAi": true,
+      "revId": "2021ef38afa57d0fb9241bddcc673d504cbc19e4",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    }
+  ]
+}
