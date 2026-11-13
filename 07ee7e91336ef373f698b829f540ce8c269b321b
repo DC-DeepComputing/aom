@@ -55,6 +55,24 @@
     {
       "unresolved": false,
       "key": {
+        "uuid": "aa5a284e_52f0ae1b",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 31322
+      },
+      "writtenOn": "2026-11-13T06:30:11Z",
+      "side": 1,
+      "message": "Acknowledged",
+      "parentUuid": "bd371867_22a8ae6a",
+      "revId": "07ee7e91336ef373f698b829f540ce8c269b321b",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
         "uuid": "9f771203_b456c38c",
         "filename": "aom_dsp/pyramid.h",
         "patchSetId": 3
@@ -143,6 +161,30 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "cb4cb021_0b5260a6",
+        "filename": "av1/encoder/pyramid_me.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 998,
+      "author": {
+        "id": 31322
+      },
+      "writtenOn": "2026-11-13T06:30:11Z",
+      "side": 1,
+      "message": "We will take care in follow up patch.",
+      "parentUuid": "5ef11d05_3d3fd74b",
+      "range": {
+        "startLine": 989,
+        "startChar": 0,
+        "endLine": 998,
+        "endChar": 9999
+      },
+      "revId": "07ee7e91336ef373f698b829f540ce8c269b321b",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "42d0e482_11f7a534",
@@ -163,6 +205,30 @@
         "endChar": 9999
       },
       "isAi": true,
+      "revId": "07ee7e91336ef373f698b829f540ce8c269b321b",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "993c007b_097e7d74",
+        "filename": "av1/encoder/pyramid_me.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 1125,
+      "author": {
+        "id": 31322
+      },
+      "writtenOn": "2026-11-13T06:30:11Z",
+      "side": 1,
+      "message": "We will take care in follow up patch.",
+      "parentUuid": "42d0e482_11f7a534",
+      "range": {
+        "startLine": 1102,
+        "startChar": 0,
+        "endLine": 1125,
+        "endChar": 9999
+      },
       "revId": "07ee7e91336ef373f698b829f540ce8c269b321b",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
@@ -191,6 +257,30 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "44f925cd_d7f80e29",
+        "filename": "av1/encoder/pyramid_me.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 1141,
+      "author": {
+        "id": 31322
+      },
+      "writtenOn": "2026-11-13T06:30:11Z",
+      "side": 1,
+      "message": "We will take care in follow up patch.",
+      "parentUuid": "6882fdb1_8fcf406b",
+      "range": {
+        "startLine": 1128,
+        "startChar": 0,
+        "endLine": 1141,
+        "endChar": 9999
+      },
+      "revId": "07ee7e91336ef373f698b829f540ce8c269b321b",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "a8f2db96_42b2db0f",
@@ -215,6 +305,30 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "c1f4c312_52f976c7",
+        "filename": "av1/encoder/pyramid_me.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 1802,
+      "author": {
+        "id": 31322
+      },
+      "writtenOn": "2026-11-13T06:30:11Z",
+      "side": 1,
+      "message": "We will take care in follow up patch.",
+      "parentUuid": "a8f2db96_42b2db0f",
+      "range": {
+        "startLine": 1789,
+        "startChar": 0,
+        "endLine": 1802,
+        "endChar": 9999
+      },
+      "revId": "07ee7e91336ef373f698b829f540ce8c269b321b",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "71b06899_7e8b188f",
@@ -235,6 +349,30 @@
         "endChar": 9999
       },
       "isAi": true,
+      "revId": "07ee7e91336ef373f698b829f540ce8c269b321b",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "dca28a5e_e4cde1fb",
+        "filename": "av1/encoder/pyramid_me.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 1868,
+      "author": {
+        "id": 31322
+      },
+      "writtenOn": "2026-11-13T06:30:11Z",
+      "side": 1,
+      "message": "We will take care in follow up patch.",
+      "parentUuid": "71b06899_7e8b188f",
+      "range": {
+        "startLine": 1865,
+        "startChar": 0,
+        "endLine": 1868,
+        "endChar": 9999
+      },
       "revId": "07ee7e91336ef373f698b829f540ce8c269b321b",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
