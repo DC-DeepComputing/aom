@@ -23,6 +23,10 @@
 extern "C" {
 #endif
 
+#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
+#pragma GCC visibility push(hidden)
+#endif
+
 #define MAX_NEIGHBORS 2
 
 enum {
@@ -46,6 +50,10 @@ static inline const SCAN_ORDER *get_default_scan(TX_SIZE tx_size,
 static inline const SCAN_ORDER *get_scan(TX_SIZE tx_size, TX_TYPE tx_type) {
   return get_default_scan(tx_size, tx_type);
 }
+
+#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
+#pragma GCC visibility pop
+#endif
 
 #ifdef __cplusplus
 }  // extern "C"

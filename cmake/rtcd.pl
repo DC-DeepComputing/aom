@@ -252,11 +252,19 @@ print <<EOF;
 extern "C" {
 #endif
 
+#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
+#pragma GCC visibility push(hidden)
+#endif
+
 EOF
 declare_function_pointers("c", @ALL_ARCHS);
 
 print <<EOF;
 void $opts{sym}(void);
+
+#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
+#pragma GCC visibility pop
+#endif
 
 EOF
 }
