@@ -27,6 +27,10 @@
 extern "C" {
 #endif
 
+#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
+#pragma GCC visibility push(hidden)
+#endif
+
 #define COMP_TYPE_RD_THRESH_SCALE 11
 #define COMP_TYPE_RD_THRESH_SHIFT 4
 #define MAX_WINNER_MOTION_MODES 10
@@ -352,6 +356,10 @@ static inline void av1_copy_mbmi_ext_to_mbmi_ext_frame(
   memcpy(mbmi_ext_best->global_mvs, mbmi_ext->global_mvs,
          sizeof(mbmi_ext->global_mvs));
 }
+
+#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
+#pragma GCC visibility pop
+#endif
 
 #ifdef __cplusplus
 }  // extern "C"
