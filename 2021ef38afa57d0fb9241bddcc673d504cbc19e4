@@ -19,6 +19,24 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "8c1baa35_f50df786",
+        "filename": "aom_dsp/variance_hwy.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 722,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-13T01:27:21Z",
+      "side": 1,
+      "message": "Done. Added the entry asserts for w and h and documented the 15-bit pre / mask precondition above WidenMulPairwiseAdd.",
+      "parentUuid": "f38d662e_af2cac34",
+      "revId": "2021ef38afa57d0fb9241bddcc673d504cbc19e4",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "2761fa43_d88d1712",
@@ -39,6 +57,30 @@
         "endChar": 9999
       },
       "isAi": true,
+      "revId": "2021ef38afa57d0fb9241bddcc673d504cbc19e4",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "a600cdf6_67dd6736",
+        "filename": "aom_dsp/variance_hwy.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 775,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-13T01:27:21Z",
+      "side": 1,
+      "message": "Done. Simplified using assert(height % 4 \u003d\u003d 0) and LoadRowsU\u003c4\u003e(du8_32, ref, ref_stride).",
+      "parentUuid": "2761fa43_d88d1712",
+      "range": {
+        "startLine": 757,
+        "startChar": 0,
+        "endLine": 775,
+        "endChar": 9999
+      },
       "revId": "2021ef38afa57d0fb9241bddcc673d504cbc19e4",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
@@ -67,6 +109,30 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "d92c7621_1ffb3b4d",
+        "filename": "aom_dsp/variance_hwy.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 942,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-13T01:27:21Z",
+      "side": 1,
+      "message": "Done. Changed pred and ref to const uint16_t * and comp_pred to int16_t *.",
+      "parentUuid": "63d30c5f_cdf5c153",
+      "range": {
+        "startLine": 940,
+        "startChar": 0,
+        "endLine": 942,
+        "endChar": 9999
+      },
+      "revId": "2021ef38afa57d0fb9241bddcc673d504cbc19e4",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "98878549_48d6415f",
@@ -91,6 +157,30 @@
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     },
     {
+      "unresolved": false,
+      "key": {
+        "uuid": "166314bf_0c7c0afd",
+        "filename": "aom_dsp/variance_hwy.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 1152,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-13T01:27:21Z",
+      "side": 1,
+      "message": "Done. Replaced HWY_IF_CONSTEXPR((W) \u003e\u003d 16) and the _avx2 fallback with static_assert((W) \u003e\u003d 16, ...).",
+      "parentUuid": "98878549_48d6415f",
+      "range": {
+        "startLine": 1144,
+        "startChar": 0,
+        "endLine": 1152,
+        "endChar": 9999
+      },
+      "revId": "2021ef38afa57d0fb9241bddcc673d504cbc19e4",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
       "unresolved": true,
       "key": {
         "uuid": "2b4a1465_4276da1a",
@@ -105,6 +195,24 @@
       "side": 1,
       "message": "IMPORTANT: `kCompMaskPredParams` on line 42 is guarded by `#if HAVE_SSSE3 || HAVE_SSE2 || HAVE_AVX2 || HAVE_NEON` (missing `|| HAVE_AVX512`, unlike `kValidBlockSize` on line 210).\n\nAlso, `kCompMaskPredParams` only covers up to `BLOCK_32X32` (since `get_wedge_types_lookup(bsize) \u003d\u003d 0` for `width \u003e 32`), which leaves the `else` (`width \u003e 32`, e.g. `64x64`, `128x128`) branch in `CompMaskPred` (`aom_dsp/variance_hwy.h:886`) and `width \u003e 32` in `HighbdCompMaskPred` (`aom_dsp/variance_hwy.h:964`) untested by `CheckOutput`. Can we cover `width \u003e 32` block sizes (used by `COMPOUND_DISTWTD` / `COMPOUND_DIFFWTD`) with a random mask in `[0, AOM_BLEND_A64_MAX_ALPHA]` when `wedge_types \u003d\u003d 0`?",
       "isAi": true,
+      "revId": "2021ef38afa57d0fb9241bddcc673d504cbc19e4",
+      "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "11b5ea58_1edbda20",
+        "filename": "test/comp_mask_pred_test.cc",
+        "patchSetId": 8
+      },
+      "lineNbr": 200,
+      "author": {
+        "id": 31132
+      },
+      "writtenOn": "2026-11-13T01:27:21Z",
+      "side": 1,
+      "message": "Done. Added || HAVE_AVX512 to the kCompMaskPredParams guard, extended kCompMaskPredParams to include the 64 and 128 block sizes (16x64 through 128x128), and added random mask testing in [0, AOM_BLEND_A64_MAX_ALPHA] when wedge_types \u003d\u003d 0 in both lowbd and highbd tests.",
+      "parentUuid": "2b4a1465_4276da1a",
       "revId": "2021ef38afa57d0fb9241bddcc673d504cbc19e4",
       "serverId": "e5514cf8-2d6e-3e29-adb4-24cd6dde4bf0"
     }
