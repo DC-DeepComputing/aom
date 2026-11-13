@@ -20,7 +20,7 @@
       },
       "applicabilityExpressionResult": {},
       "submittabilityExpressionResult": {
-        "value": {"expression":{"expressionString":"label:Code-Review=MAX,user=non_uploader AND -label:Code-Review=MIN"},"status":"PASS","errorMessage":{"value":null},"passingAtoms":["label:Code-Review=MAX,user=non_uploader"],"failingAtoms":["label:Code-Review=MIN"],"atomExplanations":{"value":{"label:Code-Review=MAX,user=non_uploader":"","label:Code-Review=MIN":""}}}
+        "value": {"expression":{"expressionString":"label:Code-Review=MAX,user=non_uploader AND -label:Code-Review=MIN"},"status":"FAIL","errorMessage":{"value":null},"passingAtoms":[],"failingAtoms":["label:Code-Review=MAX,user=non_uploader","label:Code-Review=MIN"],"atomExplanations":{"value":{"label:Code-Review=MAX,user=non_uploader":"","label:Code-Review=MIN":""}}}
       },
       "overrideExpressionResult": {
         "value": {"expression":{"expressionString":"label:Bot-Commit=+1 AND -label:Code-Review=MIN"},"status":"FAIL","errorMessage":{"value":null},"passingAtoms":[],"failingAtoms":["label:Bot-Commit=+1","label:Code-Review=MIN"],"atomExplanations":{"value":{"label:Bot-Commit=+1":"","label:Code-Review=MIN":""}}}
@@ -94,7 +94,7 @@
         "value": {"expression":{"expressionString":"is:review-enforced_gerrit"},"status":"PASS","errorMessage":{"value":null},"passingAtoms":["is:review-enforced_gerrit"],"failingAtoms":[],"atomExplanations":{"value":{"is:review-enforced_gerrit":""}}}
       },
       "submittabilityExpressionResult": {
-        "value": {"expression":{"expressionString":"is:review-enforcement-satisfied_gerrit"},"status":"PASS","errorMessage":{"value":null},"passingAtoms":["is:review-enforcement-satisfied_gerrit"],"failingAtoms":[],"atomExplanations":{"value":{"is:review-enforcement-satisfied_gerrit":"Required approval count satisfied"}}}
+        "value": {"expression":{"expressionString":"is:review-enforcement-satisfied_gerrit"},"status":"FAIL","errorMessage":{"value":null},"passingAtoms":[],"failingAtoms":["is:review-enforcement-satisfied_gerrit"],"atomExplanations":{"value":{"is:review-enforcement-satisfied_gerrit":"No approvals present"}}}
       },
       "overrideExpressionResult": {
         "value": {"expression":{"expressionString":"NOT label:Code-Review<0 AND is:auto-approval-override-enabled_gerrit"},"status":"FAIL","errorMessage":{"value":null},"passingAtoms":[],"failingAtoms":["is:auto-approval-override-enabled_gerrit","label:Code-Review<0"],"atomExplanations":{"value":{"is:auto-approval-override-enabled_gerrit":"","label:Code-Review<0":""}}}
@@ -156,7 +156,7 @@
       },
       "applicabilityExpressionResult": {},
       "submittabilityExpressionResult": {
-        "value": {"expression":{"expressionString":"label:Verified=MAX AND -label:Verified=MIN"},"status":"PASS","errorMessage":{"value":null},"passingAtoms":["label:Verified=MAX"],"failingAtoms":["label:Verified=MIN"],"atomExplanations":{"value":{"label:Verified=MAX":"","label:Verified=MIN":""}}}
+        "value": {"expression":{"expressionString":"label:Verified=MAX AND -label:Verified=MIN"},"status":"FAIL","errorMessage":{"value":null},"passingAtoms":[],"failingAtoms":["label:Verified=MAX","label:Verified=MIN"],"atomExplanations":{"value":{"label:Verified=MAX":"","label:Verified=MIN":""}}}
       },
       "overrideExpressionResult": {
         "value": {"expression":{"expressionString":"label:Bot-Commit=+1"},"status":"FAIL","errorMessage":{"value":null},"passingAtoms":[],"failingAtoms":["label:Bot-Commit=+1"],"atomExplanations":{"value":{"label:Bot-Commit=+1":""}}}
